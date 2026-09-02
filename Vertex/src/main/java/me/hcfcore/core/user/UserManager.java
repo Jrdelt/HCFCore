@@ -3,6 +3,7 @@ package me.hcfcore.core.user;
 import me.hcfcore.core.storage.Storage;
 import org.bukkit.plugin.Plugin;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,7 +25,13 @@ public final class UserManager {
      */
     public void load(UUID uuid) {
         try {
-            Map<String, Long> cooldowns = storage.loadCooldowns(uuid);
+            Map<String, Long> cooldowns = new HashMap<>(storage.loadCooldowns(uuid));
+            // Ability cooldowns live in their own table but share this same
+            // map at runtime, namespaced so they can't collide with a kit
+            // name -- see AbilityManager.
+            for (Map.Entry<String, Long> entry : storage.loadAbilityCooldowns(uuid).entrySet()) {
+                cooldowns.put("ability:" + entry.getKey(), entry.getValue());
+            }
             users.put(uuid, new User(uuid, cooldowns));
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to load user data for " + uuid, e);

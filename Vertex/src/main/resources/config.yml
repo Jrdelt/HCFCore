@@ -24,3 +24,8 @@ pvp:
 
 kits:
   default-cooldown-seconds: 300
+
+abilities:
+  global-cooldown-seconds: 3
+  disabled-regions:
+    - spawn

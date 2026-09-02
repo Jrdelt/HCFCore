@@ -1,0 +1,69 @@
+abilities:
+  anti-blockup-bone:
+    material: BONE
+    name: '&fAnti-Blockup Bone'
+    lore:
+      - '&7Hit an enemy with this to stop'
+      - '&7them from placing blocks for'
+      - '&7a short time.'
+    cooldown-seconds: 60
+
+  fake-pearl:
+    material: ENDER_PEARL
+    name: '&fFake Pearl'
+    lore:
+      - '&7Throws a pearl that looks real'
+      - '&7but never actually teleports'
+      - '&7you -- bait your enemy.'
+    cooldown-seconds: 30
+
+  grappling-hook:
+    material: FISHING_ROD
+    name: '&fGrappling Hook'
+    lore:
+      - '&7Hook a block or player and'
+      - '&7reel yourself toward it.'
+    cooldown-seconds: 20
+
+  leap:
+    material: FIREWORK_ROCKET
+    name: '&fLeap'
+    lore:
+      - '&7Launches you forward and'
+      - '&7slightly upward.'
+    cooldown-seconds: 45
+
+  portable-bard:
+    material: NOTE_BLOCK
+    name: '&fPortable Bard'
+    lore:
+      - '&7Right-click to choose a buff'
+      - '&7(Strength, Speed, or Regen) and'
+      - '&7share it with your whole faction.'
+    cooldown-seconds: 300
+
+  repair:
+    material: ANVIL
+    name: '&fRepair'
+    lore:
+      - '&7Grants temporary access to'
+      - '&7repair your gear, with a'
+      - '&7countdown on your scoreboard.'
+    cooldown-seconds: 600
+
+  switcher-snowball:
+    material: SNOWBALL
+    name: '&fSwitcher Snowball'
+    lore:
+      - '&7Throw at an enemy to swap'
+      - '&7places with them.'
+    cooldown-seconds: 30
+
+  time-warp-pearl:
+    material: ENDER_EYE
+    name: '&fTime Warp Pearl'
+    lore:
+      - '&7Teleports you back to the last'
+      - '&7place you actually ender'
+      - '&7pearled from.'
+    cooldown-seconds: 30

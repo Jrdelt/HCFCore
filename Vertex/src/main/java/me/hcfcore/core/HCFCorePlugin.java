@@ -1,9 +1,14 @@
 package me.hcfcore.core;
 
+import me.hcfcore.core.ability.AbilitiesCommand;
+import me.hcfcore.core.ability.AbilityManager;
+import me.hcfcore.core.ability.AbilityMenuListener;
+import me.hcfcore.core.ability.GetItemCommand;
 import me.hcfcore.core.kit.KitCommand;
 import me.hcfcore.core.kit.KitManager;
 import me.hcfcore.core.kit.KitMenuListener;
 import me.hcfcore.core.kit.KitsCommand;
+import me.hcfcore.core.listener.AbilityUseListener;
 import me.hcfcore.core.listener.CombatListener;
 import me.hcfcore.core.listener.PlayerConnectionListener;
 import me.hcfcore.core.pvp.CombatCheckCommand;
@@ -26,6 +31,7 @@ public final class HCFCorePlugin extends JavaPlugin {
     private Storage storage;
     private UserManager userManager;
     private KitManager kitManager;
+    private AbilityManager abilityManager;
     private ScoreboardManager scoreboardManager;
     private CombatManager combatManager;
 
@@ -49,6 +55,8 @@ public final class HCFCorePlugin extends JavaPlugin {
         userManager = new UserManager(this, storage);
         kitManager = new KitManager(this, storage, userManager);
         kitManager.load();
+        abilityManager = new AbilityManager(this, storage);
+        abilityManager.load();
 
         scoreboardManager = new ScoreboardManager(this, getConfig());
         scoreboardManager.start();
@@ -63,6 +71,8 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new CombatListener(combatManager), this);
         Bukkit.getPluginManager().registerEvents(
                 new PlayerConnectionListener(userManager, scoreboardManager, combatManager), this);
+        Bukkit.getPluginManager().registerEvents(new AbilityUseListener(this, abilityManager, userManager), this);
+        Bukkit.getPluginManager().registerEvents(new AbilityMenuListener(this, abilityManager), this);
 
         KitCommand kitCommand = new KitCommand(kitManager);
         getCommand("kit").setExecutor(kitCommand);
@@ -83,6 +93,11 @@ public final class HCFCorePlugin extends JavaPlugin {
         CombatTagCommand combatTagCommand = new CombatTagCommand(combatManager);
         getCommand("combattag").setExecutor(combatTagCommand);
         getCommand("combattag").setTabCompleter(combatTagCommand);
+
+        GetItemCommand getItemCommand = new GetItemCommand(abilityManager);
+        getCommand("getitem").setExecutor(getItemCommand);
+        getCommand("getitem").setTabCompleter(getItemCommand);
+        getCommand("abilities").setExecutor(new AbilitiesCommand(this, abilityManager));
 
         for (var player : Bukkit.getOnlinePlayers()) {
             var uuid = player.getUniqueId();
@@ -110,6 +125,7 @@ public final class HCFCorePlugin extends JavaPlugin {
     public void reload() {
         reloadConfig();
         kitManager.load();
+        abilityManager.load();
         if (scoreboardManager != null) {
             scoreboardManager.stop();
         }

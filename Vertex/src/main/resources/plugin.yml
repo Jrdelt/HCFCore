@@ -10,6 +10,7 @@ depend:
 
 softdepend:
   - Vault
+  - WorldGuard
 
 commands:
   kit:
@@ -30,6 +31,12 @@ commands:
   combattag:
     description: Force a player into combat, for testing.
     usage: /<command> <player> [opponent|server]
+  getitem:
+    description: Give a player an ability item, ignoring cooldowns.
+    usage: /<command> <username> <ability> [amount]
+  abilities:
+    description: Browse abilities in a GUI.
+    usage: /<command>
 
 permissions:
   hcfcore.admin:
@@ -55,4 +62,7 @@ permissions:
     default: op
   hcfcore.combat.tag:
     description: Force a player into combat, for testing.
+    default: op
+  hcfcore.ability.give:
+    description: Give ability items via /getitem or the /abilities GUI.
     default: op

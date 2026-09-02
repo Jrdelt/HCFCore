@@ -389,6 +389,15 @@ class KitManagerTest {
         }
 
         @Override
+        public Map<String, Long> loadAbilityCooldowns(UUID uuid) {
+            return Map.of();
+        }
+
+        @Override
+        public void saveAbilityCooldown(UUID uuid, String abilityId, long availableAt) {
+        }
+
+        @Override
         public void close() {
         }
     }

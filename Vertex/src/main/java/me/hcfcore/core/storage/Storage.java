@@ -12,5 +12,9 @@ public interface Storage {
 
     void saveCooldown(UUID uuid, String kitName, long availableAt) throws SQLException;
 
+    Map<String, Long> loadAbilityCooldowns(UUID uuid) throws SQLException;
+
+    void saveAbilityCooldown(UUID uuid, String abilityId, long availableAt) throws SQLException;
+
     void close();
 }

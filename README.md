@@ -14,6 +14,8 @@ placeholders).
 - **Vault** — optional; only needed if any kit sets a `cost.money` price.
   Softdepended, so it loads first if present. Without it, kits with a
   money cost can't be claimed (item-only or free kits are unaffected).
+- **WorldGuard** — optional; only needed to enforce `abilities.disabled-regions`.
+  Softdepended. Without it, abilities can be used anywhere.
 
 ## Installation
 
@@ -68,6 +70,11 @@ pvp:
 
 kits:
   default-cooldown-seconds: 300
+
+abilities:
+  global-cooldown-seconds: 3
+  disabled-regions:
+    - spawn
 ```
 
 - `scoreboard.lines` supports `{online}`, `{faction}`, `{faction_role}` and
@@ -78,6 +85,13 @@ kits:
   default for a PvP-responsive feel.
 - `pvp.logout-penalty`: if true, disconnecting while tagged is treated as a
   combat logout (see `PlayerConnectionListener`).
+- `abilities.global-cooldown-seconds` is a shared cooldown across *all*
+  ability items — using any one of them starts it, blocking every other
+  ability until it expires, independent of each item's own cooldown.
+- `abilities.disabled-regions` is a list of WorldGuard region ids (not
+  world names) where ability items refuse to activate — checked at the
+  player's location, across any world, so a region called `spawn` blocks
+  abilities inside it wherever it's defined.
 
 The database, scoreboard lines, and kit cooldown default all take effect
 immediately on `/hcfcore reload`.
@@ -120,6 +134,38 @@ kits:
 
 Reloaded along with everything else on `/hcfcore reload`.
 
+## Abilities (`abilities.yml`)
+
+Eight PvP ability items ship pre-registered (`anti-blockup-bone`,
+`fake-pearl`, `grappling-hook`, `leap`, `portable-bard`, `repair`,
+`switcher-snowball`, `time-warp-pearl`), each just a config-defined item
+right now:
+
+```yaml
+abilities:
+  grappling-hook:
+    material: FISHING_ROD
+    name: '&fGrappling Hook'
+    lore:
+      - '&7Hook a block or player and'
+      - '&7reel yourself toward it.'
+    cooldown-seconds: 20
+```
+
+- `material` / `name` / `lore` — fully configurable per ability; `name`
+  and each `lore` line accept legacy `&` color codes.
+- `cooldown-seconds` — per-item cooldown, persisted to MySQL (its own
+  `ability_cooldowns` table, separate from kit cooldowns) so it survives a
+  restart.
+- **Right-clicking any ability item currently just checks cooldowns and
+  the disabled-region list, then replies "isn't implemented yet."** The
+  actual gameplay behavior for all eight (grapple physics, the fake pearl,
+  switcher-snowball's teleport swap, etc.) is a deliberately separate,
+  not-yet-built piece of work — this is the item/cooldown/permission/
+  region framework it all plugs into.
+
+Reloaded along with everything else on `/hcfcore reload`.
+
 ## Commands & Permissions
 
 ### Kits
@@ -130,6 +176,13 @@ Reloaded along with everything else on `/hcfcore reload`.
 | `/kit save <name> [permission] [cooldownSeconds] [cost] [costItem[:amount]]` | `hcfcore.kit.save` | Saves your current inventory as a kit. `costItem` is a Material name, e.g. `DIAMOND:2`; amount defaults to 1. |
 | `/kit delete <name>` | `hcfcore.kit.delete` | Deletes a kit. |
 | `/kits` | *(none — open to all players)* | Opens a GUI of every kit you can see. **Left-click** claims it, **right-click** previews its contents read-only. |
+
+### Abilities
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/getitem <username> <ability> [amount]` | `hcfcore.ability.give` | Gives a player ability items directly, ignoring cooldowns. |
+| `/abilities` | *(none — open to all players)* | Opens a GUI listing every ability's name/lore. A viewer with `hcfcore.ability.give` who clicks one receives a copy; everyone else's click just closes/does nothing. |
 
 ### Combat
 
@@ -155,8 +208,9 @@ already warm the instant a tag starts.
 
 ## Tab-completion
 
-Every command above (`kit`, `kits`, `hcfcore`, `uncombat`, `combatcheck`,
-`combattag`) registers its own `TabCompleter`, so suggestions should appear
+Every command above (`kit`, `kits`, `hcfcore`, `getitem`, `abilities`,
+`uncombat`, `combatcheck`, `combattag`) registers its own `TabCompleter` (except
+`abilities`, which takes no arguments), so suggestions should appear
 as soon as the freshly built jar is running on the server. If they don't
 show up in-game:
 
@@ -186,3 +240,15 @@ show up in-game:
 - `CombatManager.SERVER_UUID` (`new UUID(0, 0)`) is a reserved sentinel
   opponent id used only by `/combattag ... server` — never a real player's
   UUID, so it can't collide.
+- `AbilityUseListener` (right-click activation) is the seam future
+  ability-specific behavior plugs into — it already does the real
+  cooldown/global-cooldown/region checks via `AbilityManager` and
+  `WorldGuardHook`, then sends a placeholder message. A throw- or
+  hit-triggered ability (`switcher-snowball`, `anti-blockup-bone`) will
+  need its own listener calling those same `AbilityManager`/`WorldGuardHook`
+  methods rather than going through `PlayerInteractEvent`.
+- `EconomyHook` and `WorldGuardHook` (Vault and WorldGuard are both
+  softdepends) share one shape with the FactionsUUID-specific
+  `FactionsHook`: a static, stateless wrapper that checks the target
+  plugin is actually enabled before touching any of its classes, so
+  HCFCore runs fine without them installed.
