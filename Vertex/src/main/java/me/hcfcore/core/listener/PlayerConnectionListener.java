@@ -48,6 +48,7 @@ public final class PlayerConnectionListener implements Listener {
         }
 
         combatManager.clear(player.getUniqueId());
+        combatManager.forgetPlayer(player.getUniqueId());
         scoreboardManager.remove(player.getUniqueId());
         userManager.unload(player.getUniqueId());
     }

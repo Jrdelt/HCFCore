@@ -99,6 +99,51 @@ class CombatManagerTest {
     }
 
     @Test
+    void getCpsIsZeroForAPlayerWhoHasNeverClicked() {
+        UUID randomId = UUID.randomUUID();
+
+        assertEquals(0, combatManager.getCps(randomId));
+    }
+
+    @Test
+    void getCpsCountsClicksWithinTheLastSecond() {
+        PlayerMock alice = server.addPlayer("Alice");
+
+        combatManager.recordClick(alice.getUniqueId());
+        combatManager.recordClick(alice.getUniqueId());
+        combatManager.recordClick(alice.getUniqueId());
+
+        assertEquals(3, combatManager.getCps(alice.getUniqueId()));
+    }
+
+    @Test
+    void getCpsDropsClicksOlderThanOneSecond() throws InterruptedException {
+        PlayerMock alice = server.addPlayer("Alice");
+
+        combatManager.recordClick(alice.getUniqueId());
+        Thread.sleep(1_100);
+        combatManager.recordClick(alice.getUniqueId());
+
+        assertEquals(1, combatManager.getCps(alice.getUniqueId()),
+                "the first click is over a second old and should have aged out");
+    }
+
+    @Test
+    void forgetPlayerDropsClickHistoryButNotAViaClear() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerMock bob = server.addPlayer("Bob");
+        combatManager.tag(alice, bob);
+        combatManager.recordClick(alice.getUniqueId());
+
+        // clear() is combat-tag state only -- click history must survive it.
+        combatManager.clear(alice.getUniqueId());
+        assertEquals(1, combatManager.getCps(alice.getUniqueId()));
+
+        combatManager.forgetPlayer(alice.getUniqueId());
+        assertEquals(0, combatManager.getCps(alice.getUniqueId()));
+    }
+
+    @Test
     void reconfigureAppliesNewSettingsToFutureTagsWithoutNeedingARestart() {
         PlayerMock alice = server.addPlayer("Alice");
         PlayerMock bob = server.addPlayer("Bob");

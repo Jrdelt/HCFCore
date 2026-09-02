@@ -10,11 +10,13 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * Ephemeral combat-tag tracking. No DB round-trip: tags don't need to
@@ -33,6 +35,7 @@ public final class CombatManager {
     private volatile long updateIntervalTicks;
     private final Map<UUID, Long> taggedUntil = new ConcurrentHashMap<>();
     private final Map<UUID, UUID> opponents = new ConcurrentHashMap<>();
+    private final Map<UUID, Deque<Long>> clickTimestamps = new ConcurrentHashMap<>();
     private BukkitTask task;
 
     public CombatManager(Plugin plugin, int combatSeconds, boolean logoutPenalty, int updateIntervalTicks) {
@@ -121,6 +124,46 @@ public final class CombatManager {
         }
     }
 
+    /**
+     * Records a left-click arm swing for CPS tracking. Tracked for every
+     * online player unconditionally (not just tagged ones) so the action
+     * bar has real recent history the instant a tag starts, not a cold 0.
+     */
+    public void recordClick(UUID uuid) {
+        long now = System.currentTimeMillis();
+        Deque<Long> timestamps = clickTimestamps.computeIfAbsent(uuid, id -> new ConcurrentLinkedDeque<>());
+        timestamps.addLast(now);
+        pruneClicks(timestamps, now);
+    }
+
+    /**
+     * Clicks in roughly the last second -- i.e. CPS.
+     */
+    public int getCps(UUID uuid) {
+        Deque<Long> timestamps = clickTimestamps.get(uuid);
+        if (timestamps == null) {
+            return 0;
+        }
+        pruneClicks(timestamps, System.currentTimeMillis());
+        return timestamps.size();
+    }
+
+    /**
+     * Drops all click history for a player. Only call this on disconnect --
+     * unlike clear(), this is not part of combat-tag state, so /uncombat
+     * must never touch it.
+     */
+    public void forgetPlayer(UUID uuid) {
+        clickTimestamps.remove(uuid);
+    }
+
+    private static void pruneClicks(Deque<Long> timestamps, long now) {
+        Long oldest;
+        while ((oldest = timestamps.peekFirst()) != null && now - oldest > 1000L) {
+            timestamps.pollFirst();
+        }
+    }
+
     public long remainingMillis(UUID uuid) {
         Long until = taggedUntil.get(uuid);
         if (until == null) {
@@ -162,34 +205,40 @@ public final class CombatManager {
         TextColor timeColor = gradient(1 - timeFraction);
 
         Component result = Component.text("⚔ ", NamedTextColor.DARK_RED)
-                .append(Component.text(remainingSeconds + "s", timeColor, TextDecoration.BOLD));
+                .append(Component.text("Combat: ", NamedTextColor.RED));
 
         UUID opponentId = opponents.get(player.getUniqueId());
+        boolean realOpponent = false;
         if (SERVER_UUID.equals(opponentId)) {
-            result = result
-                    .append(Component.text("  |  ", NamedTextColor.DARK_GRAY))
-                    .append(Component.text("Server", NamedTextColor.WHITE, TextDecoration.ITALIC));
-            return result;
+            result = result.append(Component.text("Server  ", NamedTextColor.WHITE, TextDecoration.ITALIC));
+        } else {
+            Player opponent = opponentId == null ? null : Bukkit.getPlayer(opponentId);
+            if (opponent != null && opponent.isOnline()) {
+                realOpponent = true;
+                double health = Math.max(0, opponent.getHealth());
+                var maxHealthAttribute = opponent.getAttribute(Attribute.MAX_HEALTH);
+                double maxHealth = Math.max(1, maxHealthAttribute == null ? 20.0 : maxHealthAttribute.getValue());
+                TextColor healthColor = gradient(clamp01(health / maxHealth));
+
+                result = result
+                        .append(Component.text(opponent.getName() + " ", NamedTextColor.WHITE))
+                        .append(Component.text(String.format(Locale.ROOT, "%.0f", health) + "❤  ", healthColor));
+            }
         }
 
-        Player opponent = opponentId == null ? null : Bukkit.getPlayer(opponentId);
-        if (opponent != null && opponent.isOnline()) {
-            double health = Math.max(0, opponent.getHealth());
-            var maxHealthAttribute = opponent.getAttribute(Attribute.MAX_HEALTH);
-            double maxHealth = Math.max(1, maxHealthAttribute == null ? 20.0 : maxHealthAttribute.getValue());
-            TextColor healthColor = gradient(clamp01(health / maxHealth));
-            TextColor pingColor = pingColor(opponent.getPing());
+        result = result.append(Component.text(remainingSeconds + "s", timeColor, TextDecoration.BOLD));
 
+        result = result
+                .append(Component.text("  You ", NamedTextColor.GREEN))
+                .append(Component.text(getCps(player.getUniqueId()), NamedTextColor.WHITE));
+
+        if (realOpponent) {
             result = result
-                    .append(Component.text("  |  ", NamedTextColor.DARK_GRAY))
-                    .append(Component.text(opponent.getName(), NamedTextColor.WHITE))
-                    .append(Component.text("  ❤ ", NamedTextColor.GRAY))
-                    .append(Component.text(String.format(Locale.ROOT, "%.1f", health), healthColor))
-                    .append(Component.text("  ⚡ ", NamedTextColor.GRAY))
-                    .append(Component.text(opponent.getPing() + "ms", pingColor));
+                    .append(Component.text("  Them ", NamedTextColor.RED))
+                    .append(Component.text(getCps(opponentId), NamedTextColor.WHITE));
         }
 
-        return result;
+        return result.append(Component.text(" ⚔", NamedTextColor.DARK_RED));
     }
 
     private static TextColor gradient(double greenFraction) {
@@ -197,16 +246,6 @@ public final class CombatManager {
         int red = (int) Math.round(255 * (1 - t));
         int green = (int) Math.round(255 * t);
         return TextColor.color(red, green, 0);
-    }
-
-    private static TextColor pingColor(int ping) {
-        if (ping <= 100) {
-            return NamedTextColor.GREEN;
-        }
-        if (ping <= 200) {
-            return NamedTextColor.YELLOW;
-        }
-        return NamedTextColor.RED;
     }
 
     private static double clamp01(double value) {

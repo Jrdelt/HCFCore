@@ -74,7 +74,7 @@ kits:
   legacy `&` color codes. There's no live-edit command yet — edit the file
   and run `/hcfcore reload`.
 - `pvp.actionbar-update-interval-ticks` controls how often the combat
-  action bar (name/timer/health/ping) refreshes — 4 ticks (~5/sec) by
+  action bar (name/timer/health/CPS) refreshes — 4 ticks (~5/sec) by
   default for a PvP-responsive feel.
 - `pvp.logout-penalty`: if true, disconnecting while tagged is treated as a
   combat logout (see `PlayerConnectionListener`).
@@ -139,10 +139,13 @@ Reloaded along with everything else on `/hcfcore reload`.
 | `/combatcheck <player>` | `hcfcore.combat.check` | Reports tagged status, time left, and (if tagged) the opponent's name, health, and ping. |
 | `/combattag <player> [opponent\|server]` | `hcfcore.combat.tag` | Testing tool. With no second argument (or `server`), tags the target against a synthetic **"Server"** opponent — lets one admin alone see the action bar without a second player online. With a real opponent name, tags both players against each other. |
 
-While tagged, both players see an action bar: `⚔ {time}s  |  {opponent}  ❤ {health}  ⚡ {ping}ms`
-(the opponent segment just reads `Server` with no health/ping when tagged
-via `/combattag <you> server`). The timer color gradients from red to green
-as it counts down.
+While tagged, both players see an action bar:
+`⚔ Combat: {opponent} {health}❤  {time}s  You {yourCps}  Them {theirCps} ⚔`
+(the opponent segment just reads `Server`, with no health or "Them" CPS,
+when tagged via `/combattag <you> server`). The timer and health both
+gradient from red to green. CPS (clicks per second) is tracked from arm
+swings for every online player, not just tagged ones, so the count is
+already warm the instant a tag starts.
 
 ### Admin / reload
 
