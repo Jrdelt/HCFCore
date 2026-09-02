@@ -1,10 +1,13 @@
 package me.hcfcore.core.kit;
 
+import me.hcfcore.core.economy.EconomyHook;
 import me.hcfcore.core.storage.Storage;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.milkbowl.vault.economy.Economy;
+import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -67,8 +70,39 @@ public final class KitManager {
             int cooldown = section.getInt("cooldown-seconds", 0);
             ItemStack[] armor = readItems(section, "armor");
             ItemStack[] contents = readItems(section, "contents");
-            kits.put(name.toLowerCase(Locale.ROOT), new Kit(name, permission, cooldown, armor, contents));
+            Kit.Cost cost = readCost(section.getConfigurationSection("cost"));
+            kits.put(name.toLowerCase(Locale.ROOT), new Kit(name, permission, cooldown, armor, contents, cost));
         }
+    }
+
+    private Kit.Cost readCost(ConfigurationSection section) {
+        if (section == null) {
+            return Kit.Cost.NONE;
+        }
+        double money = section.getDouble("money", 0.0);
+        Material itemType = null;
+        String itemName = section.getString("item");
+        if (itemName != null && !itemName.isEmpty()) {
+            try {
+                itemType = Material.valueOf(itemName.toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                plugin.getLogger().log(Level.WARNING, "Unknown cost item material '" + itemName + "' in kits.yml", e);
+            }
+        }
+        int itemAmount = section.getInt("item-amount", 1);
+        return new Kit.Cost(money, itemType, itemType == null ? 0 : itemAmount);
+    }
+
+    static String formatMaterial(Material material) {
+        String[] words = material.name().split("_");
+        StringBuilder result = new StringBuilder();
+        for (String word : words) {
+            if (result.length() > 0) {
+                result.append(' ');
+            }
+            result.append(word.charAt(0)).append(word.substring(1).toLowerCase(Locale.ROOT));
+        }
+        return result.toString();
     }
 
     private ItemStack[] readItems(ConfigurationSection section, String path) {
@@ -109,6 +143,37 @@ public final class KitManager {
         }
 
         PlayerInventory inventory = player.getInventory();
+        Kit.Cost cost = kit.getCost();
+        boolean bypassCost = player.hasPermission("hcfcore.kit.bypasscost");
+
+        // Check the side-effect-free item cost first, so a failed money
+        // check below never leaves us having already removed items.
+        if (!bypassCost && cost.hasItemCost() && !inventory.containsAtLeast(new ItemStack(cost.itemType()), cost.itemAmount())) {
+            player.sendMessage(Component.text(
+                    "You need " + cost.itemAmount() + "x " + formatMaterial(cost.itemType()) + " to claim this kit.",
+                    NamedTextColor.RED));
+            return;
+        }
+
+        if (!bypassCost && cost.hasMoneyCost()) {
+            Economy economy = EconomyHook.getEconomy();
+            if (economy == null) {
+                player.sendMessage(Component.text(
+                        "This kit costs money, but no economy plugin is installed. Contact staff.", NamedTextColor.RED));
+                return;
+            }
+            if (!economy.has(player, cost.money())) {
+                player.sendMessage(Component.text(
+                        "You need " + EconomyHook.format(cost.money()) + " to claim this kit.", NamedTextColor.RED));
+                return;
+            }
+            economy.withdrawPlayer(player, cost.money());
+        }
+
+        if (!bypassCost && cost.hasItemCost()) {
+            inventory.removeItem(new ItemStack(cost.itemType(), cost.itemAmount()));
+        }
+
         inventory.setArmorContents(kit.getArmor());
         for (ItemStack item : kit.getContents()) {
             if (item != null) {
@@ -132,9 +197,9 @@ public final class KitManager {
         }
     }
 
-    public void save(String name, Player player, String permission, int cooldownSeconds) {
+    public void save(String name, Player player, String permission, int cooldownSeconds, Kit.Cost cost) {
         PlayerInventory inventory = player.getInventory();
-        Kit kit = new Kit(name, permission, cooldownSeconds, inventory.getArmorContents(), inventory.getContents());
+        Kit kit = new Kit(name, permission, cooldownSeconds, inventory.getArmorContents(), inventory.getContents(), cost);
         kits.put(name.toLowerCase(Locale.ROOT), kit);
         persistAsync();
     }
@@ -164,6 +229,12 @@ public final class KitManager {
                 String path = "kits." + kit.getName();
                 config.set(path + ".permission", kit.getPermission());
                 config.set(path + ".cooldown-seconds", kit.getCooldownSeconds());
+                Kit.Cost cost = kit.getCost();
+                config.set(path + ".cost.money", cost.money());
+                if (cost.itemType() != null) {
+                    config.set(path + ".cost.item", cost.itemType().name());
+                    config.set(path + ".cost.item-amount", cost.itemAmount());
+                }
                 config.set(path + ".armor", Arrays.asList(kit.getArmor()));
                 config.set(path + ".contents", Arrays.asList(kit.getContents()));
             }

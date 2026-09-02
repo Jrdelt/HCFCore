@@ -8,6 +8,9 @@ description: Kits, sidebar scoreboard, and PvP combat-tag timers, integrated wit
 depend:
   - FactionsUUID
 
+softdepend:
+  - Vault
+
 commands:
   kit:
     description: Apply or manage kits.
@@ -40,6 +43,9 @@ permissions:
     default: op
   hcfcore.kit.bypasscooldown:
     description: Bypass kit cooldowns.
+    default: op
+  hcfcore.kit.bypasscost:
+    description: Bypass kit costs (money and item).
     default: op
   hcfcore.combat.uncombat:
     description: Clear another player's combat tag.

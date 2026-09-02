@@ -1,9 +1,11 @@
 package me.hcfcore.core.kit;
 
+import me.hcfcore.core.economy.EconomyHook;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -39,6 +41,8 @@ public final class KitsMenu {
         NamespacedKey kitIdKey = new NamespacedKey(plugin, KIT_ID_KEY);
         User user = userManager.get(player.getUniqueId());
         long now = System.currentTimeMillis();
+        Economy economy = EconomyHook.getEconomy();
+        boolean bypassCost = player.hasPermission("hcfcore.kit.bypasscost");
 
         int slot = 0;
         for (Kit kit : kits) {
@@ -60,6 +64,19 @@ public final class KitsMenu {
                 lore.add(Component.text("Cooldown: " + remaining + "s", NamedTextColor.RED));
             } else {
                 lore.add(Component.text("Ready to claim.", NamedTextColor.GREEN));
+            }
+
+            Kit.Cost cost = kit.getCost();
+            if (cost.hasMoneyCost()) {
+                boolean canAfford = bypassCost || (economy != null && economy.has(player, cost.money()));
+                lore.add(Component.text("Cost: " + EconomyHook.format(cost.money()),
+                        canAfford ? NamedTextColor.GREEN : NamedTextColor.RED));
+            }
+            if (cost.hasItemCost()) {
+                boolean canAfford = bypassCost
+                        || player.getInventory().containsAtLeast(new ItemStack(cost.itemType()), cost.itemAmount());
+                lore.add(Component.text("Cost: " + cost.itemAmount() + "x " + KitManager.formatMaterial(cost.itemType()),
+                        canAfford ? NamedTextColor.GREEN : NamedTextColor.RED));
             }
             lore.add(Component.empty());
             lore.add(Component.text("Left-click to claim.", NamedTextColor.GRAY));

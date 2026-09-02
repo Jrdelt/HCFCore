@@ -11,6 +11,9 @@ placeholders).
 - **FactionsUUID** (`dev.kitteh:factions`) — hard dependency, must be
   installed and enabled first.
 - **MySQL** 5.7+ / 8.x reachable from the server.
+- **Vault** — optional; only needed if any kit sets a `cost.money` price.
+  Softdepended, so it loads first if present. Without it, kits with a
+  money cost can't be claimed (item-only or free kits are unaffected).
 
 ## Installation
 
@@ -79,14 +82,52 @@ kits:
 The database, scoreboard lines, and kit cooldown default all take effect
 immediately on `/hcfcore reload`.
 
+## Kits (`kits.yml`)
+
+Each kit is a top-level key with its own permission, cooldown, optional
+cost, and contents:
+
+```yaml
+kits:
+  fighter:
+    permission: hcfcore.kit.fighter
+    cooldown-seconds: 300
+    cost:
+      money: 250.0
+      item: DIAMOND
+      item-amount: 2
+    armor:
+      - {==: org.bukkit.inventory.ItemStack, type: IRON_HELMET, amount: 1}
+      # ...
+    contents:
+      - {==: org.bukkit.inventory.ItemStack, type: IRON_SWORD, amount: 1}
+      # ...
+```
+
+- `permission` — required to claim the kit at all; defaults to
+  `hcfcore.kit.<name>` if omitted.
+- `cooldown-seconds` — time before the kit can be claimed again; `0` means
+  no cooldown. Bypassed by `hcfcore.kit.bypasscooldown`.
+- `cost` — optional; omit entirely for a free kit. `money` charges via
+  Vault (needs an economy plugin installed — see Requirements); `item` +
+  `item-amount` charges that many of a Material from the player's
+  inventory. Either, both, or neither can be set. Both checked and
+  charged as an atomic pair — a kit only ever deducts if the player can
+  afford everything it costs. Bypassed by `hcfcore.kit.bypasscost`.
+- `armor` / `contents` — standard Bukkit `ItemStack` YAML serialization;
+  easiest way to populate these is `/kit save`, then hand-edit
+  `permission`/`cooldown-seconds`/`cost` afterward.
+
+Reloaded along with everything else on `/hcfcore reload`.
+
 ## Commands & Permissions
 
 ### Kits
 
 | Command | Permission | Notes |
 |---|---|---|
-| `/kit <name>` | kit's own permission (default `hcfcore.kit.<name>`) | Applies the kit to your inventory, respecting its cooldown. |
-| `/kit save <name> [permission] [cooldownSeconds]` | `hcfcore.kit.save` | Saves your current inventory as a kit. |
+| `/kit <name>` | kit's own permission (default `hcfcore.kit.<name>`) | Applies the kit to your inventory, respecting its cooldown and cost. |
+| `/kit save <name> [permission] [cooldownSeconds] [cost] [costItem[:amount]]` | `hcfcore.kit.save` | Saves your current inventory as a kit. `costItem` is a Material name, e.g. `DIAMOND:2`; amount defaults to 1. |
 | `/kit delete <name>` | `hcfcore.kit.delete` | Deletes a kit. |
 | `/kits` | *(none — open to all players)* | Opens a GUI of every kit you can see. **Left-click** claims it, **right-click** previews its contents read-only. |
 

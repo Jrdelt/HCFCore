@@ -15,6 +15,10 @@ kits:
   fighter:
     permission: hcfcore.kit.fighter
     cooldown-seconds: 300
+    cost:
+      money: 250.0
+      item: DIAMOND
+      item-amount: 2
     armor:
       - {==: org.bukkit.inventory.ItemStack, type: IRON_HELMET, amount: 1}
       - {==: org.bukkit.inventory.ItemStack, type: IRON_CHESTPLATE, amount: 1}

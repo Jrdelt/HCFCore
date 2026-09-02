@@ -2,6 +2,7 @@ package me.hcfcore.core.kit;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -55,13 +56,16 @@ public final class KitCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             if (args.length < 2) {
-                player.sendMessage(Component.text("Usage: /kit save <name> [permission] [cooldownSeconds]", NamedTextColor.RED));
+                player.sendMessage(Component.text(
+                        "Usage: /kit save <name> [permission] [cooldownSeconds] [cost] [costItem[:amount]]", NamedTextColor.RED));
                 return true;
             }
             String name = args[1];
             String permission = args.length > 2 ? args[2] : "hcfcore.kit." + name.toLowerCase(Locale.ROOT);
             int cooldown = args.length > 3 ? parseIntOrDefault(args[3], 0) : 0;
-            kitManager.save(name, player, permission, cooldown);
+            double money = args.length > 4 ? parseDoubleOrDefault(args[4], 0.0) : 0.0;
+            Kit.Cost cost = args.length > 5 ? parseCostItem(args[5], money) : new Kit.Cost(money, null, 0);
+            kitManager.save(name, player, permission, cooldown, cost);
             player.sendMessage(Component.text("Saved kit " + name + " from your current inventory.", NamedTextColor.GREEN));
             return true;
         }
@@ -82,6 +86,31 @@ public final class KitCommand implements CommandExecutor, TabCompleter {
         } catch (NumberFormatException e) {
             return fallback;
         }
+    }
+
+    private static double parseDoubleOrDefault(String input, double fallback) {
+        try {
+            return Double.parseDouble(input);
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    /**
+     * Parses a "costItem[:amount]" token, e.g. "DIAMOND" or "DIAMOND:4".
+     * An unrecognized material silently drops the item cost rather than
+     * failing the whole save.
+     */
+    private static Kit.Cost parseCostItem(String token, double money) {
+        String[] parts = token.split(":", 2);
+        Material material;
+        try {
+            material = Material.valueOf(parts[0].toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return new Kit.Cost(money, null, 0);
+        }
+        int amount = parts.length > 1 ? parseIntOrDefault(parts[1], 1) : 1;
+        return new Kit.Cost(money, material, Math.max(1, amount));
     }
 
     @Override

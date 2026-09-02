@@ -2,8 +2,13 @@ package me.hcfcore.core.kit;
 
 import me.hcfcore.core.storage.Storage;
 import me.hcfcore.core.user.UserManager;
+import net.milkbowl.vault.economy.Economy;
+import net.milkbowl.vault.economy.EconomyResponse;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.ServicePriority;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +54,7 @@ class KitManagerTest {
         PlayerMock player = server.addPlayer("Alice");
         player.getInventory().setItem(0, new ItemStack(Material.DIAMOND_SWORD));
 
-        kitManager.save("Starter", player, "hcfcore.kit.starter", 30);
+        kitManager.save("Starter", player, "hcfcore.kit.starter", 30, Kit.Cost.NONE);
         kitManager.shutdown();
 
         KitManager reloaded = new KitManager(plugin, new InMemoryStorage(), userManager);
@@ -96,6 +101,274 @@ class KitManagerTest {
         player.addAttachment(plugin, "hcfcore.kit.bypasscooldown", true);
         kitManager.apply(player, kit);
         assertFalse(player.nextMessage().contains("again in"));
+    }
+
+    @Test
+    void applyChargesMoneyOnlyWhenAffordableAndSkippedWhenBypassed() {
+        PlayerMock player = server.addPlayer("Dana");
+        player.addAttachment(plugin, "hcfcore.kit.bypasscost", false);
+        userManager.load(player.getUniqueId());
+        FakeEconomy economy = new FakeEconomy(100.0);
+        Bukkit.getServicesManager().register(Economy.class, economy, plugin, ServicePriority.Normal);
+        Kit kit = new Kit("Rich", "", 0, new ItemStack[0], new ItemStack[0], new Kit.Cost(500.0, null, 0));
+
+        // Too poor: denied, nothing withdrawn.
+        kitManager.apply(player, kit);
+        assertTrue(player.nextMessage().contains("need"));
+        assertEquals(100.0, economy.balance);
+
+        // Affordable: charged and applied.
+        economy.balance = 1_000.0;
+        kitManager.apply(player, kit);
+        assertEquals(500.0, economy.balance);
+        assertTrue(player.nextMessage().contains("Applied kit"));
+
+        // Bypass permission: kit applies again with no further charge.
+        player.addAttachment(plugin, "hcfcore.kit.bypasscost", true);
+        kitManager.apply(player, kit);
+        assertEquals(500.0, economy.balance, "bypass should not withdraw anything");
+    }
+
+    @Test
+    void applyChargesItemCostOnlyWhenTheInventoryHasEnough() {
+        PlayerMock player = server.addPlayer("Eve");
+        userManager.load(player.getUniqueId());
+        Kit kit = new Kit("Gemstone", "", 0, new ItemStack[0], new ItemStack[0],
+                new Kit.Cost(0.0, Material.DIAMOND, 4));
+
+        // No diamonds yet.
+        kitManager.apply(player, kit);
+        assertTrue(player.nextMessage().contains("need"));
+
+        player.getInventory().addItem(new ItemStack(Material.DIAMOND, 4));
+        kitManager.apply(player, kit);
+        assertTrue(player.nextMessage().contains("Applied kit"));
+        assertFalse(player.getInventory().containsAtLeast(new ItemStack(Material.DIAMOND), 1),
+                "the 4 diamonds should have been consumed as payment");
+    }
+
+    private static final class FakeEconomy implements Economy {
+        private double balance;
+
+        private FakeEconomy(double balance) {
+            this.balance = balance;
+        }
+
+        @Override
+        public boolean has(OfflinePlayer player, double amount) {
+            return balance >= amount;
+        }
+
+        @Override
+        public EconomyResponse withdrawPlayer(OfflinePlayer player, double amount) {
+            balance -= amount;
+            return new EconomyResponse(amount, balance, EconomyResponse.ResponseType.SUCCESS, null);
+        }
+
+        @Override
+        public String format(double amount) {
+            return "$" + amount;
+        }
+
+        @Override
+        public boolean isEnabled() {
+            return true;
+        }
+
+        @Override
+        public String getName() {
+            return "FakeEconomy";
+        }
+
+        @Override
+        public boolean hasBankSupport() {
+            return false;
+        }
+
+        @Override
+        public int fractionalDigits() {
+            return 2;
+        }
+
+        @Override
+        public String currencyNamePlural() {
+            return "Dollars";
+        }
+
+        @Override
+        public String currencyNameSingular() {
+            return "Dollar";
+        }
+
+        @Override
+        public boolean hasAccount(String playerName) {
+            return true;
+        }
+
+        @Override
+        public boolean hasAccount(OfflinePlayer player) {
+            return true;
+        }
+
+        @Override
+        public boolean hasAccount(String playerName, String worldName) {
+            return true;
+        }
+
+        @Override
+        public boolean hasAccount(OfflinePlayer player, String worldName) {
+            return true;
+        }
+
+        @Override
+        public double getBalance(String playerName) {
+            return balance;
+        }
+
+        @Override
+        public double getBalance(OfflinePlayer player) {
+            return balance;
+        }
+
+        @Override
+        public double getBalance(String playerName, String world) {
+            return balance;
+        }
+
+        @Override
+        public double getBalance(OfflinePlayer player, String world) {
+            return balance;
+        }
+
+        @Override
+        public boolean has(String playerName, double amount) {
+            return balance >= amount;
+        }
+
+        @Override
+        public boolean has(String playerName, String worldName, double amount) {
+            return balance >= amount;
+        }
+
+        @Override
+        public boolean has(OfflinePlayer player, String worldName, double amount) {
+            return balance >= amount;
+        }
+
+        @Override
+        public EconomyResponse withdrawPlayer(String playerName, double amount) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse withdrawPlayer(String playerName, String worldName, double amount) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse withdrawPlayer(OfflinePlayer player, String worldName, double amount) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse depositPlayer(String playerName, double amount) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse depositPlayer(OfflinePlayer player, double amount) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse depositPlayer(String playerName, String worldName, double amount) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse depositPlayer(OfflinePlayer player, String worldName, double amount) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse createBank(String name, String player) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse createBank(String name, OfflinePlayer player) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse deleteBank(String name) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse bankBalance(String name) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse bankHas(String name, double amount) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse bankWithdraw(String name, double amount) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse bankDeposit(String name, double amount) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse isBankOwner(String name, String playerName) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse isBankOwner(String name, OfflinePlayer player) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse isBankMember(String name, String playerName) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public EconomyResponse isBankMember(String name, OfflinePlayer player) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public java.util.List<String> getBanks() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean createPlayerAccount(String playerName) {
+            return true;
+        }
+
+        @Override
+        public boolean createPlayerAccount(OfflinePlayer player) {
+            return true;
+        }
+
+        @Override
+        public boolean createPlayerAccount(String playerName, String worldName) {
+            return true;
+        }
+
+        @Override
+        public boolean createPlayerAccount(OfflinePlayer player, String worldName) {
+            return true;
+        }
     }
 
     private static final class InMemoryStorage implements Storage {
