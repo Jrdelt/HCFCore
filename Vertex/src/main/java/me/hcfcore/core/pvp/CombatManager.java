@@ -5,6 +5,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
@@ -174,7 +175,8 @@ public final class CombatManager {
         Player opponent = opponentId == null ? null : Bukkit.getPlayer(opponentId);
         if (opponent != null && opponent.isOnline()) {
             double health = Math.max(0, opponent.getHealth());
-            double maxHealth = Math.max(1, opponent.getMaxHealth());
+            var maxHealthAttribute = opponent.getAttribute(Attribute.MAX_HEALTH);
+            double maxHealth = Math.max(1, maxHealthAttribute == null ? 20.0 : maxHealthAttribute.getValue());
             TextColor healthColor = gradient(clamp01(health / maxHealth));
             TextColor pingColor = pingColor(opponent.getPing());
 
