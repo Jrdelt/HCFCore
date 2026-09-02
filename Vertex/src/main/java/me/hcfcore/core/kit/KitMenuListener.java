@@ -48,9 +48,12 @@ public final class KitMenuListener implements Listener {
 
         if (event.getClick() == ClickType.RIGHT) {
             KitPreviewMenu.open(player, kit);
-        } else {
+        } else if (event.getClick() == ClickType.LEFT) {
             player.closeInventory();
             kitManager.apply(player, kit);
         }
+        // Any other click type (shift-click, hotbar swap, drop, etc.) is
+        // already cancelled above and otherwise ignored -- the menu only
+        // advertises left-click-to-claim / right-click-to-preview.
     }
 }

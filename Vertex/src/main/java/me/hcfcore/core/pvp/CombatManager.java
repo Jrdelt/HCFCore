@@ -27,9 +27,9 @@ public final class CombatManager {
     public static final UUID SERVER_UUID = new UUID(0L, 0L);
 
     private final Plugin plugin;
-    private final long combatDurationMillis;
-    private final boolean logoutPenalty;
-    private final long updateIntervalTicks;
+    private volatile long combatDurationMillis;
+    private volatile boolean logoutPenalty;
+    private volatile long updateIntervalTicks;
     private final Map<UUID, Long> taggedUntil = new ConcurrentHashMap<>();
     private final Map<UUID, UUID> opponents = new ConcurrentHashMap<>();
     private BukkitTask task;
@@ -43,6 +43,25 @@ public final class CombatManager {
 
     public void start() {
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, updateIntervalTicks, updateIntervalTicks);
+    }
+
+    /**
+     * Applies newly-reloaded pvp.* config values in place, so callers that
+     * hold a reference to this instance (listeners, commands) don't go
+     * stale on a config reload. Existing tags keep their already-computed
+     * expiry; only new tags and the action-bar cadence pick up the change.
+     */
+    public void reconfigure(int combatSeconds, boolean logoutPenalty, int updateIntervalTicks) {
+        this.combatDurationMillis = combatSeconds * 1000L;
+        this.logoutPenalty = logoutPenalty;
+        long newInterval = Math.max(1, updateIntervalTicks);
+        if (newInterval != this.updateIntervalTicks) {
+            this.updateIntervalTicks = newInterval;
+            if (task != null) {
+                task.cancel();
+                task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, newInterval, newInterval);
+            }
+        }
     }
 
     public void stop() {
@@ -81,9 +100,24 @@ public final class CombatManager {
         return logoutPenalty;
     }
 
+    /**
+     * Clears the given player's tag and, if they were mutually tagged
+     * against someone, clears that opponent's tag too -- otherwise the
+     * opponent is left thinking they're still in combat with someone who
+     * is no longer tagged back.
+     */
     public void clear(UUID uuid) {
+        UUID opponentId = opponents.remove(uuid);
         taggedUntil.remove(uuid);
-        opponents.remove(uuid);
+
+        if (opponentId != null && !SERVER_UUID.equals(opponentId) && uuid.equals(opponents.get(opponentId))) {
+            opponents.remove(opponentId);
+            taggedUntil.remove(opponentId);
+            Player opponent = Bukkit.getPlayer(opponentId);
+            if (opponent != null) {
+                opponent.sendActionBar(Component.text("You are no longer in combat.", NamedTextColor.GREEN));
+            }
+        }
     }
 
     public long remainingMillis(UUID uuid) {

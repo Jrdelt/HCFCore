@@ -25,7 +25,13 @@ public final class PlayerConnectionListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
-        userManager.load(event.getUniqueId());
+        // MONITOR runs last, after every whitelist/ban/duplicate-login check
+        // has had a chance to deny the login -- only load (and therefore
+        // only leak an entry to clean up later) for logins that will
+        // actually reach PlayerJoinEvent/PlayerQuitEvent.
+        if (event.getLoginResult() == AsyncPlayerPreLoginEvent.Result.ALLOWED) {
+            userManager.load(event.getUniqueId());
+        }
     }
 
     @EventHandler

@@ -19,6 +19,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 public final class KitManager {
@@ -28,6 +31,13 @@ public final class KitManager {
     private final UserManager userManager;
     private final File file;
     private final Map<String, Kit> kits = new LinkedHashMap<>();
+    // Single thread so concurrent /kit save and /kit delete calls persist in
+    // the order they happened, instead of racing on kits.yml.
+    private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "HCFCore-KitIO");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     public KitManager(Plugin plugin, Storage storage, UserManager userManager) {
         this.plugin = plugin;
@@ -126,19 +136,7 @@ public final class KitManager {
         PlayerInventory inventory = player.getInventory();
         Kit kit = new Kit(name, permission, cooldownSeconds, inventory.getArmorContents(), inventory.getContents());
         kits.put(name.toLowerCase(Locale.ROOT), kit);
-
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-        String path = "kits." + name;
-        config.set(path + ".permission", permission);
-        config.set(path + ".cooldown-seconds", cooldownSeconds);
-        config.set(path + ".armor", Arrays.asList(kit.getArmor()));
-        config.set(path + ".contents", Arrays.asList(kit.getContents()));
-
-        try {
-            config.save(file);
-        } catch (IOException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to save kits.yml", e);
-        }
+        persistAsync();
     }
 
     /**
@@ -149,14 +147,43 @@ public final class KitManager {
         if (removed == null) {
             return false;
         }
-
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-        config.set("kits." + removed.getName(), null);
-        try {
-            config.save(file);
-        } catch (IOException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to save kits.yml", e);
-        }
+        persistAsync();
         return true;
+    }
+
+    /**
+     * Snapshots the in-memory kits (main thread, cheap) and writes the
+     * whole file back out on the IO thread, so /kit save and /kit delete
+     * never block the main thread on disk.
+     */
+    private void persistAsync() {
+        List<Kit> snapshot = List.copyOf(kits.values());
+        ioExecutor.submit(() -> {
+            YamlConfiguration config = new YamlConfiguration();
+            for (Kit kit : snapshot) {
+                String path = "kits." + kit.getName();
+                config.set(path + ".permission", kit.getPermission());
+                config.set(path + ".cooldown-seconds", kit.getCooldownSeconds());
+                config.set(path + ".armor", Arrays.asList(kit.getArmor()));
+                config.set(path + ".contents", Arrays.asList(kit.getContents()));
+            }
+            try {
+                config.save(file);
+            } catch (IOException e) {
+                plugin.getLogger().log(Level.SEVERE, "Failed to save kits.yml", e);
+            }
+        });
+    }
+
+    /**
+     * Flushes any pending kit saves/deletes before the plugin shuts down.
+     */
+    public void shutdown() {
+        ioExecutor.shutdown();
+        try {
+            ioExecutor.awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

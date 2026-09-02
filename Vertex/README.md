@@ -11,8 +11,6 @@ placeholders).
 - **FactionsUUID** (`dev.kitteh:factions`) — hard dependency, must be
   installed and enabled first.
 - **MySQL** 5.7+ / 8.x reachable from the server.
-- **PlaceholderAPI** — optional; not currently used for any placeholders of
-  its own, but softdepended so it always loads first if present.
 
 ## Installation
 

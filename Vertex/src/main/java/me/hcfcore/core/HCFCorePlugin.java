@@ -85,7 +85,8 @@ public final class HCFCorePlugin extends JavaPlugin {
         getCommand("combattag").setTabCompleter(combatTagCommand);
 
         for (var player : Bukkit.getOnlinePlayers()) {
-            userManager.load(player.getUniqueId());
+            var uuid = player.getUniqueId();
+            Bukkit.getScheduler().runTaskAsynchronously(this, () -> userManager.load(uuid));
             scoreboardManager.setup(player);
         }
     }
@@ -97,6 +98,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
         if (combatManager != null) {
             combatManager.stop();
+        }
+        if (kitManager != null) {
+            kitManager.shutdown();
         }
         if (storage != null) {
             storage.close();
@@ -114,5 +118,10 @@ public final class HCFCorePlugin extends JavaPlugin {
         for (var player : Bukkit.getOnlinePlayers()) {
             scoreboardManager.setup(player);
         }
+
+        combatManager.reconfigure(
+                getConfig().getInt("pvp.combat-tag-seconds", 15),
+                getConfig().getBoolean("pvp.logout-penalty", true),
+                getConfig().getInt("pvp.actionbar-update-interval-ticks", 4));
     }
 }

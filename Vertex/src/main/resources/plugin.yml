@@ -8,9 +8,6 @@ description: Kits, sidebar scoreboard, and PvP combat-tag timers, integrated wit
 depend:
   - FactionsUUID
 
-softdepend:
-  - PlaceholderAPI
-
 commands:
   kit:
     description: Apply or manage kits.
