@@ -1,0 +1,55 @@
+name: HCFCore
+main: me.hcfcore.core.HCFCorePlugin
+version: ${project.version}
+api-version: '1.21.10'
+author: cesardeltorojr
+description: Kits, sidebar scoreboard, and PvP combat-tag timers, integrated with FactionsUUID.
+
+depend:
+  - FactionsUUID
+
+softdepend:
+  - PlaceholderAPI
+
+commands:
+  kit:
+    description: Apply or manage kits.
+    usage: /<command> <name>
+  kits:
+    description: Browse kits in a GUI -- left-click to claim, right-click to preview.
+    usage: /<command>
+  hcfcore:
+    description: HCFCore admin/reload command.
+    usage: /<command> reload
+  uncombat:
+    description: Clear a player's combat tag.
+    usage: /<command> <player>
+  combatcheck:
+    description: Check a player's combat status.
+    usage: /<command> <player>
+  combattag:
+    description: Force a player into combat, for testing.
+    usage: /<command> <player> [opponent|server]
+
+permissions:
+  hcfcore.admin:
+    description: Reload HCFCore's config.
+    default: op
+  hcfcore.kit.save:
+    description: Save the currently held inventory as a kit.
+    default: op
+  hcfcore.kit.delete:
+    description: Delete a kit.
+    default: op
+  hcfcore.kit.bypasscooldown:
+    description: Bypass kit cooldowns.
+    default: op
+  hcfcore.combat.uncombat:
+    description: Clear another player's combat tag.
+    default: op
+  hcfcore.combat.check:
+    description: Check another player's combat status.
+    default: op
+  hcfcore.combat.tag:
+    description: Force a player into combat, for testing.
+    default: op

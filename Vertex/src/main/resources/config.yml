@@ -1,0 +1,26 @@
+mysql:
+  host: localhost
+  port: 3306
+  database: hcfcore
+  username: root
+  password: ''
+  pool-size: 10
+
+scoreboard:
+  update-interval-ticks: 20
+  title: '&b&lHCF&f&lCore'
+  lines:
+    - ''
+    - '&7Online: &f{online}'
+    - '&7Faction: &f{faction}'
+    - '&7Role: &f{faction_role}'
+    - ''
+    - '&7play.example.com'
+
+pvp:
+  combat-tag-seconds: 15
+  logout-penalty: true
+  actionbar-update-interval-ticks: 4
+
+kits:
+  default-cooldown-seconds: 300

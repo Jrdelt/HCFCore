@@ -1,0 +1,5 @@
+.DS_Store
+.claude/settings.local.json
+target/
+*.jar
+!.mvn/wrapper/maven-wrapper.jar

@@ -1,0 +1,27 @@
+kits:
+  starter:
+    permission: hcfcore.kit.starter
+    cooldown-seconds: 0
+    armor:
+      - {==: org.bukkit.inventory.ItemStack, type: LEATHER_HELMET, amount: 1}
+      - {==: org.bukkit.inventory.ItemStack, type: LEATHER_CHESTPLATE, amount: 1}
+      - {==: org.bukkit.inventory.ItemStack, type: LEATHER_LEGGINGS, amount: 1}
+      - {==: org.bukkit.inventory.ItemStack, type: LEATHER_BOOTS, amount: 1}
+    contents:
+      - {==: org.bukkit.inventory.ItemStack, type: STONE_SWORD, amount: 1}
+      - {==: org.bukkit.inventory.ItemStack, type: BREAD, amount: 16}
+      - {==: org.bukkit.inventory.ItemStack, type: COBBLESTONE, amount: 64}
+
+  fighter:
+    permission: hcfcore.kit.fighter
+    cooldown-seconds: 300
+    armor:
+      - {==: org.bukkit.inventory.ItemStack, type: IRON_HELMET, amount: 1}
+      - {==: org.bukkit.inventory.ItemStack, type: IRON_CHESTPLATE, amount: 1}
+      - {==: org.bukkit.inventory.ItemStack, type: IRON_LEGGINGS, amount: 1}
+      - {==: org.bukkit.inventory.ItemStack, type: IRON_BOOTS, amount: 1}
+    contents:
+      - {==: org.bukkit.inventory.ItemStack, type: IRON_SWORD, amount: 1}
+      - {==: org.bukkit.inventory.ItemStack, type: BOW, amount: 1}
+      - {==: org.bukkit.inventory.ItemStack, type: ARROW, amount: 32}
+      - {==: org.bukkit.inventory.ItemStack, type: GOLDEN_APPLE, amount: 4}
