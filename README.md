@@ -16,6 +16,9 @@ placeholders).
   money cost can't be claimed (item-only or free kits are unaffected).
 - **WorldGuard** — optional; only needed to enforce `abilities.disabled-regions`.
   Softdepended. Without it, abilities can be used anywhere.
+- **LuckPerms** — optional; only needed for the `repair` ability, which
+  grants an EssentialsX-style permission node on a timer. Softdepended.
+  Without it, `repair` tells the player it's unavailable.
 
 ## Installation
 
@@ -44,6 +47,9 @@ won't tab-complete.
 ## Configuration (`config.yml`)
 
 ```yaml
+language:
+  default: en_us
+
 mysql:
   host: localhost
   port: 3306
@@ -77,9 +83,10 @@ abilities:
     - spawn
 ```
 
-- `scoreboard.lines` supports `{online}`, `{faction}`, `{faction_role}` and
-  legacy `&` color codes. There's no live-edit command yet — edit the file
-  and run `/hcfcore reload`.
+- `scoreboard.lines` supports `{online}`, `{faction}`, `{faction_role}`,
+  `{repair}` (blank unless the `repair` ability is active for that player,
+  then "Repairing: Xs"), and legacy `&` color codes. There's no live-edit
+  command yet — edit the file and run `/hcfcore reload`.
 - `pvp.actionbar-update-interval-ticks` controls how often the combat
   action bar (name/timer/health/CPS) refreshes — 4 ticks (~5/sec) by
   default for a PvP-responsive feel.
@@ -93,8 +100,46 @@ abilities:
   player's location, across any world, so a region called `spawn` blocks
   abilities inside it wherever it's defined.
 
+- `language.default` is the locale (see below) every player gets until
+  they run `/language` to pick their own.
+
 The database, scoreboard lines, and kit cooldown default all take effect
 immediately on `/hcfcore reload`.
+
+## Language (`lang/*.yml`)
+
+Every player-facing message — every command reply, error, GUI label, and
+the combat action bar — lives in locale files under `lang/`, not hardcoded
+in Java. Four ship out of the box: `en_us` (the reference locale; every
+key is guaranteed to exist here), `es_us`, `pt_br`, and `de_de` (translated
+without native-speaker review — treat them as a solid starting point, not
+a final proofread).
+
+```yaml
+kit:
+  applied: '&aApplied kit {kit}.'
+  cooldown: '&cYou can use this kit again in {seconds}s.'
+```
+
+- Each message is a key → a legacy-`&`-color-coded template string.
+  `{placeholders}` like `{kit}`/`{seconds}`/`{player}` get substituted
+  per-message; check `en_us.yml` for exactly which ones a given key
+  accepts.
+- `/language [code]` lets any player view or change their own language
+  (no permission node — it's a personal preference). Their choice
+  persists to MySQL (a `user_locale` table) so it survives a restart.
+  With no argument, it shows their current locale and everything
+  available.
+- **Adding a fifth language needs no code change**: copy `en_us.yml` to
+  e.g. `lang/it_it.yml` inside the plugin's data folder, translate it, and
+  run `/hcfcore reload` (or restart) — it becomes selectable immediately.
+  `Messages` reads whatever `.yml` files are actually present in `lang/`,
+  not a hardcoded list.
+- If a key is missing from a player's chosen locale, it falls back to
+  `language.default`'s file; if it's missing from that too, the plugin
+  shows `Missing translation: <key>` instead of breaking — that fallback
+  string itself is the one hardcoded exception, since it's describing a
+  broken translation rather than being plugin content.
 
 ## Kits (`kits.yml`)
 
@@ -136,10 +181,19 @@ Reloaded along with everything else on `/hcfcore reload`.
 
 ## Abilities (`abilities.yml`)
 
-Eight PvP ability items ship pre-registered (`anti-blockup-bone`,
-`fake-pearl`, `grappling-hook`, `leap`, `portable-bard`, `repair`,
-`switcher-snowball`, `time-warp-pearl`), each just a config-defined item
-right now:
+Eight PvP ability items ship pre-registered, each with real gameplay
+behavior:
+
+| Ability | Trigger | What it does |
+|---|---|---|
+| `anti-blockup-bone` | Melee hit | After `hits-required` hits (default 3), the victim can't place blocks for `deny-seconds` (default 15). |
+| `fake-pearl` | Right-click | Throws a real `EnderPearl` (identical arc/sound) but cancels the teleport it would trigger on landing. |
+| `grappling-hook` | Right-click (twice) | First click casts a `FishHook`; a second click while it's out pulls you toward it, scaled by `forward-multiplier`/`y-multiplier`. |
+| `leap` | Right-click | Sets your velocity forward and slightly upward, scaled by `forward-multiplier`/`y-multiplier`. |
+| `portable-bard` | Right-click | Opens a GUI to pick Strength III / Speed III / Regeneration II; applies it, for `buff-seconds`, to you and every online member of your faction. |
+| `repair` | Right-click | Grants `permission-node` (default `essentials.fix`) via LuckPerms for `duration-seconds`, with a live countdown on your scoreboard. Requires LuckPerms installed. |
+| `switcher-snowball` | Throw + hit | Swaps positions with whichever enemy (not a faction member) it hits. |
+| `time-warp-pearl` | Right-click | Teleports you back to wherever you last threw a *real* ender pearl from. |
 
 ```yaml
 abilities:
@@ -150,6 +204,8 @@ abilities:
       - '&7Hook a block or player and'
       - '&7reel yourself toward it.'
     cooldown-seconds: 20
+    forward-multiplier: 1.6
+    y-multiplier: 0.8
 ```
 
 - `material` / `name` / `lore` — fully configurable per ability; `name`
@@ -157,12 +213,14 @@ abilities:
 - `cooldown-seconds` — per-item cooldown, persisted to MySQL (its own
   `ability_cooldowns` table, separate from kit cooldowns) so it survives a
   restart.
-- **Right-clicking any ability item currently just checks cooldowns and
-  the disabled-region list, then replies "isn't implemented yet."** The
-  actual gameplay behavior for all eight (grapple physics, the fake pearl,
-  switcher-snowball's teleport swap, etc.) is a deliberately separate,
-  not-yet-built piece of work — this is the item/cooldown/permission/
-  region framework it all plugs into.
+- Everything else under an ability's section (`forward-multiplier`,
+  `hits-required`, `buff-seconds`, `duration-seconds`, `permission-node`,
+  etc.) is that ability's own extra config, documented in the table above.
+- `switcher-snowball` and `portable-bard` use **FactionsUUID** to tell
+  faction members apart from enemies — see `FactionsHook`.
+- `repair` degrades gracefully without LuckPerms installed: it tells the
+  player it's unavailable and doesn't consume a cooldown, the same way a
+  kit's money cost behaves without Vault.
 
 Reloaded along with everything else on `/hcfcore reload`.
 
@@ -183,6 +241,12 @@ Reloaded along with everything else on `/hcfcore reload`.
 |---|---|---|
 | `/getitem <username> <ability> [amount]` | `hcfcore.ability.give` | Gives a player ability items directly, ignoring cooldowns. |
 | `/abilities` | *(none — open to all players)* | Opens a GUI listing every ability's name/lore. A viewer with `hcfcore.ability.give` who clicks one receives a copy; everyone else's click just closes/does nothing. |
+
+### Language
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/language [code]` | *(none — open to all players)* | With no args, shows your current locale and everything available. With a code (e.g. `es_us`), switches to it and persists the choice. |
 
 ### Combat
 
@@ -209,8 +273,8 @@ already warm the instant a tag starts.
 ## Tab-completion
 
 Every command above (`kit`, `kits`, `hcfcore`, `getitem`, `abilities`,
-`uncombat`, `combatcheck`, `combattag`) registers its own `TabCompleter` (except
-`abilities`, which takes no arguments), so suggestions should appear
+`language`, `uncombat`, `combatcheck`, `combattag`) registers its own
+`TabCompleter` (except `abilities`, which takes no arguments), so suggestions should appear
 as soon as the freshly built jar is running on the server. If they don't
 show up in-game:
 

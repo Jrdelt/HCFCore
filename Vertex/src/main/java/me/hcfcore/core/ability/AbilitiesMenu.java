@@ -1,7 +1,7 @@
 package me.hcfcore.core.ability;
 
+import me.hcfcore.core.lang.Messages;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -19,12 +19,12 @@ import java.util.List;
  */
 public final class AbilitiesMenu {
 
-    public static void open(Player player, Plugin plugin, AbilityManager abilityManager) {
+    public static void open(Player player, Plugin plugin, AbilityManager abilityManager, Messages messages) {
         List<Ability> abilities = new ArrayList<>(abilityManager.getAbilities().values());
         int size = Math.max(9, ((abilities.size() / 9) + 1) * 9);
 
         Holder holder = new Holder();
-        Inventory inventory = Bukkit.createInventory(holder, size, Component.text("Abilities", NamedTextColor.DARK_AQUA));
+        Inventory inventory = Bukkit.createInventory(holder, size, messages.get(player, "ability.gui-title"));
         holder.inventory = inventory;
 
         boolean canGive = player.hasPermission("hcfcore.ability.give");
@@ -37,8 +37,8 @@ public final class AbilitiesMenu {
             List<Component> lore = new ArrayList<>(existingLore == null ? List.of() : existingLore);
             lore.add(Component.empty());
             lore.add(canGive
-                    ? Component.text("Click to receive one.", NamedTextColor.GRAY)
-                    : Component.text("Cooldown: " + ability.getCooldownSeconds() + "s", NamedTextColor.GRAY));
+                    ? messages.get(player, "ability.gui-click-to-receive")
+                    : messages.get(player, "ability.gui-cooldown", "seconds", String.valueOf(ability.getCooldownSeconds())));
             meta.lore(lore);
             icon.setItemMeta(meta);
 

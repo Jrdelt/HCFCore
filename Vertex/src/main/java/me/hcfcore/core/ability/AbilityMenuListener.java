@@ -1,7 +1,7 @@
 package me.hcfcore.core.ability;
 
+import me.hcfcore.core.lang.Messages;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
@@ -16,10 +16,12 @@ public final class AbilityMenuListener implements Listener {
 
     private final Plugin plugin;
     private final AbilityManager abilityManager;
+    private final Messages messages;
 
-    public AbilityMenuListener(Plugin plugin, AbilityManager abilityManager) {
+    public AbilityMenuListener(Plugin plugin, AbilityManager abilityManager, Messages messages) {
         this.plugin = plugin;
         this.abilityManager = abilityManager;
+        this.messages = messages;
     }
 
     @EventHandler
@@ -51,8 +53,8 @@ public final class AbilityMenuListener implements Listener {
         for (ItemStack dropped : player.getInventory().addItem(abilityManager.createItem(ability)).values()) {
             player.getWorld().dropItemNaturally(player.getLocation(), dropped);
         }
-        player.sendMessage(Component.text("Gave you ", NamedTextColor.GREEN)
+        player.sendMessage(messages.get(player, "ability.gui-received")
                 .append(LegacyComponentSerializer.legacyAmpersand().deserialize(ability.getDisplayName()))
-                .append(Component.text(".", NamedTextColor.GREEN)));
+                .append(Component.text(".")));
     }
 }

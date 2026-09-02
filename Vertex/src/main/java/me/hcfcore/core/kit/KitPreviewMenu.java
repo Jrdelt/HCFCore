@@ -1,7 +1,6 @@
 package me.hcfcore.core.kit;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import me.hcfcore.core.lang.Messages;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -14,10 +13,10 @@ import org.bukkit.inventory.ItemStack;
  */
 public final class KitPreviewMenu {
 
-    public static void open(Player player, Kit kit) {
+    public static void open(Player player, Kit kit, Messages messages) {
         Holder holder = new Holder();
         Inventory inventory = Bukkit.createInventory(holder, 45,
-                Component.text("Preview: " + kit.getName(), NamedTextColor.DARK_AQUA));
+                messages.get(player, "kit.preview-title", "kit", kit.getName()));
         holder.inventory = inventory;
 
         ItemStack[] armor = kit.getArmor();

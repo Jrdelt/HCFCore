@@ -7,6 +7,8 @@ abilities:
       - '&7them from placing blocks for'
       - '&7a short time.'
     cooldown-seconds: 60
+    hits-required: 3
+    deny-seconds: 15
 
   fake-pearl:
     material: ENDER_PEARL
@@ -24,6 +26,8 @@ abilities:
       - '&7Hook a block or player and'
       - '&7reel yourself toward it.'
     cooldown-seconds: 20
+    forward-multiplier: 1.6
+    y-multiplier: 0.8
 
   leap:
     material: FIREWORK_ROCKET
@@ -32,6 +36,8 @@ abilities:
       - '&7Launches you forward and'
       - '&7slightly upward.'
     cooldown-seconds: 45
+    forward-multiplier: 1.4
+    y-multiplier: 0.6
 
   portable-bard:
     material: NOTE_BLOCK
@@ -41,6 +47,7 @@ abilities:
       - '&7(Strength, Speed, or Regen) and'
       - '&7share it with your whole faction.'
     cooldown-seconds: 300
+    buff-seconds: 30
 
   repair:
     material: ANVIL
@@ -50,6 +57,8 @@ abilities:
       - '&7repair your gear, with a'
       - '&7countdown on your scoreboard.'
     cooldown-seconds: 600
+    duration-seconds: 60
+    permission-node: essentials.fix
 
   switcher-snowball:
     material: SNOWBALL

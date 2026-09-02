@@ -1,5 +1,6 @@
 package me.hcfcore.core.kit;
 
+import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.storage.Storage;
 import me.hcfcore.core.user.UserManager;
 import net.milkbowl.vault.economy.Economy;
@@ -31,6 +32,7 @@ class KitManagerTest {
     private ServerMock server;
     private PluginMock plugin;
     private UserManager userManager;
+    private Messages messages;
     private KitManager kitManager;
 
     @BeforeEach
@@ -38,7 +40,9 @@ class KitManagerTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         userManager = new UserManager(plugin, new InMemoryStorage());
-        kitManager = new KitManager(plugin, new InMemoryStorage(), userManager);
+        messages = new Messages(plugin, userManager);
+        messages.load();
+        kitManager = new KitManager(plugin, new InMemoryStorage(), userManager, messages);
     }
 
     @AfterEach
@@ -57,7 +61,7 @@ class KitManagerTest {
         kitManager.save("Starter", player, "hcfcore.kit.starter", 30, Kit.Cost.NONE);
         kitManager.shutdown();
 
-        KitManager reloaded = new KitManager(plugin, new InMemoryStorage(), userManager);
+        KitManager reloaded = new KitManager(plugin, new InMemoryStorage(), userManager, messages);
         reloaded.load();
         Kit kit = reloaded.get("starter");
         assertEquals("Starter", kit.getName());
@@ -67,7 +71,7 @@ class KitManagerTest {
         reloaded.delete("Starter");
         reloaded.shutdown();
 
-        KitManager reloadedAgain = new KitManager(plugin, new InMemoryStorage(), userManager);
+        KitManager reloadedAgain = new KitManager(plugin, new InMemoryStorage(), userManager, messages);
         reloadedAgain.load();
         assertNull(reloadedAgain.get("starter"));
     }
@@ -395,6 +399,15 @@ class KitManagerTest {
 
         @Override
         public void saveAbilityCooldown(UUID uuid, String abilityId, long availableAt) {
+        }
+
+        @Override
+        public String loadLocale(UUID uuid) {
+            return null;
+        }
+
+        @Override
+        public void saveLocale(UUID uuid, String locale) {
         }
 
         @Override

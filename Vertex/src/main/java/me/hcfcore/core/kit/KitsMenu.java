@@ -1,6 +1,7 @@
 package me.hcfcore.core.kit;
 
 import me.hcfcore.core.economy.EconomyHook;
+import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
 import net.kyori.adventure.text.Component;
@@ -30,12 +31,13 @@ public final class KitsMenu {
 
     public static final String KIT_ID_KEY = "kit_id";
 
-    public static void open(Player player, Plugin plugin, KitManager kitManager, UserManager userManager) {
+    public static void open(Player player, Plugin plugin, KitManager kitManager, UserManager userManager,
+                             Messages messages) {
         List<Kit> kits = new ArrayList<>(kitManager.getKits().values());
         int size = Math.max(9, ((kits.size() / 9) + 1) * 9);
 
         Holder holder = new Holder();
-        Inventory inventory = Bukkit.createInventory(holder, size, Component.text("Kits", NamedTextColor.DARK_AQUA));
+        Inventory inventory = Bukkit.createInventory(holder, size, messages.get(player, "kit.gui-title"));
         holder.inventory = inventory;
 
         NamespacedKey kitIdKey = new NamespacedKey(plugin, KIT_ID_KEY);
@@ -55,32 +57,33 @@ public final class KitsMenu {
             boolean hasPermission = kit.getPermission() == null || kit.getPermission().isEmpty()
                     || player.hasPermission(kit.getPermission());
             lore.add(hasPermission
-                    ? Component.text("You have access.", NamedTextColor.GREEN)
-                    : Component.text("No permission.", NamedTextColor.RED));
+                    ? messages.get(player, "kit.gui-access")
+                    : messages.get(player, "kit.gui-no-access"));
 
             long expiry = user == null ? 0L : user.getCooldownExpiry(key);
             if (expiry > now) {
                 long remaining = (expiry - now) / 1000L;
-                lore.add(Component.text("Cooldown: " + remaining + "s", NamedTextColor.RED));
+                lore.add(messages.get(player, "kit.gui-cooldown", "seconds", String.valueOf(remaining)));
             } else {
-                lore.add(Component.text("Ready to claim.", NamedTextColor.GREEN));
+                lore.add(messages.get(player, "kit.gui-ready"));
             }
 
             Kit.Cost cost = kit.getCost();
             if (cost.hasMoneyCost()) {
                 boolean canAfford = bypassCost || (economy != null && economy.has(player, cost.money()));
-                lore.add(Component.text("Cost: " + EconomyHook.format(cost.money()),
-                        canAfford ? NamedTextColor.GREEN : NamedTextColor.RED));
+                lore.add(colorize(messages.get(player, "kit.gui-cost-money", "amount", EconomyHook.format(cost.money())),
+                        canAfford));
             }
             if (cost.hasItemCost()) {
                 boolean canAfford = bypassCost
                         || player.getInventory().containsAtLeast(new ItemStack(cost.itemType()), cost.itemAmount());
-                lore.add(Component.text("Cost: " + cost.itemAmount() + "x " + KitManager.formatMaterial(cost.itemType()),
-                        canAfford ? NamedTextColor.GREEN : NamedTextColor.RED));
+                lore.add(colorize(messages.get(player, "kit.gui-cost-item",
+                        "amount", String.valueOf(cost.itemAmount()), "item", KitManager.formatMaterial(cost.itemType())),
+                        canAfford));
             }
             lore.add(Component.empty());
-            lore.add(Component.text("Left-click to claim.", NamedTextColor.GRAY));
-            lore.add(Component.text("Right-click to view contents.", NamedTextColor.GRAY));
+            lore.add(messages.get(player, "kit.gui-left-click"));
+            lore.add(messages.get(player, "kit.gui-right-click"));
             meta.lore(lore);
             meta.getPersistentDataContainer().set(kitIdKey, PersistentDataType.STRING, kit.getName());
             icon.setItemMeta(meta);
@@ -89,6 +92,10 @@ public final class KitsMenu {
         }
 
         player.openInventory(inventory);
+    }
+
+    private static Component colorize(Component costLine, boolean canAfford) {
+        return costLine.color(canAfford ? NamedTextColor.GREEN : NamedTextColor.RED);
     }
 
     private static ItemStack buildIcon(Kit kit) {

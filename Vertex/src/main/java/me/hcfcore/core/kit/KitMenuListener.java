@@ -1,5 +1,6 @@
 package me.hcfcore.core.kit;
 
+import me.hcfcore.core.lang.Messages;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -14,10 +15,12 @@ public final class KitMenuListener implements Listener {
 
     private final Plugin plugin;
     private final KitManager kitManager;
+    private final Messages messages;
 
-    public KitMenuListener(Plugin plugin, KitManager kitManager) {
+    public KitMenuListener(Plugin plugin, KitManager kitManager, Messages messages) {
         this.plugin = plugin;
         this.kitManager = kitManager;
+        this.messages = messages;
     }
 
     @EventHandler
@@ -47,13 +50,10 @@ public final class KitMenuListener implements Listener {
         }
 
         if (event.getClick() == ClickType.RIGHT) {
-            KitPreviewMenu.open(player, kit);
+            KitPreviewMenu.open(player, kit, messages);
         } else if (event.getClick() == ClickType.LEFT) {
             player.closeInventory();
             kitManager.apply(player, kit);
         }
-        // Any other click type (shift-click, hotbar swap, drop, etc.) is
-        // already cancelled above and otherwise ignored -- the menu only
-        // advertises left-click-to-claim / right-click-to-preview.
     }
 }

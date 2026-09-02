@@ -79,7 +79,7 @@ class AbilityManagerTest {
     @Test
     void perAbilityCooldownBlocksUntilItExpires() {
         PlayerMock player = server.addPlayer("Alice");
-        User user = new User(player.getUniqueId(), new HashMap<>());
+        User user = new User(player.getUniqueId(), new HashMap<>(), null);
         Ability ability = abilityManager.get("repair");
 
         assertFalse(abilityManager.isOnCooldown(user, ability));
@@ -137,6 +137,15 @@ class AbilityManagerTest {
         @Override
         public void saveAbilityCooldown(UUID uuid, String abilityId, long availableAt) {
             abilityCooldowns.computeIfAbsent(uuid, id -> new ConcurrentHashMap<>()).put(abilityId, availableAt);
+        }
+
+        @Override
+        public String loadLocale(UUID uuid) {
+            return null;
+        }
+
+        @Override
+        public void saveLocale(UUID uuid, String locale) {
         }
 
         @Override

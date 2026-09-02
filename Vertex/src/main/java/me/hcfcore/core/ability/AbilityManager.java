@@ -17,10 +17,12 @@ import org.bukkit.plugin.Plugin;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -28,6 +30,7 @@ import java.util.logging.Level;
 public final class AbilityManager {
 
     public static final String ABILITY_ID_KEY = "ability_id";
+    private static final Set<String> COMMON_KEYS = Set.of("material", "name", "lore", "cooldown-seconds");
 
     private final Plugin plugin;
     private final Storage storage;
@@ -62,7 +65,11 @@ public final class AbilityManager {
             String name = section.getString("name", id);
             List<String> lore = section.getStringList("lore");
             int cooldown = section.getInt("cooldown-seconds", 0);
-            abilities.put(id.toLowerCase(Locale.ROOT), new Ability(id, material, name, lore, cooldown));
+
+            Map<String, Object> settings = new HashMap<>(section.getValues(false));
+            settings.keySet().removeAll(COMMON_KEYS);
+
+            abilities.put(id.toLowerCase(Locale.ROOT), new Ability(id, material, name, lore, cooldown, settings));
         }
     }
 

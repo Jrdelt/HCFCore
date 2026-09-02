@@ -35,6 +35,7 @@ public final class ScoreboardManager {
     private final List<String> lineTemplates;
     private final long intervalTicks;
     private final Map<UUID, PlayerBoard> boards = new ConcurrentHashMap<>();
+    private final Map<UUID, Map<String, String>> customPlaceholders = new ConcurrentHashMap<>();
     private BukkitTask task;
 
     public ScoreboardManager(Plugin plugin, FileConfiguration config) {
@@ -90,6 +91,24 @@ public final class ScoreboardManager {
 
     public void remove(UUID uuid) {
         boards.remove(uuid);
+        customPlaceholders.remove(uuid);
+    }
+
+    /**
+     * Lets other subsystems (e.g. the Repair ability's countdown) feed a
+     * value into a scoreboard line without owning a second, conflicting
+     * Scoreboard object -- admins opt in by adding the matching token
+     * (e.g. "{repair}") to their configured scoreboard.lines.
+     */
+    public void setPlaceholder(UUID uuid, String key, String value) {
+        customPlaceholders.computeIfAbsent(uuid, id -> new ConcurrentHashMap<>()).put(key, value);
+    }
+
+    public void clearPlaceholder(UUID uuid, String key) {
+        Map<String, String> placeholders = customPlaceholders.get(uuid);
+        if (placeholders != null) {
+            placeholders.remove(key);
+        }
     }
 
     private void tick() {
@@ -115,10 +134,12 @@ public final class ScoreboardManager {
     }
 
     private String resolvePlaceholders(Player player, String template) {
+        Map<String, String> custom = customPlaceholders.getOrDefault(player.getUniqueId(), Map.of());
         return template
                 .replace("{online}", String.valueOf(Bukkit.getOnlinePlayers().size()))
                 .replace("{faction}", FactionsHook.getFactionTag(player))
-                .replace("{faction_role}", FactionsHook.getRoleName(player));
+                .replace("{faction_role}", FactionsHook.getRoleName(player))
+                .replace("{repair}", custom.getOrDefault("repair", ""));
     }
 
     private static String[] buildEntryCodes() {

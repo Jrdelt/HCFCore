@@ -1,3 +1,6 @@
+language:
+  default: en_us
+
 mysql:
   host: localhost
   port: 3306

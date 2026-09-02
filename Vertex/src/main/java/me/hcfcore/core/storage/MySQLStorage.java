@@ -39,6 +39,17 @@ public final class MySQLStorage implements Storage {
             INSERT INTO ability_cooldowns (uuid, ability_id, available_at) VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE available_at = VALUES(available_at)""";
 
+    private static final String CREATE_LOCALE_TABLE = """
+            CREATE TABLE IF NOT EXISTS user_locale (
+                uuid CHAR(36) NOT NULL PRIMARY KEY,
+                locale VARCHAR(16) NOT NULL
+            )""";
+
+    private static final String SELECT_LOCALE = "SELECT locale FROM user_locale WHERE uuid = ?";
+    private static final String UPSERT_LOCALE = """
+            INSERT INTO user_locale (uuid, locale) VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE locale = VALUES(locale)""";
+
     private final Database database;
 
     public MySQLStorage(Database database) {
@@ -51,6 +62,7 @@ public final class MySQLStorage implements Storage {
              Statement statement = connection.createStatement()) {
             statement.executeUpdate(CREATE_TABLE);
             statement.executeUpdate(CREATE_ABILITY_TABLE);
+            statement.executeUpdate(CREATE_LOCALE_TABLE);
         }
     }
 
@@ -102,6 +114,27 @@ public final class MySQLStorage implements Storage {
             statement.setString(1, uuid.toString());
             statement.setString(2, abilityId.toLowerCase(Locale.ROOT));
             statement.setLong(3, availableAt);
+            statement.executeUpdate();
+        }
+    }
+
+    @Override
+    public String loadLocale(UUID uuid) throws SQLException {
+        try (Connection connection = database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(SELECT_LOCALE)) {
+            statement.setString(1, uuid.toString());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? resultSet.getString("locale") : null;
+            }
+        }
+    }
+
+    @Override
+    public void saveLocale(UUID uuid, String locale) throws SQLException {
+        try (Connection connection = database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(UPSERT_LOCALE)) {
+            statement.setString(1, uuid.toString());
+            statement.setString(2, locale.toLowerCase(Locale.ROOT));
             statement.executeUpdate();
         }
     }

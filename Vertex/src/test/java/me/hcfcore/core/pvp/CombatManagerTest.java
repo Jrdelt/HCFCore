@@ -1,5 +1,8 @@
 package me.hcfcore.core.pvp;
 
+import me.hcfcore.core.lang.Messages;
+import me.hcfcore.core.storage.Storage;
+import me.hcfcore.core.user.UserManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,6 +11,7 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.plugin.PluginMock;
 
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,7 +29,10 @@ class CombatManagerTest {
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        combatManager = new CombatManager(plugin, 15, true, 4);
+        UserManager userManager = new UserManager(plugin, new NoOpStorage());
+        Messages messages = new Messages(plugin, userManager);
+        messages.load();
+        combatManager = new CombatManager(plugin, messages, 15, true, 4);
     }
 
     @AfterEach
@@ -155,5 +162,42 @@ class CombatManagerTest {
         long remaining = combatManager.remainingMillis(alice.getUniqueId());
         assertTrue(remaining <= 5_000L && remaining > 0L,
                 "expected the new 5s duration, got " + remaining + "ms remaining");
+    }
+
+    private static final class NoOpStorage implements Storage {
+        @Override
+        public void init() {
+        }
+
+        @Override
+        public Map<String, Long> loadCooldowns(UUID uuid) {
+            return Map.of();
+        }
+
+        @Override
+        public void saveCooldown(UUID uuid, String kitName, long availableAt) {
+        }
+
+        @Override
+        public Map<String, Long> loadAbilityCooldowns(UUID uuid) {
+            return Map.of();
+        }
+
+        @Override
+        public void saveAbilityCooldown(UUID uuid, String abilityId, long availableAt) {
+        }
+
+        @Override
+        public String loadLocale(UUID uuid) {
+            return null;
+        }
+
+        @Override
+        public void saveLocale(UUID uuid, String locale) {
+        }
+
+        @Override
+        public void close() {
+        }
     }
 }

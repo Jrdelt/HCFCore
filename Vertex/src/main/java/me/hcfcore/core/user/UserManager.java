@@ -32,10 +32,11 @@ public final class UserManager {
             for (Map.Entry<String, Long> entry : storage.loadAbilityCooldowns(uuid).entrySet()) {
                 cooldowns.put("ability:" + entry.getKey(), entry.getValue());
             }
-            users.put(uuid, new User(uuid, cooldowns));
+            String locale = storage.loadLocale(uuid);
+            users.put(uuid, new User(uuid, cooldowns, locale));
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to load user data for " + uuid, e);
-            users.put(uuid, new User(uuid, Map.of()));
+            users.put(uuid, new User(uuid, Map.of(), null));
         }
     }
 

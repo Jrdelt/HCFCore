@@ -1,5 +1,6 @@
 package me.hcfcore.core.pvp;
 
+import me.hcfcore.core.lang.Messages;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
@@ -30,6 +31,7 @@ public final class CombatManager {
     public static final UUID SERVER_UUID = new UUID(0L, 0L);
 
     private final Plugin plugin;
+    private final Messages messages;
     private volatile long combatDurationMillis;
     private volatile boolean logoutPenalty;
     private volatile long updateIntervalTicks;
@@ -38,8 +40,10 @@ public final class CombatManager {
     private final Map<UUID, Deque<Long>> clickTimestamps = new ConcurrentHashMap<>();
     private BukkitTask task;
 
-    public CombatManager(Plugin plugin, int combatSeconds, boolean logoutPenalty, int updateIntervalTicks) {
+    public CombatManager(Plugin plugin, Messages messages, int combatSeconds, boolean logoutPenalty,
+                          int updateIntervalTicks) {
         this.plugin = plugin;
+        this.messages = messages;
         this.combatDurationMillis = combatSeconds * 1000L;
         this.logoutPenalty = logoutPenalty;
         this.updateIntervalTicks = Math.max(1, updateIntervalTicks);
@@ -119,7 +123,7 @@ public final class CombatManager {
             taggedUntil.remove(opponentId);
             Player opponent = Bukkit.getPlayer(opponentId);
             if (opponent != null) {
-                opponent.sendActionBar(Component.text("You are no longer in combat.", NamedTextColor.GREEN));
+                opponent.sendActionBar(messages.get(opponent, "combat.no-longer-in-combat"));
             }
         }
     }
@@ -188,7 +192,7 @@ public final class CombatManager {
                 iterator.remove();
                 opponents.remove(uuid);
                 if (player != null) {
-                    player.sendActionBar(Component.text("You are no longer in combat.", NamedTextColor.GREEN));
+                    player.sendActionBar(messages.get(player, "combat.no-longer-in-combat"));
                 }
                 continue;
             }
@@ -204,13 +208,13 @@ public final class CombatManager {
         double timeFraction = combatDurationMillis <= 0 ? 0 : clamp01((double) remainingMillis / combatDurationMillis);
         TextColor timeColor = gradient(1 - timeFraction);
 
-        Component result = Component.text("⚔ ", NamedTextColor.DARK_RED)
-                .append(Component.text("Combat: ", NamedTextColor.RED));
+        Component result = messages.get(player, "combat.actionbar-prefix")
+                .append(messages.get(player, "combat.actionbar-label"));
 
         UUID opponentId = opponents.get(player.getUniqueId());
         boolean realOpponent = false;
         if (SERVER_UUID.equals(opponentId)) {
-            result = result.append(Component.text("Server  ", NamedTextColor.WHITE, TextDecoration.ITALIC));
+            result = result.append(messages.get(player, "combat.actionbar-server"));
         } else {
             Player opponent = opponentId == null ? null : Bukkit.getPlayer(opponentId);
             if (opponent != null && opponent.isOnline()) {
@@ -229,16 +233,16 @@ public final class CombatManager {
         result = result.append(Component.text(remainingSeconds + "s", timeColor, TextDecoration.BOLD));
 
         result = result
-                .append(Component.text("  You ", NamedTextColor.GREEN))
+                .append(messages.get(player, "combat.actionbar-you"))
                 .append(Component.text(getCps(player.getUniqueId()), NamedTextColor.WHITE));
 
         if (realOpponent) {
             result = result
-                    .append(Component.text("  Them ", NamedTextColor.RED))
+                    .append(messages.get(player, "combat.actionbar-them"))
                     .append(Component.text(getCps(opponentId), NamedTextColor.WHITE));
         }
 
-        return result.append(Component.text(" ⚔", NamedTextColor.DARK_RED));
+        return result.append(messages.get(player, "combat.actionbar-suffix"));
     }
 
     private static TextColor gradient(double greenFraction) {

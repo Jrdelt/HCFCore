@@ -16,5 +16,9 @@ public interface Storage {
 
     void saveAbilityCooldown(UUID uuid, String abilityId, long availableAt) throws SQLException;
 
+    String loadLocale(UUID uuid) throws SQLException;
+
+    void saveLocale(UUID uuid, String locale) throws SQLException;
+
     void close();
 }

@@ -11,6 +11,7 @@ depend:
 softdepend:
   - Vault
   - WorldGuard
+  - LuckPerms
 
 commands:
   kit:
@@ -37,6 +38,9 @@ commands:
   abilities:
     description: Browse abilities in a GUI.
     usage: /<command>
+  language:
+    description: View or change your language.
+    usage: /<command> [code]
 
 permissions:
   hcfcore.admin:

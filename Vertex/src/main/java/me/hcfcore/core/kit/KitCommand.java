@@ -1,7 +1,6 @@
 package me.hcfcore.core.kit;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import me.hcfcore.core.lang.Messages;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -16,48 +15,49 @@ import java.util.Locale;
 public final class KitCommand implements CommandExecutor, TabCompleter {
 
     private final KitManager kitManager;
+    private final Messages messages;
 
-    public KitCommand(KitManager kitManager) {
+    public KitCommand(KitManager kitManager, Messages messages) {
         this.kitManager = kitManager;
+        this.messages = messages;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Only players can use this command.");
+            sender.sendMessage(messages.get(sender, "general.players-only"));
             return true;
         }
 
         if (args.length == 0) {
-            player.sendMessage(Component.text("Usage: /kit <name> | /kit save <name> | /kit delete <name>", NamedTextColor.RED));
+            player.sendMessage(messages.get(player, "kit.usage"));
             return true;
         }
 
         if (args[0].equalsIgnoreCase("delete")) {
             if (!player.hasPermission("hcfcore.kit.delete")) {
-                player.sendMessage(Component.text("You don't have permission to do that.", NamedTextColor.RED));
+                player.sendMessage(messages.get(player, "general.no-permission"));
                 return true;
             }
             if (args.length < 2) {
-                player.sendMessage(Component.text("Usage: /kit delete <name>", NamedTextColor.RED));
+                player.sendMessage(messages.get(player, "kit.usage-delete"));
                 return true;
             }
             if (kitManager.delete(args[1])) {
-                player.sendMessage(Component.text("Deleted kit " + args[1] + ".", NamedTextColor.GREEN));
+                player.sendMessage(messages.get(player, "kit.deleted", "kit", args[1]));
             } else {
-                player.sendMessage(Component.text("No kit named '" + args[1] + "'.", NamedTextColor.RED));
+                player.sendMessage(messages.get(player, "kit.not-found", "kit", args[1]));
             }
             return true;
         }
 
         if (args[0].equalsIgnoreCase("save")) {
             if (!player.hasPermission("hcfcore.kit.save")) {
-                player.sendMessage(Component.text("You don't have permission to do that.", NamedTextColor.RED));
+                player.sendMessage(messages.get(player, "general.no-permission"));
                 return true;
             }
             if (args.length < 2) {
-                player.sendMessage(Component.text(
-                        "Usage: /kit save <name> [permission] [cooldownSeconds] [cost] [costItem[:amount]]", NamedTextColor.RED));
+                player.sendMessage(messages.get(player, "kit.usage-save"));
                 return true;
             }
             String name = args[1];
@@ -66,13 +66,13 @@ public final class KitCommand implements CommandExecutor, TabCompleter {
             double money = args.length > 4 ? parseDoubleOrDefault(args[4], 0.0) : 0.0;
             Kit.Cost cost = args.length > 5 ? parseCostItem(args[5], money) : new Kit.Cost(money, null, 0);
             kitManager.save(name, player, permission, cooldown, cost);
-            player.sendMessage(Component.text("Saved kit " + name + " from your current inventory.", NamedTextColor.GREEN));
+            player.sendMessage(messages.get(player, "kit.saved", "kit", name));
             return true;
         }
 
         Kit kit = kitManager.get(args[0]);
         if (kit == null) {
-            player.sendMessage(Component.text("No kit named '" + args[0] + "'.", NamedTextColor.RED));
+            player.sendMessage(messages.get(player, "kit.not-found", "kit", args[0]));
             return true;
         }
 

@@ -1,5 +1,6 @@
 package me.hcfcore.core.pvp;
 
+import me.hcfcore.core.lang.Messages;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -17,40 +18,42 @@ import java.util.UUID;
 public final class CombatCheckCommand implements CommandExecutor, TabCompleter {
 
     private final CombatManager combatManager;
+    private final Messages messages;
 
-    public CombatCheckCommand(CombatManager combatManager) {
+    public CombatCheckCommand(CombatManager combatManager, Messages messages) {
         this.combatManager = combatManager;
+        this.messages = messages;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("hcfcore.combat.check")) {
-            sender.sendMessage(Component.text("You don't have permission to do that.", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "general.no-permission"));
             return true;
         }
         if (args.length < 1) {
-            sender.sendMessage(Component.text("Usage: /combatcheck <player>", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "combat.check-usage"));
             return true;
         }
 
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            sender.sendMessage(Component.text("Player not found.", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "general.player-not-found"));
             return true;
         }
 
         if (!combatManager.isTagged(target.getUniqueId())) {
-            sender.sendMessage(Component.text(target.getName() + " is not in combat.", NamedTextColor.GRAY));
+            sender.sendMessage(messages.get(sender, "combat.check-not-tagged", "player", target.getName()));
             return true;
         }
 
         long remainingSeconds = (combatManager.remainingMillis(target.getUniqueId()) + 999) / 1000;
-        Component message = Component.text(target.getName() + " is in combat ", NamedTextColor.YELLOW)
-                .append(Component.text("(" + remainingSeconds + "s left)", NamedTextColor.GOLD));
+        Component message = messages.get(sender, "combat.check-tagged-prefix", "player", target.getName())
+                .append(messages.get(sender, "combat.check-time-left", "seconds", String.valueOf(remainingSeconds)));
 
         UUID opponentId = combatManager.getOpponentId(target.getUniqueId());
         if (CombatManager.SERVER_UUID.equals(opponentId)) {
-            message = message.append(Component.text(" with Server", NamedTextColor.YELLOW));
+            message = message.append(messages.get(sender, "combat.check-with-server"));
             sender.sendMessage(message);
             return true;
         }
@@ -58,9 +61,11 @@ public final class CombatCheckCommand implements CommandExecutor, TabCompleter {
         Player opponent = opponentId == null ? null : Bukkit.getPlayer(opponentId);
         if (opponent != null && opponent.isOnline()) {
             message = message
-                    .append(Component.text(" with ", NamedTextColor.YELLOW))
+                    .append(messages.get(sender, "combat.check-with-opponent-prefix"))
                     .append(Component.text(opponent.getName(), NamedTextColor.WHITE))
-                    .append(Component.text(String.format(" (%.1f hp, %dms)", opponent.getHealth(), opponent.getPing()), NamedTextColor.GRAY));
+                    .append(messages.get(sender, "combat.check-opponent-stats",
+                            "health", String.format(Locale.ROOT, "%.1f", opponent.getHealth()),
+                            "ping", String.valueOf(opponent.getPing())));
         }
 
         sender.sendMessage(message);

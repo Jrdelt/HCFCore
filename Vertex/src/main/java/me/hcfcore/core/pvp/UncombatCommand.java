@@ -1,7 +1,6 @@
 package me.hcfcore.core.pvp;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import me.hcfcore.core.lang.Messages;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -16,36 +15,38 @@ import java.util.Locale;
 public final class UncombatCommand implements CommandExecutor, TabCompleter {
 
     private final CombatManager combatManager;
+    private final Messages messages;
 
-    public UncombatCommand(CombatManager combatManager) {
+    public UncombatCommand(CombatManager combatManager, Messages messages) {
         this.combatManager = combatManager;
+        this.messages = messages;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("hcfcore.combat.uncombat")) {
-            sender.sendMessage(Component.text("You don't have permission to do that.", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "general.no-permission"));
             return true;
         }
         if (args.length < 1) {
-            sender.sendMessage(Component.text("Usage: /uncombat <player>", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "combat.uncombat-usage"));
             return true;
         }
 
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            sender.sendMessage(Component.text("Player not found.", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "general.player-not-found"));
             return true;
         }
 
         if (!combatManager.isTagged(target.getUniqueId())) {
-            sender.sendMessage(Component.text(target.getName() + " isn't in combat.", NamedTextColor.YELLOW));
+            sender.sendMessage(messages.get(sender, "combat.uncombat-not-tagged", "player", target.getName()));
             return true;
         }
 
         combatManager.clear(target.getUniqueId());
-        sender.sendMessage(Component.text("Cleared " + target.getName() + "'s combat tag.", NamedTextColor.GREEN));
-        target.sendMessage(Component.text("Your combat tag was cleared by staff.", NamedTextColor.GREEN));
+        sender.sendMessage(messages.get(sender, "combat.uncombat-cleared-sender", "player", target.getName()));
+        target.sendMessage(messages.get(target, "combat.uncombat-cleared-target"));
         return true;
     }
 

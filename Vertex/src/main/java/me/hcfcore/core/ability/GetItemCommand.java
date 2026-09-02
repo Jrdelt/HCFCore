@@ -1,7 +1,7 @@
 package me.hcfcore.core.ability;
 
+import me.hcfcore.core.lang.Messages;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -19,31 +19,33 @@ import java.util.Locale;
 public final class GetItemCommand implements CommandExecutor, TabCompleter {
 
     private final AbilityManager abilityManager;
+    private final Messages messages;
 
-    public GetItemCommand(AbilityManager abilityManager) {
+    public GetItemCommand(AbilityManager abilityManager, Messages messages) {
         this.abilityManager = abilityManager;
+        this.messages = messages;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("hcfcore.ability.give")) {
-            sender.sendMessage(Component.text("You don't have permission to do that.", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "general.no-permission"));
             return true;
         }
         if (args.length < 2) {
-            sender.sendMessage(Component.text("Usage: /getitem <username> <ability> [amount]", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "ability.getitem-usage"));
             return true;
         }
 
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            sender.sendMessage(Component.text("Player not found.", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "general.player-not-found"));
             return true;
         }
 
         Ability ability = abilityManager.get(args[1]);
         if (ability == null) {
-            sender.sendMessage(Component.text("No ability named '" + args[1] + "'.", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "ability.getitem-not-found", "ability", args[1]));
             return true;
         }
 
@@ -60,12 +62,13 @@ public final class GetItemCommand implements CommandExecutor, TabCompleter {
         }
 
         Component abilityName = LegacyComponentSerializer.legacyAmpersand().deserialize(ability.getDisplayName());
-        sender.sendMessage(Component.text("Gave " + target.getName() + " " + amount + "x ", NamedTextColor.GREEN)
+        sender.sendMessage(messages.get(sender, "ability.getitem-given-sender",
+                        "player", target.getName(), "amount", String.valueOf(amount))
                 .append(abilityName)
-                .append(Component.text(".", NamedTextColor.GREEN)));
-        target.sendMessage(Component.text("You received " + amount + "x ", NamedTextColor.GREEN)
+                .append(Component.text(".")));
+        target.sendMessage(messages.get(target, "ability.getitem-given-target", "amount", String.valueOf(amount))
                 .append(abilityName)
-                .append(Component.text(".", NamedTextColor.GREEN)));
+                .append(Component.text(".")));
         return true;
     }
 

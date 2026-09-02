@@ -1,7 +1,6 @@
 package me.hcfcore.core;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import me.hcfcore.core.lang.Messages;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -13,24 +12,26 @@ import java.util.Locale;
 public final class HCFCoreCommand implements CommandExecutor, TabCompleter {
 
     private final HCFCorePlugin plugin;
+    private final Messages messages;
 
-    public HCFCoreCommand(HCFCorePlugin plugin) {
+    public HCFCoreCommand(HCFCorePlugin plugin, Messages messages) {
         this.plugin = plugin;
+        this.messages = messages;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 1 && args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("hcfcore.admin")) {
-                sender.sendMessage(Component.text("You don't have permission to do that.", NamedTextColor.RED));
+                sender.sendMessage(messages.get(sender, "general.no-permission"));
                 return true;
             }
             plugin.reload();
-            sender.sendMessage(Component.text("HCFCore reloaded.", NamedTextColor.GREEN));
+            sender.sendMessage(messages.get(sender, "admin.reloaded"));
             return true;
         }
 
-        sender.sendMessage(Component.text("Usage: /hcfcore reload", NamedTextColor.RED));
+        sender.sendMessage(messages.get(sender, "admin.usage"));
         return true;
     }
 

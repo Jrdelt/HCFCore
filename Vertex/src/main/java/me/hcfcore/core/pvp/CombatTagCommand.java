@@ -1,7 +1,6 @@
 package me.hcfcore.core.pvp;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import me.hcfcore.core.lang.Messages;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -23,48 +22,49 @@ import java.util.Locale;
 public final class CombatTagCommand implements CommandExecutor, TabCompleter {
 
     private final CombatManager combatManager;
+    private final Messages messages;
 
-    public CombatTagCommand(CombatManager combatManager) {
+    public CombatTagCommand(CombatManager combatManager, Messages messages) {
         this.combatManager = combatManager;
+        this.messages = messages;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("hcfcore.combat.tag")) {
-            sender.sendMessage(Component.text("You don't have permission to do that.", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "general.no-permission"));
             return true;
         }
         if (args.length < 1) {
-            sender.sendMessage(Component.text("Usage: /combattag <player> [opponent|server]", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "combat.tag-usage"));
             return true;
         }
 
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            sender.sendMessage(Component.text("Player not found.", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "general.player-not-found"));
             return true;
         }
 
         if (args.length < 2 || args[1].equalsIgnoreCase("server")) {
             combatManager.tagAgainstServer(target);
-            sender.sendMessage(Component.text(
-                    "Tagged " + target.getName() + " into combat against \"Server\".", NamedTextColor.GREEN));
+            sender.sendMessage(messages.get(sender, "combat.tag-server-success", "player", target.getName()));
             return true;
         }
 
         Player opponent = Bukkit.getPlayerExact(args[1]);
         if (opponent == null) {
-            sender.sendMessage(Component.text("Opponent not found.", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "combat.tag-opponent-not-found"));
             return true;
         }
         if (target.getUniqueId().equals(opponent.getUniqueId())) {
-            sender.sendMessage(Component.text("A player can't be tagged against themselves. Omit the opponent to tag against \"Server\" instead.", NamedTextColor.RED));
+            sender.sendMessage(messages.get(sender, "combat.tag-self"));
             return true;
         }
 
         combatManager.tag(target, opponent);
-        sender.sendMessage(Component.text(
-                "Tagged " + target.getName() + " and " + opponent.getName() + " into combat.", NamedTextColor.GREEN));
+        sender.sendMessage(messages.get(sender, "combat.tag-success",
+                "player", target.getName(), "opponent", opponent.getName()));
         return true;
     }
 

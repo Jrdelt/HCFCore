@@ -1,11 +1,10 @@
 package me.hcfcore.core.kit;
 
 import me.hcfcore.core.economy.EconomyHook;
+import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.storage.Storage;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
@@ -32,6 +31,7 @@ public final class KitManager {
     private final Plugin plugin;
     private final Storage storage;
     private final UserManager userManager;
+    private final Messages messages;
     private final File file;
     private final Map<String, Kit> kits = new LinkedHashMap<>();
     // Single thread so concurrent /kit save and /kit delete calls persist in
@@ -42,10 +42,11 @@ public final class KitManager {
         return thread;
     });
 
-    public KitManager(Plugin plugin, Storage storage, UserManager userManager) {
+    public KitManager(Plugin plugin, Storage storage, UserManager userManager, Messages messages) {
         this.plugin = plugin;
         this.storage = storage;
         this.userManager = userManager;
+        this.messages = messages;
         this.file = new File(plugin.getDataFolder(), "kits.yml");
     }
 
@@ -127,7 +128,7 @@ public final class KitManager {
 
     public void apply(Player player, Kit kit) {
         if (kit.getPermission() != null && !kit.getPermission().isEmpty() && !player.hasPermission(kit.getPermission())) {
-            player.sendMessage(Component.text("You don't have permission to use that kit.", NamedTextColor.RED));
+            player.sendMessage(messages.get(player, "kit.no-kit-permission"));
             return;
         }
 
@@ -138,7 +139,7 @@ public final class KitManager {
 
         if (expiry > now && !player.hasPermission("hcfcore.kit.bypasscooldown")) {
             long remaining = (expiry - now) / 1000L;
-            player.sendMessage(Component.text("You can use this kit again in " + remaining + "s.", NamedTextColor.RED));
+            player.sendMessage(messages.get(player, "kit.cooldown", "seconds", String.valueOf(remaining)));
             return;
         }
 
@@ -149,22 +150,19 @@ public final class KitManager {
         // Check the side-effect-free item cost first, so a failed money
         // check below never leaves us having already removed items.
         if (!bypassCost && cost.hasItemCost() && !inventory.containsAtLeast(new ItemStack(cost.itemType()), cost.itemAmount())) {
-            player.sendMessage(Component.text(
-                    "You need " + cost.itemAmount() + "x " + formatMaterial(cost.itemType()) + " to claim this kit.",
-                    NamedTextColor.RED));
+            player.sendMessage(messages.get(player, "kit.cost-item-needed",
+                    "amount", String.valueOf(cost.itemAmount()), "item", formatMaterial(cost.itemType())));
             return;
         }
 
         if (!bypassCost && cost.hasMoneyCost()) {
             Economy economy = EconomyHook.getEconomy();
             if (economy == null) {
-                player.sendMessage(Component.text(
-                        "This kit costs money, but no economy plugin is installed. Contact staff.", NamedTextColor.RED));
+                player.sendMessage(messages.get(player, "kit.cost-no-economy"));
                 return;
             }
             if (!economy.has(player, cost.money())) {
-                player.sendMessage(Component.text(
-                        "You need " + EconomyHook.format(cost.money()) + " to claim this kit.", NamedTextColor.RED));
+                player.sendMessage(messages.get(player, "kit.cost-money-needed", "amount", EconomyHook.format(cost.money())));
                 return;
             }
             economy.withdrawPlayer(player, cost.money());
@@ -181,7 +179,7 @@ public final class KitManager {
             }
         }
 
-        player.sendMessage(Component.text("Applied kit " + kit.getName() + ".", NamedTextColor.GREEN));
+        player.sendMessage(messages.get(player, "kit.applied", "kit", kit.getName()));
 
         if (kit.getCooldownSeconds() > 0 && user != null) {
             long newExpiry = now + kit.getCooldownSeconds() * 1000L;
