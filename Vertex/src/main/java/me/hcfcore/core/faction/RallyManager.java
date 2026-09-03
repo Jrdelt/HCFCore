@@ -2,6 +2,7 @@ package me.hcfcore.core.faction;
 
 import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.Messages;
+import me.hcfcore.core.lang.MessageFormatter;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -106,31 +107,23 @@ public final class RallyManager implements Listener {
         double distance = rally.getDistance(player);
         int distanceInt = (int) Math.round(distance);
 
-        // Calculate direction towards rally
+        // Calculate absolute direction towards rally (where player needs to run)
         float directionToRally = getDirectionToRally(player, rally);
-        float playerYaw = player.getYaw() % 360;
-
-        // Calculate relative angle (opposite of where player is facing)
-        float relativeAngle = playerYaw - directionToRally;
 
         // Normalize to -180 to 180
-        while (relativeAngle > 180) relativeAngle -= 360;
-        while (relativeAngle < -180) relativeAngle += 360;
+        float normalizedDirection = directionToRally % 360;
+        while (normalizedDirection > 180) normalizedDirection -= 360;
+        while (normalizedDirection < -180) normalizedDirection += 360;
 
-        // Determine arrow based on relative direction
-        String arrowSymbol = getArrowForDirection(relativeAngle);
+        // Determine arrow based on absolute direction to rally
+        String arrowSymbol = getArrowForDirection(normalizedDirection);
 
         String rallyTitle = messages.getRaw(player, "factions.rally-bossbar-title");
         String distanceLabel = messages.getRaw(player, "factions.rally-bossbar-distance");
         Component text = Component.empty()
-                .append(Component.text(rallyTitle + " ")
-                        .color(NamedTextColor.GREEN)
-                        .decorate(TextDecoration.BOLD))
-                .append(Component.text(distanceInt + " " + distanceLabel + " ")
-                        .color(NamedTextColor.WHITE))
-                .append(Component.text(arrowSymbol)
-                        .color(NamedTextColor.GREEN)
-                        .decorate(TextDecoration.BOLD));
+                .append(MessageFormatter.deserialize(rallyTitle + " "))
+                .append(MessageFormatter.deserialize(distanceInt + " " + distanceLabel + " "))
+                .append(MessageFormatter.deserialize(arrowSymbol));
 
         // Update or create bossbar
         BossBar bar = playerBossBars.get(player);
@@ -159,24 +152,24 @@ public final class RallyManager implements Listener {
         return yaw;
     }
 
-    private String getArrowForDirection(float relativeAngle) {
-        // Determine arrow based on where rally is relative to player's facing direction
-        if (relativeAngle >= -22.5 && relativeAngle < 22.5) {
-            return "↑"; // Rally ahead
-        } else if (relativeAngle >= 22.5 && relativeAngle < 67.5) {
-            return "↗"; // Rally forward-right
-        } else if (relativeAngle >= 67.5 && relativeAngle < 112.5) {
-            return "→"; // Rally right
-        } else if (relativeAngle >= 112.5 && relativeAngle < 157.5) {
-            return "↘"; // Rally back-right
-        } else if (relativeAngle >= 157.5 || relativeAngle < -157.5) {
-            return "↓"; // Rally behind
-        } else if (relativeAngle >= -157.5 && relativeAngle < -112.5) {
-            return "↙"; // Rally back-left
-        } else if (relativeAngle >= -112.5 && relativeAngle < -67.5) {
-            return "←"; // Rally left
-        } else if (relativeAngle >= -67.5 && relativeAngle < -22.5) {
-            return "↖"; // Rally forward-left
+    private String getArrowForDirection(float direction) {
+        // Determine arrow based on absolute direction to rally (where player needs to run)
+        if (direction >= -22.5 && direction < 22.5) {
+            return "↑"; // North
+        } else if (direction >= 22.5 && direction < 67.5) {
+            return "↗"; // Northeast
+        } else if (direction >= 67.5 && direction < 112.5) {
+            return "→"; // East
+        } else if (direction >= 112.5 && direction < 157.5) {
+            return "↘"; // Southeast
+        } else if (direction >= 157.5 || direction < -157.5) {
+            return "↓"; // South
+        } else if (direction >= -157.5 && direction < -112.5) {
+            return "↙"; // Southwest
+        } else if (direction >= -112.5 && direction < -67.5) {
+            return "←"; // West
+        } else if (direction >= -67.5 && direction < -22.5) {
+            return "↖"; // Northwest
         }
         return "↑";
     }
