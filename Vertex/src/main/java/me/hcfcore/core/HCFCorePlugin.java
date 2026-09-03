@@ -141,7 +141,7 @@ public final class HCFCorePlugin extends JavaPlugin {
 
         rallyManager = new RallyManager(this, messages);
         RallyCommand rallyCommand = new RallyCommand(rallyManager, messages);
-        getCommand("rally").setExecutor(rallyCommand);
+        getCommand("frally").setExecutor(rallyCommand);
 
         Bukkit.getPluginManager().registerEvents(new CombatListener(combatManager), this);
         playerConnectionListener = new PlayerConnectionListener(userManager, scoreboardManager, combatManager);

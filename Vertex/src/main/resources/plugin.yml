@@ -56,9 +56,11 @@ commands:
   rollback:
     description: View and restore items from a player's death history.
     usage: /<command> <player>
-  rally:
+  frally:
     description: Set or clear faction rally point (4 minute duration).
-    usage: /<command> [set|clear]
+    usage: /f rally [set|clear]
+    aliases:
+      - f rally
 
 permissions:
   hcfcore.admin:
