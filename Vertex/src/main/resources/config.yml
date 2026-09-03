@@ -1,22 +1,49 @@
+# ============================================
+# HCFCore Configuration
+# ============================================
+# This config file controls all core gameplay settings.
+# See README.md for detailed explanations of each option.
+
+# ============================================
+# LOCALIZATION
+# ============================================
 language:
+  # Default language for new players. Supported: en_us, es_us, pt_br, de_de
   default: en_us
 
+# ============================================
+# DATABASE (MySQL/MariaDB)
+# ============================================
 mysql:
+  # Connection details
   host: localhost
   port: 3306
   database: hcfcore
   username: root
   password: ''
-  pool-size: 10
-  # Required for local MySQL servers using caching_sha2_password without SSL.
-  allow-public-key-retrieval: true
-  # Set true for a MySQL server configured with SSL certificates.
-  use-ssl: false
 
+  # Connection pool settings
+  pool-size: 10  # Number of concurrent database connections
+
+  # Security options
+  allow-public-key-retrieval: true  # Required for caching_sha2_password without SSL
+  use-ssl: false  # Set to true if using SSL certificates
+
+# ============================================
+# SCOREBOARD
+# ============================================
 scoreboard:
+  # How often to update the scoreboard (in ticks; 20 ticks = 1 second)
   update-interval-ticks: 20
+
+  # Scoreboard title with placeholders
   title: '<blue><bold>ꜰᴀᴄᴛɪᴏɴꜱ<reset>   <gray>{date}'
+
+  # Date format shown in title
   date-format: 'MM/dd'
+
+  # Scoreboard content lines
+  # Supports: {name}, {rank_prefix}, {exp}, {balance}, {faction}, {power}, {fplayers_online}, {ftop}
   lines:
     - '     <gray>Season I'
     - '   <gray>{rank_prefix}{name}'
@@ -29,58 +56,113 @@ scoreboard:
     - ''
     - '<gray>hub.mc-vertex.com'
 
+# ============================================
+# CHAT FORMATTING
+# ============================================
 chat:
+  # Separator between message components
   separator: ' <gray>» </gray>'
+
+  # Chat format components (use MiniMessage or legacy & color codes)
   faction-format: '<gray>[{faction}]</gray> '
   rank-format: '<gray>[{rank}]</gray> '
   name-format: '{name} '
 
+# ============================================
+# PVP MECHANICS
+# ============================================
 pvp:
+  # Combat tag duration in seconds
   combat-tag-seconds: 30
+
+  # Item cooldowns (in seconds)
   pearl-cooldown-seconds: 12
   golden-apple-cooldown-seconds: 8
   enchanted-golden-apple-cooldown-seconds: 120
+
+  # Logout penalty: if true, disconnecting while tagged counts as combat logout
   logout-penalty: true
+
+  # How often to update the combat action bar (ticks)
   actionbar-update-interval-ticks: 2
-  # Archer tag: an archer's arrows mark the victim, and each stack makes
-  # further arrows hurt more. The archer's own faction also gets the
-  # (smaller) melee bonus against them; nobody else does.
+
+  # ---- ARCHER CLASS ----
+  # Archers mark victims with arrows. Each stack increases arrow damage and gives
+  # the archer's faction a melee bonus against the marked player.
   archer-tag:
+    # How long a mark lasts (refreshed by each new arrow)
     duration-seconds: 10
+    # Maximum number of stacks from multiple archers
     max-stacks: 4
+    # Arrow damage multiplier per stack (0.15 = +15% per stack)
     arrow-damage-bonus-per-stack: 0.15
+    # Melee damage bonus for the archer's faction only
     faction-melee-bonus-per-stack: 0.05
+
+  # ---- LEGACY COMBAT (1.8 PvP style) ----
   legacy-combat:
     enabled: true
-    # Empty means every world. Add world names to limit legacy PvP.
+    # Worlds to apply legacy combat (leave empty for all worlds)
     worlds: []
-    # High attack speed removes the modern attack cooldown indicator.
+    # Attack speed (higher = faster attacks, removes cooldown bar)
     attack-speed: 1024.0
+    # Remove sweeping damage from axes
     disable-sweeping-attacks: true
 
+# ============================================
+# FACTIONS
+# ============================================
 factions:
+  # Prevent faction leaders from using /f leave
   prevent-leader-leave: true
+
+  # Command aliases for /factions
   command-aliases:
     - f
     - factions
 
+# ============================================
+# KITS
+# ============================================
 kits:
+  # Default kit cooldown in seconds
   default-cooldown-seconds: 30
+
+  # Delay before class effects apply after putting on full armor
   effect-warmup-seconds: 5
+
+  # Maximum cooldown allowed (about 1 day)
   max-cooldown-seconds: 86400
+
+  # Maximum money cost for a kit
   max-money-cost: 1000000000.0
+
+  # Maximum item cost amount
   max-cost-item-amount: 64
 
+# ============================================
+# ABILITIES
+# ============================================
 abilities:
+  # Cooldown shared across all ability items
   global-cooldown-seconds: 4
+
+  # Maximum number of items /getitem can give
   max-getitem-amount: 64
-  # Per-ability tuning (durations, multipliers, cooldowns) lives with the
-  # ability itself in abilities.yml -- only server-wide limits belong here.
+
+  # Regions where abilities are disabled (e.g., spawn, safezone)
+  # Per-ability settings (cooldowns, durations) go in abilities.yml
   disabled-regions:
     - spawn
 
+# ============================================
+# REBOOT SYSTEM
+# ============================================
 reboot:
+  # Default countdown length for /reboot
   default-delay-minutes: 10
+
+  # When to announce reminders before shutdown
   reminder-minutes:
     - 10
     - 5

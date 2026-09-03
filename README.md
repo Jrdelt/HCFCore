@@ -7,24 +7,15 @@ integrated with **FactionsUUID**.
 
 ## Requirements
 
-- **Paper 1.21.10** or newer (matches the API version FactionsUUID itself
-  requires — an older 1.21.1 core will fail to load either plugin).
-- **FactionsUUID** (`dev.kitteh:factions`) — hard dependency, must be
-  installed and enabled first.
-- **MySQL** 5.7+ / 8.x reachable from the server.
-- **Vault** — optional; only needed if any kit sets a `cost.money` price.
-  Softdepended, so it loads first if present. Without it, kits with a
-  money cost can't be claimed (item-only or free kits are unaffected).
-- **WorldGuard** — optional; only needed to enforce `abilities.disabled-regions`.
-  Softdepended. Without it, abilities can be used anywhere.
-- **LuckPerms** — optional; used for the `repair` ability (grants an
-  EssentialsX-style permission node on a timer) and for showing a
-  player's primary group as a rank in chat. Softdepended. Without it,
-  `repair` tells the player it's unavailable, and chat simply omits the
-  rank bracket. Even with LuckPerms installed, a player still in the
-  built-in `default` group (i.e. never promoted, or promoted to a group
-  with no custom display name) shows no rank bracket either — only a
-  group with an actual display name renders one.
+**Required:**
+- **Paper 1.21.10+** (the server software)
+- **FactionsUUID** (must be installed first)
+- **MySQL 5.7+** or **MariaDB** (reachable from your server)
+
+**Optional** (features work without them):
+- **Vault** — Enables money costs on kits. Without it, only item/free kits work.
+- **WorldGuard** — Enables disabling abilities in specific regions (like spawn). Without it, abilities work everywhere.
+- **LuckPerms** — Shows player ranks in chat and enables the Repair ability. Without it, those features are disabled.
 
 ## Installation
 
@@ -50,146 +41,58 @@ needed.
 server is the most common reason a newly added command won't show up or
 won't tab-complete.
 
-## Configuration (`config.yml`)
+## Configuration Guide
 
+All settings are in `config.yml`. See the file for detailed comments on each option.
+
+### Quick Setup
+After installing, edit `config.yml` with your **MySQL credentials** only:
 ```yaml
-language:
-  default: en_us
-
 mysql:
-  host: localhost
+  host: your-db-host
   port: 3306
   database: hcfcore
-  username: root
-  password: ''
-  pool-size: 10
-  allow-public-key-retrieval: true
-  use-ssl: false
-
-scoreboard:
-  update-interval-ticks: 20
-  title: '<blue><bold>ꜰᴀᴄᴛɪᴏɴꜱ<reset>   <gray>{date}'
-  date-format: 'MM/dd'
-  lines:
-    - '     <gray>Season I'
-    - '   <gray>{rank_prefix}{name}'
-    - '<gray>• <red>Experience: <white>{exp}'
-    - '<gray>• <red>Balance: <white>{balance}'
-    - ''
-    - '<white>{faction} <gray>[<yellow>#{ftop}<gray>]'
-    - '<gray> <red>• Power: <white>{power}'
-    - '<gray> <red>• Online: <white>{fplayers_online}'
-    - ''
-    - '<gray>hub.mc-vertex.com'
-
-chat:
-  separator: ' <gray>» </gray>'
-  faction-format: '<gray>[{faction}]</gray> '
-  rank-format: '<gray>[{rank}]</gray> '
-  name-format: '{name} '
-
-pvp:
-  combat-tag-seconds: 30
-  pearl-cooldown-seconds: 12
-  golden-apple-cooldown-seconds: 8
-  enchanted-golden-apple-cooldown-seconds: 120
-  logout-penalty: true
-  actionbar-update-interval-ticks: 2
-  archer-tag:
-    duration-seconds: 10
-    max-stacks: 4
-    arrow-damage-bonus-per-stack: 0.15
-    faction-melee-bonus-per-stack: 0.05
-  legacy-combat:
-    enabled: true
-    worlds: []
-    attack-speed: 1024.0
-    disable-sweeping-attacks: true
-
-factions:
-  prevent-leader-leave: true
-  command-aliases:
-    - f
-    - factions
-
-kits:
-  default-cooldown-seconds: 30
-  effect-warmup-seconds: 5
-  max-cooldown-seconds: 86400
-  max-money-cost: 1000000000.0
-  max-cost-item-amount: 64
-
-abilities:
-  global-cooldown-seconds: 4
-  max-getitem-amount: 64
-  disabled-regions:
-    - spawn
-
-reboot:
-  default-delay-minutes: 10
-  reminder-minutes:
-    - 10
-    - 5
-    - 1
+  username: your-username
+  password: your-password
 ```
 
-- `scoreboard.title` and every entry in `scoreboard.lines` accept
-  `{date}` (formatted per `scoreboard.date-format`) plus `{name}`,
-  `{rank}` / `{rank_prefix}` (LuckPerms primary group; `rank_prefix` adds
-  brackets and a trailing space only when a rank exists), `{exp}` (XP level), `{balance}` (Vault balance, formatted, `0` without
-  an economy plugin), `{online}`, `{faction}`, `{faction_role}`,
-  `{ftop}` (the player's faction's power ranking), `{power}`
-  (`current/max`, comma-formatted), `{fplayers_online}`, and `{repair}`
-  (fed live by the Repair ability's countdown). The title re-resolves
-  every tick and only pushes a packet when it actually changes, so
-  `{date}` rolls over at midnight with no restart needed.
-- `chat.*` controls the live chat renderer (see **Chat format** below) —
-  separate from `lang/*.yml`'s `general.prefix`, which is the branded
-  prefix shown before *system* messages (command feedback, errors), not
-  regular player chat.
-- `pvp.actionbar-update-interval-ticks` controls how often the combat
-  action bar (name/timer/health/CPS) refreshes — 2 ticks (10/sec) by
-  default for a PvP-responsive feel.
-- `pvp.pearl-cooldown-seconds` /
-  `pvp.golden-apple-cooldown-seconds` /
-  `pvp.enchanted-golden-apple-cooldown-seconds`: HCF-style cooldowns on the
-  vanilla items, enforced by the plugin rather than by Minecraft's own
-  client cooldown — the two apple types stay independent even though
-  vanilla groups them together. Using one while it's still cooling down is
-  cancelled with a chat message, and the remaining time shows up in
-  `/cooldowns`. Tracked in memory and deliberately *not* cleared on
-  disconnect, so relogging can't reset a pearl or gapple timer mid-fight.
-  A pearl right-click that opens a block (chest, door, anvil) instead of
-  throwing is ignored by both halves of this — it neither starts the
-  cooldown nor gets blocked by one.
-- `pvp.archer-tag.*`: the archer class mechanic (see **Archer tag**
-  below). `duration-seconds` is how long a mark lasts and is refreshed by
-  every new arrow, `max-stacks` caps how deep focus fire can go, and the
-  two `*-bonus-per-stack` values are fractions (`0.15` = +15% per stack)
-  applied to arrow damage and to the archer's faction's melee damage
-  respectively.
-- `pvp.logout-penalty`: if true, disconnecting while tagged is treated as a
-  combat logout (see `PlayerConnectionListener`).
-- `pvp.legacy-combat`: enables the 1.8-style attack-speed behavior. Empty
-  `worlds` applies it everywhere; `disable-sweeping-attacks` removes modern
-  sweeping damage.
-- `factions.prevent-leader-leave`: prevents faction leaders from using
-  `/f leave` or `/factions leave`; `/f disband` remains the explicit disband
-  command. Aliases are configurable in `factions.command-aliases`.
-- `kits.effect-warmup-seconds`: delay between putting on a kit's full
-  armor set and its class effects (see **Kits**) actually applying.
-- `abilities.global-cooldown-seconds` is a shared cooldown across *all*
-  ability items — using any one of them starts it, blocking every other
-  ability until it expires, independent of each item's own cooldown.
-- `abilities.disabled-regions` is a list of WorldGuard region ids (not
-  world names) where ability items refuse to activate — checked at the
-  player's location, across any world, so a region called `spawn` blocks
-  abilities inside it wherever it's defined.
-- `reboot.default-delay-minutes` / `reminder-minutes`: default countdown
-  length for `/reboot` (with no argument) and which minute marks get a
-  broadcast reminder.
-- `language.default` is the locale (see below) every player gets until
-  they run `/language` to pick their own.
+### Key Settings Explained
+
+**Database** — `mysql.pool-size` (default: 10) controls how many concurrent database connections are allowed. Increase for larger servers.
+
+**Scoreboard** — Customize with `scoreboard.lines`. Use these placeholders:
+- `{name}` — player name
+- `{rank_prefix}` — player's rank (if using LuckPerms)
+- `{faction}` — player's faction name
+- `{power}` — faction power (current/max)
+- `{ftop}` — faction's position on power ranking
+- `{fplayers_online}` — online faction members
+- `{exp}` — player's XP level
+- `{balance}` — player's money (if using Vault economy)
+
+**Chat** — Control the live chat format with `chat.separator`, `chat.faction-format`, `chat.rank-format`. Leave `rank-format` blank if not using LuckPerms.
+
+**PvP Cooldowns** — These override vanilla Minecraft cooldowns:
+- `pearl-cooldown-seconds` — ender pearl reuse timer
+- `golden-apple-cooldown-seconds` — regular gapple timer
+- `enchanted-golden-apple-cooldown-seconds` — enchanted gapple timer
+
+Importantly: **cooldowns survive logout** — players can't escape them by relogging.
+
+**Archer Tag** — The archer class mechanic where arrows mark victims:
+- `arrow-damage-bonus-per-stack` — extra damage per mark (0.15 = +15% per stack)
+- `faction-melee-bonus-per-stack` — bonus for the archer's faction only
+- `duration-seconds` — how long a mark lasts
+
+**Legacy Combat** — Enable 1.8-style PvP with instant attacks. Leave `worlds: []` to apply everywhere, or list specific world names to limit it.
+
+**Kits** — `effect-warmup-seconds` (default: 5) is the delay before class effects activate after equipping a full armor set. This gives players time to react to the visual change.
+
+**Abilities** — `global-cooldown-seconds` is a shared cooldown across ALL ability items (using any one blocks all others for that duration). Disable regions by adding WorldGuard region names to `disabled-regions`.
+
+**Reboot** — Customize shutdown reminders. `default-delay-minutes: 10` means `/reboot` with no argument schedules a 10-minute countdown.
+
+All changes take effect immediately with `/hcfcore reload` — **no restart required** for config, kits, abilities, tags, or messages.
 
 The database, scoreboard, chat, kit, ability, and tag config all take
 effect immediately on `/hcfcore reload` — including `tags.yml` and
@@ -201,207 +104,94 @@ If player data cannot be loaded from MySQL, kit and ability claims fail closed
 until the player reconnects successfully instead of silently bypassing saved
 cooldowns.
 
-## Chat format
+## Chat Format
 
-Every chat message renders as:
+Chat appears as: `[faction] [tag] [rank] name » message`
 
-```
-[faction] [tag] [rank] name » message
-```
+Each part is optional:
+- **[faction]** — faction name (omitted if factionless)
+- **[tag]** — equipped cosmetic tag (omitted if none)
+- **[rank]** — LuckPerms rank display name (omitted without LuckPerms)
+- **name » message** — the actual chat message
 
-- `[faction]` — the player's FactionsUUID tag, via `chat.faction-format`;
-  omitted entirely for a factionless player.
-- `[tag]` — the player's currently equipped tag (see **Tags** below);
-  omitted if they have none equipped. Its color comes from the tag's own
-  `display` in `tags.yml`, not a single uniform color for every tag.
-- `[rank]` — the player's LuckPerms primary group display name, via
-  `chat.rank-format`; omitted without LuckPerms, or if the group has no
-  configured display name (including the built-in `default` group every
-  player starts in — see **Requirements**).
-- The name itself normally uses `chat.name-format`, but if the player has
-  **nickname-match** enabled on their equipped tag (see **Tags**), it's
-  recolored to match that tag's color/gradient instead.
+Players can enable **nickname-match** on tags to recolor their name to match the tag's color.
 
-## Language (`lang/*.yml`)
+## Languages
 
-Every player-facing message — every command reply, error, GUI label, and
-the combat action bar — lives in locale files under `lang/`, not hardcoded
-in Java. Four ship out of the box: `en_us` (the reference locale; every
-key is guaranteed to exist here), `es_us`, `pt_br`, and `de_de` (translated
-without native-speaker review — treat them as a solid starting point, not
-a final proofread).
+All player-facing text lives in `lang/` folder files, not hardcoded. Four languages ship by default: **en_us**, **es_us**, **pt_br**, **de_de**.
 
-```yaml
-kit:
-  applied: '<success>Applied kit {kit}.'
-  cooldown: '<deny>You can use this kit again in {seconds}s.'
-```
+Players can change their language with `/language [code]` — their choice is saved to the database and persists across restarts.
 
-- Each message is a key → a MiniMessage-formatted template string.
-  `<deny>`, `<success>`, `<info>`, and `<warning>` are semantic aliases for
-  red, green, gray, and yellow. Legacy `&` color codes remain supported,
-  including legacy hex (`&#RRGGBB`). `{placeholders}` like
-  `{kit}`/`{seconds}`/`{player}` get substituted per-message; check
-  `en_us.yml` for exactly which ones a given key accepts.
-- `general.prefix` is the branded prefix (`ᴠᴇʀᴛᴇx ➛` by default) shown
-  before every *system* message — command feedback, errors, confirmations
-  — sourced from this key rather than hardcoded, so it's themeable and
-  translatable per locale like everything else. It's unrelated to live
-  chat, which has its own look controlled by `chat.*` in `config.yml`.
-- `/language [code]` lets any player view or change their own language
-  (no permission node — it's a personal preference). Their choice
-  persists to MySQL (a `user_locale` table) so it survives a restart.
-  With no argument, it shows their current locale and everything
-  available.
-- **Adding a fifth language needs no code change**: copy `en_us.yml` to
-  e.g. `lang/it_it.yml` inside the plugin's data folder, translate it, and
-  run `/hcfcore reload` (or restart) — it becomes selectable immediately.
-  `Messages` reads whatever `.yml` files are actually present in `lang/`,
-  not a hardcoded list.
-- If a key is missing from a player's chosen locale, it falls back to
-  `language.default`'s file; if it's missing from that too, the plugin
-  shows `Missing translation: <key>` instead of breaking — that fallback
-  string itself is the one hardcoded exception, since it's describing a
-  broken translation rather than being plugin content.
+**To add a new language:**
+1. Copy `lang/en_us.yml` to `lang/xx_xx.yml` (replace `xx_xx` with your language code)
+2. Translate the messages
+3. Run `/hcfcore reload` — it becomes available immediately
 
-## Kits (`kits.yml`)
+**Color codes:**
+- Use `<red>`, `<green>`, `<blue>`, etc. for colors
+- `<success>`, `<deny>`, `<info>`, `<warning>` are semantic colors (don't hardcode red/green)
+- Legacy `&` codes like `&4` still work
+- Hex codes: `&#FF5555` for custom colors
 
-Each kit is a top-level key with its own permission, cooldown, optional
-cost, armor/contents, and optional class effects:
+**Placeholders:**
+- `{kit}`, `{player}`, `{seconds}`, `{faction}`, etc. get filled in automatically
+- Check `en_us.yml` to see what placeholders each message supports
 
-```yaml
-kits:
-  diamond:
-    permission: ''
-    cooldown-seconds: 30
-    icon: DIAMOND_CHESTPLATE
-    purpose: '<gray>All-round tank.'
-    armor:
-      - material: DIAMOND_HELMET
-        amount: 1
-      - material: DIAMOND_CHESTPLATE
-        amount: 1
-    contents:
-      - material: DIAMOND_SWORD
-        amount: 1
-        enchantments:
-          UNBREAKING: 3
-      - material: SPLASH_POTION
-        amount: 1
-        potion-effect: SPEED
-        potion-duration-ticks: 3600
-    effects:
-      - type: SPEED
-        amplifier: 0
-      - type: ABSORPTION
-        amplifier: 0
-```
+## Kits
 
-- `permission` — required to claim the kit; **blank (`''`) means open to
-  everyone**, with no permission check at all. The six shipped base kits
-  (`archer`, `miner`, `bard`, `diamond`, `rogue`, `mage`) ship this way;
-  their `-donator` variants keep a real permission node
-  (`hcfcore.kit.<name>.donator`).
-- `cooldown-seconds` — time before the kit can be claimed again; `0` means
-  no cooldown. Bypassed by `hcfcore.kit.bypasscooldown`.
-- `cost` — optional; omit entirely for a free kit (none of the shipped
-  kits have one). `cost.money` charges via Vault; `cost.item` +
-  `cost.item-amount` charges that many of a Material from the player's
-  inventory. Either, both, or neither can be set — both are checked and
-  charged as an atomic pair, only deducting if the player can afford
-  everything. Bypassed by `hcfcore.kit.bypasscost`.
-- `icon` — optional Material name overriding the `/kits` GUI icon. The
-  default is the kit's first non-air armor piece, else its first content
-  item, which doesn't always pick the recognizable piece — the shipped
-  `mage`/`mage-donator` kits set `CHAINMAIL_LEGGINGS` so they don't show
-  the same gold helmet as `bard`. An unknown material falls back to the
-  default rather than erroring.
-- `purpose` — optional one-line role blurb (MiniMessage or legacy `&`)
-  shown in the `/kits` GUI lore under the claimable/unclaimable line.
-  Omit it and nothing is shown. Both `icon` and `purpose` are preserved
-  by `/kit create`'s rewrite of `kits.yml`.
-- `armor` / `contents` — each entry is a plain map: `material` (or
-  `type`), `amount` (or `count`), an optional `enchantments` map
-  (`ENCHANTMENT_NAME: level`), an optional `potion-effect` +
-  `potion-duration-ticks` + `potion-amplifier` (for splash potions), and
-  an optional `ability` id tying the item to one of the ability listeners
-  in `abilities.yml`. The easiest way to populate these is `/kit save`,
-  then hand-edit `permission`/`cooldown-seconds`/`cost` afterward. Use
-  `/kit create`; the older `/kit save` alias remains supported.
-- `effects` — optional list of passive potion effects (`type` +
-  `amplifier`) granted while the player is wearing the kit's *exact* full
-  armor set (all four pieces, matched by material/enchants/etc., with
-  durability damage ignored so a worn set still counts), and removed the
-  moment any piece comes off. Applying is delayed by
-  `kits.effect-warmup-seconds` after the armor set first goes on, with a
-  chat message; an unrelated potion effect from PvP that happens to
-  override the same effect type doesn't retrigger that warmup or message
-  — the class effect just silently resumes once the external one wears
-  off, as long as the armor itself was never removed.
-- Claiming a kit never replaces worn armor. If armor is already equipped, the
-  kit armor is placed in storage inventory, and the claim is rejected with a
-  localized full-inventory message when it cannot fit. A kit cost is charged
-  only after all capacity and economy checks succeed.
+Edit `kits.yml` to create kits. Each kit has:
+- **permission** — blank (`''`) = open to everyone, or `hcfcore.kit.name` to restrict
+- **cooldown-seconds** — reuse timer (0 = no cooldown)
+- **cost** — optional money or item cost (or both)
+- **armor** — 4 armor pieces to give
+- **contents** — items for the inventory
+- **effects** — passive potion effects while wearing full armor set
+- **icon** — GUI icon (Material name)
+- **purpose** — one-line description in GUI
 
-Reloaded along with everything else on `/hcfcore reload`.
+**To create a kit:**
+1. Equip the armor and hold the items you want
+2. Run `/kit create mykit [permission] [cooldown] [cost]`
+3. Edit `kits.yml` if needed
+4. Run `/hcfcore reload`
 
-## Abilities (`abilities.yml`)
+**Example cost formats:**
+- `cost: {money: 50000}` — costs 50k money
+- `cost: {item: DIAMOND, item-amount: 32}` — costs 32 diamonds
+- `cost: {money: 50000, item: DIAMOND, item-amount: 32}` — costs both
 
-Fifteen PvP ability items ship pre-registered (the four `mage-*` debuffs
-share one row below), each with real gameplay behavior:
+**Class effects** — When a player wears the full armor set, they get passive buffs (e.g., Speed, Strength) after a 5-second delay. The delay gives visual feedback and prevents instant effect switching. Effects are removed immediately if any armor piece comes off.
 
-| Ability | Trigger | What it does |
-|---|---|---|
-| `pearl-stunner` | Melee hit | Stops the victim from using pearls for `stun-seconds`. |
-| `rabbits-feed` | Right-click | Grants yourself Speed V for `speed-duration-seconds`. |
-| `anti-blockup-bone` | Melee hit | After `hits-required` hits, the victim can't place blocks for `deny-seconds`. |
-| `fake-pearl` | Right-click | Throws a real `EnderPearl` (identical arc/sound) but cancels the teleport it would trigger on landing. |
-| `grappling-hook` | Right-click (twice) | First click casts a `FishHook`; a second click while it's out pulls you toward it, scaled by `forward-multiplier`/`y-multiplier`. |
-| `leap` | Right-click | Sets your velocity forward and slightly upward, scaled by `forward-multiplier`/`y-multiplier`, plus a short buff (`effect-type`/`effect-amplifier`/`effect-duration-seconds`). |
-| `rogue-backstab` | Melee hit, from behind | Deals bonus `damage` to an enemy struck from behind; consumed on use. |
-| `mage-wither` / `mage-slowness` / `mage-weakness` / `mage-poison` | Melee hit | Applies the named debuff (`effect-type`/`effect-amplifier`/`effect-duration-seconds`) to whoever you hit. |
-| `portable-bard` | Right-click | Opens a GUI to pick Strength/Speed/Resistance/Regeneration/Jump Boost; applies it, for `buff-seconds`, to you and every online member of your faction. In the full gold bard set the item cooldown is `bard-cooldown-seconds` (6s) instead of `cooldown-seconds`, and putting the gold set on shortens an outstanding out-of-class cooldown down to that same wait, so a player who used the item in another kit isn't locked out of the bard kit they just geared into. Each individual buff also has its own `buff-cooldown-seconds` (7s) cooldown, so buffs can be rotated but not repeated back to back. |
-| `repair` | Right-click | Grants `permission-node` (default `essentials.fix`) via LuckPerms for `duration-seconds`, with a live countdown on your scoreboard. Requires LuckPerms installed. |
-| `switcher-snowball` | Throw + hit | Swaps positions with whichever enemy (not a faction member) it hits. |
-| `time-warp-pearl` | Right-click | Teleports you back to wherever you last threw a *real* ender pearl from. |
+**Armor matching** — Matching is exact: same material, enchantments, and durability (worn armor counts). A diamond kit won't match enchanted diamond armor.
 
-```yaml
-abilities:
-  grappling-hook:
-    material: FISHING_ROD
-    name: '<light_purple>Grappling Hook'
-    lore:
-      - '<gray>Hook a block or player and'
-      - '<gray>reel yourself toward it.'
-    cooldown-seconds: 20
-    uses: 8
-    forward-multiplier: 1.6
-    y-multiplier: 0.8
-```
+## Abilities
 
-- `material` / `name` / `lore` — fully configurable per ability; `name`
-  and each `lore` line accept MiniMessage tags and legacy `&` color codes.
-- Ability items are consumed only after successful activation. The grappling
-  hook has 8 uses by default and breaks after its eighth successful pull;
-  `rogue-backstab` is consumed on its single use.
-- `cooldown-seconds` — per-item cooldown, persisted to MySQL (its own
-  `ability_cooldowns` table, separate from kit cooldowns) so it survives a
-  restart. `/cooldowns` lists a player's own active kit, ability, global,
-  and vanilla-item cooldowns.
-- Everything else under an ability's section (`forward-multiplier`,
-  `hits-required`, `buff-seconds`, `duration-seconds`, `permission-node`,
-  `effect-type`/`effect-amplifier`/`effect-duration-seconds`, etc.) is
-  that ability's own extra config, documented in the table above. All
-  per-ability tuning lives here rather than in `config.yml`, which only
-  carries the server-wide `global-cooldown-seconds`,
-  `max-getitem-amount`, and `disabled-regions`.
-- `switcher-snowball` and `portable-bard` use **FactionsUUID** to tell
-  faction members apart from enemies — see `FactionsHook`.
-- `repair` degrades gracefully without LuckPerms installed: it tells the
-  player it's unavailable and doesn't consume a cooldown, the same way a
-  kit's money cost behaves without Vault.
+Fifteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
+- **material** / **name** / **lore** — fully customizable appearance
+- **cooldown-seconds** — reuse timer (saved to database, persists across restarts)
+- **uses** — number of uses before breaking (optional)
+- Ability-specific settings (e.g., `forward-multiplier`, `duration-seconds`)
 
-Reloaded along with everything else on `/hcfcore reload`.
+**Ability List:**
+- **Pearl Stunner** (melee) — Blocks victim's pearl use
+- **Rabbits Feed** (right-click) — Speed V buff
+- **Anti-Blockup Bone** (melee) — Block placement denial after N hits
+- **Fake Pearl** (right-click) — Looks like ender pearl but no teleport
+- **Grappling Hook** (right-click) — Fish hook pull mechanic (8 uses)
+- **Leap** (right-click) — Jump forward with velocity
+- **Rogue Backstab** (melee from behind) — Extra damage
+- **Mage Debuffs** (melee) — Wither/Slowness/Weakness/Poison
+- **Portable Bard** (right-click) — Pick a buff for your faction (in gold armor set)
+- **Repair** (right-click) — Grant block-breaking permission (needs LuckPerms)
+- **Switcher Snowball** (throw) — Swap positions with enemy
+- **Time Warp Pearl** (right-click) — Teleport to last pearl throw location
+
+**Key behaviors:**
+- Items are only consumed after successful activation
+- Cooldowns block usage again until timer expires
+- `/cooldowns` shows all active cooldown timers
+- **Global cooldown** (default 4s) blocks all abilities while active
+- Abilities disabled in regions (set in `config.yml`)
 
 ## Tags (`tags.yml`)
 
