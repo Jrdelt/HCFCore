@@ -11,6 +11,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.PrepareAnvilEvent;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
@@ -31,11 +33,37 @@ public final class TagMenuListener implements Listener {
         }
     }
 
+    /**
+     * Keeps the search anvil's result slot free and up to date as the
+     * player types. Renaming in an anvil normally costs XP levels, which
+     * greys the result out and leaves no way to click through and commit
+     * the search.
+     */
+    @EventHandler
+    public void onPrepareAnvil(PrepareAnvilEvent event) {
+        if (!(event.getInventory().getHolder() instanceof TagSearchMenu.Holder holder)) {
+            return;
+        }
+        if (!(event.getView().getPlayer() instanceof Player player)) {
+            return;
+        }
+        event.getView().setRepairCost(0);
+        event.getView().setMaximumRepairCost(0);
+        event.setResult(TagSearchMenu.confirmButton(player, holder.messages(),
+                TagSearchMenu.readQuery(player, holder.messages(), event.getInventory())));
+    }
+
     @EventHandler
     public void onClick(InventoryClickEvent event) {
         Object rawHolder = event.getInventory().getHolder();
-        if (rawHolder instanceof TagSearchMenu.Holder) {
+        if (rawHolder instanceof TagSearchMenu.Holder searchHolder) {
+            // Cancelled regardless: the confirm button is a button, never
+            // an item the player takes out of the anvil.
             event.setCancelled(true);
+            if (event.getRawSlot() == TagSearchMenu.SLOT_RESULT
+                    && event.getWhoClicked() instanceof Player player) {
+                commitSearch(player, event.getInventory(), searchHolder);
+            }
             return;
         }
         if (!(rawHolder instanceof TagMenu.Holder holder)) {
@@ -57,8 +85,22 @@ public final class TagMenuListener implements Listener {
         if (!(event.getPlayer() instanceof Player player)) {
             return;
         }
-        String query = TagSearchMenu.readQuery(event.getInventory());
-        TagMenuState nextState = holder.state().withSearchQuery(query == null || query.isBlank() ? null : query.trim());
+        // Clicking confirm already applied the search and is reopening the
+        // tags menu, which is what closed this one -- don't apply it twice.
+        if (holder.committed()) {
+            return;
+        }
+        commitSearch(player, event.getInventory(), holder);
+    }
+
+    /**
+     * Applies whatever is currently typed in the search anvil and returns
+     * the player to the tags menu, filtered to it.
+     */
+    private void commitSearch(Player player, Inventory inventory, TagSearchMenu.Holder holder) {
+        holder.markCommitted();
+        String query = TagSearchMenu.readQuery(player, holder.messages(), inventory);
+        TagMenuState nextState = holder.state().withSearchQuery(query);
         Bukkit.getScheduler().runTask(plugin, () -> TagMenu.open(player, holder.manager(), holder.messages(), nextState));
     }
 

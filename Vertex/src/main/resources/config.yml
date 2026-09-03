@@ -15,32 +15,41 @@ mysql:
 
 scoreboard:
   update-interval-ticks: 20
-  title: '<white><bold>FACTIONS<reset>   <gray>{date}'
+  title: '<blue><bold>ꜰᴀᴄᴛɪᴏɴꜱ<reset>   <gray>{date}'
   date-format: 'MM/dd'
   lines:
-    - '<white><bold>{name}'
-    - '<gray>Experience: <white>{exp}'
-    - '<gray>Balance: <white>{balance}'
+    - '     <gray>Season I'
+    - '   <gray>{rank_prefix}{name}'
+    - '<gray>• <red>Experience: <white>{exp}'
+    - '<gray>• <red>Balance: <white>{balance}'
     - ''
     - '<white>{faction} <gray>[<yellow>#{ftop}<gray>]'
     - '<gray> <red>• Power: <white>{power}'
     - '<gray> <red>• Online: <white>{fplayers_online}'
     - ''
-    - '<aqua>play.example.com'
+    - '<gray>hub.mc-vertex.com'
 
 chat:
-  separator: '<gray>»</gray>'
-  faction-format: '<gold>[{faction}]</gold> '
-  rank-format: '<light_purple>[{rank}]</light_purple> '
-  name-format: '<white>{name}</white>'
+  separator: ' <gray>» </gray>'
+  faction-format: '<gray>[{faction}]</gray> '
+  rank-format: '<gray>[{rank}]</gray> '
+  name-format: '{name} '
 
 pvp:
   combat-tag-seconds: 30
-  pearl-cooldown-seconds: 15
-  golden-apple-cooldown-seconds: 10
-  enchanted-golden-apple-cooldown-seconds: 30
+  pearl-cooldown-seconds: 12
+  golden-apple-cooldown-seconds: 8
+  enchanted-golden-apple-cooldown-seconds: 120
   logout-penalty: true
-  actionbar-update-interval-ticks: 4
+  actionbar-update-interval-ticks: 2
+  # Archer tag: an archer's arrows mark the victim, and each stack makes
+  # further arrows hurt more. The archer's own faction also gets the
+  # (smaller) melee bonus against them; nobody else does.
+  archer-tag:
+    duration-seconds: 10
+    max-stacks: 4
+    arrow-damage-bonus-per-stack: 0.15
+    faction-melee-bonus-per-stack: 0.05
   legacy-combat:
     enabled: true
     # Empty means every world. Add world names to limit legacy PvP.
@@ -56,17 +65,17 @@ factions:
     - factions
 
 kits:
-  default-cooldown-seconds: 300
-  effect-warmup-seconds: 3
+  default-cooldown-seconds: 30
+  effect-warmup-seconds: 5
   max-cooldown-seconds: 86400
   max-money-cost: 1000000000.0
   max-cost-item-amount: 64
 
 abilities:
-  global-cooldown-seconds: 3
+  global-cooldown-seconds: 4
   max-getitem-amount: 64
-  pearl-stunner-seconds: 8
-  rabbits-feed-speed-seconds: 8
+  # Per-ability tuning (durations, multipliers, cooldowns) lives with the
+  # ability itself in abilities.yml -- only server-wide limits belong here.
   disabled-regions:
     - spawn
 

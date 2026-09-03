@@ -4,6 +4,7 @@ import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.ability.AbilityManager;
 import me.hcfcore.core.economy.EconomyHook;
 import me.hcfcore.core.lang.MessageFormatter;
+import me.hcfcore.core.luckperms.LuckPermsHook;
 import me.hcfcore.core.user.UserManager;
 import io.papermc.paper.scoreboard.numbers.NumberFormat;
 import net.kyori.adventure.text.Component;
@@ -163,10 +164,14 @@ public final class ScoreboardManager {
 
     private String resolvePlaceholders(Player player, String template) {
         Map<String, String> custom = customPlaceholders.getOrDefault(player.getUniqueId(), Map.of());
+        String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
+        String rankPrefix = rank == null || rank.isBlank() ? "" : "[" + rank + "] ";
         return template
                 .replace("{date}", LocalDate.now().format(dateFormatter))
                 .replace("{online}", String.valueOf(Bukkit.getOnlinePlayers().size()))
                 .replace("{name}", player.getName())
+                .replace("{rank_prefix}", rankPrefix)
+                .replace("{rank}", rank == null ? "" : rank)
                 .replace("{exp}", String.valueOf(player.getLevel()))
                 .replace("{balance}", EconomyHook.getBalance(player))
                 .replace("{faction}", FactionsHook.getFactionTag(player))

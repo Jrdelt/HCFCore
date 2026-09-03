@@ -35,6 +35,10 @@ tags:
   search-hint-left: '<gray>Clic izquierdo para buscar un tag.'
   search-hint-right: '<gray>Clic derecho para limpiar tu busqueda.'
   search-prompt: 'Escribe el nombre de un tag...'
+  search-confirm: '<green>Buscar "{query}"'
+  search-confirm-hint: '<gray>Clic para filtrar tus tags.'
+  search-confirm-empty: '<gray>No escribiste una busqueda'
+  search-confirm-empty-hint: '<gray>Escribe el nombre de un tag arriba y haz clic aqui.'
   nickname-heading: '<green>Combina tu apodo con el color de tu tag!'
   nickname-status-on: '<green>Activado'
   nickname-status-off: '<red>Desactivado'
@@ -49,6 +53,10 @@ tags:
 cooldowns:
   title: '<gold>Enfriamientos activos'
   none: '<gray>No hay enfriamientos activos.'
+  ender-pearl: 'Perla de Ender'
+  golden-apple: 'Manzana dorada'
+  enchanted-golden-apple: 'Manzana dorada encantada'
+  item-on-cooldown: '<red>{item} está en enfriamiento durante otros {seconds}s.'
 
 language:
   usage: '<red>Uso: /language <codigo>'
@@ -83,6 +91,8 @@ kit:
   gui-cost-item: '<white>Costo: {amount}x {item}'
   gui-left-click: '<gray>Clic izquierdo para reclamar.'
   gui-right-click: '<gray>Clic derecho para ver el contenido.'
+  gui-previous-page: '<yellow>Pagina anterior'
+  gui-next-page: '<yellow>Pagina siguiente'
   preview-title: 'Vista previa: {kit}'
 
 combat:
@@ -108,9 +118,14 @@ combat:
   actionbar-you: '<green>Tu'
   actionbar-them: '<red>Ellos'
 
+archer:
+  tag-applied: '<gold>{player} esta marcado por arquero ({seconds}s) <gray>- <red>+{percent}% con flechas <gray>/ <red>+{melee}% cuerpo a cuerpo de tu faccion<gray>.'
+  tag-received: '<red>Estas marcado por el arquero {player} ({seconds}s) y recibiras +{percent}% de dano con flechas y +{melee}% cuerpo a cuerpo de su faccion.'
+
 ability:
   on-global-cooldown: '<red>Estas en espera de habilidades por otros {seconds}s.'
   on-cooldown: '<red>Puedes volver a usar esto en {seconds}s.'
+  bard-cooldown-shortened: '<green>Tu espera de Bardo Portatil bajo a {seconds}s por llevar el equipo de bardo.'
   region-blocked: '<red>Las habilidades no se pueden usar aqui.'
   getitem-usage: '<red>Uso: /getitem <usuario> <habilidad> [cantidad]'
   getitem-not-found: '<red>No existe una habilidad llamada ''{ability}''.'

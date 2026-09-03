@@ -17,6 +17,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.plugin.Plugin;
@@ -38,6 +39,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -57,6 +59,7 @@ public final class KitManager {
     private final Map<UUID, Long> effectWarmups = new ConcurrentHashMap<>();
     private final AtomicLong effectWarmupGeneration = new AtomicLong();
     private final Map<UUID, Kit> activeEffectKits = new ConcurrentHashMap<>();
+    private final java.util.Set<CompletableFuture<Void>> pendingCooldownWrites = ConcurrentHashMap.newKeySet();
     private BukkitTask armorMonitorTask;
     private final Map<String, Kit> kits = new LinkedHashMap<>();
     // Single thread so concurrent /kit save and /kit delete calls persist in
@@ -116,7 +119,10 @@ public final class KitManager {
             ItemStack[] contents = readItems(sectionMap.get("contents"));
             Kit.Cost cost = readCost(sectionMap.get("cost"));
             List<Kit.Effect> effects = readEffects(sectionMap.get("effects"));
-            kits.put(name.toLowerCase(Locale.ROOT), new Kit(name, permission, cooldown, armor, contents, cost, effects));
+            String icon = asString(sectionMap.get("icon"), null);
+            String purpose = asString(sectionMap.get("purpose"), null);
+            kits.put(name.toLowerCase(Locale.ROOT),
+                    new Kit(name, permission, cooldown, armor, contents, cost, effects, icon, purpose));
         }
     }
 
@@ -438,13 +444,16 @@ public final class KitManager {
             long newExpiry = now + kit.getCooldownSeconds() * 1000L;
             user.setCooldownExpiry(key, newExpiry);
 
-            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            UUID playerId = player.getUniqueId();
+            CompletableFuture<Void> write = CompletableFuture.runAsync(() -> {
                 try {
-                    storage.saveCooldown(player.getUniqueId(), key, newExpiry);
+                    storage.saveCooldown(playerId, key, newExpiry);
                 } catch (Exception e) {
-                    plugin.getLogger().log(Level.WARNING, "Failed to persist kit cooldown for " + player.getUniqueId(), e);
+                    plugin.getLogger().log(Level.WARNING, "Failed to persist kit cooldown for " + playerId, e);
                 }
-            });
+            }, ioExecutor);
+            pendingCooldownWrites.add(write);
+            write.whenComplete((ignored, error) -> pendingCooldownWrites.remove(write));
         }
     }
 
@@ -535,11 +544,33 @@ public final class KitManager {
                 if (actualItem != expectedItem) {
                     return false;
                 }
-            } else if (!actualItem.isSimilar(expectedItem)) {
+            } else if (!withoutWear(actualItem).isSimilar(withoutWear(expectedItem))) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * A copy of `item` with its durability reset, for comparison only.
+     *
+     * <p>isSimilar() compares ItemMeta, and durability lives in the meta
+     * as Damageable#damage -- so armor that has taken any wear (a creeper
+     * explosion chewing all four pieces at once, or just ordinary combat)
+     * would stop matching the pristine kit definition and be read as the
+     * player having taken the set off. Only wear is normalized away:
+     * enchantments and the rest of the meta still have to match, which is
+     * what distinguishes e.g. the archer kit from its donator variant.
+     */
+    private static ItemStack withoutWear(ItemStack item) {
+        if (!(item.getItemMeta() instanceof Damageable meta) || !meta.hasDamage()) {
+            return item;
+        }
+        ItemStack copy = item.clone();
+        Damageable copyMeta = (Damageable) copy.getItemMeta();
+        copyMeta.setDamage(0);
+        copy.setItemMeta(copyMeta);
+        return copy;
     }
 
     private static void applyEffects(Player player, Kit kit) {
@@ -697,6 +728,12 @@ public final class KitManager {
                     if (!kit.getEffects().isEmpty()) {
                         config.set(path + ".effects", serializeEffects(kit.getEffects()));
                     }
+                    if (kit.getIcon() != null && !kit.getIcon().isBlank()) {
+                        config.set(path + ".icon", kit.getIcon());
+                    }
+                    if (kit.getPurpose() != null && !kit.getPurpose().isBlank()) {
+                        config.set(path + ".purpose", kit.getPurpose());
+                    }
                 }
 
                 try {
@@ -745,6 +782,7 @@ public final class KitManager {
         stopArmorMonitor();
         saveGeneration.incrementAndGet();
         waitForPendingPersist();
+        awaitCooldownWrites();
         ioExecutor.shutdown();
         try {
             if (!ioExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -754,6 +792,19 @@ public final class KitManager {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             ioExecutor.shutdownNow();
+        }
+    }
+
+    private void awaitCooldownWrites() {
+        try {
+            CompletableFuture.allOf(pendingCooldownWrites.toArray(new CompletableFuture[0]))
+                    .get(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (java.util.concurrent.TimeoutException e) {
+            plugin.getLogger().warning("Timed out waiting for kit cooldown writes during shutdown.");
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Failed while waiting for kit cooldown writes.", e);
         }
     }
 }

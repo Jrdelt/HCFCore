@@ -35,6 +35,10 @@ tags:
   search-hint-left: '<gray>Clique esquerdo para buscar uma tag.'
   search-hint-right: '<gray>Clique direito para limpar sua busca.'
   search-prompt: 'Digite o nome de uma tag...'
+  search-confirm: '<green>Buscar "{query}"'
+  search-confirm-hint: '<gray>Clique para filtrar suas tags.'
+  search-confirm-empty: '<gray>Nenhuma busca digitada'
+  search-confirm-empty-hint: '<gray>Digite o nome de uma tag acima e clique aqui.'
   nickname-heading: '<green>Combine seu apelido com a cor da sua tag!'
   nickname-status-on: '<green>Ativado'
   nickname-status-off: '<red>Desativado'
@@ -49,6 +53,10 @@ tags:
 cooldowns:
   title: '<gold>Recargas ativas'
   none: '<gray>Nenhuma recarga ativa.'
+  ender-pearl: 'Pérola do End'
+  golden-apple: 'Maçã dourada'
+  enchanted-golden-apple: 'Maçã dourada encantada'
+  item-on-cooldown: '<red>{item} está em recarga por mais {seconds}s.'
 
 language:
   usage: '<red>Uso: /language <codigo>'
@@ -83,6 +91,8 @@ kit:
   gui-cost-item: '<white>Custo: {amount}x {item}'
   gui-left-click: '<gray>Clique esquerdo para resgatar.'
   gui-right-click: '<gray>Clique direito para ver o conteudo.'
+  gui-previous-page: '<yellow>Pagina anterior'
+  gui-next-page: '<yellow>Proxima pagina'
   preview-title: 'Previa: {kit}'
 
 combat:
@@ -108,9 +118,14 @@ combat:
   actionbar-you: '<green>Voce'
   actionbar-them: '<red>Eles'
 
+archer:
+  tag-applied: '<gold>{player} esta marcado pelo arqueiro ({seconds}s) <gray>- <red>+{percent}% de flecha <gray>/ <red>+{melee}% corpo a corpo da sua faccao<gray>.'
+  tag-received: '<red>Voce esta marcado pelo arqueiro {player} ({seconds}s) e vai receber +{percent}% de dano de flecha e +{melee}% corpo a corpo da faccao dele.'
+
 ability:
   on-global-cooldown: '<red>Voce esta em espera de habilidades por mais {seconds}s.'
   on-cooldown: '<red>Voce pode usar isso novamente em {seconds}s.'
+  bard-cooldown-shortened: '<green>Sua espera do Bardo Portatil caiu para {seconds}s por usar o kit de bardo.'
   region-blocked: '<red>Habilidades nao podem ser usadas aqui.'
   getitem-usage: '<red>Uso: /getitem <usuario> <habilidade> [quantidade]'
   getitem-not-found: '<red>Nenhuma habilidade chamada ''{ability}''.'

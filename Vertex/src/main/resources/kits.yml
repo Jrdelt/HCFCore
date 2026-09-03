@@ -1,7 +1,7 @@
 kits:
   archer:
     permission: ''
-    cooldown-seconds: 600
+    cooldown-seconds: 30
     armor:
       - material: LEATHER_HELMET
         amount: 1
@@ -76,7 +76,7 @@ kits:
 
   miner:
     permission: ''
-    cooldown-seconds: 600
+    cooldown-seconds: 30
     armor:
       - material: IRON_HELMET
         amount: 1
@@ -149,7 +149,7 @@ kits:
 
   bard:
     permission: ''
-    cooldown-seconds: 600
+    cooldown-seconds: 30
     armor:
       - material: GOLDEN_HELMET
         amount: 1
@@ -183,7 +183,7 @@ kits:
       - type: RESISTANCE
         amplifier: 1
       - type: WEAKNESS
-        amplifier: 3
+        amplifier: 0
 
   bard-donator:
     permission: hcfcore.kit.bard.donator
@@ -225,11 +225,11 @@ kits:
       - type: RESISTANCE
         amplifier: 1
       - type: WEAKNESS
-        amplifier: 3
+        amplifier: 0
 
   diamond:
     permission: ''
-    cooldown-seconds: 600
+    cooldown-seconds: 30
     armor:
       - material: DIAMOND_HELMET
         amount: 1
@@ -290,7 +290,7 @@ kits:
 
   rogue:
     permission: ''
-    cooldown-seconds: 600
+    cooldown-seconds: 30
     armor:
       - material: CHAINMAIL_HELMET
         amount: 1
@@ -347,7 +347,8 @@ kits:
 
   mage:
     permission: ''
-    cooldown-seconds: 600
+    cooldown-seconds: 30
+    icon: CHAINMAIL_LEGGINGS
     armor:
       - material: GOLDEN_HELMET
         amount: 1
@@ -379,6 +380,7 @@ kits:
   mage-donator:
     permission: hcfcore.kit.mage.donator
     cooldown-seconds: 300
+    icon: CHAINMAIL_LEGGINGS
     armor:
       - material: GOLDEN_HELMET
         amount: 1

@@ -35,6 +35,10 @@ tags:
   search-hint-left: '<gray>Linksklick, um nach einem Tag zu suchen.'
   search-hint-right: '<gray>Rechtsklick, um deine Suche zu loeschen.'
   search-prompt: 'Gib einen Tag-Namen ein...'
+  search-confirm: '<green>Nach "{query}" suchen'
+  search-confirm-hint: '<gray>Klicke, um deine Tags zu filtern.'
+  search-confirm-empty: '<gray>Keine Suche eingegeben'
+  search-confirm-empty-hint: '<gray>Gib oben einen Tag-Namen ein und klicke hier.'
   nickname-heading: '<green>Passe deinen Namen an die Farbe deines Tags an!'
   nickname-status-on: '<green>Aktiviert'
   nickname-status-off: '<red>Deaktiviert'
@@ -49,6 +53,10 @@ tags:
 cooldowns:
   title: '<gold>Aktive Abklingzeiten'
   none: '<gray>Keine aktiven Abklingzeiten.'
+  ender-pearl: 'Enderperle'
+  golden-apple: 'Goldener Apfel'
+  enchanted-golden-apple: 'Verzauberter goldener Apfel'
+  item-on-cooldown: '<red>{item} hat noch {seconds}s Abklingzeit.'
 
 language:
   usage: '<red>Verwendung: /language <Code>'
@@ -83,6 +91,8 @@ kit:
   gui-cost-item: '<white>Kosten: {amount}x {item}'
   gui-left-click: '<gray>Linksklick zum Abholen.'
   gui-right-click: '<gray>Rechtsklick zur Vorschau.'
+  gui-previous-page: '<yellow>Vorherige Seite'
+  gui-next-page: '<yellow>Naechste Seite'
   preview-title: 'Vorschau: {kit}'
 
 combat:
@@ -108,9 +118,14 @@ combat:
   actionbar-you: '<green>Du'
   actionbar-them: '<red>Sie'
 
+archer:
+  tag-applied: '<gold>{player} ist bogenschuetzen-markiert ({seconds}s) <gray>- <red>+{percent}% Pfeilschaden <gray>/ <red>+{melee}% Nahkampf deiner Fraktion<gray>.'
+  tag-received: '<red>Du bist von {player} bogenschuetzen-markiert ({seconds}s) und erleidest +{percent}% Pfeilschaden und +{melee}% Nahkampfschaden von seiner Fraktion.'
+
 ability:
   on-global-cooldown: '<red>Du bist noch {seconds}s in der globalen Faehigkeiten-Abklingzeit.'
   on-cooldown: '<red>Du kannst das in {seconds}s wieder benutzen.'
+  bard-cooldown-shortened: '<green>Deine Abklingzeit fuer den Tragbaren Barden faellt auf {seconds}s, weil du das Barden-Set traegst.'
   region-blocked: '<red>Faehigkeiten koennen hier nicht benutzt werden.'
   getitem-usage: '<red>Verwendung: /getitem <Benutzername> <Faehigkeit> [Menge]'
   getitem-not-found: '<red>Keine Faehigkeit namens ''{ability}''.'

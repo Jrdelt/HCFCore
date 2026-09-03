@@ -1,11 +1,4 @@
 tags:
-  gladiator:
-    display: "<gradient:#ff4b2b:#ff416c>GLADIATOR</gradient>"
-    permission: hcfcore.tag.gladiator
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Bred for the arena.'
   berserker:
     display: "<gradient:#ff512f:#f09819>Berserker</gradient>"
     permission: hcfcore.tag.berserker
@@ -13,333 +6,67 @@ tags:
     owners: 0
     lore:
       - '<gray>Driven by pure rage.'
-  warlord:
-    display: "<gradient:#f7b733:#fc4a1a>WARLORD</gradient>"
-    permission: hcfcore.tag.warlord
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Commands the battlefield.'
-  assassin:
-    display: "<gradient:#8e2de2:#4a00e0>Assassin</gradient>"
-    permission: hcfcore.tag.assassin
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Strikes from the shadows.'
-  shadow:
-    display: "<gradient:#4ca1af:#2c3e50>SHADOW</gradient>"
-    permission: hcfcore.tag.shadow
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Unseen and lethal.'
-  sniper:
-    display: "<gradient:#00c6ff:#0072ff>Sniper</gradient>"
-    permission: hcfcore.tag.sniper
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>One shot, one kill.'
-  juggernaut:
-    display: "<gradient:#11998e:#38ef7d>JUGGERNAUT</gradient>"
-    permission: hcfcore.tag.juggernaut
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>An unstoppable force.'
-  immortal:
-    display: "<gradient:#00b4db:#0083b0>Immortal</gradient>"
-    permission: hcfcore.tag.immortal
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Refuses to stay down.'
-  executioner:
-    display: "<gradient:#cb2d3e:#ef473a>EXECUTIONER</gradient>"
-    permission: hcfcore.tag.executioner
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Delivers the final blow.'
-  reaper:
-    display: "<gradient:#232526:#414345>Reaper</gradient>"
-    permission: hcfcore.tag.reaper
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Harvesting souls daily.'
-  apex:
-    display: "<gradient:#f12711:#f5af19>APEX</gradient>"
-    permission: hcfcore.tag.apex
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>At the top of the food chain.'
-  overlord:
-    display: "<gradient:#ff0844:#ffb199>Overlord</gradient>"
-    permission: hcfcore.tag.overlord
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Rules with an iron fist.'
-  champion:
-    display: "<gradient:#ffe000:#799f0c>CHAMPION</gradient>"
-    permission: hcfcore.tag.champion
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Victorious in every clash.'
-  destroyer:
-    display: "<gradient:#ff9966:#ff5e62>Destroyer</gradient>"
-    permission: hcfcore.tag.destroyer
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Leaves nothing behind.'
-  vanguard:
-    display: "<gradient:#2193b0:#6dd5ed>VANGUARD</gradient>"
-    permission: hcfcore.tag.vanguard
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Leads the charge.'
   venom:
-    display: "<gradient:#56ab2f:#a8e063>Venom</gradient>"
+    display: "<gradient:#00b09b:#96c93d>Venom</gradient>"
     permission: hcfcore.tag.venom
     created-at: 1725235200000
     owners: 0
     lore:
-      - '<gray>Slow and painful demise.'
-  phantom:
-    display: "<gradient:#bdc3c7:#2c3e50>PHANTOM</gradient>"
-    permission: hcfcore.tag.phantom
+      - '<gray>Toxic strike.'
+  ruin:
+    display: "<gradient:#f12711:#f5af19>Ruin</gradient>"
+    permission: hcfcore.tag.ruin
     created-at: 1725235200000
     owners: 0
     lore:
-      - '<gray>Here one second, gone the next.'
-  titan:
-    display: "<gradient:#3e5151:#decba4>Titan</gradient>"
-    permission: hcfcore.tag.titan
+      - '<gray>Bring total collapse.'
+  apocalypse:
+    display: "<gradient:#232526:#414345>Apocalypse</gradient>"
+    permission: hcfcore.tag.apocalypse
     created-at: 1725235200000
     owners: 0
     lore:
-      - '<gray>Massive presence, heavy hits.'
-  demon:
-    display: "<gradient:#870000:#190000>DEMON</gradient>"
-    permission: hcfcore.tag.demon
+      - '<gray>The end of days.'
+  slaughter:
+    display: "<gradient:#870000:#190a05>Slaughter</gradient>"
+    permission: hcfcore.tag.slaughter
     created-at: 1725235200000
     owners: 0
     lore:
-      - '<gray>Unleashed from the depths.'
-  spectre:
-    display: "<gradient:#134e5e:#71b280>Spectre</gradient>"
-    permission: hcfcore.tag.spectre
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Haunts the enemy spawn.'
-  storm:
-    display: "<gradient:#005c97:#363795>STORM</gradient>"
-    permission: hcfcore.tag.storm
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Strikes fast and heavy.'
-  blitz:
-    display: "<gradient:#f37335:#fdc830>Blitz</gradient>"
-    permission: hcfcore.tag.blitz
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Speed kills.'
-  goliath:
-    display: "<gradient:#757f9a:#d7dde8>GOLIATH</gradient>"
-    permission: hcfcore.tag.goliath
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>The bigger they are...'
-  savage:
-    display: "<gradient:#ff4e50:#f9d423>Savage</gradient>"
-    permission: hcfcore.tag.savage
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Shows zero mercy.'
-  merciless:
-    display: "<gradient:#ed213a:#93291e>MERCILESS</gradient>"
-    permission: hcfcore.tag.merciless
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>No quarter given.'
-  striker:
-    display: "<gradient:#11998e:#38ef7d>Striker</gradient>"
-    permission: hcfcore.tag.striker
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Precise and deadly strikes.'
-  renegade:
-    display: "<gradient:#eb3349:#f45c43>RENEGADE</gradient>"
-    permission: hcfcore.tag.renegade
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Fights by no rules.'
-  predator:
-    display: "<gradient:#134e5e:#ff7b00>Predator</gradient>"
-    permission: hcfcore.tag.predator
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Tracks down every target.'
-  stalker:
-    display: "<gradient:#659999:#f4791f>STALKER</gradient>"
-    permission: hcfcore.tag.stalker
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Always watching from behind.'
-  warlock:
-    display: "<gradient:#7f00ff:#e100ff>Warlock</gradient>"
-    permission: hcfcore.tag.warlock
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Master of potions and debuffs.'
-  paladin:
-    display: "<gradient:#fffc00:#fc00ff>PALADIN</gradient>"
-    permission: hcfcore.tag.paladin
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Holy defense in battle.'
-  inquisitor:
-    display: "<gradient:#870000:#4e0000>Inquisitor</gradient>"
-    permission: hcfcore.tag.inquisitor
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Purging the enemies.'
-  brawler:
-    display: "<gradient:#ff416c:#ff4b2b>BRAWLER</gradient>"
-    permission: hcfcore.tag.brawler
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Loves a messy close-up fight.'
-  glitch:
-    display: "<gradient:#00ffff:#ff00ff>Glitch</gradient>"
-    permission: hcfcore.tag.glitch
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Breaking the combat system.'
-  rage:
-    display: "<gradient:#f12711:#ff512f>RAGE</gradient>"
-    permission: hcfcore.tag.rage
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Fueled by pure adrenaline.'
-  hazard:
-    display: "<gradient:#f39c12:#f1c40f>Hazard</gradient>"
-    permission: hcfcore.tag.hazard
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Dangerous to be near.'
-  bandit:
-    display: "<gradient:#9796f0:#fbc7d4>BANDIT</gradient>"
-    permission: hcfcore.tag.bandit
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Loot, pillage, repeat.'
+      - '<gray>No mercy given.'
   frostbite:
-    display: "<gradient:#e0c3fc:#8ec5fc>Frostbite</gradient>"
+    display: "<gradient:#2980b9:#6dd5fa>Frostbite</gradient>"
     permission: hcfcore.tag.frostbite
     created-at: 1725235200000
     owners: 0
     lore:
-      - '<gray>Freezing out the competition.'
-  inferno:
-    display: "<gradient:#f857a6:#ff5858>INFERNO</gradient>"
-    permission: hcfcore.tag.inferno
+      - '<gray>Frozen in combat.'
+  typhoon:
+    display: "<gradient:#1f4037:#99f2c8>Typhoon</gradient>"
+    permission: hcfcore.tag.typhoon
     created-at: 1725235200000
     owners: 0
     lore:
-      - '<gray>Burning down enemy bases.'
-  spectator:
-    display: "<gradient:#434343:#000000>Spectator</gradient>"
-    permission: hcfcore.tag.spectator
+      - '<gray>Sweeps away the enemy.'
+  eclipse:
+    display: "<gradient:#0f2027:#203a43:#2c5364>Eclipse</gradient>"
+    permission: hcfcore.tag.eclipse
     created-at: 1725235200000
     owners: 0
     lore:
-      - '<gray>Watching them fall.'
-  cavalry:
-    display: "<gradient:#f2994a:#f2c94c>CAVALRY</gradient>"
-    permission: hcfcore.tag.cavalry
+      - '<gray>Shadows conceal the kill.'
+  butcher:
+    display: "<gradient:#cb356b:#bd3f32>Butcher</gradient>"
+    permission: hcfcore.tag.butcher
     created-at: 1725235200000
     owners: 0
     lore:
-      - '<gray>Charging headfirst.'
-  sentinel:
-    display: "<gradient:#007991:#78ffd6>Sentinel</gradient>"
-    permission: hcfcore.tag.sentinel
+      - '<gray>Swift execution.'
+  vortex:
+    display: "<gradient:#3a1c71:#d76d77:#ffaf7b>Vortex</gradient>"
+    permission: hcfcore.tag.vortex
     created-at: 1725235200000
     owners: 0
     lore:
-      - '<gray>Guarding the territory.'
-  mutiny:
-    display: "<gradient:#ff416c:#841b2e>MUTINY</gradient>"
-    permission: hcfcore.tag.mutiny
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Turning against the faction.'
-  anarchy:
-    display: "<gradient:#cc2b5e:#753a88>Anarchy</gradient>"
-    permission: hcfcore.tag.anarchy
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Order through chaos.'
-  colossus:
-    display: "<gradient:#2c3e50:#000000>COLOSSUS</gradient>"
-    permission: hcfcore.tag.colossus
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Harder to break than stone.'
-  vengeance:
-    display: "<gradient:#ff0099:#493240>Vengeance</gradient>"
-    permission: hcfcore.tag.vengeance
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Returning for payback.'
-  viper:
-    display: "<gradient:#00b09b:#96c93d>VIPER</gradient>"
-    permission: hcfcore.tag.viper
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Quick strike, toxic finish.'
-  dominator:
-    display: "<gradient:#ff8008:#ffc837>Dominator</gradient>"
-    permission: hcfcore.tag.dominator
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Total battlefield control.'
-  unstoppable:
-    display: "<gradient:#00c6ff:#0072ff>UNSTOPPABLE</gradient>"
-    permission: hcfcore.tag.unstoppable
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Nothing can block this path.'
+      - '<gray>Caught in the spin.'
 players: {}

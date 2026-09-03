@@ -40,6 +40,9 @@ import me.hcfcore.core.reboot.NextRebootCommand;
 import me.hcfcore.core.reboot.RebootCommand;
 import me.hcfcore.core.reboot.RebootManager;
 import me.hcfcore.core.scoreboard.ScoreboardManager;
+import me.hcfcore.core.faction.RallyCommand;
+import me.hcfcore.core.faction.RallyListener;
+import me.hcfcore.core.faction.RallyManager;
 import me.hcfcore.core.staff.DeathListener;
 import me.hcfcore.core.staff.DeathManager;
 import me.hcfcore.core.staff.InvRestoreMenuListener;
@@ -78,6 +81,8 @@ public final class HCFCorePlugin extends JavaPlugin {
     private VanillaCooldownManager vanillaCooldownManager;
     private ArcherTagManager archerTagManager;
     private DeathManager deathManager;
+    private RallyManager rallyManager;
+    private RallyListener rallyListener;
 
     @Override
     public void onEnable() {
@@ -135,6 +140,10 @@ public final class HCFCorePlugin extends JavaPlugin {
         deathManager = new DeathManager(this, storage);
         Bukkit.getPluginManager().registerEvents(new DeathListener(deathManager), this);
         Bukkit.getPluginManager().registerEvents(new InvRestoreMenuListener(this, deathManager), this);
+
+        rallyManager = new RallyManager(this, messages);
+        rallyListener = new RallyListener(this, rallyManager);
+        Bukkit.getPluginManager().registerEvents(rallyListener, this);
 
         Bukkit.getPluginManager().registerEvents(new CombatListener(combatManager), this);
         playerConnectionListener = new PlayerConnectionListener(userManager, scoreboardManager, combatManager);
@@ -206,6 +215,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         getCommand("rollback").setExecutor(rollbackCommand);
         getCommand("rollback").setTabCompleter(rollbackCommand);
 
+        RallyCommand rallyCommand = new RallyCommand(rallyManager, messages);
+        getCommand("frally").setExecutor(rallyCommand);
+
         for (var player : Bukkit.getOnlinePlayers()) {
             var uuid = player.getUniqueId();
             Bukkit.getScheduler().runTaskAsynchronously(this, () -> userManager.load(uuid));
@@ -232,6 +244,12 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
         if (languageCommand != null) {
             languageCommand.awaitWrites();
+        }
+        if (rallyListener != null) {
+            rallyListener.shutdown();
+        }
+        if (rallyManager != null) {
+            rallyManager.shutdown();
         }
         if (storage != null) {
             storage.close();

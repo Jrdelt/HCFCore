@@ -230,10 +230,13 @@ public final class CombatManager {
                 realOpponent = true;
                 double health = Math.max(0, opponent.getHealth());
 
+                // Hearts lead, so the number a player is watching for is the
+                // first thing in the bar rather than something they have to
+                // read past the name to find.
                 result = result
+                        .append(Component.text("❤ " + String.format(Locale.ROOT, "%.0f", health), NamedTextColor.RED))
+                        .append(Component.text("   "))
                         .append(Component.text(opponent.getName(), NamedTextColor.WHITE))
-                        .appendSpace()
-                        .append(Component.text("❤" + String.format(Locale.ROOT, "%.0f", health), NamedTextColor.GREEN))
                         .appendSpace();
             }
         }

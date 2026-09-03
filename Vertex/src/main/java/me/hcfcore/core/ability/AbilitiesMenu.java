@@ -38,7 +38,10 @@ public final class AbilitiesMenu {
             lore.add(Component.empty());
             lore.add(canGive
                     ? messages.get(player, "ability.gui-click-to-receive")
-                    : messages.get(player, "ability.gui-cooldown", "seconds", String.valueOf(ability.getCooldownSeconds())));
+                    // The effective cooldown, not the flat one, so the menu
+                    // doesn't quote 300s at a bard whose real wait is 6s.
+                    : messages.get(player, "ability.gui-cooldown", "seconds",
+                            String.valueOf(abilityManager.effectiveCooldownSeconds(player, ability))));
             meta.lore(lore);
             icon.setItemMeta(meta);
 

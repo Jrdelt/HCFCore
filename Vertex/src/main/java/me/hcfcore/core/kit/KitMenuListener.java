@@ -48,6 +48,15 @@ public final class KitMenuListener implements Listener {
             return;
         }
 
+        NamespacedKey pageKey = new NamespacedKey(plugin, KitsMenu.PAGE_ACTION_KEY);
+        String pageAction = clicked.getItemMeta().getPersistentDataContainer().get(pageKey, PersistentDataType.STRING);
+        if (pageAction != null) {
+            KitsMenu.Holder holder = (KitsMenu.Holder) event.getInventory().getHolder();
+            int page = pageAction.equals("next") ? holder.page() + 1 : holder.page() - 1;
+            KitsMenu.open(player, plugin, kitManager, holder.userManager(), messages, page);
+            return;
+        }
+
         NamespacedKey key = new NamespacedKey(plugin, KitsMenu.KIT_ID_KEY);
         String kitId = clicked.getItemMeta().getPersistentDataContainer().get(key, PersistentDataType.STRING);
         if (kitId == null) {

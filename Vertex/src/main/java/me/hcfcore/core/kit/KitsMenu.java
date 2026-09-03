@@ -4,6 +4,7 @@ import me.hcfcore.core.economy.EconomyHook;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
+import me.hcfcore.core.lang.MessageFormatter;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -29,17 +30,18 @@ import java.util.Locale;
  * contents without claiming it. Each icon is tagged via PersistentDataContainer
  * with the kit's id so KitMenuListener can identify it without a slot map.
  *
- * Laid out as a fixed 5-row inventory: non-donor kits sit in row 2, each
+ * Laid out as a fixed 4-row inventory: non-donor kits sit in row 2, each
  * one's donor variant (same name + "-donator") directly below it in row
  * 3, both kept off the leftmost/rightmost columns so nothing touches the
- * inventory's outer edge. Rows 1, 4, and 5 are left as a border.
+ * inventory's outer edge. Rows 1 and 4 are left as a border.
  */
 public final class KitsMenu {
 
     public static final String KIT_ID_KEY = "kit_id";
+    public static final String PAGE_ACTION_KEY = "kit_page_action";
 
     private static final int ROW_WIDTH = 9;
-    private static final int GRID_SIZE = 5 * ROW_WIDTH;
+    private static final int GRID_SIZE = 4 * ROW_WIDTH;
     private static final int USABLE_COLUMN_START = 1;
     private static final int USABLE_COLUMN_END = 7;
     private static final int BASE_ROW = 1;
@@ -47,6 +49,11 @@ public final class KitsMenu {
 
     public static void open(Player player, Plugin plugin, KitManager kitManager, UserManager userManager,
                              Messages messages) {
+        open(player, plugin, kitManager, userManager, messages, 0);
+    }
+
+    public static void open(Player player, Plugin plugin, KitManager kitManager, UserManager userManager,
+                             Messages messages, int requestedPage) {
         List<Kit> allKits = new ArrayList<>(kitManager.getKits().values());
         List<Kit> baseKits = new ArrayList<>();
         List<Kit> donorKits = new ArrayList<>();
@@ -58,7 +65,25 @@ public final class KitsMenu {
             }
         }
 
-        Holder holder = new Holder();
+        List<Pair> pairs = new ArrayList<>();
+        List<Kit> remainingDonorKits = new ArrayList<>(donorKits);
+        for (Kit baseKit : baseKits) {
+            String donorName = baseKit.getName() + "-donator";
+            Kit matchingDonor = remainingDonorKits.stream()
+                    .filter(candidate -> candidate.getName().equalsIgnoreCase(donorName))
+                    .findFirst().orElse(null);
+            if (matchingDonor != null) {
+                remainingDonorKits.remove(matchingDonor);
+            }
+            pairs.add(new Pair(baseKit, matchingDonor));
+        }
+        for (Kit donorKit : remainingDonorKits) {
+            pairs.add(new Pair(null, donorKit));
+        }
+
+        int pageCount = Math.max(1, (pairs.size() + 6) / 7);
+        int page = Math.max(0, Math.min(requestedPage, pageCount - 1));
+        Holder holder = new Holder(page, userManager);
         Inventory inventory = Bukkit.createInventory(holder, GRID_SIZE, messages.get(player, "kit.gui-title"));
         holder.inventory = inventory;
 
@@ -68,45 +93,26 @@ public final class KitsMenu {
         Economy economy = EconomyHook.getEconomy();
         boolean bypassCost = player.hasPermission("hcfcore.kit.bypasscost");
 
-        boolean[] donorColumnTaken = new boolean[USABLE_COLUMN_END + 1];
-        List<Kit> remainingDonorKits = new ArrayList<>(donorKits);
-
-        int column = USABLE_COLUMN_START;
-        for (Kit baseKit : baseKits) {
-            if (column > USABLE_COLUMN_END) {
-                break;
+        int start = page * 7;
+        int end = Math.min(pairs.size(), start + 7);
+        for (int i = start; i < end; i++) {
+            Pair pair = pairs.get(i);
+            int column = USABLE_COLUMN_START + i - start;
+            if (pair.base() != null) {
+                inventory.setItem(BASE_ROW * ROW_WIDTH + column,
+                        buildIcon(player, pair.base(), user, now, economy, bypassCost, messages, kitIdKey));
             }
-            inventory.setItem(BASE_ROW * ROW_WIDTH + column,
-                    buildIcon(player, baseKit, user, now, economy, bypassCost, messages, kitIdKey));
-
-            String donorName = baseKit.getName() + "-donator";
-            Kit matchingDonor = remainingDonorKits.stream()
-                    .filter(candidate -> candidate.getName().equalsIgnoreCase(donorName))
-                    .findFirst().orElse(null);
-            if (matchingDonor != null) {
-                remainingDonorKits.remove(matchingDonor);
+            if (pair.donor() != null) {
                 inventory.setItem(DONOR_ROW * ROW_WIDTH + column,
-                        buildIcon(player, matchingDonor, user, now, economy, bypassCost, messages, kitIdKey));
-                donorColumnTaken[column] = true;
+                        buildIcon(player, pair.donor(), user, now, economy, bypassCost, messages, kitIdKey));
             }
-            column++;
         }
 
-        // Any donor kit without a same-named base kit (e.g. a donor-only
-        // kit) still gets shown, filling whatever donor-row columns the
-        // paired kits above didn't already claim.
-        int donorColumn = USABLE_COLUMN_START;
-        for (Kit leftoverDonor : remainingDonorKits) {
-            while (donorColumn <= USABLE_COLUMN_END && donorColumnTaken[donorColumn]) {
-                donorColumn++;
-            }
-            if (donorColumn > USABLE_COLUMN_END) {
-                break;
-            }
-            inventory.setItem(DONOR_ROW * ROW_WIDTH + donorColumn,
-                    buildIcon(player, leftoverDonor, user, now, economy, bypassCost, messages, kitIdKey));
-            donorColumnTaken[donorColumn] = true;
-            donorColumn++;
+        if (page > 0) {
+            inventory.setItem(0, pageButton(plugin, player, messages, "kit.gui-previous-page", "previous"));
+        }
+        if (page < pageCount - 1) {
+            inventory.setItem(8, pageButton(plugin, player, messages, "kit.gui-next-page", "next"));
         }
 
         player.openInventory(inventory);
@@ -127,6 +133,9 @@ public final class KitsMenu {
         lore.add(hasPermission
                 ? messages.get(player, "kit.gui-access")
                 : messages.get(player, "kit.gui-no-access"));
+        if (kit.getPurpose() != null && !kit.getPurpose().isBlank()) {
+            lore.add(MessageFormatter.deserialize(kit.getPurpose()));
+        }
 
         long expiry = user == null ? 0L : user.getCooldownExpiry(key);
         if (expiry > now) {
@@ -163,6 +172,12 @@ public final class KitsMenu {
     }
 
     private static ItemStack resolveIconItem(Kit kit) {
+        if (kit.getIcon() != null && !kit.getIcon().isBlank()) {
+            Material override = Material.matchMaterial(kit.getIcon());
+            if (override != null) {
+                return new ItemStack(override);
+            }
+        }
         for (ItemStack item : kit.getArmor()) {
             if (item != null && item.getType() != Material.AIR) {
                 return item.clone();
@@ -176,8 +191,30 @@ public final class KitsMenu {
         return new ItemStack(Material.CHEST);
     }
 
+    private static ItemStack pageButton(Plugin plugin, Player player, Messages messages, String key, String action) {
+        ItemStack item = new ItemStack(Material.ARROW);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(messages.get(player, key).decoration(TextDecoration.ITALIC, false));
+        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, PAGE_ACTION_KEY), PersistentDataType.STRING, action);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private record Pair(Kit base, Kit donor) {
+    }
+
     public static final class Holder implements InventoryHolder {
         private Inventory inventory;
+        private final int page;
+        private final UserManager userManager;
+
+        private Holder(int page, UserManager userManager) {
+            this.page = page;
+            this.userManager = userManager;
+        }
+
+        public int page() { return page; }
+        public UserManager userManager() { return userManager; }
 
         @Override
         public Inventory getInventory() {

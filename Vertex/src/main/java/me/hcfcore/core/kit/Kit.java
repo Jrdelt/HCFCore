@@ -15,6 +15,8 @@ public final class Kit {
     private final ItemStack[] contents;
     private final Cost cost;
     private final List<Effect> effects;
+    private final String icon;
+    private final String purpose;
 
     public Kit(String name, String permission, int cooldownSeconds, ItemStack[] armor, ItemStack[] contents) {
         this(name, permission, cooldownSeconds, armor, contents, Cost.NONE, List.of());
@@ -26,6 +28,11 @@ public final class Kit {
 
     public Kit(String name, String permission, int cooldownSeconds, ItemStack[] armor, ItemStack[] contents,
                 Cost cost, List<Effect> effects) {
+        this(name, permission, cooldownSeconds, armor, contents, cost, effects, null, null);
+    }
+
+    public Kit(String name, String permission, int cooldownSeconds, ItemStack[] armor, ItemStack[] contents,
+                Cost cost, List<Effect> effects, String icon, String purpose) {
         this.name = name;
         this.permission = permission;
         this.cooldownSeconds = cooldownSeconds;
@@ -33,6 +40,8 @@ public final class Kit {
         this.contents = cloneArray(contents);
         this.cost = cost;
         this.effects = List.copyOf(effects);
+        this.icon = icon;
+        this.purpose = purpose;
     }
 
     public String getName() {
@@ -61,6 +70,26 @@ public final class Kit {
 
     public List<Effect> getEffects() {
         return effects;
+    }
+
+    /**
+     * Optional override for the /kits GUI icon, since the default (first
+     * non-air armor piece, else first content item) doesn't always pick
+     * the most recognizable item for a kit -- e.g. a class kit whose
+     * helmet happens to be plain but whose leggings are the distinctive
+     * piece. Null means "use the default".
+     */
+    public String getIcon() {
+        return icon;
+    }
+
+    /**
+     * Optional short role/flavor blurb for the /kits GUI lore (e.g.
+     * "Faction support -- share buffs with your team"). Null shows
+     * nothing.
+     */
+    public String getPurpose() {
+        return purpose;
     }
 
     private static ItemStack[] cloneArray(ItemStack[] source) {

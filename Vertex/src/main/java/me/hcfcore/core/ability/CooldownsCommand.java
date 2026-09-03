@@ -11,6 +11,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.Material;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -23,13 +24,15 @@ public final class CooldownsCommand implements CommandExecutor {
     private final AbilityManager abilityManager;
     private final UserManager userManager;
     private final Messages messages;
+    private final VanillaCooldownManager vanillaCooldownManager;
 
     public CooldownsCommand(KitManager kitManager, AbilityManager abilityManager,
-                            UserManager userManager, Messages messages) {
+                            UserManager userManager, Messages messages, VanillaCooldownManager vanillaCooldownManager) {
         this.kitManager = kitManager;
         this.abilityManager = abilityManager;
         this.userManager = userManager;
         this.messages = messages;
+        this.vanillaCooldownManager = vanillaCooldownManager;
     }
 
     @Override
@@ -53,6 +56,10 @@ public final class CooldownsCommand implements CommandExecutor {
         for (Ability ability : abilityManager.getAbilities().values()) {
             addEntry(entries, simplify(ability.getId()), user.getCooldownExpiry("ability:" + ability.getId()), now);
         }
+        addVanillaEntry(entries, player, Material.ENDER_PEARL, messages.getRaw(player, "cooldowns.ender-pearl"));
+        addVanillaEntry(entries, player, Material.GOLDEN_APPLE, messages.getRaw(player, "cooldowns.golden-apple"));
+        addVanillaEntry(entries, player, Material.ENCHANTED_GOLDEN_APPLE,
+                messages.getRaw(player, "cooldowns.enchanted-golden-apple"));
 
         long globalRemaining = abilityManager.globalCooldownRemainingMillis(player.getUniqueId());
         if (globalRemaining > 0) {
@@ -76,6 +83,13 @@ public final class CooldownsCommand implements CommandExecutor {
     private static void addEntry(List<CooldownEntry> entries, String name, long expiry, long now) {
         if (expiry > now) {
             entries.add(new CooldownEntry(name, ceilSeconds(expiry - now)));
+        }
+    }
+
+    private void addVanillaEntry(List<CooldownEntry> entries, Player player, Material material, String name) {
+        long remaining = vanillaCooldownManager.remainingMillis(player.getUniqueId(), material);
+        if (remaining > 0L) {
+            entries.add(new CooldownEntry(name, ceilSeconds(remaining)));
         }
     }
 

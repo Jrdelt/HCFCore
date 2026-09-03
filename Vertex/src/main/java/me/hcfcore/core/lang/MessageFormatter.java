@@ -3,6 +3,7 @@ package me.hcfcore.core.lang;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import java.util.regex.Pattern;
 
@@ -17,6 +18,16 @@ public final class MessageFormatter {
     public static Component deserialize(String message) {
         return MINI_MESSAGE.deserialize(normalize(message))
             .decoration(TextDecoration.ITALIC, false);
+    }
+
+    /**
+     * The visible text of a color-coded string, with all formatting
+     * removed -- for matching or sorting on what a player actually reads
+     * rather than on the markup wrapped around it. Goes through
+     * deserialize() so it handles legacy codes and MiniMessage tags alike.
+     */
+    public static String plain(String message) {
+        return PlainTextComponentSerializer.plainText().serialize(deserialize(message));
     }
 
     private static String normalize(String message) {

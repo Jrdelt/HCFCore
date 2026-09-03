@@ -41,8 +41,7 @@ public final class RabbitsFeedListener implements Listener {
         if (ability == null || !AbilityGate.checkAndStart(plugin, abilityManager, userManager, messages, player, ability)) {
             return;
         }
-        int durationSeconds = Math.max(1,
-            plugin.getConfig().getInt("abilities.rabbits-feed-speed-seconds", 8));
+        int durationSeconds = Math.max(1, ability.getInt("speed-duration-seconds", 8));
         player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, durationSeconds * 20, 4, false, false));
     }
 }

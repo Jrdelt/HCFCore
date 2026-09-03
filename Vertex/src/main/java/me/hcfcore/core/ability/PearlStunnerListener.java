@@ -48,7 +48,7 @@ public final class PearlStunnerListener implements Listener {
                 || abilityManager.isOnCooldown(user, ability)) {
             return;
         }
-        long durationSeconds = Math.max(1L, plugin.getConfig().getInt("abilities.pearl-stunner-seconds", 8));
+        long durationSeconds = Math.max(1, ability.getInt("stun-seconds", 8));
         abilityManager.markGlobalCooldown(attacker.getUniqueId());
         abilityManager.startCooldown(attacker, user, ability);
         stunnedUntil.put(victim.getUniqueId(), System.currentTimeMillis() + durationSeconds * 1000L);

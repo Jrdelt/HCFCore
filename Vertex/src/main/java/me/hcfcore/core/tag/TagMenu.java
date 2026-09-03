@@ -90,11 +90,21 @@ public final class TagMenu {
         };
     }
 
+    /**
+     * Matches on the tag's visible name (and its id), not on its raw
+     * `display` string. Every bundled tag is authored as
+     * "&lt;gradient:#hex:#hex&gt;Name&lt;/gradient&gt;", so searching the raw
+     * string matched the markup instead of the name -- "a" or "f" hit the
+     * hex digits of every tag, "grad" hit all of them, and a query could
+     * never be trusted to mean the name the player was reading.
+     */
     private static boolean matchesSearch(TagManager.Tag tag, String query) {
         if (query == null || query.isBlank()) {
             return true;
         }
-        return tag.display().toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT));
+        String needle = query.trim().toLowerCase(Locale.ROOT);
+        return MessageFormatter.plain(tag.display()).toLowerCase(Locale.ROOT).contains(needle)
+                || tag.id().toLowerCase(Locale.ROOT).contains(needle);
     }
 
     private static String titleKey(TagManager.Filter filter) {

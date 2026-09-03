@@ -3,7 +3,6 @@ package me.hcfcore.core.listener;
 import me.hcfcore.core.pvp.CombatManager;
 import me.hcfcore.core.scoreboard.ScoreboardManager;
 import me.hcfcore.core.user.UserManager;
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -11,17 +10,14 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.plugin.Plugin;
 
 public final class PlayerConnectionListener implements Listener {
 
-    private final Plugin plugin;
     private final UserManager userManager;
     private volatile ScoreboardManager scoreboardManager;
     private final CombatManager combatManager;
 
-    public PlayerConnectionListener(Plugin plugin, UserManager userManager, ScoreboardManager scoreboardManager, CombatManager combatManager) {
-        this.plugin = plugin;
+    public PlayerConnectionListener(UserManager userManager, ScoreboardManager scoreboardManager, CombatManager combatManager) {
         this.userManager = userManager;
         this.scoreboardManager = scoreboardManager;
         this.combatManager = combatManager;
@@ -48,19 +44,11 @@ public final class PlayerConnectionListener implements Listener {
             return;
         }
 
-        Player player = event.getPlayer();
-        if (userManager != null && userManager.get(player.getUniqueId()) == null && !userManager.hasFailedLoad(player.getUniqueId())) {
-            java.util.UUID uuid = player.getUniqueId();
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                Player stillOnline = Bukkit.getPlayer(uuid);
-                if (stillOnline != null && scoreboardManager != null) {
-                    scoreboardManager.setup(stillOnline);
-                }
-            }, 1L);
-            return;
-        }
-
-        scoreboardManager.setup(player);
+        // Scoreboard rendering does not require the database-backed User
+        // object.  Setting it up immediately avoids a one-tick race with a
+        // slow MySQL login load, which otherwise left players without a
+        // scoreboard for the rest of their session.
+        scoreboardManager.setup(event.getPlayer());
     }
 
     @EventHandler

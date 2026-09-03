@@ -10,7 +10,7 @@ abilities:
 
   rabbits-feed:
     material: FEATHER
-    name: '<light_purple>Rabbit''s Feed'
+    name: '<green>Rabbit''s Feed'
     lore:
       - '<gray>Right-click for Speed V.'
     cooldown-seconds: 30
@@ -18,7 +18,7 @@ abilities:
 
   anti-blockup-bone:
     material: BONE
-    name: '<light_purple>Anti-Blockup Bone'
+    name: '<white>Anti-Blockup Bone'
     lore:
       - '<gray>Hit an enemy with this to stop'
       - '<gray>them from placing blocks for'
@@ -38,7 +38,7 @@ abilities:
 
   grappling-hook:
     material: FISHING_ROD
-    name: '<light_purple>Grappling Hook'
+    name: '<blue>Grappling Hook'
     lore:
       - '<gray>Hook a block or player and'
       - '<gray>reel yourself toward it.'
@@ -49,7 +49,7 @@ abilities:
 
   leap:
     material: FIREWORK_ROCKET
-    name: '<light_purple>Leap'
+    name: '<light_red>Leap'
     lore:
       - '<gray>Launches you forward and'
       - '<gray>slightly upward.'
@@ -62,7 +62,7 @@ abilities:
 
   rogue-backstab:
     material: GOLDEN_SWORD
-    name: '<light_purple>Gold Dagger'
+    name: '<yellow>Gold Dagger'
     lore:
       - '<gray>Hit an enemy from behind for 3 hearts.'
       - '<gray>Consumed on use.'
@@ -81,7 +81,7 @@ abilities:
 
   mage-slowness:
     material: COBWEB
-    name: '<light_purple>Slowness Spell'
+    name: '<brown>Slowness Spell'
     lore:
       - '<gray>Hit an enemy to apply Slowness.'
     cooldown-seconds: 20
@@ -101,7 +101,7 @@ abilities:
 
   mage-poison:
     material: SPIDER_EYE
-    name: '<light_purple>Poison Spell'
+    name: '<w green>Poison Spell'
     lore:
       - '<gray>Hit an enemy to apply Poison.'
     cooldown-seconds: 25
@@ -116,7 +116,13 @@ abilities:
       - '<gray>Right-click to choose a buff'
       - '<gray>(Strength, Speed, or Regen) and'
       - '<gray>share it with your whole faction.'
+    # The long cooldown is for anyone using the item outside the class it
+    # belongs to; a player in the full gold bard set uses the short one.
     cooldown-seconds: 300
+    bard-cooldown-seconds: 6
+    # Each buff in the GUI also gets its own cooldown, so a bard can rotate
+    # between buffs but can't re-apply the same one back to back.
+    buff-cooldown-seconds: 7
     buff-seconds: 6
 
   repair:
@@ -132,7 +138,7 @@ abilities:
 
   switcher-snowball:
     material: SNOWBALL
-    name: '<light_purple>Switcher Snowball'
+    name: '<white>Switcher Snowball'
     lore:
       - '<gray>Throw at an enemy to swap'
       - '<gray>places with them.'

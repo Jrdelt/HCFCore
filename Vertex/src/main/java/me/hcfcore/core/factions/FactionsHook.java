@@ -17,6 +17,9 @@ import java.util.Locale;
  */
 public final class FactionsHook {
 
+    /** Sentinel faction id for a factionless player. */
+    public static final int NO_FACTION = Integer.MIN_VALUE;
+
     private FactionsHook() {
     }
 
@@ -57,6 +60,17 @@ public final class FactionsHook {
         Faction factionA = fa.faction();
         Faction factionB = fb.faction();
         return factionA != null && factionB != null && factionA.id() == factionB.id();
+    }
+
+    /**
+     * The player's faction id, or {@link #NO_FACTION} when they aren't in
+     * one. Ids are only ever compared to each other, so callers must treat
+     * NO_FACTION as "matches nothing" rather than as a faction of its own
+     * -- otherwise every factionless player would read as teammates.
+     */
+    public static int getFactionId(Player player) {
+        Faction faction = getFaction(player);
+        return faction == null ? NO_FACTION : faction.id();
     }
 
     /**

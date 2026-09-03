@@ -1,6 +1,7 @@
 package me.hcfcore.core.ability;
 
 import me.hcfcore.core.storage.Storage;
+import me.hcfcore.core.kit.ArmorClass;
 import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.user.User;
 import net.kyori.adventure.text.Component;
@@ -33,6 +34,7 @@ public final class AbilityManager {
 
     public static final String ABILITY_ID_KEY = "ability_id";
     public static final String USES_KEY = "ability_uses";
+    private static final String PORTABLE_BARD_ID = "portable-bard";
     private static final Set<String> COMMON_KEYS = Set.of("material", "name", "lore", "cooldown-seconds");
 
     private final Plugin plugin;
@@ -133,11 +135,62 @@ public final class AbilityManager {
         return Math.max(0L, user.getCooldownExpiry(cooldownKey(ability)) - System.currentTimeMillis());
     }
 
+    /**
+     * How long `ability` should stay on cooldown for this particular
+     * player, which is not always the flat abilities.yml value.
+     *
+     * <p>Portable Bard is the bard kit's own ability, and its long
+     * cooldown exists to stop non-bards who got hold of the item from
+     * spamming faction-wide buffs. A player actually wearing the full
+     * gold set is playing the class the item belongs to, so they get the
+     * short in-kit cooldown ("bard-cooldown-seconds") instead.
+     */
+    public int effectiveCooldownSeconds(Player player, Ability ability) {
+        if (PORTABLE_BARD_ID.equalsIgnoreCase(ability.getId()) && ArmorClass.isBard(player)) {
+            return ability.getInt("bard-cooldown-seconds", ability.getCooldownSeconds());
+        }
+        return ability.getCooldownSeconds();
+    }
+
     public void startCooldown(Player player, User user, Ability ability) {
-        if (ability.getCooldownSeconds() <= 0) {
+        int cooldownSeconds = effectiveCooldownSeconds(player, ability);
+        if (cooldownSeconds <= 0) {
             return;
         }
-        long expiry = System.currentTimeMillis() + ability.getCooldownSeconds() * 1000L;
+        setCooldownExpiry(player, user, ability, System.currentTimeMillis() + cooldownSeconds * 1000L);
+    }
+
+    /**
+     * Re-scores an outstanding Portable Bard cooldown the moment a player
+     * puts the full gold set on, capping it at the in-kit
+     * "bard-cooldown-seconds" wait.
+     *
+     * <p>The long flat cooldown is a penalty for using the bard's item
+     * outside the bard's class, so it shouldn't follow a player into the
+     * class: someone who fired it off in diamond and then geared into gold
+     * would otherwise spend most of their bard session locked out of the
+     * ability the kit is built around.
+     *
+     * @return the seconds the player now has left, or -1 if there was
+     *         nothing to shorten (not a bard, no live cooldown, or already
+     *         within the bard wait)
+     */
+    public long shortenBardCooldownForKitSwap(Player player, User user) {
+        Ability ability = get(PORTABLE_BARD_ID);
+        if (ability == null || !ArmorClass.isBard(player)) {
+            return -1L;
+        }
+        long now = System.currentTimeMillis();
+        long expiry = user.getCooldownExpiry(cooldownKey(ability));
+        long bardExpiry = now + effectiveCooldownSeconds(player, ability) * 1000L;
+        if (expiry <= now || expiry <= bardExpiry) {
+            return -1L;
+        }
+        setCooldownExpiry(player, user, ability, bardExpiry);
+        return (bardExpiry - now + 999L) / 1000L;
+    }
+
+    private void setCooldownExpiry(Player player, User user, Ability ability, long expiry) {
         user.setCooldownExpiry(cooldownKey(ability), expiry);
 
         CompletableFuture<Void> write = CompletableFuture.runAsync(() -> {
@@ -162,6 +215,63 @@ public final class AbilityManager {
         } catch (Exception e) {
             plugin.getLogger().log(Level.WARNING, "Failed while waiting for ability cooldown writes.", e);
         }
+    }
+
+    /**
+     * Per-buff cooldowns for the abilities offered inside an ability's own
+     * GUI (currently only Portable Bard's buff picker). Kept in memory
+     * rather than in the User cooldown map because they are short enough
+     * that surviving a relog would never matter, and because they are not
+     * abilities in their own right -- /cooldowns lists one entry for the
+     * parent ability, not five.
+     */
+    private final Map<UUID, Map<String, Long>> buffCooldowns = new ConcurrentHashMap<>();
+
+    public long buffCooldownRemainingMillis(UUID playerId, Ability ability, String buffId) {
+        Map<String, Long> playerBuffs = buffCooldowns.get(playerId);
+        if (playerBuffs == null) {
+            return 0L;
+        }
+        String key = buffKey(ability, buffId);
+        long remaining = playerBuffs.getOrDefault(key, 0L) - System.currentTimeMillis();
+        if (remaining <= 0L) {
+            playerBuffs.remove(key);
+            if (playerBuffs.isEmpty()) {
+                buffCooldowns.remove(playerId, playerBuffs);
+            }
+            return 0L;
+        }
+        return remaining;
+    }
+
+    public void startBuffCooldown(UUID playerId, Ability ability, String buffId) {
+        int seconds = ability.getInt("buff-cooldown-seconds", 0);
+        if (seconds <= 0) {
+            return;
+        }
+        buffCooldowns.computeIfAbsent(playerId, ignored -> new ConcurrentHashMap<>())
+                .put(buffKey(ability, buffId), System.currentTimeMillis() + seconds * 1000L);
+    }
+
+    /**
+     * Housekeeping for a leaving player. Only drops what has already
+     * expired: wiping live buff cooldowns on quit would let a bard relog
+     * to re-apply the same buff immediately.
+     */
+    public void clearExpiredBuffCooldowns(UUID playerId) {
+        Map<String, Long> playerBuffs = buffCooldowns.get(playerId);
+        if (playerBuffs == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        playerBuffs.values().removeIf(expiry -> expiry <= now);
+        if (playerBuffs.isEmpty()) {
+            buffCooldowns.remove(playerId, playerBuffs);
+        }
+    }
+
+    private static String buffKey(Ability ability, String buffId) {
+        return ability.getId().toLowerCase(Locale.ROOT) + ":" + buffId;
     }
 
     public boolean isOnGlobalCooldown(UUID uuid) {
