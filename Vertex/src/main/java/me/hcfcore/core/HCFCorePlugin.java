@@ -81,6 +81,7 @@ public final class HCFCorePlugin extends JavaPlugin {
     private ArcherTagManager archerTagManager;
     private DeathManager deathManager;
     private RallyManager rallyManager;
+    private ArcherTagListener archerTagListener;
 
     @Override
     public void onEnable() {
@@ -167,7 +168,8 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(
                 new TimeWarpPearlListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new VanillaCooldownListener(this, messages, vanillaCooldownManager), this);
-        Bukkit.getPluginManager().registerEvents(new ArcherTagListener(this, archerTagManager, messages), this);
+        archerTagListener = new ArcherTagListener(this, archerTagManager, messages);
+        Bukkit.getPluginManager().registerEvents(archerTagListener, this);
         // Periodic cleanup of expired archer tag entries to prevent unbounded map growth
         Bukkit.getScheduler().runTaskTimer(this, archerTagManager::cleanupExpired, 300L, 300L);
         Bukkit.getPluginManager().registerEvents(new PearlStunnerListener(this, abilityManager, userManager, messages), this);
@@ -316,6 +318,9 @@ public final class HCFCorePlugin extends JavaPlugin {
                     getConfig().getInt("pvp.combat-tag-seconds", 30),
                     getConfig().getBoolean("pvp.logout-penalty", true),
                     getConfig().getInt("pvp.actionbar-update-interval-ticks", 4));
+        }
+        if (archerTagListener != null) {
+            archerTagListener.reloadConfig();
         }
         if (legacyCombatManager != null) {
             legacyCombatManager.reconfigure();

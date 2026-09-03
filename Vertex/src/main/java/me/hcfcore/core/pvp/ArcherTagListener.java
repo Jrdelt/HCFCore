@@ -26,10 +26,24 @@ public final class ArcherTagListener implements Listener {
     private final ArcherTagManager archerTagManager;
     private final Messages messages;
 
+    // Cached config values to avoid repeated reads on hot path
+    private volatile int cachedDurationSeconds;
+    private volatile int cachedMaxStacks;
+    private volatile double cachedArrowBonusPerStack;
+    private volatile double cachedMeleeBonusPerStack;
+
     public ArcherTagListener(Plugin plugin, ArcherTagManager archerTagManager, Messages messages) {
         this.plugin = plugin;
         this.archerTagManager = archerTagManager;
         this.messages = messages;
+        reloadConfig();
+    }
+
+    public void reloadConfig() {
+        cachedDurationSeconds = plugin.getConfig().getInt("pvp.archer-tag.duration-seconds", 10);
+        cachedMaxStacks = plugin.getConfig().getInt("pvp.archer-tag.max-stacks", 4);
+        cachedArrowBonusPerStack = Math.max(0, plugin.getConfig().getDouble("pvp.archer-tag.arrow-damage-bonus-per-stack", 0.15));
+        cachedMeleeBonusPerStack = Math.max(0, plugin.getConfig().getDouble("pvp.archer-tag.faction-melee-bonus-per-stack", 0.05));
     }
 
     /**
@@ -107,19 +121,19 @@ public final class ArcherTagListener implements Listener {
     }
 
     private int durationSeconds() {
-        return plugin.getConfig().getInt("pvp.archer-tag.duration-seconds", 10);
+        return cachedDurationSeconds;
     }
 
     private int maxStacks() {
-        return plugin.getConfig().getInt("pvp.archer-tag.max-stacks", 4);
+        return cachedMaxStacks;
     }
 
     private double arrowBonusPerStack() {
-        return Math.max(0, plugin.getConfig().getDouble("pvp.archer-tag.arrow-damage-bonus-per-stack", 0.15));
+        return cachedArrowBonusPerStack;
     }
 
     private double meleeBonusPerStack() {
-        return Math.max(0, plugin.getConfig().getDouble("pvp.archer-tag.faction-melee-bonus-per-stack", 0.05));
+        return cachedMeleeBonusPerStack;
     }
 
     /** Whole-percent string for the messages, e.g. 0.45 -> "45". */
