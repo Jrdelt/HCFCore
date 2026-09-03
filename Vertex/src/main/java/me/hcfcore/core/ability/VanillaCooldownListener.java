@@ -92,6 +92,12 @@ public final class VanillaCooldownListener implements Listener {
         }
 
         Player player = (Player) projectile.getShooter();
+
+        // Skip cooldown for fake pearls
+        if (FakePearlListener.THROWING_FAKE_PEARL.contains(player.getUniqueId())) {
+            return;
+        }
+
         long remaining = cooldownManager.remainingMillis(player.getUniqueId(), Material.ENDER_PEARL);
         if (remaining > 0L) {
             event.setCancelled(true);

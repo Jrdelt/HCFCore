@@ -36,6 +36,7 @@ public final class FakePearlListener implements Listener {
     private final UserManager userManager;
     private final Messages messages;
     private final Set<UUID> pendingFakePearl = ConcurrentHashMap.newKeySet();
+    public static final Set<UUID> THROWING_FAKE_PEARL = ConcurrentHashMap.newKeySet();
 
     public FakePearlListener(Plugin plugin, AbilityManager abilityManager, UserManager userManager, Messages messages) {
         this.plugin = plugin;
@@ -67,10 +68,14 @@ public final class FakePearlListener implements Listener {
             return;
         }
 
+        UUID playerId = player.getUniqueId();
+        THROWING_FAKE_PEARL.add(playerId);
         player.launchProjectile(EnderPearl.class);
-        pendingFakePearl.add(player.getUniqueId());
+        pendingFakePearl.add(playerId);
         plugin.getServer().getScheduler().runTaskLater(plugin,
-            () -> pendingFakePearl.remove(player.getUniqueId()), 200L);
+            () -> THROWING_FAKE_PEARL.remove(playerId), 5L);
+        plugin.getServer().getScheduler().runTaskLater(plugin,
+            () -> pendingFakePearl.remove(playerId), 200L);
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
