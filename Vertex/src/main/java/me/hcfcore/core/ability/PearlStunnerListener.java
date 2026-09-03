@@ -1,5 +1,6 @@
 package me.hcfcore.core.ability;
 
+import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
@@ -39,6 +40,10 @@ public final class PearlStunnerListener implements Listener {
         if (!(event.getDamager() instanceof Player attacker) || !(event.getEntity() instanceof Player victim)
                 || attacker.equals(victim)
                 || !AbilityGate.isAbility(plugin, attacker.getInventory().getItemInMainHand(), ABILITY_ID)) {
+            return;
+        }
+        // Prevent pearl stunner from affecting teammates/allies
+        if (FactionsHook.isSameFaction(attacker, victim)) {
             return;
         }
         Ability ability = abilityManager.get(ABILITY_ID);

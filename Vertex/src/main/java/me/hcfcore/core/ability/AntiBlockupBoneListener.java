@@ -1,5 +1,6 @@
 package me.hcfcore.core.ability;
 
+import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
@@ -48,6 +49,10 @@ public final class AntiBlockupBoneListener implements Listener {
         Player attacker = resolveAttacker(event.getDamager());
         if (attacker == null || attacker.equals(victim)
                 || !AbilityGate.isAbility(plugin, attacker.getInventory().getItemInMainHand(), ABILITY_ID)) {
+            return;
+        }
+        // Prevent anti-blockup bone from affecting teammates/allies
+        if (FactionsHook.isSameFaction(attacker, victim)) {
             return;
         }
 

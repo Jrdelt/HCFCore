@@ -1,5 +1,6 @@
 package me.hcfcore.core.ability;
 
+import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
@@ -38,6 +39,10 @@ public final class MageSpellListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onHit(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player attacker) || !(event.getEntity() instanceof Player victim)) {
+            return;
+        }
+        // Prevent mage spells from affecting teammates/allies
+        if (FactionsHook.isSameFaction(attacker, victim)) {
             return;
         }
         ItemStack item = attacker.getInventory().getItemInMainHand();
