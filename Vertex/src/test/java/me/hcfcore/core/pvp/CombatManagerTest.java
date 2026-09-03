@@ -69,6 +69,20 @@ class CombatManagerTest {
     }
 
     @Test
+    void retaggingPlayerClearsTheirPreviousOpponent() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerMock bob = server.addPlayer("Bob");
+        PlayerMock carol = server.addPlayer("Carol");
+
+        combatManager.tag(alice, bob);
+        combatManager.tag(alice, carol);
+
+        assertFalse(combatManager.isTagged(bob.getUniqueId()));
+        assertNull(combatManager.getOpponentId(bob.getUniqueId()));
+        assertEquals(carol.getUniqueId(), combatManager.getOpponentId(alice.getUniqueId()));
+    }
+
+    @Test
     void clearOnPlayerTaggedAgainstServerDoesNotTouchOtherPlayers() {
         PlayerMock alice = server.addPlayer("Alice");
         PlayerMock bob = server.addPlayer("Bob");

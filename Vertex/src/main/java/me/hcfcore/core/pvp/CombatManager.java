@@ -82,10 +82,19 @@ public final class CombatManager {
 
     public void tag(Player a, Player b) {
         long until = System.currentTimeMillis() + combatDurationMillis;
+        UUID oldA = opponents.put(a.getUniqueId(), b.getUniqueId());
+        UUID oldB = opponents.put(b.getUniqueId(), a.getUniqueId());
+        clearStaleOpponent(a.getUniqueId(), oldA, b.getUniqueId());
+        clearStaleOpponent(b.getUniqueId(), oldB, a.getUniqueId());
         taggedUntil.put(a.getUniqueId(), until);
         taggedUntil.put(b.getUniqueId(), until);
-        opponents.put(a.getUniqueId(), b.getUniqueId());
-        opponents.put(b.getUniqueId(), a.getUniqueId());
+    }
+
+    private void clearStaleOpponent(UUID playerId, UUID oldOpponentId, UUID newOpponentId) {
+        if (oldOpponentId != null && !oldOpponentId.equals(newOpponentId)) {
+            opponents.remove(oldOpponentId, playerId);
+            taggedUntil.remove(oldOpponentId);
+        }
     }
 
     /**

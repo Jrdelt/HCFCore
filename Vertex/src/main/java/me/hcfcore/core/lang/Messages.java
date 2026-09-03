@@ -3,7 +3,6 @@ package me.hcfcore.core.lang;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -93,7 +92,7 @@ public final class Messages {
      * result as a legacy-color-coded Component.
      */
     public Component get(CommandSender sender, String key, String... placeholders) {
-        return LegacyComponentSerializer.legacyAmpersand().deserialize(getRaw(sender, key, placeholders));
+        return MessageFormatter.deserialize(getRaw(sender, key, placeholders));
     }
 
     /**

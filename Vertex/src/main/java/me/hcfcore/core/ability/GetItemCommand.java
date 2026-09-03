@@ -1,8 +1,8 @@
 package me.hcfcore.core.ability;
 
 import me.hcfcore.core.lang.Messages;
+import me.hcfcore.core.lang.MessageFormatter;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -61,7 +61,7 @@ public final class GetItemCommand implements CommandExecutor, TabCompleter {
             target.getWorld().dropItemNaturally(target.getLocation(), dropped);
         }
 
-        Component abilityName = LegacyComponentSerializer.legacyAmpersand().deserialize(ability.getDisplayName());
+        Component abilityName = MessageFormatter.deserialize(ability.getDisplayName());
         sender.sendMessage(messages.get(sender, "ability.getitem-given-sender",
                         "player", target.getName(), "amount", String.valueOf(amount))
                 .append(abilityName)

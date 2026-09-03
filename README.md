@@ -57,22 +57,39 @@ mysql:
   username: root
   password: ''
   pool-size: 10
+  use-ssl: false
+  allow-public-key-retrieval: true
 
 scoreboard:
   update-interval-ticks: 20
-  title: '&b&lHCF&f&lCore'
+  title: '<aqua><bold>HCF<white><bold>Core'
   lines:
     - ''
-    - '&7Online: &f{online}'
-    - '&7Faction: &f{faction}'
-    - '&7Role: &f{faction_role}'
+    - '<gray>Online: <white>{online}'
+    - '<gray>Faction: <white>{faction}'
+    - '<gray>Role: <white>{faction_role}'
     - ''
-    - '&7play.example.com'
+    - '<gray>play.example.com'
+  cooldowns:
+    enabled: true
+    header: '<light_purple>Cooldowns:'
+    line: '<gray>{ability_cooldowns}'
 
 pvp:
-  combat-tag-seconds: 15
+  combat-tag-seconds: 30
   logout-penalty: true
   actionbar-update-interval-ticks: 4
+  legacy-combat:
+    enabled: true
+    worlds: []
+    attack-speed: 1024.0
+    disable-sweeping-attacks: true
+
+factions:
+  prevent-leader-leave: true
+  command-aliases:
+    - f
+    - factions
 
 kits:
   default-cooldown-seconds: 300
@@ -84,14 +101,22 @@ abilities:
 ```
 
 - `scoreboard.lines` supports `{online}`, `{faction}`, `{faction_role}`,
-  `{repair}` (blank unless the `repair` ability is active for that player,
-  then "Repairing: Xs"), and legacy `&` color codes. There's no live-edit
+  `{repair}` and `{ability_cooldowns}`. `scoreboard.cooldowns` adds a
+  configurable section header and a line containing every active ability
+  cooldown. MiniMessage tags are preferred; legacy `&` color codes remain
+  supported for older configs. There's no live-edit
   command yet — edit the file and run `/hcfcore reload`.
 - `pvp.actionbar-update-interval-ticks` controls how often the combat
   action bar (name/timer/health/CPS) refreshes — 4 ticks (~5/sec) by
   default for a PvP-responsive feel.
 - `pvp.logout-penalty`: if true, disconnecting while tagged is treated as a
   combat logout (see `PlayerConnectionListener`).
+- `pvp.legacy-combat`: enables the 1.8-style attack-speed behavior. Empty
+  `worlds` applies it everywhere; `disable-sweeping-attacks` removes modern
+  sweeping damage.
+- `factions.prevent-leader-leave`: prevents faction leaders from using
+  `/f leave` or `/factions leave`; `/f disband` remains the explicit disband
+  command. Aliases are configurable in `factions.command-aliases`.
 - `abilities.global-cooldown-seconds` is a shared cooldown across *all*
   ability items — using any one of them starts it, blocking every other
   ability until it expires, independent of each item's own cooldown.
@@ -106,6 +131,11 @@ abilities:
 The database, scoreboard lines, and kit cooldown default all take effect
 immediately on `/hcfcore reload`.
 
+Player locale and ability/kit cooldown writes are flushed during shutdown.
+If player data cannot be loaded from MySQL, kit and ability claims fail closed
+until the player reconnects successfully instead of silently bypassing saved
+cooldowns.
+
 ## Language (`lang/*.yml`)
 
 Every player-facing message — every command reply, error, GUI label, and
@@ -117,11 +147,13 @@ a final proofread).
 
 ```yaml
 kit:
-  applied: '&aApplied kit {kit}.'
-  cooldown: '&cYou can use this kit again in {seconds}s.'
+  applied: '<success>Applied kit {kit}.'
+  cooldown: '<deny>You can use this kit again in {seconds}s.'
 ```
 
-- Each message is a key → a legacy-`&`-color-coded template string.
+- Each message is a key → a MiniMessage-formatted template string.
+  `<deny>`, `<success>`, `<info>`, and `<warning>` are semantic aliases for
+  red, green, gray, and yellow. Legacy `&` color codes remain supported.
   `{placeholders}` like `{kit}`/`{seconds}`/`{player}` get substituted
   per-message; check `en_us.yml` for exactly which ones a given key
   accepts.
@@ -175,7 +207,12 @@ kits:
   afford everything it costs. Bypassed by `hcfcore.kit.bypasscost`.
 - `armor` / `contents` — standard Bukkit `ItemStack` YAML serialization;
   easiest way to populate these is `/kit save`, then hand-edit
-  `permission`/`cooldown-seconds`/`cost` afterward.
+  `permission`/`cooldown-seconds`/`cost` afterward. Use `/kit create`; the
+  older `/kit save` alias remains supported.
+- Claiming a kit never replaces worn armor. If armor is already equipped, the
+  kit armor is placed in storage inventory, and the claim is rejected with a
+  localized full-inventory message when it cannot fit. A kit cost is charged
+  only after all capacity and economy checks succeed.
 
 Reloaded along with everything else on `/hcfcore reload`.
 
@@ -199,17 +236,21 @@ behavior:
 abilities:
   grappling-hook:
     material: FISHING_ROD
-    name: '&fGrappling Hook'
+      name: '<light_purple>Grappling Hook'
     lore:
-      - '&7Hook a block or player and'
-      - '&7reel yourself toward it.'
+        - '<gray>Hook a block or player and'
+        - '<gray>reel yourself toward it.'
     cooldown-seconds: 20
+    uses: 8
     forward-multiplier: 1.6
     y-multiplier: 0.8
 ```
 
 - `material` / `name` / `lore` — fully configurable per ability; `name`
-  and each `lore` line accept legacy `&` color codes.
+  and each `lore` line accept MiniMessage tags and legacy `&` color codes.
+- Ability items are consumed only after successful activation. The grappling
+  hook has 8 uses by default and breaks after its eighth successful pull.
+- Portable Bard effects last 6 seconds by default.
 - `cooldown-seconds` — per-item cooldown, persisted to MySQL (its own
   `ability_cooldowns` table, separate from kit cooldowns) so it survives a
   restart.

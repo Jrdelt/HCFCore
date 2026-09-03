@@ -1,10 +1,9 @@
 package me.hcfcore.core.ability;
 
 import me.hcfcore.core.storage.Storage;
+import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.user.User;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
@@ -25,11 +24,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 
 public final class AbilityManager {
 
     public static final String ABILITY_ID_KEY = "ability_id";
+    public static final String USES_KEY = "ability_uses";
     private static final Set<String> COMMON_KEYS = Set.of("material", "name", "lore", "cooldown-seconds");
 
     private final Plugin plugin;
@@ -37,6 +40,7 @@ public final class AbilityManager {
     private final File file;
     private final Map<String, Ability> abilities = new LinkedHashMap<>();
     private final Map<UUID, Long> lastAbilityUse = new ConcurrentHashMap<>();
+    private final Set<CompletableFuture<Void>> pendingWrites = ConcurrentHashMap.newKeySet();
 
     public AbilityManager(Plugin plugin, Storage storage) {
         this.plugin = plugin;
@@ -96,16 +100,21 @@ public final class AbilityManager {
     public ItemStack createItem(Ability ability) {
         ItemStack item = new ItemStack(ability.getMaterial());
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(LegacyComponentSerializer.legacyAmpersand().deserialize(ability.getDisplayName()));
+        meta.displayName(MessageFormatter.deserialize(ability.getDisplayName()));
 
         List<Component> lore = new ArrayList<>();
         for (String line : ability.getLore()) {
-            lore.add(LegacyComponentSerializer.legacyAmpersand().deserialize(line));
+            lore.add(MessageFormatter.deserialize(line));
         }
         meta.lore(lore);
 
         meta.getPersistentDataContainer().set(
                 new NamespacedKey(plugin, ABILITY_ID_KEY), PersistentDataType.STRING, ability.getId());
+        int uses = ability.getInt("uses", 0);
+        if (uses > 0) {
+            meta.getPersistentDataContainer().set(
+                new NamespacedKey(plugin, USES_KEY), PersistentDataType.INTEGER, uses);
+        }
         item.setItemMeta(meta);
         return item;
     }
@@ -131,13 +140,28 @@ public final class AbilityManager {
         long expiry = System.currentTimeMillis() + ability.getCooldownSeconds() * 1000L;
         user.setCooldownExpiry(cooldownKey(ability), expiry);
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        CompletableFuture<Void> write = CompletableFuture.runAsync(() -> {
             try {
                 storage.saveAbilityCooldown(player.getUniqueId(), ability.getId(), expiry);
             } catch (Exception e) {
                 plugin.getLogger().log(Level.WARNING, "Failed to persist ability cooldown for " + player.getUniqueId(), e);
             }
         });
+        pendingWrites.add(write);
+        try {
+            CompletableFuture.allOf(pendingWrites.toArray(new CompletableFuture[0]))
+                    .get(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (TimeoutException e) {
+            plugin.getLogger().warning("Timed out waiting for ability cooldown writes during shutdown.");
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Failed while waiting for ability cooldown writes.", e);
+        }
+    }
+
+    public void awaitWrites() {
+        CompletableFuture.allOf(pendingWrites.toArray(new CompletableFuture[0])).join();
     }
 
     public boolean isOnGlobalCooldown(UUID uuid) {

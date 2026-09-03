@@ -11,6 +11,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 
 import java.util.Map;
@@ -56,7 +57,7 @@ public final class SwitcherSnowballListener implements Listener {
         if (ability == null) {
             return;
         }
-        if (!AbilityGate.checkAndStart(plugin, abilityManager, userManager, messages, player, ability)) {
+        if (!AbilityGate.checkAndStart(plugin, abilityManager, userManager, messages, player, ability, false)) {
             event.setCancelled(true);
             return;
         }
@@ -82,5 +83,11 @@ public final class SwitcherSnowballListener implements Listener {
         Location targetLocation = target.getLocation();
         thrower.teleport(targetLocation);
         target.teleport(throwerLocation);
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        UUID playerId = event.getPlayer().getUniqueId();
+        trackedSnowballs.entrySet().removeIf(entry -> entry.getValue().equals(playerId));
     }
 }

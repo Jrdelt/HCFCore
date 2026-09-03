@@ -20,6 +20,7 @@ import org.mockbukkit.mockbukkit.plugin.PluginMock;
 
 import java.util.Map;
 import java.util.UUID;
+import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -74,6 +75,49 @@ class KitManagerTest {
         KitManager reloadedAgain = new KitManager(plugin, new InMemoryStorage(), userManager, messages);
         reloadedAgain.load();
         assertNull(reloadedAgain.get("starter"));
+    }
+
+    @Test
+    void savedKitIsNotChangedWhenPlayerInventoryChanges() {
+        PlayerMock player = server.addPlayer("Frank");
+        player.getInventory().setItem(0, new ItemStack(Material.DIAMOND_SWORD));
+
+        kitManager.save("Starter", player, "hcfcore.kit.starter", 0, Kit.Cost.NONE);
+        player.getInventory().clear();
+
+        Kit kit = kitManager.get("starter");
+        assertEquals(Material.DIAMOND_SWORD, kit.getContents()[0].getType());
+    }
+
+    @Test
+    void kitArmorUsesCorrectBukkitSlots() {
+        PlayerMock player = server.addPlayer("Grace");
+        ItemStack boots = new ItemStack(Material.LEATHER_BOOTS);
+        ItemStack leggings = new ItemStack(Material.LEATHER_LEGGINGS);
+        ItemStack chestplate = new ItemStack(Material.LEATHER_CHESTPLATE);
+        ItemStack helmet = new ItemStack(Material.LEATHER_HELMET);
+        player.getInventory().setArmorContents(new ItemStack[]{boots, leggings, chestplate, helmet});
+
+        kitManager.save("Armor", player, "", 0, Kit.Cost.NONE);
+        Kit kit = kitManager.get("armor");
+
+        assertEquals(Material.LEATHER_HELMET, kit.getArmor()[0].getType());
+        assertEquals(Material.LEATHER_CHESTPLATE, kit.getArmor()[1].getType());
+        assertEquals(Material.LEATHER_LEGGINGS, kit.getArmor()[2].getType());
+        assertEquals(Material.LEATHER_BOOTS, kit.getArmor()[3].getType());
+        assertTrue(Arrays.stream(kit.getContents()).noneMatch(item -> item != null && switch (item.getType()) {
+            case LEATHER_HELMET, LEATHER_CHESTPLATE, LEATHER_LEGGINGS, LEATHER_BOOTS -> true;
+            default -> false;
+        }),
+            "armor should not be saved as kit contents");
+
+        player.getInventory().setArmorContents(new ItemStack[4]);
+        kitManager.apply(player, kit);
+        ItemStack[] appliedArmor = player.getInventory().getArmorContents();
+        assertEquals(Material.LEATHER_BOOTS, appliedArmor[0].getType());
+        assertEquals(Material.LEATHER_LEGGINGS, appliedArmor[1].getType());
+        assertEquals(Material.LEATHER_CHESTPLATE, appliedArmor[2].getType());
+        assertEquals(Material.LEATHER_HELMET, appliedArmor[3].getType());
     }
 
     @Test

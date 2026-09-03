@@ -9,7 +9,12 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.NamespacedKey;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.util.Vector;
 
@@ -67,7 +72,7 @@ public final class GrapplingHookListener implements Listener {
             return;
         }
 
-        if (!AbilityGate.checkAndStart(plugin, abilityManager, userManager, messages, player, ability)) {
+        if (!AbilityGate.checkAndStart(plugin, abilityManager, userManager, messages, player, ability, false)) {
             return;
         }
         activeHooks.put(player.getUniqueId(), player.launchProjectile(FishHook.class));
@@ -85,7 +90,33 @@ public final class GrapplingHookListener implements Listener {
             pull.multiply(forwardMultiplier / length);
             pull.setY(pull.getY() + yMultiplier);
             player.setVelocity(pull);
+            consumeUse(player, ability.getInt("uses", 8));
         }
         hook.remove();
+    }
+
+    private void consumeUse(Player player, int maximumUses) {
+        ItemStack item = player.getInventory().getItemInMainHand();
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        NamespacedKey usesKey = new NamespacedKey(plugin, AbilityManager.USES_KEY);
+        int uses = meta.getPersistentDataContainer().getOrDefault(
+                usesKey, PersistentDataType.INTEGER, Math.max(1, maximumUses)) - 1;
+        if (uses <= 0) {
+            player.getInventory().setItemInMainHand(null);
+            return;
+        }
+        meta.getPersistentDataContainer().set(usesKey, PersistentDataType.INTEGER, uses);
+        item.setItemMeta(meta);
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        FishHook hook = activeHooks.remove(event.getPlayer().getUniqueId());
+        if (hook != null) {
+            hook.remove();
+        }
     }
 }

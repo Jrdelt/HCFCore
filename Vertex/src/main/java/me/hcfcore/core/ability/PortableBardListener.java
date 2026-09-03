@@ -51,10 +51,6 @@ public final class PortableBardListener implements Listener {
         event.setCancelled(true);
         Player player = event.getPlayer();
 
-        if (!AbilityGate.checkAndStart(plugin, abilityManager, userManager, messages, player, ability)) {
-            return;
-        }
-
         PortableBardMenu.open(player, messages);
     }
 
@@ -94,7 +90,11 @@ public final class PortableBardListener implements Listener {
         }
 
         Ability ability = abilityManager.get(ABILITY_ID);
-        int buffSeconds = ability == null ? 30 : ability.getInt("buff-seconds", 30);
+        if (ability == null || !AbilityGate.checkAndStart(plugin, abilityManager, userManager,
+                messages, player, ability)) {
+            return;
+        }
+        int buffSeconds = ability == null ? 6 : ability.getInt("buff-seconds", 6);
         PotionEffect effect = new PotionEffect(effectType, buffSeconds * 20, amplifier);
 
         for (Player member : FactionsHook.getOnlineFactionMembers(player)) {

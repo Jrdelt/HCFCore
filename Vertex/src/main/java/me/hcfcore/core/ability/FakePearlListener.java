@@ -9,6 +9,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.plugin.Plugin;
@@ -78,5 +79,10 @@ public final class FakePearlListener implements Listener {
         if (pendingFakePearl.remove(event.getPlayer().getUniqueId())) {
             event.setCancelled(true);
         }
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        pendingFakePearl.remove(event.getPlayer().getUniqueId());
     }
 }

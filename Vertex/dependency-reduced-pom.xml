@@ -61,6 +61,14 @@
       <id>kitteh-factions</id>
       <url>https://dependency.download/releases</url>
     </repository>
+    <repository>
+      <id>jitpack</id>
+      <url>https://jitpack.io</url>
+    </repository>
+    <repository>
+      <id>enginehub</id>
+      <url>https://maven.enginehub.org/repo/</url>
+    </repository>
   </repositories>
   <dependencies>
     <dependency>
@@ -73,6 +81,30 @@
       <groupId>dev.kitteh</groupId>
       <artifactId>factions</artifactId>
       <version>4.4.0</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.github.MilkBowl</groupId>
+      <artifactId>VaultAPI</artifactId>
+      <version>1.7.1</version>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>bukkit</artifactId>
+          <groupId>org.bukkit</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.sk89q.worldguard</groupId>
+      <artifactId>worldguard-bukkit</artifactId>
+      <version>7.0.18</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.luckperms</groupId>
+      <artifactId>api</artifactId>
+      <version>5.5</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -121,7 +153,7 @@
     </dependency>
   </dependencies>
   <properties>
-    <maven.compiler.release>25</maven.compiler.release>
+    <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <paper.version>1.21.11-R0.1-SNAPSHOT</paper.version>
   </properties>

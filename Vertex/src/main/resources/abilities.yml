@@ -1,78 +1,79 @@
 abilities:
   anti-blockup-bone:
     material: BONE
-    name: '&fAnti-Blockup Bone'
+    name: '<light_purple>Anti-Blockup Bone'
     lore:
-      - '&7Hit an enemy with this to stop'
-      - '&7them from placing blocks for'
-      - '&7a short time.'
+      - '<gray>Hit an enemy with this to stop'
+      - '<gray>them from placing blocks for'
+      - '<gray>a short time.'
     cooldown-seconds: 60
     hits-required: 3
     deny-seconds: 15
 
   fake-pearl:
     material: ENDER_PEARL
-    name: '&fFake Pearl'
+    name: '<light_purple>Fake Pearl'
     lore:
-      - '&7Throws a pearl that looks real'
-      - '&7but never actually teleports'
-      - '&7you -- bait your enemy.'
+      - '<gray>Throws a pearl that looks real'
+      - '<gray>but never actually teleports'
+      - '<gray>you -- bait your enemy.'
     cooldown-seconds: 30
 
   grappling-hook:
     material: FISHING_ROD
-    name: '&fGrappling Hook'
+    name: '<light_purple>Grappling Hook'
     lore:
-      - '&7Hook a block or player and'
-      - '&7reel yourself toward it.'
+      - '<gray>Hook a block or player and'
+      - '<gray>reel yourself toward it.'
     cooldown-seconds: 20
+    uses: 8
     forward-multiplier: 1.6
     y-multiplier: 0.8
 
   leap:
     material: FIREWORK_ROCKET
-    name: '&fLeap'
+    name: '<light_purple>Leap'
     lore:
-      - '&7Launches you forward and'
-      - '&7slightly upward.'
+      - '<gray>Launches you forward and'
+      - '<gray>slightly upward.'
     cooldown-seconds: 45
     forward-multiplier: 1.4
     y-multiplier: 0.6
 
   portable-bard:
     material: NOTE_BLOCK
-    name: '&fPortable Bard'
+    name: '<light_purple>Portable Bard'
     lore:
-      - '&7Right-click to choose a buff'
-      - '&7(Strength, Speed, or Regen) and'
-      - '&7share it with your whole faction.'
+      - '<gray>Right-click to choose a buff'
+      - '<gray>(Strength, Speed, or Regen) and'
+      - '<gray>share it with your whole faction.'
     cooldown-seconds: 300
-    buff-seconds: 30
+    buff-seconds: 6
 
   repair:
     material: ANVIL
-    name: '&fRepair'
+    name: '<light_purple>Repair'
     lore:
-      - '&7Grants temporary access to'
-      - '&7repair your gear, with a'
-      - '&7countdown on your scoreboard.'
+      - '<gray>Grants temporary access to'
+      - '<gray>repair your gear, with a'
+      - '<gray>countdown on your scoreboard.'
     cooldown-seconds: 600
     duration-seconds: 60
     permission-node: essentials.fix
 
   switcher-snowball:
     material: SNOWBALL
-    name: '&fSwitcher Snowball'
+    name: '<light_purple>Switcher Snowball'
     lore:
-      - '&7Throw at an enemy to swap'
-      - '&7places with them.'
+      - '<gray>Throw at an enemy to swap'
+      - '<gray>places with them.'
     cooldown-seconds: 30
 
   time-warp-pearl:
     material: ENDER_EYE
-    name: '&fTime Warp Pearl'
+    name: '<light_purple>Time Warp Pearl'
     lore:
-      - '&7Teleports you back to the last'
-      - '&7place you actually ender'
-      - '&7pearled from.'
+      - '<gray>Teleports you back to the last'
+      - '<gray>place you actually ender'
+      - '<gray>pearled from.'
     cooldown-seconds: 30

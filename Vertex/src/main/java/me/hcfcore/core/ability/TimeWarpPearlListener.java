@@ -9,6 +9,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.plugin.Plugin;
@@ -81,5 +82,10 @@ public final class TimeWarpPearlListener implements Listener {
         lastPearlOrigin.remove(player.getUniqueId());
         player.teleport(origin);
         player.sendMessage(messages.get(player, "ability.timewarp-warped"));
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        lastPearlOrigin.remove(event.getPlayer().getUniqueId());
     }
 }

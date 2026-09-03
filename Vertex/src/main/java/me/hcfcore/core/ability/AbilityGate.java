@@ -40,6 +40,11 @@ public final class AbilityGate {
      */
     public static boolean checkAndStart(Plugin plugin, AbilityManager abilityManager, UserManager userManager,
                                          Messages messages, Player player, Ability ability) {
+        return checkAndStart(plugin, abilityManager, userManager, messages, player, ability, true);
+    }
+
+    public static boolean checkAndStart(Plugin plugin, AbilityManager abilityManager, UserManager userManager,
+                                         Messages messages, Player player, Ability ability, boolean consumeItem) {
         if (abilityManager.isOnGlobalCooldown(player.getUniqueId())) {
             long remaining = (abilityManager.globalCooldownRemainingMillis(player.getUniqueId()) + 999) / 1000;
             player.sendMessage(messages.get(player, "ability.on-global-cooldown", "seconds", String.valueOf(remaining)));
@@ -47,6 +52,10 @@ public final class AbilityGate {
         }
 
         User user = userManager.get(player.getUniqueId());
+        if (user == null && userManager.hasFailedLoad(player.getUniqueId())) {
+            player.sendMessage(messages.get(player, "general.data-unavailable"));
+            return false;
+        }
         if (user != null && abilityManager.isOnCooldown(user, ability)) {
             long remaining = (abilityManager.remainingCooldownMillis(user, ability) + 999) / 1000;
             player.sendMessage(messages.get(player, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
@@ -63,6 +72,18 @@ public final class AbilityGate {
         if (user != null) {
             abilityManager.startCooldown(player, user, ability);
         }
+        if (consumeItem) {
+            consumeMainHand(player);
+        }
         return true;
+    }
+
+    private static void consumeMainHand(Player player) {
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (item.getAmount() <= 1) {
+            player.getInventory().setItemInMainHand(null);
+        } else {
+            item.setAmount(item.getAmount() - 1);
+        }
     }
 }

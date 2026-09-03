@@ -41,13 +41,22 @@ commands:
   language:
     description: View or change your language.
     usage: /<command> [code]
+  reboot:
+    description: Start or cancel a server reboot countdown.
+    usage: /<command> [cancel]
+  nextreboot:
+    description: Show the next scheduled server reboot.
+    usage: /<command>
 
 permissions:
   hcfcore.admin:
     description: Reload HCFCore's config.
     default: op
+  hcfcore.kit.create:
+    description: Create a kit from the currently held inventory.
+    default: op
   hcfcore.kit.save:
-    description: Save the currently held inventory as a kit.
+    description: Legacy alias permission for creating kits.
     default: op
   hcfcore.kit.delete:
     description: Delete a kit.
@@ -69,4 +78,7 @@ permissions:
     default: op
   hcfcore.ability.give:
     description: Give ability items via /getitem or the /abilities GUI.
+    default: op
+  hcfcore.reboot.start:
+    description: Start or cancel a server reboot countdown.
     default: op

@@ -33,6 +33,11 @@ public final class FactionsHook {
         return role == null ? "None" : role.toString();
     }
 
+    public static boolean isLeader(Player player) {
+        FPlayer fPlayer = FPlayers.fPlayers().get(player.getUniqueId());
+        return fPlayer != null && fPlayer.hasFaction() && Role.ADMIN.equals(fPlayer.role());
+    }
+
     /**
      * True only when both players are actually in a faction and it's the
      * same one -- two factionless players are never considered "same

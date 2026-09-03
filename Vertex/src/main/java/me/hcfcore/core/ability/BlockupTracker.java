@@ -33,4 +33,9 @@ public final class BlockupTracker {
         Long until = deniedUntil.get(uuid);
         return until != null && until > System.currentTimeMillis();
     }
+
+    public void forget(UUID uuid) {
+        hitCounts.remove(uuid);
+        deniedUntil.remove(uuid);
+    }
 }

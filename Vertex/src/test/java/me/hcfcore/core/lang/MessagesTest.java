@@ -44,7 +44,7 @@ class MessagesTest {
 
         String rendered = messages.getRaw(player, "kit.cooldown", "seconds", "42");
 
-        assertEquals("&cYou can use this kit again in 42s.", rendered);
+        assertEquals("<red>You can use this kit again in 42s.", rendered);
     }
 
     @Test
@@ -67,7 +67,7 @@ class MessagesTest {
         // Overridden in xx_test.
         assertEquals("&aCustom applied text.", messages.getRaw(player, "kit.applied"));
         // Not present in xx_test -- must fall back to en_us's real text.
-        assertEquals("&cNo permission.", messages.getRaw(player, "kit.gui-no-access"));
+        assertEquals("<red>No permission.", messages.getRaw(player, "kit.gui-no-access"));
     }
 
     @Test

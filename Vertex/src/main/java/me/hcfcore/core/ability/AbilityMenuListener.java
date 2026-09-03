@@ -1,8 +1,8 @@
 package me.hcfcore.core.ability;
 
 import me.hcfcore.core.lang.Messages;
+import me.hcfcore.core.lang.MessageFormatter;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -54,7 +54,7 @@ public final class AbilityMenuListener implements Listener {
             player.getWorld().dropItemNaturally(player.getLocation(), dropped);
         }
         player.sendMessage(messages.get(player, "ability.gui-received")
-                .append(LegacyComponentSerializer.legacyAmpersand().deserialize(ability.getDisplayName()))
+                .append(MessageFormatter.deserialize(ability.getDisplayName()))
                 .append(Component.text(".")));
     }
 }

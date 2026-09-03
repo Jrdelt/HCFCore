@@ -8,22 +8,43 @@ mysql:
   username: root
   password: ''
   pool-size: 10
+  # Required for local MySQL servers using caching_sha2_password without SSL.
+  allow-public-key-retrieval: true
+  # Set true for a MySQL server configured with SSL certificates.
+  use-ssl: false
 
 scoreboard:
   update-interval-ticks: 20
-  title: '&b&lHCF&f&lCore'
+  title: '<aqua><bold>HCF<white><bold>Core'
   lines:
     - ''
-    - '&7Online: &f{online}'
-    - '&7Faction: &f{faction}'
-    - '&7Role: &f{faction_role}'
+    - '<gray>Online: <white>{online}'
+    - '<gray>Faction: <white>{faction}'
+    - '<gray>Role: <white>{faction_role}'
     - ''
-    - '&7play.example.com'
+    - '<gray>play.example.com'
+  cooldowns:
+    enabled: true
+    header: '<light_purple>Cooldowns:'
+    line: '<gray>{ability_cooldowns}'
 
 pvp:
-  combat-tag-seconds: 15
+  combat-tag-seconds: 30
   logout-penalty: true
   actionbar-update-interval-ticks: 4
+  legacy-combat:
+    enabled: true
+    # Empty means every world. Add world names to limit legacy PvP.
+    worlds: []
+    # High attack speed removes the modern attack cooldown indicator.
+    attack-speed: 1024.0
+    disable-sweeping-attacks: true
+
+factions:
+  prevent-leader-leave: true
+  command-aliases:
+    - f
+    - factions
 
 kits:
   default-cooldown-seconds: 300
@@ -32,3 +53,10 @@ abilities:
   global-cooldown-seconds: 3
   disabled-regions:
     - spawn
+
+reboot:
+  default-delay-minutes: 10
+  reminder-minutes:
+    - 10
+    - 5
+    - 1

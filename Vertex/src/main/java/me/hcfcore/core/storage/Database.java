@@ -18,10 +18,15 @@ public final class Database {
         String username = config.getString("mysql.username", "root");
         String password = config.getString("mysql.password", "");
         int poolSize = config.getInt("mysql.pool-size", 10);
+        boolean useSsl = config.getBoolean("mysql.use-ssl", false);
+        boolean allowPublicKeyRetrieval = config.getBoolean(
+            "mysql.allow-public-key-retrieval", !useSsl);
 
         HikariConfig hikariConfig = new HikariConfig();
         hikariConfig.setJdbcUrl("jdbc:mysql://" + host + ":" + port + "/" + database
-                + "?useSSL=false&autoReconnect=true&characterEncoding=utf8");
+            + "?useSSL=" + useSsl
+            + "&allowPublicKeyRetrieval=" + allowPublicKeyRetrieval
+            + "&autoReconnect=true&characterEncoding=utf8");
         hikariConfig.setUsername(username);
         hikariConfig.setPassword(password);
         hikariConfig.setMaximumPoolSize(poolSize);

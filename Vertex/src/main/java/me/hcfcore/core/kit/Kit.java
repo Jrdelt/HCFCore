@@ -20,8 +20,8 @@ public final class Kit {
         this.name = name;
         this.permission = permission;
         this.cooldownSeconds = cooldownSeconds;
-        this.armor = armor;
-        this.contents = contents;
+        this.armor = cloneArray(armor);
+        this.contents = cloneArray(contents);
         this.cost = cost;
     }
 

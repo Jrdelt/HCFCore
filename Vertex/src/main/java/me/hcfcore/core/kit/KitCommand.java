@@ -51,13 +51,14 @@ public final class KitCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (args[0].equalsIgnoreCase("save")) {
-            if (!player.hasPermission("hcfcore.kit.save")) {
+        if (args[0].equalsIgnoreCase("create") || args[0].equalsIgnoreCase("save")) {
+            if (!player.hasPermission("hcfcore.kit.create")
+                    && !player.hasPermission("hcfcore.kit.save")) {
                 player.sendMessage(messages.get(player, "general.no-permission"));
                 return true;
             }
             if (args.length < 2) {
-                player.sendMessage(messages.get(player, "kit.usage-save"));
+                player.sendMessage(messages.get(player, "kit.usage-create"));
                 return true;
             }
             String name = args[1];
@@ -119,7 +120,7 @@ public final class KitCommand implements CommandExecutor, TabCompleter {
             return List.of();
         }
         List<String> options = new ArrayList<>(kitManager.getKits().keySet());
-        options.add("save");
+        options.add("create");
         options.add("delete");
         List<String> matches = new ArrayList<>();
         String partial = args[0].toLowerCase(Locale.ROOT);

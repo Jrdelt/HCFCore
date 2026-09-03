@@ -3,7 +3,6 @@ package me.hcfcore.core.lang;
 import me.hcfcore.core.storage.Storage;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
-import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -14,6 +13,11 @@ import org.bukkit.plugin.Plugin;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 
 /**
@@ -26,6 +30,7 @@ public final class LanguageCommand implements CommandExecutor, TabCompleter {
     private final Storage storage;
     private final UserManager userManager;
     private final Messages messages;
+    private final Set<CompletableFuture<Void>> pendingWrites = ConcurrentHashMap.newKeySet();
 
     public LanguageCommand(Plugin plugin, Storage storage, UserManager userManager, Messages messages) {
         this.plugin = plugin;
@@ -61,16 +66,31 @@ public final class LanguageCommand implements CommandExecutor, TabCompleter {
         if (user != null) {
             user.setLocale(code);
         }
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        CompletableFuture<Void> write = CompletableFuture.runAsync(() -> {
             try {
                 storage.saveLocale(player.getUniqueId(), code);
             } catch (Exception e) {
                 plugin.getLogger().log(Level.WARNING, "Failed to persist locale for " + player.getUniqueId(), e);
             }
         });
+        pendingWrites.add(write);
+        write.whenComplete((ignored, error) -> pendingWrites.remove(write));
 
         player.sendMessage(messages.get(player, "language.changed", "locale", code));
         return true;
+    }
+
+    public void awaitWrites() {
+        try {
+            CompletableFuture.allOf(pendingWrites.toArray(new CompletableFuture[0]))
+                    .get(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (TimeoutException e) {
+            plugin.getLogger().warning("Timed out waiting for locale writes during shutdown.");
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Failed while waiting for locale writes.", e);
+        }
     }
 
     @Override

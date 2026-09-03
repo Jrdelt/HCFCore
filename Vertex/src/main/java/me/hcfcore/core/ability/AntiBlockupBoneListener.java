@@ -11,6 +11,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import java.util.Set;
@@ -77,6 +79,12 @@ public final class AntiBlockupBoneListener implements Listener {
         if (user != null) {
             abilityManager.startCooldown(attacker, user, ability);
         }
+        ItemStack item = attacker.getInventory().getItemInMainHand();
+        if (item.getAmount() <= 1) {
+            attacker.getInventory().setItemInMainHand(null);
+        } else {
+            item.setAmount(item.getAmount() - 1);
+        }
         attacker.sendMessage(messages.get(attacker, "ability.bone-attacker",
                 "player", victim.getName(), "seconds", String.valueOf(denySeconds)));
         victim.sendMessage(messages.get(victim, "ability.bone-victim", "seconds", String.valueOf(denySeconds)));
@@ -88,6 +96,11 @@ public final class AntiBlockupBoneListener implements Listener {
             event.setCancelled(true);
             event.getPlayer().sendMessage(messages.get(event.getPlayer(), "ability.bone-place-denied"));
         }
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        tracker.forget(event.getPlayer().getUniqueId());
     }
 
     private Player resolveAttacker(Entity damager) {

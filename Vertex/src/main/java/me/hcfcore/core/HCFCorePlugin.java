@@ -12,18 +12,23 @@ import me.hcfcore.core.ability.PortableBardListener;
 import me.hcfcore.core.ability.RepairListener;
 import me.hcfcore.core.ability.SwitcherSnowballListener;
 import me.hcfcore.core.ability.TimeWarpPearlListener;
+import me.hcfcore.core.factions.FactionCommandListener;
 import me.hcfcore.core.kit.KitCommand;
 import me.hcfcore.core.kit.KitManager;
 import me.hcfcore.core.kit.KitMenuListener;
 import me.hcfcore.core.kit.KitsCommand;
-import me.hcfcore.core.lang.LanguageCommand;
 import me.hcfcore.core.lang.Messages;
+import me.hcfcore.core.lang.LanguageCommand;
 import me.hcfcore.core.listener.CombatListener;
 import me.hcfcore.core.listener.PlayerConnectionListener;
 import me.hcfcore.core.pvp.CombatCheckCommand;
 import me.hcfcore.core.pvp.CombatManager;
 import me.hcfcore.core.pvp.CombatTagCommand;
 import me.hcfcore.core.pvp.UncombatCommand;
+import me.hcfcore.core.pvp.LegacyCombatManager;
+import me.hcfcore.core.reboot.NextRebootCommand;
+import me.hcfcore.core.reboot.RebootCommand;
+import me.hcfcore.core.reboot.RebootManager;
 import me.hcfcore.core.scoreboard.ScoreboardManager;
 import me.hcfcore.core.storage.Database;
 import me.hcfcore.core.storage.MySQLStorage;
@@ -40,18 +45,21 @@ public final class HCFCorePlugin extends JavaPlugin {
     private Storage storage;
     private UserManager userManager;
     private Messages messages;
+    private LanguageCommand languageCommand;
     private KitManager kitManager;
     private AbilityManager abilityManager;
     private ScoreboardManager scoreboardManager;
     private CombatManager combatManager;
+    private LegacyCombatManager legacyCombatManager;
+    private RebootManager rebootManager;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
 
-        database = new Database(getConfig());
-        storage = new MySQLStorage(database);
         try {
+            database = new Database(getConfig());
+            storage = new MySQLStorage(database);
             // One-time schema check at boot; the recurring load/save calls
             // made during gameplay are the ones that must stay off the main
             // thread, and they do (see UserManager/KitManager).
@@ -70,16 +78,23 @@ public final class HCFCorePlugin extends JavaPlugin {
         abilityManager = new AbilityManager(this, storage);
         abilityManager.load();
 
-        scoreboardManager = new ScoreboardManager(this, getConfig());
+        scoreboardManager = new ScoreboardManager(this, getConfig(), userManager, abilityManager);
         scoreboardManager.start();
 
         combatManager = new CombatManager(
                 this,
                 messages,
-                getConfig().getInt("pvp.combat-tag-seconds", 15),
+                getConfig().getInt("pvp.combat-tag-seconds", 30),
                 getConfig().getBoolean("pvp.logout-penalty", true),
                 getConfig().getInt("pvp.actionbar-update-interval-ticks", 4));
         combatManager.start();
+
+        legacyCombatManager = new LegacyCombatManager(this);
+        Bukkit.getPluginManager().registerEvents(legacyCombatManager, this);
+        legacyCombatManager.start();
+
+        rebootManager = new RebootManager(this, messages);
+        rebootManager.start();
 
         Bukkit.getPluginManager().registerEvents(new CombatListener(combatManager), this);
         Bukkit.getPluginManager().registerEvents(
@@ -100,6 +115,7 @@ public final class HCFCorePlugin extends JavaPlugin {
                 new SwitcherSnowballListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new TimeWarpPearlListener(this, abilityManager, userManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new FactionCommandListener(this, messages), this);
 
         KitCommand kitCommand = new KitCommand(kitManager, messages);
         getCommand("kit").setExecutor(kitCommand);
@@ -109,7 +125,7 @@ public final class HCFCorePlugin extends JavaPlugin {
 
         getCommand("hcfcore").setExecutor(new HCFCoreCommand(this, messages));
 
-        LanguageCommand languageCommand = new LanguageCommand(this, storage, userManager, messages);
+        languageCommand = new LanguageCommand(this, storage, userManager, messages);
         getCommand("language").setExecutor(languageCommand);
         getCommand("language").setTabCompleter(languageCommand);
 
@@ -130,6 +146,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         getCommand("getitem").setTabCompleter(getItemCommand);
         getCommand("abilities").setExecutor(new AbilitiesCommand(this, abilityManager, messages));
 
+        getCommand("reboot").setExecutor(new RebootCommand(rebootManager, messages));
+        getCommand("nextreboot").setExecutor(new NextRebootCommand(rebootManager));
+
         for (var player : Bukkit.getOnlinePlayers()) {
             var uuid = player.getUniqueId();
             Bukkit.getScheduler().runTaskAsynchronously(this, () -> userManager.load(uuid));
@@ -145,8 +164,17 @@ public final class HCFCorePlugin extends JavaPlugin {
         if (combatManager != null) {
             combatManager.stop();
         }
+        if (rebootManager != null) {
+            rebootManager.stop();
+        }
         if (kitManager != null) {
             kitManager.shutdown();
+        }
+        if (abilityManager != null) {
+            abilityManager.awaitWrites();
+        }
+        if (languageCommand != null) {
+            languageCommand.awaitWrites();
         }
         if (storage != null) {
             storage.close();
@@ -161,15 +189,17 @@ public final class HCFCorePlugin extends JavaPlugin {
         if (scoreboardManager != null) {
             scoreboardManager.stop();
         }
-        scoreboardManager = new ScoreboardManager(this, getConfig());
+        scoreboardManager = new ScoreboardManager(this, getConfig(), userManager, abilityManager);
         scoreboardManager.start();
         for (var player : Bukkit.getOnlinePlayers()) {
             scoreboardManager.setup(player);
         }
 
         combatManager.reconfigure(
-                getConfig().getInt("pvp.combat-tag-seconds", 15),
+                getConfig().getInt("pvp.combat-tag-seconds", 30),
                 getConfig().getBoolean("pvp.logout-penalty", true),
                 getConfig().getInt("pvp.actionbar-update-interval-ticks", 4));
+        legacyCombatManager.reconfigure();
+        rebootManager.reconfigure();
     }
 }

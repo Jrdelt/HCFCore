@@ -6,10 +6,13 @@ import me.hcfcore.core.storage.Storage;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
 import net.milkbowl.vault.economy.Economy;
+import net.milkbowl.vault.economy.EconomyResponse;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.Plugin;
@@ -134,6 +137,10 @@ public final class KitManager {
 
         String key = kit.getName().toLowerCase(Locale.ROOT);
         User user = userManager.get(player.getUniqueId());
+        if (user == null && userManager.hasFailedLoad(player.getUniqueId())) {
+            player.sendMessage(messages.get(player, "general.data-unavailable"));
+            return;
+        }
         long now = System.currentTimeMillis();
         long expiry = user == null ? 0L : user.getCooldownExpiry(key);
 
@@ -165,17 +172,39 @@ public final class KitManager {
                 player.sendMessage(messages.get(player, "kit.cost-money-needed", "amount", EconomyHook.format(cost.money())));
                 return;
             }
-            economy.withdrawPlayer(player, cost.money());
+        }
+
+        ItemStack[] kitArmor = kit.getArmor();
+        boolean wearingArmor = hasArmor(inventory.getArmorContents());
+        List<ItemStack> itemsToStore = new java.util.ArrayList<>();
+        if (wearingArmor) {
+            addNonEmpty(itemsToStore, kitArmor);
+        }
+        addNonEmpty(itemsToStore, kit.getContents());
+        if (!canStore(inventory, itemsToStore, !bypassCost && cost.hasItemCost() ? cost : Kit.Cost.NONE)) {
+            player.sendMessage(messages.get(player, "kit.inventory-full"));
+            return;
+        }
+
+        if (!bypassCost && cost.hasMoneyCost()) {
+            Economy economy = EconomyHook.getEconomy();
+            EconomyResponse response = economy.withdrawPlayer(player, cost.money());
+            if (!response.transactionSuccess()) {
+                player.sendMessage(messages.get(player, "kit.cost-withdraw-failed"));
+                return;
+            }
         }
 
         if (!bypassCost && cost.hasItemCost()) {
             inventory.removeItem(new ItemStack(cost.itemType(), cost.itemAmount()));
         }
 
-        inventory.setArmorContents(kit.getArmor());
-        for (ItemStack item : kit.getContents()) {
-            if (item != null) {
-                inventory.addItem(item);
+        if (wearingArmor) {
+            inventory.addItem(itemsToStore.toArray(new ItemStack[0]));
+        } else {
+            inventory.setArmorContents(toBukkitArmorOrder(kitArmor));
+            if (!itemsToStore.isEmpty()) {
+                inventory.addItem(itemsToStore.toArray(new ItemStack[0]));
             }
         }
 
@@ -197,9 +226,54 @@ public final class KitManager {
 
     public void save(String name, Player player, String permission, int cooldownSeconds, Kit.Cost cost) {
         PlayerInventory inventory = player.getInventory();
-        Kit kit = new Kit(name, permission, cooldownSeconds, inventory.getArmorContents(), inventory.getContents(), cost);
+        Kit kit = new Kit(name, permission, cooldownSeconds,
+            fromBukkitArmorOrder(inventory.getArmorContents()), inventory.getStorageContents(), cost);
         kits.put(name.toLowerCase(Locale.ROOT), kit);
         persistAsync();
+    }
+
+    private static ItemStack[] toBukkitArmorOrder(ItemStack[] armor) {
+        return fromBukkitArmorOrder(armor);
+    }
+
+    private static ItemStack[] fromBukkitArmorOrder(ItemStack[] armor) {
+        ItemStack[] reversed = new ItemStack[armor.length];
+        for (int i = 0; i < armor.length; i++) {
+            reversed[i] = armor[armor.length - 1 - i];
+        }
+        return reversed;
+    }
+
+    private static boolean hasArmor(ItemStack[] armor) {
+        for (ItemStack item : armor) {
+            if (item != null && item.getType() != Material.AIR) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void addNonEmpty(List<ItemStack> target, ItemStack[] items) {
+        for (ItemStack item : items) {
+            if (item != null && item.getType() != Material.AIR) {
+                target.add(item.clone());
+            }
+        }
+    }
+
+    private static boolean canStore(PlayerInventory inventory, List<ItemStack> items, Kit.Cost cost) {
+        if (items.isEmpty()) {
+            return true;
+        }
+        Inventory simulation = Bukkit.createInventory(null, inventory.getStorageContents().length);
+        ItemStack[] storage = inventory.getStorageContents();
+        for (int i = 0; i < storage.length; i++) {
+            simulation.setItem(i, storage[i] == null ? null : storage[i].clone());
+        }
+        if (cost.hasItemCost()) {
+            simulation.removeItem(new ItemStack(cost.itemType(), cost.itemAmount()));
+        }
+        return simulation.addItem(items.toArray(new ItemStack[0])).isEmpty();
     }
 
     /**
