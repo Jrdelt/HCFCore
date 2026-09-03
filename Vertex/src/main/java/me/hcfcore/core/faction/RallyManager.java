@@ -30,6 +30,10 @@ public final class RallyManager {
         rallyExpires.put(factionId, System.currentTimeMillis() + RALLY_DURATION_MILLIS);
     }
 
+    public void clearRally(int factionId) {
+        rallyExpires.remove(factionId);
+    }
+
     private boolean isRallyActive(int factionId) {
         Long expiry = rallyExpires.get(factionId);
         if (expiry == null) return false;

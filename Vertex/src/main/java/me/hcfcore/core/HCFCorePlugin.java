@@ -40,7 +40,7 @@ import me.hcfcore.core.reboot.NextRebootCommand;
 import me.hcfcore.core.reboot.RebootCommand;
 import me.hcfcore.core.reboot.RebootManager;
 import me.hcfcore.core.scoreboard.ScoreboardManager;
-import me.hcfcore.core.faction.RallyListener;
+import me.hcfcore.core.faction.RallyCommand;
 import me.hcfcore.core.faction.RallyManager;
 import me.hcfcore.core.staff.DeathListener;
 import me.hcfcore.core.staff.DeathManager;
@@ -81,7 +81,6 @@ public final class HCFCorePlugin extends JavaPlugin {
     private ArcherTagManager archerTagManager;
     private DeathManager deathManager;
     private RallyManager rallyManager;
-    private RallyListener rallyListener;
 
     @Override
     public void onEnable() {
@@ -141,8 +140,8 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new InvRestoreMenuListener(this, deathManager), this);
 
         rallyManager = new RallyManager(this, messages);
-        rallyListener = new RallyListener(this, rallyManager);
-        Bukkit.getPluginManager().registerEvents(rallyListener, this);
+        RallyCommand rallyCommand = new RallyCommand(rallyManager, messages);
+        getCommand("rally").setExecutor(rallyCommand);
 
         Bukkit.getPluginManager().registerEvents(new CombatListener(combatManager), this);
         playerConnectionListener = new PlayerConnectionListener(userManager, scoreboardManager, combatManager);
@@ -240,9 +239,6 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
         if (languageCommand != null) {
             languageCommand.awaitWrites();
-        }
-        if (rallyListener != null) {
-            rallyListener.shutdown();
         }
         if (rallyManager != null) {
             rallyManager.shutdown();
