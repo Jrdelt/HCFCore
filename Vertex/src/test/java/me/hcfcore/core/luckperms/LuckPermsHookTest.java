@@ -10,6 +10,7 @@ import org.mockbukkit.mockbukkit.plugin.PluginMock;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class LuckPermsHookTest {
 
@@ -37,5 +38,12 @@ class LuckPermsHookTest {
         PlayerMock player = server.addPlayer("Alice");
 
         assertDoesNotThrow(() -> LuckPermsHook.grantTemporaryPermission(plugin, player, "essentials.fix", 60));
+    }
+
+    @Test
+    void getPrimaryGroupDisplayNameIsNullWhenLuckPermsIsNotInstalled() {
+        PlayerMock player = server.addPlayer("Bob");
+
+        assertNull(LuckPermsHook.getPrimaryGroupDisplayName(player));
     }
 }

@@ -1,7 +1,6 @@
 package me.hcfcore.core.tag;
 
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -65,7 +64,7 @@ public final class TagMenuListener implements Listener {
         TagManager manager = holder.manager();
         int slot = event.getRawSlot();
 
-        if (slot >= 0 && slot < TagMenu.PAGE_SIZE) {
+        if (TagMenu.isTagSlot(slot)) {
             selectTag(player, manager, event.getCurrentItem());
             return;
         }
@@ -84,9 +83,8 @@ public final class TagMenuListener implements Listener {
                     TagMenu.open(player, manager, holder.messages(), state.withAscending(!state.ascending()));
                 } else {
                     TagManager.Sort next = switch (state.sort()) {
-                        case RARITY -> TagManager.Sort.ALPHABETICAL;
                         case ALPHABETICAL -> TagManager.Sort.AGE;
-                        case AGE -> TagManager.Sort.RARITY;
+                        case AGE -> TagManager.Sort.ALPHABETICAL;
                     };
                     TagMenu.open(player, manager, holder.messages(), state.withSort(next));
                 }
@@ -119,7 +117,7 @@ public final class TagMenuListener implements Listener {
     }
 
     private void selectTag(Player player, TagManager manager, ItemStack clicked) {
-        if (clicked == null || clicked.getType() != Material.NAME_TAG || !clicked.hasItemMeta()) {
+        if (clicked == null || !clicked.hasItemMeta()) {
             return;
         }
         String tagId = clicked.getItemMeta().getPersistentDataContainer()
@@ -128,7 +126,12 @@ public final class TagMenuListener implements Listener {
         if (tag == null || !manager.isUnlocked(player, tag)) {
             return;
         }
-        manager.select(player.getUniqueId(), tag.id());
+        boolean alreadyEquipped = tag.id().equalsIgnoreCase(manager.getPlayerTag(player.getUniqueId()));
+        if (alreadyEquipped) {
+            manager.unselect(player.getUniqueId());
+        } else {
+            manager.select(player.getUniqueId(), tag.id());
+        }
         player.closeInventory();
     }
 }

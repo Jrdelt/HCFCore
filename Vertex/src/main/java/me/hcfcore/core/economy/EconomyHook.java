@@ -2,6 +2,7 @@ package me.hcfcore.core.economy;
 
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.RegisteredServiceProvider;
 
 import java.util.Locale;
@@ -31,5 +32,13 @@ public final class EconomyHook {
             return economy.format(amount);
         }
         return String.format(Locale.ROOT, "%.2f", amount);
+    }
+
+    public static String getBalance(OfflinePlayer player) {
+        Economy economy = getEconomy();
+        if (economy == null) {
+            return "0";
+        }
+        return format(economy.getBalance(player));
     }
 }

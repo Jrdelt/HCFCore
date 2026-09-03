@@ -1,6 +1,6 @@
 kits:
   archer:
-    permission: hcfcore.kit.archer
+    permission: ''
     cooldown-seconds: 600
     armor:
       - material: LEATHER_HELMET
@@ -75,7 +75,7 @@ kits:
         amplifier: 1
 
   miner:
-    permission: hcfcore.kit.miner
+    permission: ''
     cooldown-seconds: 600
     armor:
       - material: IRON_HELMET
@@ -148,7 +148,7 @@ kits:
         amplifier: 0
 
   bard:
-    permission: hcfcore.kit.bard
+    permission: ''
     cooldown-seconds: 600
     armor:
       - material: GOLDEN_HELMET
@@ -228,21 +228,17 @@ kits:
         amplifier: 3
 
   diamond:
-    permission: hcfcore.kit.diamond
+    permission: ''
     cooldown-seconds: 600
     armor:
       - material: DIAMOND_HELMET
         amount: 1
-        enchantments: {PROTECTION: 2}
       - material: DIAMOND_CHESTPLATE
         amount: 1
-        enchantments: {PROTECTION: 1}
       - material: DIAMOND_LEGGINGS
         amount: 1
-        enchantments: {PROTECTION: 1}
       - material: DIAMOND_BOOTS
         amount: 1
-        enchantments: {PROTECTION: 2}
     contents:
       - material: DIAMOND_SWORD
         amount: 1
@@ -268,16 +264,16 @@ kits:
     armor:
       - material: DIAMOND_HELMET
         amount: 1
-        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+        enchantments: {PROTECTION: 1, UNBREAKING: 2}
       - material: DIAMOND_CHESTPLATE
         amount: 1
-        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+        enchantments: {PROTECTION: 1, UNBREAKING: 2}
       - material: DIAMOND_LEGGINGS
         amount: 1
-        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+        enchantments: {PROTECTION: 1, UNBREAKING: 2}
       - material: DIAMOND_BOOTS
         amount: 1
-        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+        enchantments: {PROTECTION: 1, UNBREAKING: 2}
     contents:
       - material: DIAMOND_SWORD
         amount: 1
@@ -293,7 +289,7 @@ kits:
         amplifier: 0
 
   rogue:
-    permission: hcfcore.kit.rogue
+    permission: ''
     cooldown-seconds: 600
     armor:
       - material: CHAINMAIL_HELMET
@@ -350,7 +346,7 @@ kits:
         amplifier: 1
 
   mage:
-    permission: hcfcore.kit.mage
+    permission: ''
     cooldown-seconds: 600
     armor:
       - material: GOLDEN_HELMET

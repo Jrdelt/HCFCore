@@ -249,6 +249,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         if (abilityManager != null) {
             abilityManager.load();
         }
+        if (tagManager != null) {
+            tagManager.load();
+        }
 
         if (scoreboardManager != null) {
             scoreboardManager.stop();

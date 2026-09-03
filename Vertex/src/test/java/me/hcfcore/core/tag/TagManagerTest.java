@@ -50,30 +50,38 @@ class TagManagerTest {
 
     @Test
     void sortsAlphabeticallyAscendingAndDescending() {
+        // Uses its own fixture rather than the bundled tags.yml, whose
+        // tag list is admin content that changes independently of this
+        // test (e.g. padded with extra entries to test pagination).
+        writeTagsYaml("""
+                tags:
+                  founder:
+                    display: "&dFounder"
+                    permission: ''
+                    created-at: 1000
+                  legend:
+                    display: "<gradient:#facc15:#f97316>Legend"
+                    permission: ''
+                    created-at: 1000
+                  newcomer:
+                    display: "&7Newcomer"
+                    permission: ''
+                    created-at: 1000
+                  veteran:
+                    display: "&bVeteran"
+                    permission: ''
+                    created-at: 1000
+                players: {}
+                """);
         tagManager.load();
 
         List<String> ascending = tagManager.getSorted(TagManager.Sort.ALPHABETICAL, true).stream()
-                .map(TagManager.Tag::display).toList();
+                .map(tag -> GradientColor.stripLeadingColor(tag.display())).toList();
         assertEquals(List.of("Founder", "Legend", "Newcomer", "Veteran"), ascending);
 
         List<String> descending = tagManager.getSorted(TagManager.Sort.ALPHABETICAL, false).stream()
-                .map(TagManager.Tag::display).toList();
+                .map(tag -> GradientColor.stripLeadingColor(tag.display())).toList();
         assertEquals(List.of("Veteran", "Newcomer", "Legend", "Founder"), descending);
-    }
-
-    @Test
-    void sortsByRarityLegendaryFirstAscending() {
-        // Regression test: RARITY previously fell through to the dead
-        // rarityOrder() method and actually sorted by player count instead.
-        tagManager.load();
-
-        List<String> ascending = tagManager.getSorted(TagManager.Sort.RARITY, true).stream()
-                .map(TagManager.Tag::display).toList();
-        assertEquals(List.of("Legend", "Founder", "Veteran", "Newcomer"), ascending);
-
-        List<String> descending = tagManager.getSorted(TagManager.Sort.RARITY, false).stream()
-                .map(TagManager.Tag::display).toList();
-        assertEquals(List.of("Newcomer", "Veteran", "Founder", "Legend"), descending);
     }
 
     @Test
@@ -83,17 +91,14 @@ class TagManagerTest {
                   oldest:
                     display: "Oldest"
                     permission: ''
-                    rarity: COMMON
                     created-at: 1000
                   middle:
                     display: "Middle"
                     permission: ''
-                    rarity: COMMON
                     created-at: 2000
                   newest:
                     display: "Newest"
                     permission: ''
-                    rarity: COMMON
                     created-at: 3000
                 players: {}
                 """);
@@ -111,12 +116,10 @@ class TagManagerTest {
                   open:
                     display: "Open"
                     permission: ''
-                    rarity: COMMON
                     created-at: 1000
                   gated:
                     display: "Gated"
                     permission: hcfcore.tag.gated
-                    rarity: COMMON
                     created-at: 1000
                 players: {}
                 """);
@@ -140,17 +143,14 @@ class TagManagerTest {
                   open:
                     display: "Open"
                     permission: ''
-                    rarity: COMMON
                     created-at: 1000
                   gated1:
                     display: "Gated1"
                     permission: hcfcore.tag.gated1
-                    rarity: COMMON
                     created-at: 1000
                   gated2:
                     display: "Gated2"
                     permission: hcfcore.tag.gated2
-                    rarity: COMMON
                     created-at: 1000
                 players: {}
                 """);
@@ -168,8 +168,38 @@ class TagManagerTest {
         assertEquals(1, unownedCount, "gated2 should still be locked");
     }
 
+    private static final String LEGEND_FIXTURE = """
+            tags:
+              legend:
+                display: "<gradient:#facc15:#f97316>Legend"
+                permission: ''
+                created-at: 1000
+            players: {}
+            """;
+
+    @Test
+    void selectThenUnselectClearsThePlayersTag() {
+        // Uses its own fixture rather than the bundled tags.yml, whose
+        // tag set is admin content that changes independently of this test.
+        writeTagsYaml(LEGEND_FIXTURE);
+        tagManager.load();
+        PlayerMock player = server.addPlayer("Eve");
+
+        tagManager.select(player.getUniqueId(), "legend");
+        assertEquals("legend", tagManager.getPlayerTag(player.getUniqueId()));
+        assertEquals(1, tagManager.owners("legend"));
+
+        tagManager.unselect(player.getUniqueId());
+        assertNull(tagManager.getPlayerTag(player.getUniqueId()));
+
+        // owners is a lifetime counter, not a live "currently equipped"
+        // count -- unselecting doesn't roll it back.
+        assertEquals(1, tagManager.owners("legend"));
+    }
+
     @Test
     void nicknameMatchAndReversedPersistAcrossAFreshLoad() {
+        writeTagsYaml(LEGEND_FIXTURE);
         tagManager.load();
         PlayerMock player = server.addPlayer("Carol");
 
@@ -188,12 +218,63 @@ class TagManagerTest {
 
     @Test
     void nicknameColorIsNullWhenMatchDisabled() {
+        writeTagsYaml(LEGEND_FIXTURE);
         tagManager.load();
         PlayerMock player = server.addPlayer("Dave");
 
         tagManager.select(player.getUniqueId(), "legend");
 
         assertNull(tagManager.getNicknameColor(player), "nickname-match defaults to disabled");
+    }
+
+    @Test
+    void materialAndLorePersistAcrossAFreshLoad() {
+        writeTagsYaml("""
+                tags:
+                  legend:
+                    display: "Legend"
+                    permission: ''
+                    created-at: 1000
+                    material: NETHER_STAR
+                    custom-model-data: 42
+                    lore:
+                      - '<gray>A name known by all.'
+                      - '<gray>Second line.'
+                players: {}
+                """);
+        tagManager.load();
+
+        TagManager.Tag legend = tagManager.get("legend");
+        assertEquals("NETHER_STAR", legend.material());
+        assertEquals(42, legend.customModelData());
+        assertEquals(List.of("<gray>A name known by all.", "<gray>Second line."), legend.lore());
+
+        tagManager.save();
+        TagManager reloaded = new TagManager(plugin);
+        reloaded.load();
+
+        TagManager.Tag reloadedLegend = reloaded.get("legend");
+        assertEquals("NETHER_STAR", reloadedLegend.material());
+        assertEquals(42, reloadedLegend.customModelData());
+        assertEquals(List.of("<gray>A name known by all.", "<gray>Second line."), reloadedLegend.lore());
+    }
+
+    @Test
+    void materialAndLoreDefaultToNullAndEmptyWhenUnset() {
+        writeTagsYaml("""
+                tags:
+                  plain:
+                    display: "Plain"
+                    permission: ''
+                    created-at: 1000
+                players: {}
+                """);
+        tagManager.load();
+
+        TagManager.Tag plain = tagManager.get("plain");
+        assertNull(plain.material());
+        assertNull(plain.customModelData());
+        assertTrue(plain.lore().isEmpty());
     }
 
     @Test
@@ -204,7 +285,6 @@ class TagManagerTest {
                   veteran:
                     display: "Veteran"
                     permission: ''
-                    rarity: RARE
                     created-at: 1000
                 players:
                   %s: veteran

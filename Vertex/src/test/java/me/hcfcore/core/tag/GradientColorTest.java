@@ -43,4 +43,35 @@ class GradientColorTest {
         String original = "<gradient:#facc15:#f97316>";
         assertEquals(original, GradientColor.reverse(GradientColor.reverse(original)));
     }
+
+    @Test
+    void extractsLeadingMiniMessageColor() {
+        assertEquals("<gradient:#facc15:#f97316>",
+                GradientColor.extractLeadingColor("<gradient:#facc15:#f97316>Legend"));
+        assertEquals("Legend", GradientColor.stripLeadingColor("<gradient:#facc15:#f97316>Legend"));
+    }
+
+    @Test
+    void extractsLeadingLegacyColorCodes() {
+        assertEquals("&a&l", GradientColor.extractLeadingColor("&a&lNewcomer"));
+        assertEquals("Newcomer", GradientColor.stripLeadingColor("&a&lNewcomer"));
+    }
+
+    @Test
+    void extractsLeadingLegacyHexCode() {
+        assertEquals("&#facc15", GradientColor.extractLeadingColor("&#facc15Legend"));
+        assertEquals("Legend", GradientColor.stripLeadingColor("&#facc15Legend"));
+    }
+
+    @Test
+    void leadingColorIsNullForPlainText() {
+        assertNull(GradientColor.extractLeadingColor("Newcomer"));
+        assertEquals("Newcomer", GradientColor.stripLeadingColor("Newcomer"));
+    }
+
+    @Test
+    void leadingColorHandlesNullInput() {
+        assertNull(GradientColor.extractLeadingColor(null));
+        assertNull(GradientColor.stripLeadingColor(null));
+    }
 }

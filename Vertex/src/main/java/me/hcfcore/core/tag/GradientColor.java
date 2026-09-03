@@ -16,8 +16,40 @@ import java.util.regex.Pattern;
 public final class GradientColor {
 
     private static final Pattern GRADIENT = Pattern.compile("<gradient:([^>]+)>", Pattern.CASE_INSENSITIVE);
+    // A tag's `display` can be authored in MiniMessage ("<light_purple>") or
+    // legacy ("&d", "&#facc15") style, so the leading-color match needs to
+    // recognize both.
+    private static final Pattern LEADING_TAGS = Pattern.compile(
+            "^(?:<[^>]+>|&#[0-9A-Fa-f]{6}|&[0-9A-Fa-fK-Ok-oRr])+");
 
     private GradientColor() {
+    }
+
+    /**
+     * A tag's `display` embeds its own color directly (e.g.
+     * "<gradient:#a:#b>Legend"). This pulls out just the leading color/
+     * gradient tag(s), for reuse elsewhere (like coloring a matched
+     * player's nickname) -- or null if display doesn't start with one.
+     */
+    public static String extractLeadingColor(String display) {
+        if (display == null) {
+            return null;
+        }
+        Matcher matcher = LEADING_TAGS.matcher(display);
+        return matcher.find() ? matcher.group() : null;
+    }
+
+    /**
+     * The counterpart to extractLeadingColor: the same display string with
+     * its leading color/gradient tag(s) removed, for sorting/searching by
+     * the visible name rather than the raw MiniMessage-tagged string.
+     */
+    public static String stripLeadingColor(String display) {
+        if (display == null) {
+            return null;
+        }
+        Matcher matcher = LEADING_TAGS.matcher(display);
+        return matcher.find() ? display.substring(matcher.end()) : display;
     }
 
     public static String reverse(String colorTag) {

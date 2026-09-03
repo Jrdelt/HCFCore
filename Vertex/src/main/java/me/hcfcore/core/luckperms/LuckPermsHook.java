@@ -47,6 +47,13 @@ public final class LuckPermsHook {
      * group name if none is set. Null if LuckPerms isn't installed or the
      * player has no loaded LuckPerms user.
      */
+    /**
+     * Null means "no rank to show" -- both for players with no LuckPerms
+     * user record, and for LuckPerms' own built-in "default" base group,
+     * which every player starts in and which normally has no configured
+     * display name (so falling back to the raw group id would print the
+     * literal word "default" as everyone's rank).
+     */
     public static String getPrimaryGroupDisplayName(Player player) {
         if (!isAvailable()) {
             return null;
@@ -58,11 +65,11 @@ public final class LuckPermsHook {
         }
         String groupName = user.getPrimaryGroup();
         Group group = api.getGroupManager().getGroup(groupName);
-        if (group == null) {
-            return groupName;
+        String displayName = group == null ? null : group.getDisplayName();
+        if (displayName != null) {
+            return displayName;
         }
-        String displayName = group.getDisplayName();
-        return displayName != null ? displayName : groupName;
+        return "default".equalsIgnoreCase(groupName) ? null : groupName;
     }
 
     private static void grant(Plugin plugin, Player player, String permissionNode, long seconds) {

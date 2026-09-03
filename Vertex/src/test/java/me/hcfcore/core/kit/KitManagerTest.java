@@ -11,6 +11,7 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.ServicePriority;
+import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -245,6 +246,49 @@ class KitManagerTest {
         assertFalse(player.hasPotionEffect(PotionEffectType.SPEED));
         ((BukkitSchedulerMock) server.getScheduler()).performOneTick();
         assertTrue(player.hasPotionEffect(PotionEffectType.SPEED));
+    }
+
+    @Test
+    void externalPotionOverridingAKitEffectDoesNotRetriggerTheWarmupMessage() {
+        // Regression test: an external potion (e.g. a PvP splash potion)
+        // sharing an effect type with the kit used to be misread as the
+        // kit's own effect having "fallen off" armor, since the old check
+        // compared amplifiers exactly. That re-cleared tracking and
+        // resent the equip warmup message mid-fight, without the player
+        // ever touching their armor.
+        PlayerMock player = server.addPlayer("Hank");
+        player.addAttachment(plugin, "hcfcore.kit.archer", true);
+        userManager.load(player.getUniqueId());
+        kitManager.load();
+        Kit kit = kitManager.get("archer");
+
+        kitManager.start();
+        kitManager.apply(player, kit);
+        ((BukkitSchedulerMock) server.getScheduler()).performTicks(61);
+        assertEquals(2, player.getPotionEffect(PotionEffectType.SPEED).getAmplifier());
+        player.nextMessage();
+        player.nextMessage();
+
+        // Simulate a stronger Speed splash potion landing on the player
+        // mid-fight, overriding the kit's own SPEED amplifier.
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 200, 3));
+        ((BukkitSchedulerMock) server.getScheduler()).performOneTick();
+
+        assertEquals(3, player.getPotionEffect(PotionEffectType.SPEED).getAmplifier(),
+                "the external potion's stronger amplifier should not be immediately stomped");
+        assertTrue(player.hasPotionEffect(PotionEffectType.JUMP_BOOST),
+                "the untouched kit effect should never be cleared just because SPEED was overridden");
+        assertNull(player.nextMessage(), "no equip/warmup message should fire since the kit armor never changed");
+
+        // The external potion naturally expires (simulated directly,
+        // since MockBukkit doesn't tick down real potion durations).
+        player.removePotionEffect(PotionEffectType.SPEED);
+        ((BukkitSchedulerMock) server.getScheduler()).performOneTick();
+
+        assertEquals(2, player.getPotionEffect(PotionEffectType.SPEED).getAmplifier(),
+                "the kit's own SPEED should silently reappear the moment the override is gone");
+        assertTrue(player.hasPotionEffect(PotionEffectType.JUMP_BOOST), "still never should have been cleared");
+        assertNull(player.nextMessage(), "restoring a stripped effect on unchanged armor should stay silent");
     }
 
     @Test

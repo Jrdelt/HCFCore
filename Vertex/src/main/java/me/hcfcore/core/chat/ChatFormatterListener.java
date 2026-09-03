@@ -31,7 +31,7 @@ public final class ChatFormatterListener implements Listener {
     }
 
     private Component render(Player player, Component message) {
-        Component result = deserializeTemplate("chat.prefix", "<gradient:#38bdf8:#a855f7>❖</gradient>");
+        Component result = Component.empty();
 
         String faction = FactionsHook.getFactionTag(player);
         if (!"None".equalsIgnoreCase(faction)) {
@@ -54,17 +54,15 @@ public final class ChatFormatterListener implements Listener {
     }
 
     /**
-     * Uses the tag's own `color` (tags.yml) instead of a single uniform
-     * color for every tag, so different tags actually look different in
-     * chat. `color`/`display` are both admin-authored (tags.yml), so this
-     * builds the component directly rather than through the escaped
-     * placeholder path in deserializeTemplate, which exists specifically
-     * to guard untrusted values like a player's own name.
+     * `display` embeds its own tag color (tags.yml), so different tags
+     * already look different in chat without a separate color lookup.
+     * `display` is admin-authored (tags.yml), so this builds the
+     * component directly rather than through the escaped placeholder path
+     * in deserializeTemplate, which exists specifically to guard untrusted
+     * values like a player's own name.
      */
     private Component coloredTag(TagManager.Tag tag) {
-        String color = tag.color() != null && !tag.color().isBlank()
-                ? tag.color() : config.getString("chat.tag-color", "<aqua>");
-        return MessageFormatter.deserialize("<gray>[</gray>" + color + tag.display() + "<gray>]</gray> ");
+        return MessageFormatter.deserialize("<gray>[</gray>" + tag.display() + "<gray>]</gray> ");
     }
 
     /**

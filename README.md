@@ -1,8 +1,9 @@
 # HCFCore
 
-Kits, a live sidebar scoreboard, and PvP combat-tag timers, built for Paper
-and integrated with **FactionsUUID** (used for the scoreboard's faction/role
-placeholders).
+Kits with armor-based class effects, a live sidebar scoreboard, faction-aware
+chat formatting, an equippable tags system, PvP combat-tag timers, a
+scheduled reboot system, and PvP ability items — built for Paper and
+integrated with **FactionsUUID**.
 
 ## Requirements
 
@@ -16,9 +17,14 @@ placeholders).
   money cost can't be claimed (item-only or free kits are unaffected).
 - **WorldGuard** — optional; only needed to enforce `abilities.disabled-regions`.
   Softdepended. Without it, abilities can be used anywhere.
-- **LuckPerms** — optional; only needed for the `repair` ability, which
-  grants an EssentialsX-style permission node on a timer. Softdepended.
-  Without it, `repair` tells the player it's unavailable.
+- **LuckPerms** — optional; used for the `repair` ability (grants an
+  EssentialsX-style permission node on a timer) and for showing a
+  player's primary group as a rank in chat. Softdepended. Without it,
+  `repair` tells the player it's unavailable, and chat simply omits the
+  rank bracket. Even with LuckPerms installed, a player still in the
+  built-in `default` group (i.e. never promoted, or promoted to a group
+  with no custom display name) shows no rank bracket either — only a
+  group with an actual display name renders one.
 
 ## Installation
 
@@ -57,26 +63,35 @@ mysql:
   username: root
   password: ''
   pool-size: 10
-  use-ssl: false
   allow-public-key-retrieval: true
+  use-ssl: false
 
 scoreboard:
   update-interval-ticks: 20
-  title: '<aqua><bold>HCF<white><bold>Core'
+  title: '<white><bold>FACTIONS<reset>   <gray>{date}'
+  date-format: 'MM/dd'
   lines:
+    - '<white><bold>{name}'
+    - '<gray>Experience: <white>{exp}'
+    - '<gray>Balance: <white>{balance}'
     - ''
-    - '<gray>Online: <white>{online}'
-    - '<gray>Faction: <white>{faction}'
-    - '<gray>Role: <white>{faction_role}'
+    - '<white>{faction} <gray>[<yellow>#{ftop}<gray>]'
+    - '<gray> <red>• Power: <white>{power}'
+    - '<gray> <red>• Online: <white>{fplayers_online}'
     - ''
-    - '<gray>play.example.com'
-  cooldowns:
-    enabled: true
-    header: '<light_purple>Cooldowns:'
-    line: '<gray>{ability_cooldowns}'
+    - '<aqua>play.example.com'
+
+chat:
+  separator: '<gray>»</gray>'
+  faction-format: '<gold>[{faction}]</gold> '
+  rank-format: '<light_purple>[{rank}]</light_purple> '
+  name-format: '<white>{name}</white>'
 
 pvp:
   combat-tag-seconds: 30
+  pearl-cooldown-seconds: 15
+  golden-apple-cooldown-seconds: 10
+  enchanted-golden-apple-cooldown-seconds: 30
   logout-penalty: true
   actionbar-update-interval-ticks: 4
   legacy-combat:
@@ -93,19 +108,40 @@ factions:
 
 kits:
   default-cooldown-seconds: 300
+  effect-warmup-seconds: 3
+  max-cooldown-seconds: 86400
+  max-money-cost: 1000000000.0
+  max-cost-item-amount: 64
 
 abilities:
   global-cooldown-seconds: 3
+  max-getitem-amount: 64
+  pearl-stunner-seconds: 8
+  rabbits-feed-speed-seconds: 8
   disabled-regions:
     - spawn
+
+reboot:
+  default-delay-minutes: 10
+  reminder-minutes:
+    - 10
+    - 5
+    - 1
 ```
 
-- `scoreboard.lines` supports `{online}`, `{faction}`, `{faction_role}`,
-  `{repair}` and `{ability_cooldowns}`. `scoreboard.cooldowns` adds a
-  configurable section header and a line containing every active ability
-  cooldown. MiniMessage tags are preferred; legacy `&` color codes remain
-  supported for older configs. There's no live-edit
-  command yet — edit the file and run `/hcfcore reload`.
+- `scoreboard.title` and every entry in `scoreboard.lines` accept
+  `{date}` (formatted per `scoreboard.date-format`) plus `{name}`,
+  `{exp}` (XP level), `{balance}` (Vault balance, formatted, `0` without
+  an economy plugin), `{online}`, `{faction}`, `{faction_role}`,
+  `{ftop}` (the player's faction's power ranking), `{power}`
+  (`current/max`, comma-formatted), `{fplayers_online}`, and `{repair}`
+  (fed live by the Repair ability's countdown). The title re-resolves
+  every tick and only pushes a packet when it actually changes, so
+  `{date}` rolls over at midnight with no restart needed.
+- `chat.*` controls the live chat renderer (see **Chat format** below) —
+  separate from `lang/*.yml`'s `general.prefix`, which is the branded
+  prefix shown before *system* messages (command feedback, errors), not
+  regular player chat.
 - `pvp.actionbar-update-interval-ticks` controls how often the combat
   action bar (name/timer/health/CPS) refreshes — 4 ticks (~5/sec) by
   default for a PvP-responsive feel.
@@ -117,6 +153,8 @@ abilities:
 - `factions.prevent-leader-leave`: prevents faction leaders from using
   `/f leave` or `/factions leave`; `/f disband` remains the explicit disband
   command. Aliases are configurable in `factions.command-aliases`.
+- `kits.effect-warmup-seconds`: delay between putting on a kit's full
+  armor set and its class effects (see **Kits**) actually applying.
 - `abilities.global-cooldown-seconds` is a shared cooldown across *all*
   ability items — using any one of them starts it, blocking every other
   ability until it expires, independent of each item's own cooldown.
@@ -124,17 +162,42 @@ abilities:
   world names) where ability items refuse to activate — checked at the
   player's location, across any world, so a region called `spawn` blocks
   abilities inside it wherever it's defined.
-
+- `reboot.default-delay-minutes` / `reminder-minutes`: default countdown
+  length for `/reboot` (with no argument) and which minute marks get a
+  broadcast reminder.
 - `language.default` is the locale (see below) every player gets until
   they run `/language` to pick their own.
 
-The database, scoreboard lines, and kit cooldown default all take effect
-immediately on `/hcfcore reload`.
+The database, scoreboard, chat, kit, ability, and tag config all take
+effect immediately on `/hcfcore reload` — including `tags.yml` and
+`kits.yml`, so editing either and reloading updates the live GUIs with no
+restart.
 
 Player locale and ability/kit cooldown writes are flushed during shutdown.
 If player data cannot be loaded from MySQL, kit and ability claims fail closed
 until the player reconnects successfully instead of silently bypassing saved
 cooldowns.
+
+## Chat format
+
+Every chat message renders as:
+
+```
+[faction] [tag] [rank] name » message
+```
+
+- `[faction]` — the player's FactionsUUID tag, via `chat.faction-format`;
+  omitted entirely for a factionless player.
+- `[tag]` — the player's currently equipped tag (see **Tags** below);
+  omitted if they have none equipped. Its color comes from the tag's own
+  `display` in `tags.yml`, not a single uniform color for every tag.
+- `[rank]` — the player's LuckPerms primary group display name, via
+  `chat.rank-format`; omitted without LuckPerms, or if the group has no
+  configured display name (including the built-in `default` group every
+  player starts in — see **Requirements**).
+- The name itself normally uses `chat.name-format`, but if the player has
+  **nickname-match** enabled on their equipped tag (see **Tags**), it's
+  recolored to match that tag's color/gradient instead.
 
 ## Language (`lang/*.yml`)
 
@@ -153,10 +216,15 @@ kit:
 
 - Each message is a key → a MiniMessage-formatted template string.
   `<deny>`, `<success>`, `<info>`, and `<warning>` are semantic aliases for
-  red, green, gray, and yellow. Legacy `&` color codes remain supported.
-  `{placeholders}` like `{kit}`/`{seconds}`/`{player}` get substituted
-  per-message; check `en_us.yml` for exactly which ones a given key
-  accepts.
+  red, green, gray, and yellow. Legacy `&` color codes remain supported,
+  including legacy hex (`&#RRGGBB`). `{placeholders}` like
+  `{kit}`/`{seconds}`/`{player}` get substituted per-message; check
+  `en_us.yml` for exactly which ones a given key accepts.
+- `general.prefix` is the branded prefix (`ᴠᴇʀᴛᴇx ➛` by default) shown
+  before every *system* message — command feedback, errors, confirmations
+  — sourced from this key rather than hardcoded, so it's themeable and
+  translatable per locale like everything else. It's unrelated to live
+  chat, which has its own look controlled by `chat.*` in `config.yml`.
 - `/language [code]` lets any player view or change their own language
   (no permission node — it's a personal preference). Their choice
   persists to MySQL (a `user_locale` table) so it survives a restart.
@@ -176,39 +244,64 @@ kit:
 ## Kits (`kits.yml`)
 
 Each kit is a top-level key with its own permission, cooldown, optional
-cost, and contents:
+cost, armor/contents, and optional class effects:
 
 ```yaml
 kits:
-  fighter:
-    permission: hcfcore.kit.fighter
-    cooldown-seconds: 300
-    cost:
-      money: 250.0
-      item: DIAMOND
-      item-amount: 2
+  diamond:
+    permission: ''
+    cooldown-seconds: 600
     armor:
-      - {==: org.bukkit.inventory.ItemStack, type: IRON_HELMET, amount: 1}
-      # ...
+      - material: DIAMOND_HELMET
+        amount: 1
+      - material: DIAMOND_CHESTPLATE
+        amount: 1
     contents:
-      - {==: org.bukkit.inventory.ItemStack, type: IRON_SWORD, amount: 1}
-      # ...
+      - material: DIAMOND_SWORD
+        amount: 1
+        enchantments:
+          UNBREAKING: 3
+      - material: SPLASH_POTION
+        amount: 1
+        potion-effect: SPEED
+        potion-duration-ticks: 3600
+    effects:
+      - type: SPEED
+        amplifier: 0
+      - type: ABSORPTION
+        amplifier: 0
 ```
 
-- `permission` — required to claim the kit at all; defaults to
-  `hcfcore.kit.<name>` if omitted.
+- `permission` — required to claim the kit; **blank (`''`) means open to
+  everyone**, with no permission check at all. The six shipped base kits
+  (`archer`, `miner`, `bard`, `diamond`, `rogue`, `mage`) ship this way;
+  their `-donator` variants keep a real permission node
+  (`hcfcore.kit.<name>.donator`).
 - `cooldown-seconds` — time before the kit can be claimed again; `0` means
   no cooldown. Bypassed by `hcfcore.kit.bypasscooldown`.
-- `cost` — optional; omit entirely for a free kit. `money` charges via
-  Vault (needs an economy plugin installed — see Requirements); `item` +
-  `item-amount` charges that many of a Material from the player's
-  inventory. Either, both, or neither can be set. Both checked and
-  charged as an atomic pair — a kit only ever deducts if the player can
-  afford everything it costs. Bypassed by `hcfcore.kit.bypasscost`.
-- `armor` / `contents` — standard Bukkit `ItemStack` YAML serialization;
-  easiest way to populate these is `/kit save`, then hand-edit
-  `permission`/`cooldown-seconds`/`cost` afterward. Use `/kit create`; the
-  older `/kit save` alias remains supported.
+- `cost` — optional; omit entirely for a free kit (none of the shipped
+  kits have one). `cost.money` charges via Vault; `cost.item` +
+  `cost.item-amount` charges that many of a Material from the player's
+  inventory. Either, both, or neither can be set — both are checked and
+  charged as an atomic pair, only deducting if the player can afford
+  everything. Bypassed by `hcfcore.kit.bypasscost`.
+- `armor` / `contents` — each entry is a plain map: `material` (or
+  `type`), `amount` (or `count`), an optional `enchantments` map
+  (`ENCHANTMENT_NAME: level`), an optional `potion-effect` +
+  `potion-duration-ticks` + `potion-amplifier` (for splash potions), and
+  an optional `ability` id tying the item to one of the ability listeners
+  in `abilities.yml`. The easiest way to populate these is `/kit save`,
+  then hand-edit `permission`/`cooldown-seconds`/`cost` afterward. Use
+  `/kit create`; the older `/kit save` alias remains supported.
+- `effects` — optional list of passive potion effects (`type` +
+  `amplifier`) granted while the player is wearing the kit's *exact* full
+  armor set (all four pieces, matched by material/enchants/etc.), and
+  removed the moment any piece comes off. Applying is delayed by
+  `kits.effect-warmup-seconds` after the armor set first goes on, with a
+  chat message; an unrelated potion effect from PvP that happens to
+  override the same effect type doesn't retrigger that warmup or message
+  — the class effect just silently resumes once the external one wears
+  off, as long as the armor itself was never removed.
 - Claiming a kit never replaces worn armor. If armor is already equipped, the
   kit armor is placed in storage inventory, and the claim is rejected with a
   localized full-inventory message when it cannot fit. A kit cost is charged
@@ -218,16 +311,20 @@ Reloaded along with everything else on `/hcfcore reload`.
 
 ## Abilities (`abilities.yml`)
 
-Eight PvP ability items ship pre-registered, each with real gameplay
+Thirteen PvP ability items ship pre-registered, each with real gameplay
 behavior:
 
 | Ability | Trigger | What it does |
 |---|---|---|
-| `anti-blockup-bone` | Melee hit | After `hits-required` hits (default 3), the victim can't place blocks for `deny-seconds` (default 15). |
+| `pearl-stunner` | Melee hit | Stops the victim from using pearls for `stun-seconds`. |
+| `rabbits-feed` | Right-click | Grants yourself Speed V for `speed-duration-seconds`. |
+| `anti-blockup-bone` | Melee hit | After `hits-required` hits, the victim can't place blocks for `deny-seconds`. |
 | `fake-pearl` | Right-click | Throws a real `EnderPearl` (identical arc/sound) but cancels the teleport it would trigger on landing. |
 | `grappling-hook` | Right-click (twice) | First click casts a `FishHook`; a second click while it's out pulls you toward it, scaled by `forward-multiplier`/`y-multiplier`. |
-| `leap` | Right-click | Sets your velocity forward and slightly upward, scaled by `forward-multiplier`/`y-multiplier`. |
-| `portable-bard` | Right-click | Opens a GUI to pick Strength III / Speed III / Regeneration II; applies it, for `buff-seconds`, to you and every online member of your faction. |
+| `leap` | Right-click | Sets your velocity forward and slightly upward, scaled by `forward-multiplier`/`y-multiplier`, plus a short buff (`effect-type`/`effect-amplifier`/`effect-duration-seconds`). |
+| `rogue-backstab` | Melee hit, from behind | Deals bonus `damage` to an enemy struck from behind; consumed on use. |
+| `mage-wither` / `mage-slowness` / `mage-weakness` / `mage-poison` | Melee hit | Applies the named debuff (`effect-type`/`effect-amplifier`/`effect-duration-seconds`) to whoever you hit. |
+| `portable-bard` | Right-click | Opens a GUI to pick Strength/Speed/Regeneration; applies it, for `buff-seconds`, to you and every online member of your faction. |
 | `repair` | Right-click | Grants `permission-node` (default `essentials.fix`) via LuckPerms for `duration-seconds`, with a live countdown on your scoreboard. Requires LuckPerms installed. |
 | `switcher-snowball` | Throw + hit | Swaps positions with whichever enemy (not a faction member) it hits. |
 | `time-warp-pearl` | Right-click | Teleports you back to wherever you last threw a *real* ender pearl from. |
@@ -236,10 +333,10 @@ behavior:
 abilities:
   grappling-hook:
     material: FISHING_ROD
-      name: '<light_purple>Grappling Hook'
+    name: '<light_purple>Grappling Hook'
     lore:
-        - '<gray>Hook a block or player and'
-        - '<gray>reel yourself toward it.'
+      - '<gray>Hook a block or player and'
+      - '<gray>reel yourself toward it.'
     cooldown-seconds: 20
     uses: 8
     forward-multiplier: 1.6
@@ -249,14 +346,18 @@ abilities:
 - `material` / `name` / `lore` — fully configurable per ability; `name`
   and each `lore` line accept MiniMessage tags and legacy `&` color codes.
 - Ability items are consumed only after successful activation. The grappling
-  hook has 8 uses by default and breaks after its eighth successful pull.
-- Portable Bard effects last 6 seconds by default.
+  hook has 8 uses by default and breaks after its eighth successful pull;
+  `rogue-backstab` is consumed on its single use.
 - `cooldown-seconds` — per-item cooldown, persisted to MySQL (its own
   `ability_cooldowns` table, separate from kit cooldowns) so it survives a
-  restart.
+  restart. `/cooldowns` shows a player's own active kit and ability
+  cooldowns.
 - Everything else under an ability's section (`forward-multiplier`,
   `hits-required`, `buff-seconds`, `duration-seconds`, `permission-node`,
-  etc.) is that ability's own extra config, documented in the table above.
+  `effect-type`/`effect-amplifier`/`effect-duration-seconds`, etc.) is
+  that ability's own extra config, documented in the table above.
+  `pearl-stunner-seconds` / `rabbits-feed-speed-seconds` in `config.yml`
+  (not `abilities.yml`) control those two specifically.
 - `switcher-snowball` and `portable-bard` use **FactionsUUID** to tell
   faction members apart from enemies — see `FactionsHook`.
 - `repair` degrades gracefully without LuckPerms installed: it tells the
@@ -265,16 +366,78 @@ abilities:
 
 Reloaded along with everything else on `/hcfcore reload`.
 
+## Tags (`tags.yml`)
+
+An equippable, cosmetic tags system with a paginated `/tags` GUI:
+
+```yaml
+tags:
+  legend:
+    display: "<gradient:#facc15:#f97316>Legend"
+    permission: hcfcore.tag.legend
+    created-at: 1725235200000
+    owners: 0
+    material: NETHER_STAR
+    custom-model-data: 1001
+    lore:
+      - '<gray>A name known by all.'
+players: {}
+```
+
+- `display` — the tag's name **and** its color/gradient in one MiniMessage
+  (or legacy `&`) string; there's no separate color field. Sorting,
+  searching, and nickname-matching all resolve the leading color/gradient
+  tag out of `display` automatically.
+- `permission` — blank means unlocked for everyone, same convention as
+  kits; otherwise required to unlock/equip the tag.
+- `created-at` — epoch millis; shown in the GUI as `MM/yy`.
+- `owners` — a lifetime counter of how many times players have equipped
+  this tag (not a live "currently equipped" count — unequipping doesn't
+  roll it back).
+- `material` / `custom-model-data` — optional icon override for the GUI;
+  falls back to `NAME_TAG` if unset, and to `IRON_BARS` whenever the
+  viewing player hasn't unlocked the tag (regardless of `material`), so
+  locked tags stay visually distinct.
+- `lore` — optional extra flavor lines shown under the equipped/unequipped
+  status line, above the auto-generated Created/Owners lines.
+- `players` — per-player state (equipped tag id, nickname-match on/off,
+  nickname-match reversed), keyed by UUID; managed entirely by the plugin,
+  not meant for hand-editing.
+
+`/tags` opens a 4×7 grid of tag icons (kept off the inventory's outer
+edge) with a control row: **filter** (Your/Unowned/All, each with a live
+count), **sort** (Alphabetical/Age — click to cycle, shift-click to flip
+direction), **search** (opens an anvil to type a query; right-click
+clears it), **prev/next page**, and a **nickname-match** preview (top
+middle) that recolors your name in chat to match your equipped tag,
+including a "reversed" gradient-direction option. Clicking an unlocked
+tag equips it; clicking your already-equipped tag unequips it.
+
+Reloaded along with everything else on `/hcfcore reload`.
+
+## Reboot scheduling
+
+`/reboot [minutes]` starts a countdown (default `reboot.default-delay-minutes`)
+to a full server shutdown, broadcasting reminders at
+`reboot.reminder-minutes` marks; `/reboot cancel` stops it. `/nextreboot`
+shows any player the currently scheduled countdown, if one is running.
+
 ## Commands & Permissions
 
 ### Kits
 
 | Command | Permission | Notes |
 |---|---|---|
-| `/kit <name>` | kit's own permission (default `hcfcore.kit.<name>`) | Applies the kit to your inventory, respecting its cooldown and cost. |
-| `/kit save <name> [permission] [cooldownSeconds] [cost] [costItem[:amount]]` | `hcfcore.kit.save` | Saves your current inventory as a kit. `costItem` is a Material name, e.g. `DIAMOND:2`; amount defaults to 1. |
+| `/kit <name>` | kit's own permission (blank for the six base kits — open to everyone; the `-donator` variants require theirs) | Applies the kit to your inventory, respecting its cooldown and cost. |
+| `/kit create <name> [permission] [cooldownSeconds] [cost] [costItem[:amount]]` | `hcfcore.kit.create` | Saves your current inventory as a kit. `costItem` is a Material name, e.g. `DIAMOND:2`; amount defaults to 1. The older `/kit save` alias remains supported (`hcfcore.kit.save`). |
 | `/kit delete <name>` | `hcfcore.kit.delete` | Deletes a kit. |
 | `/kits` | *(none — open to all players)* | Opens a GUI of every kit you can see. **Left-click** claims it, **right-click** previews its contents read-only. |
+
+### Tags
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/tags` | *(none — open to all players)* | Opens the tags GUI (see **Tags** above). |
 
 ### Abilities
 
@@ -282,6 +445,7 @@ Reloaded along with everything else on `/hcfcore reload`.
 |---|---|---|
 | `/getitem <username> <ability> [amount]` | `hcfcore.ability.give` | Gives a player ability items directly, ignoring cooldowns. |
 | `/abilities` | *(none — open to all players)* | Opens a GUI listing every ability's name/lore. A viewer with `hcfcore.ability.give` who clicks one receives a copy; everyone else's click just closes/does nothing. |
+| `/cooldowns` | *(none — open to all players)* | Shows your own active kit and ability cooldowns. |
 
 ### Language
 
@@ -305,19 +469,28 @@ gradient from red to green. CPS (clicks per second) is tracked from arm
 swings for every online player, not just tagged ones, so the count is
 already warm the instant a tag starts.
 
+### Reboot
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/reboot [minutes]` | `hcfcore.reboot.start` | Starts a shutdown countdown. |
+| `/reboot cancel` | `hcfcore.reboot.start` | Cancels an in-progress countdown. |
+| `/nextreboot` | *(none — open to all players)* | Shows the currently scheduled countdown, if any. |
+
 ### Admin / reload
 
 | Command | Permission | Notes |
 |---|---|---|
-| `/hcfcore reload` | `hcfcore.admin` | Reloads config, kits, and scoreboard. |
+| `/hcfcore reload` | `hcfcore.admin` | Reloads config, messages, kits, abilities, tags, and rebuilds the scoreboard for every online player. |
 
 ## Tab-completion
 
 Every command above (`kit`, `kits`, `hcfcore`, `getitem`, `abilities`,
-`language`, `uncombat`, `combatcheck`, `combattag`) registers its own
-`TabCompleter` (except `abilities`, which takes no arguments), so suggestions should appear
-as soon as the freshly built jar is running on the server. If they don't
-show up in-game:
+`language`, `cooldowns`, `tags`, `reboot`, `nextreboot`, `uncombat`,
+`combatcheck`, `combattag`) registers its own `TabCompleter` (except the
+argument-less ones like `kits`/`abilities`/`tags`/`cooldowns`), so
+suggestions should appear as soon as the freshly built jar is running on
+the server. If they don't show up in-game:
 
 1. Confirm the server is actually running the jar you just built — check
    `plugins/HCFCore.jar`'s modified date, or run `/hcfcore reload` and watch
@@ -335,23 +508,39 @@ show up in-game:
 
 - All player-facing text uses Adventure `Component`s, not legacy color
   codes (except a couple of plain-string fallbacks for console-only
-  messages).
+  messages). Item display names/lore always run through an explicit
+  `TextDecoration.ITALIC, false` — Minecraft renders those italic by
+  default when unset, which otherwise silently affects any raw
+  `Component.text(...)` used in a GUI.
 - All MySQL access goes through HikariCP off the main thread.
 - HikariCP and the MySQL driver are shaded and relocated into
   `me.hcfcore.core.libs.*` to avoid classpath collisions with other plugins.
-- GUIs (`/kits`, kit preview) use a static-nested
+- GUIs (`/kits`, `/tags`, `/abilities`, kit preview) use a static-nested
   `Holder implements InventoryHolder` per menu to identify their own
   inventories in click listeners, rather than comparing title strings.
+  The tags GUI additionally rebuilds itself from an immutable
+  `TagMenuState` (sort/filter/page/search) on every click rather than
+  mutating anything in place.
+- `GradientColor` (in the `tag` package) is a small pure-function utility:
+  reversing a MiniMessage gradient's stop order, and extracting/stripping
+  a tag's leading color (MiniMessage or legacy `&`/`&#RRGGBB`) from its
+  `display` string, since tags embed their color directly rather than
+  storing it separately.
 - `CombatManager.SERVER_UUID` (`new UUID(0, 0)`) is a reserved sentinel
   opponent id used only by `/combattag ... server` — never a real player's
   UUID, so it can't collide.
-- `AbilityUseListener` (right-click activation) is the seam future
-  ability-specific behavior plugs into — it already does the real
-  cooldown/global-cooldown/region checks via `AbilityManager` and
-  `WorldGuardHook`, then sends a placeholder message. A throw- or
-  hit-triggered ability (`switcher-snowball`, `anti-blockup-bone`) will
-  need its own listener calling those same `AbilityManager`/`WorldGuardHook`
-  methods rather than going through `PlayerInteractEvent`.
+- Kit class effects are driven by a single every-tick pass
+  (`KitManager.checkArmorEffects`) that compares each online player's worn
+  armor against every kit's exact armor set. It deliberately only checks
+  effect *presence*, not amplifier, when topping up an already-active
+  kit's effects — an external potion (PvP, milk bucket, etc.) sharing an
+  effect type with the kit legitimately overrides it without the kit
+  effect having "fallen off", and re-triggering the warmup/message for
+  that would misfire mid-fight.
+- `LuckPermsHook.getPrimaryGroupDisplayName` returns `null` (not the raw
+  group id) for LuckPerms' built-in `default` group when it has no
+  configured display name, so chat doesn't print the literal word
+  `default` as everyone's rank.
 - `EconomyHook` and `WorldGuardHook` (Vault and WorldGuard are both
   softdepends) share one shape with the FactionsUUID-specific
   `FactionsHook`: a static, stateless wrapper that checks the target

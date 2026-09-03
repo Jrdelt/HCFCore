@@ -4,6 +4,7 @@ import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.lang.Messages;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -20,15 +21,16 @@ import java.util.Locale;
 
 public final class TagMenu {
 
-    static final int PAGE_SIZE = 45;
+    static final int GRID_ROWS = 4;
+    static final int GRID_COLUMNS = 7;
+    static final int PAGE_SIZE = GRID_ROWS * GRID_COLUMNS;
+    static final int SLOT_NICKNAME = 4;
     static final int SLOT_FILTER = 45;
-    static final int SLOT_SORT = 46;
-    static final int SLOT_SEARCH = 47;
     static final int SLOT_PREV_PAGE = 48;
-    static final int SLOT_NICKNAME = 49;
+    static final int SLOT_SEARCH = 49;
     static final int SLOT_NEXT_PAGE = 50;
-    static final int SLOT_PAGE_INDICATOR = 52;
-    static final int SLOT_CLOSE = 53;
+    static final int SLOT_CLOSE = 52;
+    static final int SLOT_SORT = 53;
 
     private TagMenu() {
     }
@@ -47,7 +49,7 @@ public final class TagMenu {
         int start = page * PAGE_SIZE;
         int end = Math.min(visible.size(), start + PAGE_SIZE);
         for (int i = start; i < end; i++) {
-            inventory.setItem(i - start, tagIcon(player, manager, messages, visible.get(i)));
+            inventory.setItem(tagSlot(i - start), tagIcon(player, manager, messages, visible.get(i)));
         }
 
         inventory.setItem(SLOT_FILTER, filterButton(player, manager, messages, state));
@@ -58,12 +60,20 @@ public final class TagMenu {
         inventory.setItem(SLOT_NICKNAME, nicknameButton(player, manager, messages));
         inventory.setItem(SLOT_NEXT_PAGE, pageButton(messages, player, "tags.next-page",
                 Material.LIME_DYE, page < totalPages - 1));
-        inventory.setItem(SLOT_PAGE_INDICATOR, plainButton(Material.PAPER,
-                messages.get(player, "tags.page-indicator", "page", String.valueOf(page + 1),
-                        "total", String.valueOf(totalPages))));
         inventory.setItem(SLOT_CLOSE, plainButton(Material.BARRIER, messages.get(player, "tags.close")));
 
         player.openInventory(inventory);
+    }
+
+    /**
+     * Keeps tag icons off the inventory's outer edge: row 0 (top) and
+     * columns 0/8 (left/right) are left empty, so tags only ever occupy
+     * the inset 4x7 block in rows 1-4. Row 5 is the control row.
+     */
+    private static int tagSlot(int index) {
+        int row = index / GRID_COLUMNS;
+        int column = index % GRID_COLUMNS;
+        return (row + 1) * 9 + (column + 1);
     }
 
     private static List<TagManager.Tag> visibleTags(Player player, TagManager manager, TagMenuState state) {
@@ -97,28 +107,69 @@ public final class TagMenu {
         };
     }
 
+    @SuppressWarnings("deprecation")
     private static ItemStack tagIcon(Player player, TagManager manager, Messages messages, TagManager.Tag tag) {
         boolean unlocked = manager.isUnlocked(player, tag);
-        ItemStack item = new ItemStack(unlocked ? Material.NAME_TAG : Material.IRON_BARS);
+        Material material = unlocked ? resolveMaterial(tag.material(), Material.NAME_TAG) : Material.IRON_BARS;
+        ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
+        if (tag.customModelData() != null) {
+            // The legacy single-int overload -- simplest to author as a
+            // single tags.yml field. The 1.21.5+ CustomModelDataComponent
+            // API adds float/flag/string/color lists that aren't needed
+            // for a plain per-tag model-data override.
+            meta.setCustomModelData(tag.customModelData());
+        }
 
-        String color = tag.color() != null && !tag.color().isBlank() ? tag.color() : "<white>";
-        meta.displayName(MessageFormatter.deserialize((unlocked ? "" : "<gray>") + color + tag.display()));
+        meta.displayName(noItalic(MessageFormatter.deserialize(tag.display())));
 
         boolean equipped = tag.id().equalsIgnoreCase(manager.getPlayerTag(player.getUniqueId()));
         List<Component> lore = new ArrayList<>();
         lore.add(messages.get(player, equipped ? "tags.equipped" : "tags.unequipped"));
-        lore.add(Component.text("Rarity: " + tag.rarity(), NamedTextColor.GRAY));
-        lore.add(Component.text("Players: " + manager.playerCount(tag.id()), NamedTextColor.GRAY));
-        lore.add(Component.text("Created: " + TagManager.formatMonth(tag.createdAt()), NamedTextColor.GRAY));
-        lore.add(Component.text("Uses: " + manager.uses(tag.id()), NamedTextColor.GRAY));
+        if (tag.lore() != null && !tag.lore().isEmpty()) {
+            lore.add(Component.empty());
+            for (String line : tag.lore()) {
+                lore.add(MessageFormatter.deserialize(line));
+            }
+        }
         lore.add(Component.empty());
-        lore.add(messages.get(player, unlocked ? "tags.click-select" : "tags.locked"));
-        meta.lore(lore);
+        lore.add(messages.get(player, "tags.info-created", "date", TagManager.formatCreated(tag.createdAt())));
+        lore.add(messages.get(player, "tags.info-owners", "count", String.valueOf(manager.owners(tag.id()))));
+        lore.add(Component.empty());
+        String hintKey = !unlocked ? "tags.locked" : (equipped ? "tags.click-unselect" : "tags.click-select");
+        lore.add(messages.get(player, hintKey));
+        meta.lore(lore.stream().map(TagMenu::noItalic).toList());
         meta.getPersistentDataContainer().set(new NamespacedKey(manager.plugin(), "tag_id"),
                 PersistentDataType.STRING, tag.id());
         item.setItemMeta(meta);
         return item;
+    }
+
+    /**
+     * tags.yml's `material` is an optional admin-authored override for the
+     * tag's icon; an unset or unrecognized value falls back to the default
+     * (NAME_TAG when unlocked) rather than failing the whole menu render.
+     */
+    private static Material resolveMaterial(String name, Material fallback) {
+        if (name == null || name.isBlank()) {
+            return fallback;
+        }
+        Material material = Material.matchMaterial(name);
+        return material != null ? material : fallback;
+    }
+
+    /**
+     * The inverse of tagSlot(): whether a raw inventory slot falls inside
+     * the inset tag grid (rather than the border or the control row), for
+     * the click listener to tell tag clicks apart from everything else.
+     */
+    static boolean isTagSlot(int slot) {
+        if (slot < 0 || slot > 53) {
+            return false;
+        }
+        int row = slot / 9;
+        int column = slot % 9;
+        return row >= 1 && row <= GRID_ROWS && column >= 1 && column <= GRID_COLUMNS;
     }
 
     private static ItemStack filterButton(Player player, TagManager manager, Messages messages, TagMenuState state) {
@@ -164,14 +215,13 @@ public final class TagMenu {
         lore.add(Component.empty());
         lore.add(messages.get(player, "tags.sort-hint-cycle"));
         lore.add(messages.get(player, "tags.sort-hint-direction"));
-        return button(Material.HOPPER, Component.text("Sort", NamedTextColor.AQUA), lore);
+        return button(Material.CLOCK, Component.text("Sort", NamedTextColor.AQUA), lore);
     }
 
     private static String sortLabelKey(TagManager.Sort sort) {
         return switch (sort) {
             case ALPHABETICAL -> "tags.sort-alphabetical";
             case AGE -> "tags.sort-age";
-            case RARITY -> "tags.sort-rarity";
         };
     }
 
@@ -191,7 +241,7 @@ public final class TagMenu {
     private static ItemStack pageButton(Messages messages, Player player, String key, Material material, boolean enabled) {
         ItemStack item = new ItemStack(enabled ? material : Material.GRAY_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(messages.get(player, key));
+        meta.displayName(noItalic(messages.get(player, key)));
         item.setItemMeta(meta);
         return item;
     }
@@ -206,8 +256,7 @@ public final class TagMenu {
 
         String tagId = manager.getPlayerTag(player.getUniqueId());
         TagManager.Tag equippedTag = tagId == null ? null : manager.get(tagId);
-        String color = equippedTag != null && equippedTag.color() != null && !equippedTag.color().isBlank()
-                ? equippedTag.color() : null;
+        String color = equippedTag == null ? null : GradientColor.extractLeadingColor(equippedTag.display());
         if (color != null) {
             String sample = messages.getRaw(player, "tags.nickname-sample-message");
             lore.add(messages.get(player, "tags.nickname-preview-heading"));
@@ -230,7 +279,7 @@ public final class TagMenu {
     private static ItemStack plainButton(Material material, Component name) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(name);
+        meta.displayName(noItalic(name));
         item.setItemMeta(meta);
         return item;
     }
@@ -238,10 +287,19 @@ public final class TagMenu {
     private static ItemStack button(Material material, Component name, List<Component> lore) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(name);
-        meta.lore(lore);
+        meta.displayName(noItalic(name));
+        meta.lore(lore.stream().map(TagMenu::noItalic).toList());
         item.setItemMeta(meta);
         return item;
+    }
+
+    /**
+     * Item display names and lore render italic by default when their
+     * italic decoration is unset -- explicitly turning it off here (once,
+     * centrally) keeps every button/lore line in this menu upright.
+     */
+    private static Component noItalic(Component component) {
+        return component.decoration(TextDecoration.ITALIC, false);
     }
 
     public static final class Holder implements InventoryHolder {

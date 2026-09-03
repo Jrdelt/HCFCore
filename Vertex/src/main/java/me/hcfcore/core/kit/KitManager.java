@@ -463,8 +463,13 @@ public final class KitManager {
                 }
                 continue;
             }
-            if (activeKit != null && activeKit.getName().equalsIgnoreCase(matchingKit.getName())
-                    && hasAllEffects(player, activeKit)) {
+            if (activeKit != null && activeKit.getName().equalsIgnoreCase(matchingKit.getName())) {
+                // Armor never changed, so this isn't a re-equip -- just
+                // silently top up whatever an external source (a PvP
+                // potion wearing off, a milk bucket, a totem) stripped,
+                // instead of clearing everything and re-running the
+                // warmup/message for effects that never actually left.
+                reapplyMissingEffects(player, activeKit);
                 continue;
             }
             if (activeKit != null) {
@@ -552,14 +557,22 @@ public final class KitManager {
         }
     }
 
-    private static boolean hasAllEffects(Player player, Kit kit) {
+    /**
+     * Re-adds only the effects that are actually absent right now, without
+     * touching ones still present (even at a different amplifier -- an
+     * external potion, e.g. a PvP splash potion, sharing an effect type
+     * with the kit is legitimately overriding it, not signaling the kit
+     * effect "fell off"). Called every tick while the tracked kit's armor
+     * is still worn, so once an external override naturally expires, the
+     * kit's own effect silently reappears the very next tick -- no
+     * warmup, no message, since the armor itself never changed.
+     */
+    private static void reapplyMissingEffects(Player player, Kit kit) {
         for (Kit.Effect effect : kit.getEffects()) {
-            PotionEffect current = player.getPotionEffect(effect.type());
-            if (current == null || current.getAmplifier() != effect.amplifier()) {
-                return false;
+            if (player.getPotionEffect(effect.type()) == null) {
+                player.addPotionEffect(new PotionEffect(effect.type(), Integer.MAX_VALUE, effect.amplifier(), false, false));
             }
         }
-        return true;
     }
 
     private void stopArmorMonitor() {

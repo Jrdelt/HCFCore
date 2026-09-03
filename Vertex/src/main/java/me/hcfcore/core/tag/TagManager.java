@@ -8,8 +8,8 @@ import org.bukkit.plugin.Plugin;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -20,11 +20,13 @@ import java.util.UUID;
 
 public final class TagManager {
 
+    private static final DateTimeFormatter CREATED_FORMAT = DateTimeFormatter.ofPattern("MM/yy", Locale.ROOT);
+
     private final Plugin plugin;
     private final File file;
     private final Map<String, Tag> tags = new HashMap<>();
     private final Map<UUID, PlayerPrefs> playerPrefs = new HashMap<>();
-    private final Map<String, Integer> uses = new HashMap<>();
+    private final Map<String, Integer> owners = new HashMap<>();
 
     public TagManager(Plugin plugin) {
         this.plugin = plugin;
@@ -42,7 +44,7 @@ public final class TagManager {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         tags.clear();
         playerPrefs.clear();
-        uses.clear();
+        owners.clear();
 
         ConfigurationSection definitions = config.getConfigurationSection("tags");
         if (definitions != null) {
@@ -53,9 +55,11 @@ public final class TagManager {
                 }
                 tags.put(id.toLowerCase(Locale.ROOT), new Tag(id, section.getString("display", id),
                     section.getString("permission", "hcfcore.tag." + id.toLowerCase(Locale.ROOT)),
-                    section.getString("rarity", "COMMON"), section.getLong("created-at", System.currentTimeMillis()),
-                    section.getString("color", null)));
-                uses.put(id.toLowerCase(Locale.ROOT), section.getInt("uses", 0));
+                    section.getLong("created-at", System.currentTimeMillis()),
+                    section.getString("material", null),
+                    section.isInt("custom-model-data") ? section.getInt("custom-model-data") : null,
+                    List.copyOf(section.getStringList("lore"))));
+                owners.put(id.toLowerCase(Locale.ROOT), section.getInt("owners", 0));
             }
         }
 
@@ -88,9 +92,9 @@ public final class TagManager {
     public List<Tag> getSorted(Sort sort, boolean ascending) {
         List<Tag> result = new ArrayList<>(tags.values());
         Comparator<Tag> comparator = switch (sort) {
-            case ALPHABETICAL -> Comparator.comparing(Tag::display, String.CASE_INSENSITIVE_ORDER);
+            case ALPHABETICAL -> Comparator.comparing(
+                    tag -> GradientColor.stripLeadingColor(tag.display()), String.CASE_INSENSITIVE_ORDER);
             case AGE -> Comparator.comparingLong(Tag::createdAt);
-            case RARITY -> Comparator.comparingInt(tag -> rarityOrder(tag.rarity()));
         };
         if (!ascending) {
             comparator = comparator.reversed();
@@ -106,14 +110,8 @@ public final class TagManager {
         return tag != null && (tag.permission().isBlank() || player.hasPermission(tag.permission()));
     }
 
-    public int playerCount(String id) {
-        return (int) playerPrefs.values().stream()
-                .filter(prefs -> id.equalsIgnoreCase(prefs.tagId()))
-                .count();
-    }
-
-    public int uses(String id) {
-        return uses.getOrDefault(id.toLowerCase(Locale.ROOT), 0);
+    public int owners(String id) {
+        return owners.getOrDefault(id.toLowerCase(Locale.ROOT), 0);
     }
 
     public String getPlayerTag(UUID uuid) {
@@ -129,8 +127,17 @@ public final class TagManager {
         String previous = current.tagId();
         playerPrefs.put(uuid, current.withTag(tag.id()));
         if (previous == null || !previous.equalsIgnoreCase(tag.id())) {
-            uses.merge(tag.id().toLowerCase(Locale.ROOT), 1, Integer::sum);
+            owners.merge(tag.id().toLowerCase(Locale.ROOT), 1, Integer::sum);
         }
+        save();
+    }
+
+    public void unselect(UUID uuid) {
+        PlayerPrefs current = playerPrefs.getOrDefault(uuid, PlayerPrefs.DEFAULT);
+        if (current.tagId() == null) {
+            return;
+        }
+        playerPrefs.put(uuid, current.withTag(null));
         save();
     }
 
@@ -153,9 +160,10 @@ public final class TagManager {
     }
 
     /**
-     * The color/gradient to render the player's name with in chat, or null
-     * if nickname-match is off, they have no tag equipped, or their tag
-     * has no color set.
+     * The color/gradient to render the player's name with in chat, pulled
+     * from the leading color tag(s) of their equipped tag's `display` --
+     * or null if nickname-match is off, they have no tag equipped, or
+     * their tag's display doesn't start with a color.
      */
     public String getNicknameColor(Player player) {
         PlayerPrefs prefs = playerPrefs.get(player.getUniqueId());
@@ -163,10 +171,11 @@ public final class TagManager {
             return null;
         }
         Tag tag = get(prefs.tagId());
-        if (tag == null || tag.color() == null || tag.color().isBlank()) {
+        String color = tag == null ? null : GradientColor.extractLeadingColor(tag.display());
+        if (color == null) {
             return null;
         }
-        return prefs.nicknameReversed() ? GradientColor.reverse(tag.color()) : tag.color();
+        return prefs.nicknameReversed() ? GradientColor.reverse(color) : color;
     }
 
     public void save() {
@@ -175,11 +184,16 @@ public final class TagManager {
             String path = "tags." + tag.id();
             config.set(path + ".display", tag.display());
             config.set(path + ".permission", tag.permission());
-            config.set(path + ".rarity", tag.rarity());
             config.set(path + ".created-at", tag.createdAt());
-            config.set(path + ".uses", uses(tag.id()));
-            if (tag.color() != null && !tag.color().isBlank()) {
-                config.set(path + ".color", tag.color());
+            config.set(path + ".owners", owners(tag.id()));
+            if (tag.material() != null && !tag.material().isBlank()) {
+                config.set(path + ".material", tag.material());
+            }
+            if (tag.customModelData() != null) {
+                config.set(path + ".custom-model-data", tag.customModelData());
+            }
+            if (tag.lore() != null && !tag.lore().isEmpty()) {
+                config.set(path + ".lore", tag.lore());
             }
         }
         for (Map.Entry<UUID, PlayerPrefs> entry : playerPrefs.entrySet()) {
@@ -202,28 +216,16 @@ public final class TagManager {
         }
     }
 
-    public static String formatDate(long epochMillis) {
-        return LocalDate.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneOffset.UTC).toString();
+    public static String formatCreated(long epochMillis) {
+        return CREATED_FORMAT.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneOffset.UTC));
     }
 
-    public static String formatMonth(long epochMillis) {
-        return LocalDate.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneOffset.UTC).toString().substring(0, 7);
-    }
-
-    private static int rarityOrder(String rarity) {
-        return switch (rarity.toUpperCase(Locale.ROOT)) {
-            case "LEGENDARY" -> 0;
-            case "EPIC" -> 1;
-            case "RARE" -> 2;
-            default -> 3;
-        };
-    }
-
-    public enum Sort { ALPHABETICAL, AGE, RARITY }
+    public enum Sort { ALPHABETICAL, AGE }
 
     public enum Filter { YOUR, UNOWNED, ALL }
 
-    public record Tag(String id, String display, String permission, String rarity, long createdAt, String color) { }
+    public record Tag(String id, String display, String permission, long createdAt, String material,
+                       Integer customModelData, List<String> lore) { }
 
     private record PlayerPrefs(String tagId, boolean nicknameMatch, boolean nicknameReversed) {
         static final PlayerPrefs DEFAULT = new PlayerPrefs(null, false, false);

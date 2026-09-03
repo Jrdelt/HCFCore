@@ -18,6 +18,9 @@ scoreboard:
   title: '<white><bold>FACTIONS<reset>   <gray>{date}'
   date-format: 'MM/dd'
   lines:
+    - '<white><bold>{name}'
+    - '<gray>Experience: <white>{exp}'
+    - '<gray>Balance: <white>{balance}'
     - ''
     - '<white>{faction} <gray>[<yellow>#{ftop}<gray>]'
     - '<gray> <red>• Power: <white>{power}'
@@ -26,10 +29,8 @@ scoreboard:
     - '<aqua>play.example.com'
 
 chat:
-  prefix: '<gradient:#38bdf8:#a855f7>❖</gradient>'
   separator: '<gray>»</gray>'
   faction-format: '<gold>[{faction}]</gold> '
-  tag-format: '<aqua>[{tag}]</aqua> '
   rank-format: '<light_purple>[{rank}]</light_purple> '
   name-format: '<white>{name}</white>'
 
