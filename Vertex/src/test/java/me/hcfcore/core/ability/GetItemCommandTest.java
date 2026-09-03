@@ -14,6 +14,7 @@ import org.mockbukkit.mockbukkit.plugin.PluginMock;
 import java.util.Map;
 import java.util.UUID;
 
+import static me.hcfcore.core.lang.MessageAssertions.isChatMessage;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -21,13 +22,14 @@ class GetItemCommandTest {
 
     private ServerMock server;
     private PluginMock plugin;
+    private Messages messages;
     private GetItemCommand command;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        Messages messages = new Messages(plugin, new UserManager(plugin, new NoOpStorage()));
+        messages = new Messages(plugin, new UserManager(plugin, new NoOpStorage()));
         messages.load();
         AbilityManager abilityManager = new AbilityManager(plugin, new NoOpStorage());
         abilityManager.load();
@@ -50,7 +52,7 @@ class GetItemCommandTest {
         assertDoesNotThrow(() ->
                 command.onCommand(sender, null, "getitem", new String[]{"Target", "leap", "999999999"}));
 
-        assertTrue(sender.nextMessage().contains("Usage"));
+        assertTrue(isChatMessage(messages, sender, sender.nextComponentMessage(), "ability.getitem-usage"));
     }
 
     @Test
@@ -62,7 +64,7 @@ class GetItemCommandTest {
         assertDoesNotThrow(() ->
                 command.onCommand(sender, null, "getitem", new String[]{"Target2", "leap", "abc"}));
 
-        assertTrue(sender.nextMessage().contains("Usage"));
+        assertTrue(isChatMessage(messages, sender, sender.nextComponentMessage(), "ability.getitem-usage"));
     }
 
     private static final class NoOpStorage implements Storage {
@@ -95,6 +97,15 @@ class GetItemCommandTest {
 
         @Override
         public void saveLocale(UUID uuid, String locale) {
+        }
+
+        @Override
+        public void saveDeath(UUID uuid, me.hcfcore.core.staff.Death death) {
+        }
+
+        @Override
+        public java.util.List<me.hcfcore.core.staff.Death> loadDeaths(UUID uuid, int limit) {
+            return java.util.List.of();
         }
 
         @Override

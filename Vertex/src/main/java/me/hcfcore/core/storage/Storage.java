@@ -1,6 +1,9 @@
 package me.hcfcore.core.storage;
 
+import me.hcfcore.core.staff.Death;
+
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -19,6 +22,10 @@ public interface Storage {
     String loadLocale(UUID uuid) throws SQLException;
 
     void saveLocale(UUID uuid, String locale) throws SQLException;
+
+    void saveDeath(UUID uuid, Death death) throws SQLException;
+
+    List<Death> loadDeaths(UUID uuid, int limit) throws SQLException;
 
     void close();
 }

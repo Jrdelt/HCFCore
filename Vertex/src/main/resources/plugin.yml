@@ -53,6 +53,9 @@ commands:
   nextreboot:
     description: Show the next scheduled server reboot.
     usage: /<command>
+  rollback:
+    description: View and restore items from a player's death history.
+    usage: /<command> <player>
 
 permissions:
   hcfcore.admin:
@@ -87,4 +90,7 @@ permissions:
     default: op
   hcfcore.reboot.start:
     description: Start or cancel a server reboot countdown.
+    default: op
+  hcfcore.staff.rollback:
+    description: View and restore items from a player's death history.
     default: op

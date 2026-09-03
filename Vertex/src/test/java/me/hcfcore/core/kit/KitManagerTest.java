@@ -10,6 +10,7 @@ import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -28,6 +29,7 @@ import java.util.UUID;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static me.hcfcore.core.lang.MessageAssertions.isChatMessage;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -148,7 +150,7 @@ class KitManagerTest {
 
         kitManager.apply(player, kit);
 
-        assertTrue(player.nextMessage().contains("permission"));
+        assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "kit.no-kit-permission"));
     }
 
     @Test
@@ -159,16 +161,16 @@ class KitManagerTest {
         Kit kit = new Kit("Grinder", "", 60, new ItemStack[0], new ItemStack[0]);
 
         kitManager.apply(player, kit);
-        player.nextMessage(); // consume "Applied kit ..."
+        player.nextComponentMessage(); // consume kit.applied
 
         // Second attempt, still on cooldown.
         kitManager.apply(player, kit);
-        assertTrue(player.nextMessage().contains("again in"));
+        assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "kit.cooldown"));
 
         // A player with the bypass permission skips the cooldown entirely.
         player.addAttachment(plugin, "hcfcore.kit.bypasscooldown", true);
         kitManager.apply(player, kit);
-        assertFalse(player.nextMessage().contains("again in"));
+        assertFalse(isChatMessage(messages, player, player.nextComponentMessage(), "kit.cooldown"));
     }
 
     @Test
@@ -182,14 +184,14 @@ class KitManagerTest {
 
         // Too poor: denied, nothing withdrawn.
         kitManager.apply(player, kit);
-        assertTrue(player.nextMessage().contains("need"));
+        assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "kit.cost-money-needed"));
         assertEquals(100.0, economy.balance);
 
         // Affordable: charged and applied.
         economy.balance = 1_000.0;
         kitManager.apply(player, kit);
         assertEquals(500.0, economy.balance);
-        assertTrue(player.nextMessage().contains("Applied kit"));
+        assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "kit.applied"));
 
         // Bypass permission: kit applies again with no further charge.
         player.addAttachment(plugin, "hcfcore.kit.bypasscost", true);
@@ -206,11 +208,11 @@ class KitManagerTest {
 
         // No diamonds yet.
         kitManager.apply(player, kit);
-        assertTrue(player.nextMessage().contains("need"));
+        assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "kit.cost-item-needed"));
 
         player.getInventory().addItem(new ItemStack(Material.DIAMOND, 4));
         kitManager.apply(player, kit);
-        assertTrue(player.nextMessage().contains("Applied kit"));
+        assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "kit.applied"));
         assertFalse(player.getInventory().containsAtLeast(new ItemStack(Material.DIAMOND), 1),
                 "the 4 diamonds should have been consumed as payment");
     }
@@ -233,13 +235,13 @@ class KitManagerTest {
         assertTrue(player.hasPotionEffect(PotionEffectType.JUMP_BOOST));
         assertEquals(1, player.getPotionEffect(PotionEffectType.JUMP_BOOST).getAmplifier());
 
-        player.nextMessage();
-        player.nextMessage();
+        player.nextComponentMessage();
+        player.nextComponentMessage();
         ItemStack[] archerArmor = player.getInventory().getArmorContents();
         player.getInventory().setArmorContents(new ItemStack[4]);
         ((BukkitSchedulerMock) server.getScheduler()).performOneTick();
         assertFalse(player.hasPotionEffect(PotionEffectType.SPEED));
-        assertTrue(player.nextMessage().contains("Class effects removed"));
+        assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "kit.effects-removed"));
 
         player.getInventory().setArmorContents(archerArmor);
         ((BukkitSchedulerMock) server.getScheduler()).performTicks(60);
@@ -266,8 +268,8 @@ class KitManagerTest {
         kitManager.apply(player, kit);
         ((BukkitSchedulerMock) server.getScheduler()).performTicks(61);
         assertEquals(2, player.getPotionEffect(PotionEffectType.SPEED).getAmplifier());
-        player.nextMessage();
-        player.nextMessage();
+        player.nextComponentMessage();
+        player.nextComponentMessage();
 
         // Simulate a stronger Speed splash potion landing on the player
         // mid-fight, overriding the kit's own SPEED amplifier.
@@ -278,7 +280,7 @@ class KitManagerTest {
                 "the external potion's stronger amplifier should not be immediately stomped");
         assertTrue(player.hasPotionEffect(PotionEffectType.JUMP_BOOST),
                 "the untouched kit effect should never be cleared just because SPEED was overridden");
-        assertNull(player.nextMessage(), "no equip/warmup message should fire since the kit armor never changed");
+        assertNull(player.nextComponentMessage(), "no equip/warmup message should fire since the kit armor never changed");
 
         // The external potion naturally expires (simulated directly,
         // since MockBukkit doesn't tick down real potion durations).
@@ -288,7 +290,82 @@ class KitManagerTest {
         assertEquals(2, player.getPotionEffect(PotionEffectType.SPEED).getAmplifier(),
                 "the kit's own SPEED should silently reappear the moment the override is gone");
         assertTrue(player.hasPotionEffect(PotionEffectType.JUMP_BOOST), "still never should have been cleared");
-        assertNull(player.nextMessage(), "restoring a stripped effect on unchanged armor should stay silent");
+        assertNull(player.nextComponentMessage(), "restoring a stripped effect on unchanged armor should stay silent");
+    }
+
+    @Test
+    void armorDurabilityDamageDoesNotDropTheKitsEffects() {
+        // Regression test: kit armor was matched with ItemStack.isSimilar,
+        // which compares ItemMeta -- and durability lives in the meta as
+        // Damageable#damage. So anything that chewed durability off the
+        // worn set (a creeper explosion hitting all four pieces at once,
+        // or just ordinary combat) stopped matching the kit, and the
+        // player was told their class effects were removed "because the
+        // full kit armor is no longer equipped" while still wearing it.
+        PlayerMock player = server.addPlayer("Ivy");
+        player.addAttachment(plugin, "hcfcore.kit.archer", true);
+        userManager.load(player.getUniqueId());
+        kitManager.load();
+        Kit kit = kitManager.get("archer");
+
+        kitManager.start();
+        kitManager.apply(player, kit);
+        ((BukkitSchedulerMock) server.getScheduler()).performTicks(61);
+        assertTrue(player.hasPotionEffect(PotionEffectType.SPEED));
+        player.nextComponentMessage();
+        player.nextComponentMessage();
+
+        ItemStack[] worn = player.getInventory().getArmorContents();
+        for (ItemStack piece : worn) {
+            if (piece != null && piece.getItemMeta() instanceof Damageable meta) {
+                meta.setDamage(meta.getDamage() + 5);
+                piece.setItemMeta(meta);
+            }
+        }
+        player.getInventory().setArmorContents(worn);
+        ((BukkitSchedulerMock) server.getScheduler()).performOneTick();
+
+        assertTrue(player.hasPotionEffect(PotionEffectType.SPEED),
+                "worn-down kit armor is still the kit's armor");
+        assertTrue(player.hasPotionEffect(PotionEffectType.JUMP_BOOST),
+                "worn-down kit armor is still the kit's armor");
+        assertNull(player.nextComponentMessage(),
+                "durability loss should not read as the player taking the armor off");
+    }
+
+    @Test
+    void normalizingWearDoesNotStopEnchantmentsFromDiscriminatingKits() {
+        // Guards the other side of the durability fix: wear is ignored,
+        // but nothing else is. Enchantment levels are the only thing
+        // separating some kits from their donator variants, so armor that
+        // differs there must still fail to match.
+        PlayerMock player = server.addPlayer("Jonas");
+        player.addAttachment(plugin, "hcfcore.kit.archer", true);
+        userManager.load(player.getUniqueId());
+        kitManager.load();
+        Kit kit = kitManager.get("archer");
+
+        kitManager.start();
+        kitManager.apply(player, kit);
+        ((BukkitSchedulerMock) server.getScheduler()).performTicks(61);
+        assertTrue(player.hasPotionEffect(PotionEffectType.SPEED));
+        player.nextComponentMessage();
+        player.nextComponentMessage();
+
+        // Same set, worn down, but re-enchanted beyond the kit's spec.
+        ItemStack[] worn = player.getInventory().getArmorContents();
+        ItemStack helmet = worn[3];
+        if (helmet.getItemMeta() instanceof Damageable meta) {
+            meta.setDamage(meta.getDamage() + 5);
+            helmet.setItemMeta(meta);
+        }
+        helmet.addUnsafeEnchantment(Enchantment.PROTECTION, 5);
+        player.getInventory().setArmorContents(worn);
+        ((BukkitSchedulerMock) server.getScheduler()).performOneTick();
+
+        assertFalse(player.hasPotionEffect(PotionEffectType.SPEED),
+                "a differently enchanted helmet is not the archer kit's helmet");
+        assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "kit.effects-removed"));
     }
 
     @Test
@@ -310,6 +387,41 @@ class KitManagerTest {
             item -> item.getEnchantmentLevel(Enchantment.UNBREAKING) == 3
                 && item.getEnchantmentLevel(Enchantment.PROTECTION) == 2),
             "the donator archer kit's armor should have Unbreaking III and Protection II");
+    }
+
+    @Test
+    void mageKitOverridesItsGuiIconAwayFromItsHelmet() {
+        // The mage kit's first armor slot (helmet) is a plain golden
+        // helmet -- kits.yml overrides the /kits GUI icon to its more
+        // distinctive chainmail leggings via the "icon" field, since the
+        // default icon picker just takes the first non-air armor piece.
+        kitManager.load();
+
+        Kit mage = kitManager.get("mage");
+        assertEquals("CHAINMAIL_LEGGINGS", mage.getIcon());
+        assertEquals(Material.GOLDEN_HELMET, mage.getArmor()[0].getType(),
+            "the icon override shouldn't change what's actually worn");
+    }
+
+    @Test
+    void kitIconOverridePersistsAcrossAFreshLoad() throws java.io.IOException {
+        File liveFile = new File(plugin.getDataFolder(), "kits.yml");
+        liveFile.getParentFile().mkdirs();
+        java.nio.file.Files.writeString(liveFile.toPath(), """
+                kits:
+                  scout:
+                    permission: ''
+                    icon: CHAINMAIL_LEGGINGS
+                    armor: []
+                    contents: []
+                """);
+
+        kitManager.load();
+        assertEquals("CHAINMAIL_LEGGINGS", kitManager.get("scout").getIcon());
+
+        KitManager reloaded = new KitManager(plugin, new InMemoryStorage(), userManager, messages);
+        reloaded.load();
+        assertEquals("CHAINMAIL_LEGGINGS", reloaded.get("scout").getIcon());
     }
 
     private static final class FakeEconomy implements Economy {
@@ -569,6 +681,14 @@ class KitManagerTest {
 
         @Override
         public void saveLocale(UUID uuid, String locale) {
+        }
+        @Override
+        public void saveDeath(UUID uuid, me.hcfcore.core.staff.Death death) {
+        }
+
+        @Override
+        public java.util.List<me.hcfcore.core.staff.Death> loadDeaths(UUID uuid, int limit) {
+            return java.util.List.of();
         }
 
         @Override

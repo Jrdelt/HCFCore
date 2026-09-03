@@ -1,11 +1,21 @@
 package me.hcfcore.core.storage;
 
+import me.hcfcore.core.staff.Death;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.util.io.BukkitObjectInputStream;
+import org.bukkit.util.io.BukkitObjectOutputStream;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -50,6 +60,35 @@ public final class MySQLStorage implements Storage {
             INSERT INTO user_locale (uuid, locale) VALUES (?, ?)
             ON DUPLICATE KEY UPDATE locale = VALUES(locale)""";
 
+    private static final String CREATE_DEATH_TABLE = """
+            CREATE TABLE IF NOT EXISTS player_deaths (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                uuid CHAR(36) NOT NULL,
+                timestamp BIGINT NOT NULL,
+                cause VARCHAR(255) NOT NULL,
+                killer_name VARCHAR(16),
+                items LONGBLOB NOT NULL,
+                helmet BLOB,
+                chestplate BLOB,
+                leggings BLOB,
+                boots BLOB,
+                offhand BLOB,
+                INDEX (uuid, timestamp DESC)
+            )""";
+
+    private static final String INSERT_DEATH = """
+            INSERT INTO player_deaths (uuid, timestamp, cause, killer_name, items, helmet, chestplate, leggings, boots, offhand)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""";
+
+    private static final String SELECT_DEATHS = """
+            SELECT timestamp, cause, killer_name, items, helmet, chestplate, leggings, boots, offhand
+            FROM player_deaths WHERE uuid = ? ORDER BY timestamp DESC LIMIT ?""";
+
+    private static final String CLEANUP_DEATHS = """
+            DELETE FROM player_deaths WHERE uuid = ? AND id NOT IN (
+                SELECT id FROM (SELECT id FROM player_deaths WHERE uuid = ? ORDER BY timestamp DESC LIMIT 20) t
+            )""";
+
     private final Database database;
 
     public MySQLStorage(Database database) {
@@ -63,6 +102,7 @@ public final class MySQLStorage implements Storage {
             statement.executeUpdate(CREATE_TABLE);
             statement.executeUpdate(CREATE_ABILITY_TABLE);
             statement.executeUpdate(CREATE_LOCALE_TABLE);
+            statement.executeUpdate(CREATE_DEATH_TABLE);
         }
     }
 
@@ -136,6 +176,122 @@ public final class MySQLStorage implements Storage {
             statement.setString(1, uuid.toString());
             statement.setString(2, locale.toLowerCase(Locale.ROOT));
             statement.executeUpdate();
+        }
+    }
+
+    @Override
+    public void saveDeath(UUID uuid, Death death) throws SQLException {
+        try (Connection connection = database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(INSERT_DEATH)) {
+            statement.setString(1, uuid.toString());
+            statement.setLong(2, death.getTimestamp());
+            statement.setString(3, death.getCause());
+            statement.setString(4, death.getKillerName());
+            statement.setBytes(5, serializeItemList(death.getItems()));
+            statement.setBytes(6, serializeItem(death.getHelmet()));
+            statement.setBytes(7, serializeItem(death.getChestplate()));
+            statement.setBytes(8, serializeItem(death.getLeggings()));
+            statement.setBytes(9, serializeItem(death.getBoots()));
+            statement.setBytes(10, serializeItem(death.getOffhand()));
+            statement.executeUpdate();
+
+            cleanupOldDeaths(uuid, connection);
+        }
+    }
+
+    @Override
+    public List<Death> loadDeaths(UUID uuid, int limit) throws SQLException {
+        List<Death> deaths = new ArrayList<>();
+        try (Connection connection = database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(SELECT_DEATHS)) {
+            statement.setString(1, uuid.toString());
+            statement.setInt(2, limit);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    long timestamp = resultSet.getLong("timestamp");
+                    String cause = resultSet.getString("cause");
+                    String killerName = resultSet.getString("killer_name");
+                    List<ItemStack> items = deserializeItemList(resultSet.getBytes("items"));
+                    ItemStack helmet = deserializeItem(resultSet.getBytes("helmet"));
+                    ItemStack chestplate = deserializeItem(resultSet.getBytes("chestplate"));
+                    ItemStack leggings = deserializeItem(resultSet.getBytes("leggings"));
+                    ItemStack boots = deserializeItem(resultSet.getBytes("boots"));
+                    ItemStack offhand = deserializeItem(resultSet.getBytes("offhand"));
+
+                    Death death = new Death(timestamp, cause, killerName, items, helmet, chestplate, leggings, boots, offhand);
+                    deaths.add(death);
+                }
+            }
+        }
+        return deaths;
+    }
+
+    private void cleanupOldDeaths(UUID uuid, Connection connection) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(CLEANUP_DEATHS)) {
+            statement.setString(1, uuid.toString());
+            statement.setString(2, uuid.toString());
+            statement.executeUpdate();
+        }
+    }
+
+    private byte[] serializeItem(ItemStack item) throws SQLException {
+        if (item == null || item.getType().isAir()) {
+            return null;
+        }
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            BukkitObjectOutputStream oos = new BukkitObjectOutputStream(baos);
+            oos.writeObject(item);
+            oos.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new SQLException("Failed to serialize ItemStack", e);
+        }
+    }
+
+    private byte[] serializeItemList(List<ItemStack> items) throws SQLException {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            BukkitObjectOutputStream oos = new BukkitObjectOutputStream(baos);
+            oos.writeInt(items.size());
+            for (ItemStack item : items) {
+                oos.writeObject(item);
+            }
+            oos.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new SQLException("Failed to serialize ItemStack list", e);
+        }
+    }
+
+    private ItemStack deserializeItem(byte[] data) throws SQLException {
+        if (data == null || data.length == 0) {
+            return null;
+        }
+        try {
+            ByteArrayInputStream bais = new ByteArrayInputStream(data);
+            BukkitObjectInputStream ois = new BukkitObjectInputStream(bais);
+            ItemStack item = (ItemStack) ois.readObject();
+            ois.close();
+            return item;
+        } catch (Exception e) {
+            throw new SQLException("Failed to deserialize ItemStack", e);
+        }
+    }
+
+    private List<ItemStack> deserializeItemList(byte[] data) throws SQLException {
+        List<ItemStack> items = new ArrayList<>();
+        try {
+            ByteArrayInputStream bais = new ByteArrayInputStream(data);
+            BukkitObjectInputStream ois = new BukkitObjectInputStream(bais);
+            int size = ois.readInt();
+            for (int i = 0; i < size; i++) {
+                items.add((ItemStack) ois.readObject());
+            }
+            ois.close();
+            return items;
+        } catch (Exception e) {
+            throw new SQLException("Failed to deserialize ItemStack list", e);
         }
     }
 

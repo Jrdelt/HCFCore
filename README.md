@@ -68,32 +68,38 @@ mysql:
 
 scoreboard:
   update-interval-ticks: 20
-  title: '<white><bold>FACTIONS<reset>   <gray>{date}'
+  title: '<blue><bold>ꜰᴀᴄᴛɪᴏɴꜱ<reset>   <gray>{date}'
   date-format: 'MM/dd'
   lines:
-    - '<white><bold>{name}'
-    - '<gray>Experience: <white>{exp}'
-    - '<gray>Balance: <white>{balance}'
+    - '     <gray>Season I'
+    - '   <gray>{rank_prefix}{name}'
+    - '<gray>• <red>Experience: <white>{exp}'
+    - '<gray>• <red>Balance: <white>{balance}'
     - ''
     - '<white>{faction} <gray>[<yellow>#{ftop}<gray>]'
     - '<gray> <red>• Power: <white>{power}'
     - '<gray> <red>• Online: <white>{fplayers_online}'
     - ''
-    - '<aqua>play.example.com'
+    - '<gray>hub.mc-vertex.com'
 
 chat:
-  separator: '<gray>»</gray>'
-  faction-format: '<gold>[{faction}]</gold> '
-  rank-format: '<light_purple>[{rank}]</light_purple> '
-  name-format: '<white>{name}</white>'
+  separator: ' <gray>» </gray>'
+  faction-format: '<gray>[{faction}]</gray> '
+  rank-format: '<gray>[{rank}]</gray> '
+  name-format: '{name} '
 
 pvp:
   combat-tag-seconds: 30
-  pearl-cooldown-seconds: 15
-  golden-apple-cooldown-seconds: 10
-  enchanted-golden-apple-cooldown-seconds: 30
+  pearl-cooldown-seconds: 12
+  golden-apple-cooldown-seconds: 8
+  enchanted-golden-apple-cooldown-seconds: 120
   logout-penalty: true
-  actionbar-update-interval-ticks: 4
+  actionbar-update-interval-ticks: 2
+  archer-tag:
+    duration-seconds: 10
+    max-stacks: 4
+    arrow-damage-bonus-per-stack: 0.15
+    faction-melee-bonus-per-stack: 0.05
   legacy-combat:
     enabled: true
     worlds: []
@@ -107,17 +113,15 @@ factions:
     - factions
 
 kits:
-  default-cooldown-seconds: 300
-  effect-warmup-seconds: 3
+  default-cooldown-seconds: 30
+  effect-warmup-seconds: 5
   max-cooldown-seconds: 86400
   max-money-cost: 1000000000.0
   max-cost-item-amount: 64
 
 abilities:
-  global-cooldown-seconds: 3
+  global-cooldown-seconds: 4
   max-getitem-amount: 64
-  pearl-stunner-seconds: 8
-  rabbits-feed-speed-seconds: 8
   disabled-regions:
     - spawn
 
@@ -131,7 +135,8 @@ reboot:
 
 - `scoreboard.title` and every entry in `scoreboard.lines` accept
   `{date}` (formatted per `scoreboard.date-format`) plus `{name}`,
-  `{exp}` (XP level), `{balance}` (Vault balance, formatted, `0` without
+  `{rank}` / `{rank_prefix}` (LuckPerms primary group; `rank_prefix` adds
+  brackets and a trailing space only when a rank exists), `{exp}` (XP level), `{balance}` (Vault balance, formatted, `0` without
   an economy plugin), `{online}`, `{faction}`, `{faction_role}`,
   `{ftop}` (the player's faction's power ranking), `{power}`
   (`current/max`, comma-formatted), `{fplayers_online}`, and `{repair}`
@@ -143,8 +148,26 @@ reboot:
   prefix shown before *system* messages (command feedback, errors), not
   regular player chat.
 - `pvp.actionbar-update-interval-ticks` controls how often the combat
-  action bar (name/timer/health/CPS) refreshes — 4 ticks (~5/sec) by
+  action bar (name/timer/health/CPS) refreshes — 2 ticks (10/sec) by
   default for a PvP-responsive feel.
+- `pvp.pearl-cooldown-seconds` /
+  `pvp.golden-apple-cooldown-seconds` /
+  `pvp.enchanted-golden-apple-cooldown-seconds`: HCF-style cooldowns on the
+  vanilla items, enforced by the plugin rather than by Minecraft's own
+  client cooldown — the two apple types stay independent even though
+  vanilla groups them together. Using one while it's still cooling down is
+  cancelled with a chat message, and the remaining time shows up in
+  `/cooldowns`. Tracked in memory and deliberately *not* cleared on
+  disconnect, so relogging can't reset a pearl or gapple timer mid-fight.
+  A pearl right-click that opens a block (chest, door, anvil) instead of
+  throwing is ignored by both halves of this — it neither starts the
+  cooldown nor gets blocked by one.
+- `pvp.archer-tag.*`: the archer class mechanic (see **Archer tag**
+  below). `duration-seconds` is how long a mark lasts and is refreshed by
+  every new arrow, `max-stacks` caps how deep focus fire can go, and the
+  two `*-bonus-per-stack` values are fractions (`0.15` = +15% per stack)
+  applied to arrow damage and to the archer's faction's melee damage
+  respectively.
 - `pvp.logout-penalty`: if true, disconnecting while tagged is treated as a
   combat logout (see `PlayerConnectionListener`).
 - `pvp.legacy-combat`: enables the 1.8-style attack-speed behavior. Empty
@@ -250,7 +273,9 @@ cost, armor/contents, and optional class effects:
 kits:
   diamond:
     permission: ''
-    cooldown-seconds: 600
+    cooldown-seconds: 30
+    icon: DIAMOND_CHESTPLATE
+    purpose: '<gray>All-round tank.'
     armor:
       - material: DIAMOND_HELMET
         amount: 1
@@ -285,6 +310,16 @@ kits:
   inventory. Either, both, or neither can be set — both are checked and
   charged as an atomic pair, only deducting if the player can afford
   everything. Bypassed by `hcfcore.kit.bypasscost`.
+- `icon` — optional Material name overriding the `/kits` GUI icon. The
+  default is the kit's first non-air armor piece, else its first content
+  item, which doesn't always pick the recognizable piece — the shipped
+  `mage`/`mage-donator` kits set `CHAINMAIL_LEGGINGS` so they don't show
+  the same gold helmet as `bard`. An unknown material falls back to the
+  default rather than erroring.
+- `purpose` — optional one-line role blurb (MiniMessage or legacy `&`)
+  shown in the `/kits` GUI lore under the claimable/unclaimable line.
+  Omit it and nothing is shown. Both `icon` and `purpose` are preserved
+  by `/kit create`'s rewrite of `kits.yml`.
 - `armor` / `contents` — each entry is a plain map: `material` (or
   `type`), `amount` (or `count`), an optional `enchantments` map
   (`ENCHANTMENT_NAME: level`), an optional `potion-effect` +
@@ -295,8 +330,9 @@ kits:
   `/kit create`; the older `/kit save` alias remains supported.
 - `effects` — optional list of passive potion effects (`type` +
   `amplifier`) granted while the player is wearing the kit's *exact* full
-  armor set (all four pieces, matched by material/enchants/etc.), and
-  removed the moment any piece comes off. Applying is delayed by
+  armor set (all four pieces, matched by material/enchants/etc., with
+  durability damage ignored so a worn set still counts), and removed the
+  moment any piece comes off. Applying is delayed by
   `kits.effect-warmup-seconds` after the armor set first goes on, with a
   chat message; an unrelated potion effect from PvP that happens to
   override the same effect type doesn't retrigger that warmup or message
@@ -311,8 +347,8 @@ Reloaded along with everything else on `/hcfcore reload`.
 
 ## Abilities (`abilities.yml`)
 
-Thirteen PvP ability items ship pre-registered, each with real gameplay
-behavior:
+Fifteen PvP ability items ship pre-registered (the four `mage-*` debuffs
+share one row below), each with real gameplay behavior:
 
 | Ability | Trigger | What it does |
 |---|---|---|
@@ -324,7 +360,7 @@ behavior:
 | `leap` | Right-click | Sets your velocity forward and slightly upward, scaled by `forward-multiplier`/`y-multiplier`, plus a short buff (`effect-type`/`effect-amplifier`/`effect-duration-seconds`). |
 | `rogue-backstab` | Melee hit, from behind | Deals bonus `damage` to an enemy struck from behind; consumed on use. |
 | `mage-wither` / `mage-slowness` / `mage-weakness` / `mage-poison` | Melee hit | Applies the named debuff (`effect-type`/`effect-amplifier`/`effect-duration-seconds`) to whoever you hit. |
-| `portable-bard` | Right-click | Opens a GUI to pick Strength/Speed/Regeneration; applies it, for `buff-seconds`, to you and every online member of your faction. |
+| `portable-bard` | Right-click | Opens a GUI to pick Strength/Speed/Resistance/Regeneration/Jump Boost; applies it, for `buff-seconds`, to you and every online member of your faction. In the full gold bard set the item cooldown is `bard-cooldown-seconds` (6s) instead of `cooldown-seconds`, and putting the gold set on shortens an outstanding out-of-class cooldown down to that same wait, so a player who used the item in another kit isn't locked out of the bard kit they just geared into. Each individual buff also has its own `buff-cooldown-seconds` (7s) cooldown, so buffs can be rotated but not repeated back to back. |
 | `repair` | Right-click | Grants `permission-node` (default `essentials.fix`) via LuckPerms for `duration-seconds`, with a live countdown on your scoreboard. Requires LuckPerms installed. |
 | `switcher-snowball` | Throw + hit | Swaps positions with whichever enemy (not a faction member) it hits. |
 | `time-warp-pearl` | Right-click | Teleports you back to wherever you last threw a *real* ender pearl from. |
@@ -350,14 +386,15 @@ abilities:
   `rogue-backstab` is consumed on its single use.
 - `cooldown-seconds` — per-item cooldown, persisted to MySQL (its own
   `ability_cooldowns` table, separate from kit cooldowns) so it survives a
-  restart. `/cooldowns` shows a player's own active kit and ability
-  cooldowns.
+  restart. `/cooldowns` lists a player's own active kit, ability, global,
+  and vanilla-item cooldowns.
 - Everything else under an ability's section (`forward-multiplier`,
   `hits-required`, `buff-seconds`, `duration-seconds`, `permission-node`,
   `effect-type`/`effect-amplifier`/`effect-duration-seconds`, etc.) is
-  that ability's own extra config, documented in the table above.
-  `pearl-stunner-seconds` / `rabbits-feed-speed-seconds` in `config.yml`
-  (not `abilities.yml`) control those two specifically.
+  that ability's own extra config, documented in the table above. All
+  per-ability tuning lives here rather than in `config.yml`, which only
+  carries the server-wide `global-cooldown-seconds`,
+  `max-getitem-amount`, and `disabled-regions`.
 - `switcher-snowball` and `portable-bard` use **FactionsUUID** to tell
   faction members apart from enemies — see `FactionsHook`.
 - `repair` degrades gracefully without LuckPerms installed: it tells the
@@ -406,7 +443,9 @@ players: {}
 edge) with a control row: **filter** (Your/Unowned/All, each with a live
 count), **sort** (Alphabetical/Age — click to cycle, shift-click to flip
 direction), **search** (opens an anvil to type a query; right-click
-clears it), **prev/next page**, and a **nickname-match** preview (top
+clears it — the anvil's result slot is a free, XP-cost-free confirm
+button that shows what will be searched for, and closing the anvil
+applies whatever is typed exactly once), **prev/next page**, and a **nickname-match** preview (top
 middle) that recolors your name in chat to match your equipped tag,
 including a "reversed" gradient-direction option. There's no close
 button — leave the GUI the normal way (Esc / click outside). Clicking an
@@ -414,6 +453,33 @@ unlocked tag equips it and announces it in chat (`<tag> EQUIPPED`);
 clicking your already-equipped tag unequips it (`<tag> UNEQUIPPED`).
 
 Reloaded along with everything else on `/hcfcore reload`.
+
+## Archer tag
+
+A player wearing the full **leather** set (the `archer` kit or its donator
+variant — matched by `ArmorClass.isArcher`, same material-only rule the
+bard uses) marks whoever their arrows hit:
+
+- Each arrow hit adds a stack, up to `pvp.archer-tag.max-stacks`, and
+  refreshes the mark's `duration-seconds`. Stacks are shared across every
+  archer shooting that player, so two archers focusing one target stack
+  twice as fast.
+- **Arrows** landing on a marked player deal
+  `arrow-damage-bonus-per-stack` extra damage per stack. The arrow that
+  *opens* the mark deals normal damage — the bonus only applies from the
+  next arrow on.
+- **Melee** hits get `faction-melee-bonus-per-stack` per stack, but only
+  for members of a faction whose own archer put a mark on that player.
+  A rival faction, or a bystander, deals normal melee damage no matter
+  how deep the stack is. A factionless archer's mark gives *nobody* the
+  melee bonus (including themselves) — there's no faction to grant it to.
+- Both the archer and the target get a chat message on every hit, naming
+  the other player, the stack's current arrow and melee percentages, and
+  the seconds left (`archer.tag-applied` / `archer.tag-received` in
+  `lang/*.yml`).
+- Archers can't mark their own faction members, and the mark clears on
+  death. It deliberately survives a disconnect, so relogging isn't a way
+  to shed it mid-fight.
 
 ## Reboot scheduling
 
@@ -431,7 +497,7 @@ shows any player the currently scheduled countdown, if one is running.
 | `/kit <name>` | kit's own permission (blank for the six base kits — open to everyone; the `-donator` variants require theirs) | Applies the kit to your inventory, respecting its cooldown and cost. |
 | `/kit create <name> [permission] [cooldownSeconds] [cost] [costItem[:amount]]` | `hcfcore.kit.create` | Saves your current inventory as a kit. `costItem` is a Material name, e.g. `DIAMOND:2`; amount defaults to 1. The older `/kit save` alias remains supported (`hcfcore.kit.save`). |
 | `/kit delete <name>` | `hcfcore.kit.delete` | Deletes a kit. |
-| `/kits` | *(none — open to all players)* | Opens a fixed 5-row GUI: non-donor kits fill row 2, each one's `-donator` variant sits directly below it in row 3 (same column), both kept off the outer columns. **Left-click** claims it, **right-click** previews its contents read-only. |
+| `/kits` | *(none — open to all players)* | Opens a fixed 4-row GUI: non-donor kits fill row 2, each one's `-donator` variant sits directly below it in row 3 (same column), both kept off the outer columns. Seven columns per page, with labeled arrow buttons in the top corners when there are more; a donor kit with no matching base kit still gets its own column. **Left-click** claims it, **right-click** previews its contents read-only. |
 
 ### Tags
 
@@ -445,7 +511,7 @@ shows any player the currently scheduled countdown, if one is running.
 |---|---|---|
 | `/getitem <username> <ability> [amount]` | `hcfcore.ability.give` | Gives a player ability items directly, ignoring cooldowns. |
 | `/abilities` | *(none — open to all players)* | Opens a GUI listing every ability's name/lore. A viewer with `hcfcore.ability.give` who clicks one receives a copy; everyone else's click just closes/does nothing. |
-| `/cooldowns` | *(none — open to all players)* | Shows your own active kit and ability cooldowns. |
+| `/cooldowns` | *(none — open to all players)* | Shows your own active cooldowns: kits, ability items, the shared global ability cooldown, and the vanilla pearl/golden-apple/enchanted-golden-apple timers. |
 
 ### Language
 
@@ -462,10 +528,11 @@ shows any player the currently scheduled countdown, if one is running.
 | `/combattag <player> [opponent\|server]` | `hcfcore.combat.tag` | Testing tool. With no second argument (or `server`), tags the target against a synthetic **"Server"** opponent — lets one admin alone see the action bar without a second player online. With a real opponent name, tags both players against each other. |
 
 While tagged, both players see an action bar:
-`⚔ Combat: {opponent} {health}❤  {time}s  You {yourCps}  Them {theirCps} ⚔`
-(the opponent segment just reads `Server`, with no health or "Them" CPS,
-when tagged via `/combattag <you> server`). The timer and health both
-gradient from red to green. CPS (clicks per second) is tracked from arm
+`Combat: ❤ {health}   {opponent} ({time}s) You ({yourCps}cps) Them ({theirCps}cps)`
+— the opponent's hearts lead, in red, spaced off from their name (the
+opponent segment just reads `Server`, with no health or "Them" CPS, when
+tagged via `/combattag <you> server`). The timer gradients from green to
+red as it runs down. CPS (clicks per second) is tracked from arm
 swings for every online player, not just tagged ones, so the count is
 already warm the instant a tag starts.
 
@@ -477,6 +544,29 @@ already warm the instant a tag starts.
 | `/reboot cancel` | `hcfcore.reboot.start` | Cancels an in-progress countdown. |
 | `/nextreboot` | *(none — open to all players)* | Shows the currently scheduled countdown, if any. |
 
+### Staff / Rollback
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/rollback <player>` | `hcfcore.staff.rollback` | Opens a death history GUI for a player. Shows the last 20 deaths with timestamps, death causes, and killer info. **Left-click** a death to restore all items to your inventory; **right-click** to view the death's contents in detail. |
+
+The death history system automatically captures:
+- **Inventory items** from the moment of death
+- **Armor pieces** (helmet, chestplate, leggings, boots)
+- **Off-hand items**
+- **Death timestamp** (formatted as MM/dd HH:mm:ss)
+- **Death cause** (damage type)
+- **Killer name** (if killed by a player; otherwise shows "Environment")
+
+Each player's death history persists to MySQL and stores the last 20 deaths automatically. Older deaths are purged, so the database footprint stays constant per player.
+
+**Death restoration workflow:**
+1. Staff member runs `/rollback <player>` to open the death list
+2. Each death shows its number, timestamp, cause, and killer
+3. **Left-click** to restore all items to the staff member's inventory (overflow items drop to the ground)
+4. **Right-click** to view exactly what items/armor/offhand the player had at that death
+5. The "Back" button in the contents view returns to the death list
+
 ### Admin / reload
 
 | Command | Permission | Notes |
@@ -487,7 +577,7 @@ already warm the instant a tag starts.
 
 Every command above (`kit`, `kits`, `hcfcore`, `getitem`, `abilities`,
 `language`, `cooldowns`, `tags`, `reboot`, `nextreboot`, `uncombat`,
-`combatcheck`, `combattag`) registers its own `TabCompleter` (except the
+`combatcheck`, `combattag`, `rollback`) registers its own `TabCompleter` (except the
 argument-less ones like `kits`/`abilities`/`tags`/`cooldowns`), so
 suggestions should appear as soon as the freshly built jar is running on
 the server. If they don't show up in-game:
@@ -526,6 +616,26 @@ the server. If they don't show up in-game:
   a tag's leading color (MiniMessage or legacy `&`/`&#RRGGBB`) from its
   `display` string, since tags embed their color directly rather than
   storing it separately.
+- Class detection for gameplay rules that key off "what class is this
+  player" (currently Portable Bard's short cooldown) goes through
+  `ArmorClass`, which matches armor **material** only — worn durability,
+  donator enchantments, and repairs must not drop a player out of their
+  class mid-fight. That's deliberately looser than the exact-set match
+  `KitManager` uses to decide whether a kit's passive `effects` apply, and
+  strict enough to keep the mage set (gold helmet + gold boots over
+  chainmail) from reading as a bard.
+- `ArcherTagManager` stores faction **ids**, not `Faction` objects or
+  player lookups, and takes them as plain ints from the caller. That keeps
+  the stacking/expiry logic unit-testable with no Factions plugin running,
+  and confines the FactionsUUID API to `ArcherTagListener`.
+  `FactionsHook.NO_FACTION` is the factionless sentinel and never matches
+  anything, so a mark from a factionless archer grants no melee bonus
+  rather than arming every factionless player.
+- Short-lived cooldowns that would be pointless to persist —
+  `VanillaCooldownManager`'s pearl/gapple timers, Portable Bard's per-buff
+  timers in `AbilityManager` — live in memory, keyed by UUID. Their quit
+  handlers only drop entries that have already expired; clearing live ones
+  would turn a relog into a cooldown reset.
 - `CombatManager.SERVER_UUID` (`new UUID(0, 0)`) is a reserved sentinel
   opponent id used only by `/combattag ... server` — never a real player's
   UUID, so it can't collide.

@@ -2,6 +2,7 @@ package me.hcfcore.core.reboot;
 
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.UserManager;
+import me.hcfcore.core.storage.Storage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,10 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.plugin.PluginMock;
 
+import java.util.Map;
+import java.util.UUID;
+
+import static me.hcfcore.core.lang.MessageAssertions.isChatMessage;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -17,6 +22,7 @@ class RebootCommandTest {
 
     private ServerMock server;
     private PluginMock plugin;
+    private Messages messages;
     private RebootManager rebootManager;
     private RebootCommand command;
 
@@ -24,7 +30,7 @@ class RebootCommandTest {
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        Messages messages = new Messages(plugin, new UserManager(plugin, new NoOpStorage()));
+        messages = new Messages(plugin, new UserManager(plugin, new NoOpStorage()));
         messages.load();
         rebootManager = new RebootManager(plugin, messages);
         command = new RebootCommand(rebootManager, messages);
@@ -45,20 +51,20 @@ class RebootCommandTest {
 
         command.onCommand(player, null, "reboot", new String[0]);
 
-        assertTrue(player.nextMessage().contains("server reboot has been scheduled"));
-        assertNull(player.nextMessage(), "the sender should only see the broadcast once");
+        assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "reboot.started"));
+        assertNull(player.nextComponentMessage(), "the sender should only see the broadcast once");
     }
 
     @Test
     void successfulCancelBroadcastsExactlyOnce() {
         PlayerMock player = authorizedPlayer("Bob");
         rebootManager.schedule();
-        player.nextMessage();
+        player.nextComponentMessage();
 
         command.onCommand(player, null, "reboot", new String[]{"cancel"});
 
-        assertTrue(player.nextMessage().contains("scheduled reboot was cancelled"));
-        assertNull(player.nextMessage(), "the sender should only see the broadcast once");
+        assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "reboot.cancelled"));
+        assertNull(player.nextComponentMessage(), "the sender should only see the broadcast once");
     }
 
     private PlayerMock authorizedPlayer(String name) {
@@ -97,6 +103,14 @@ class RebootCommandTest {
 
         @Override
         public void saveLocale(java.util.UUID uuid, String locale) {
+        }
+        @Override
+        public void saveDeath(UUID uuid, me.hcfcore.core.staff.Death death) {
+        }
+
+        @Override
+        public java.util.List<me.hcfcore.core.staff.Death> loadDeaths(UUID uuid, int limit) {
+            return java.util.List.of();
         }
 
         @Override

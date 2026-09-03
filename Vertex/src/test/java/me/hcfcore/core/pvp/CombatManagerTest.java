@@ -209,6 +209,14 @@ class CombatManagerTest {
         @Override
         public void saveLocale(UUID uuid, String locale) {
         }
+        @Override
+        public void saveDeath(UUID uuid, me.hcfcore.core.staff.Death death) {
+        }
+
+        @Override
+        public java.util.List<me.hcfcore.core.staff.Death> loadDeaths(UUID uuid, int limit) {
+            return java.util.List.of();
+        }
 
         @Override
         public void close() {

@@ -14,6 +14,7 @@ import org.mockbukkit.mockbukkit.plugin.PluginMock;
 import java.util.Map;
 import java.util.UUID;
 
+import static me.hcfcore.core.lang.MessageAssertions.isChatMessage;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -21,6 +22,7 @@ class KitCommandTest {
 
     private ServerMock server;
     private PluginMock plugin;
+    private Messages messages;
     private KitCommand command;
 
     @BeforeEach
@@ -28,7 +30,7 @@ class KitCommandTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         UserManager userManager = new UserManager(plugin, new NoOpStorage());
-        Messages messages = new Messages(plugin, userManager);
+        messages = new Messages(plugin, userManager);
         messages.load();
         KitManager kitManager = new KitManager(plugin, new NoOpStorage(), userManager, messages);
         command = new KitCommand(plugin, kitManager, messages);
@@ -50,7 +52,7 @@ class KitCommandTest {
         assertDoesNotThrow(() ->
                 command.onCommand(player, null, "kit", new String[]{"create", "Test", "", "999999999999"}));
 
-        assertTrue(player.nextMessage().contains("Usage"));
+        assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "kit.usage-create"));
     }
 
     @Test
@@ -61,7 +63,7 @@ class KitCommandTest {
         assertDoesNotThrow(() ->
                 command.onCommand(player, null, "kit", new String[]{"create", "Test", "", "notanumber"}));
 
-        assertTrue(player.nextMessage().contains("Usage"));
+        assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "kit.usage-create"));
     }
 
     @Test
@@ -72,7 +74,7 @@ class KitCommandTest {
         assertDoesNotThrow(() -> command.onCommand(player, null, "kit",
                 new String[]{"create", "Test", "", "0", "0", "DIAMOND:999999999"}));
 
-        assertTrue(player.nextMessage().contains("Usage"));
+        assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "kit.usage-create"));
     }
 
     private static final class NoOpStorage implements Storage {
@@ -105,6 +107,14 @@ class KitCommandTest {
 
         @Override
         public void saveLocale(UUID uuid, String locale) {
+        }
+        @Override
+        public void saveDeath(UUID uuid, me.hcfcore.core.staff.Death death) {
+        }
+
+        @Override
+        public java.util.List<me.hcfcore.core.staff.Death> loadDeaths(UUID uuid, int limit) {
+            return java.util.List.of();
         }
 
         @Override
