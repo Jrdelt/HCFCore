@@ -1,6 +1,7 @@
 package me.hcfcore.core.staff;
 
 import me.hcfcore.core.lang.Messages;
+import me.hcfcore.core.lang.MessageFormatter;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -124,13 +125,11 @@ public final class InvRestoreMenu {
             lore.add(Component.empty());
             String causeText = messages.getRaw(player, "staff.death-cause").replace("{cause}", cause);
             String killerText = messages.getRaw(player, "staff.death-killer").replace("{killer}", killer);
-            lore.add(Component.text(causeText).color(NamedTextColor.GRAY));
-            lore.add(Component.text(killerText).color(NamedTextColor.GRAY));
+            lore.add(MessageFormatter.deserialize(causeText));
+            lore.add(MessageFormatter.deserialize(killerText));
             lore.add(Component.empty());
-            lore.add(Component.text(messages.getRaw(player, "staff.death-lore-left"))
-                    .color(NamedTextColor.YELLOW));
-            lore.add(Component.text(messages.getRaw(player, "staff.death-lore-right"))
-                    .color(NamedTextColor.YELLOW));
+            lore.add(MessageFormatter.deserialize(messages.getRaw(player, "staff.death-lore-left")));
+            lore.add(MessageFormatter.deserialize(messages.getRaw(player, "staff.death-lore-right")));
 
             meta.lore(lore);
             icon.setItemMeta(meta);
