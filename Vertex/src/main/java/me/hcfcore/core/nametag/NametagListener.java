@@ -3,11 +3,11 @@ package me.hcfcore.core.nametag;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 /**
- * Handles nametag updates on player join/quit.
+ * Handles nametag cleanup on player quit.
+ * Nametags are automatically created/updated by the NametagManager update task.
  */
 public final class NametagListener implements Listener {
 
@@ -15,12 +15,6 @@ public final class NametagListener implements Listener {
 
     public NametagListener(NametagManager nametagManager) {
         this.nametagManager = nametagManager;
-    }
-
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        nametagManager.updatePlayerNametag(player);
     }
 
     @EventHandler
