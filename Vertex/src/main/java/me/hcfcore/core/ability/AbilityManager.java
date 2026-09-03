@@ -17,6 +17,7 @@ import org.bukkit.plugin.Plugin;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -96,7 +97,7 @@ public final class AbilityManager {
     }
 
     public Map<String, Ability> getAbilities() {
-        return abilities;
+        return Collections.unmodifiableMap(abilities);
     }
 
     public ItemStack createItem(Ability ability) {

@@ -272,9 +272,11 @@ public final class KitManager {
         Object abilityId = map.get("ability");
         if (abilityId != null) {
             ItemMeta meta = item.getItemMeta();
-            meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "ability_id"),
-                org.bukkit.persistence.PersistentDataType.STRING, String.valueOf(abilityId));
-            item.setItemMeta(meta);
+            if (meta != null) {
+                meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "ability_id"),
+                    org.bukkit.persistence.PersistentDataType.STRING, String.valueOf(abilityId));
+                item.setItemMeta(meta);
+            }
         }
         return item;
     }
@@ -299,7 +301,8 @@ public final class KitManager {
             return;
         }
         for (Map.Entry<?, ?> entry : map.entrySet()) {
-            Enchantment enchantment = Enchantment.getByName(String.valueOf(entry.getKey()).toUpperCase(Locale.ROOT));
+            Enchantment enchantment = Registry.ENCHANTMENT.get(
+                    NamespacedKey.minecraft(String.valueOf(entry.getKey()).toLowerCase(Locale.ROOT)));
             if (enchantment == null) {
                 continue;
             }
@@ -346,7 +349,7 @@ public final class KitManager {
     }
 
     public Map<String, Kit> getKits() {
-        return kits;
+        return Collections.unmodifiableMap(kits);
     }
 
     public void start() {

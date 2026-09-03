@@ -238,11 +238,9 @@ public final class MySQLStorage implements Storage {
         if (item == null || item.getType().isAir()) {
             return null;
         }
-        try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            BukkitObjectOutputStream oos = new BukkitObjectOutputStream(baos);
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             BukkitObjectOutputStream oos = new BukkitObjectOutputStream(baos)) {
             oos.writeObject(item);
-            oos.close();
             return baos.toByteArray();
         } catch (Exception e) {
             throw new SQLException("Failed to serialize ItemStack", e);
@@ -250,14 +248,12 @@ public final class MySQLStorage implements Storage {
     }
 
     private byte[] serializeItemList(List<ItemStack> items) throws SQLException {
-        try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            BukkitObjectOutputStream oos = new BukkitObjectOutputStream(baos);
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             BukkitObjectOutputStream oos = new BukkitObjectOutputStream(baos)) {
             oos.writeInt(items.size());
             for (ItemStack item : items) {
                 oos.writeObject(item);
             }
-            oos.close();
             return baos.toByteArray();
         } catch (Exception e) {
             throw new SQLException("Failed to serialize ItemStack list", e);
@@ -268,12 +264,9 @@ public final class MySQLStorage implements Storage {
         if (data == null || data.length == 0) {
             return null;
         }
-        try {
-            ByteArrayInputStream bais = new ByteArrayInputStream(data);
-            BukkitObjectInputStream ois = new BukkitObjectInputStream(bais);
-            ItemStack item = (ItemStack) ois.readObject();
-            ois.close();
-            return item;
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(data);
+             BukkitObjectInputStream ois = new BukkitObjectInputStream(bais)) {
+            return (ItemStack) ois.readObject();
         } catch (Exception e) {
             throw new SQLException("Failed to deserialize ItemStack", e);
         }
@@ -281,14 +274,12 @@ public final class MySQLStorage implements Storage {
 
     private List<ItemStack> deserializeItemList(byte[] data) throws SQLException {
         List<ItemStack> items = new ArrayList<>();
-        try {
-            ByteArrayInputStream bais = new ByteArrayInputStream(data);
-            BukkitObjectInputStream ois = new BukkitObjectInputStream(bais);
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(data);
+             BukkitObjectInputStream ois = new BukkitObjectInputStream(bais)) {
             int size = ois.readInt();
             for (int i = 0; i < size; i++) {
                 items.add((ItemStack) ois.readObject());
             }
-            ois.close();
             return items;
         } catch (Exception e) {
             throw new SQLException("Failed to deserialize ItemStack list", e);

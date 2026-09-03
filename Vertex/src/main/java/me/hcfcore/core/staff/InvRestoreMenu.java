@@ -28,6 +28,7 @@ public final class InvRestoreMenu {
 
     private static final int ROW_WIDTH = 9;
     private static final int GRID_SIZE = 6 * ROW_WIDTH;
+    private static final ThreadLocal<SimpleDateFormat> DATE_FORMAT = ThreadLocal.withInitial(() -> new SimpleDateFormat("MM/dd HH:mm:ss"));
 
     public static void open(Player staffPlayer, Player targetPlayer, Plugin plugin, DeathManager deathManager) {
         openByUUID(staffPlayer, targetPlayer.getUniqueId(), plugin, deathManager);
@@ -111,8 +112,7 @@ public final class InvRestoreMenu {
         ItemStack icon = new ItemStack(Material.SKELETON_SKULL);
         ItemMeta meta = icon.getItemMeta();
         if (meta != null) {
-            SimpleDateFormat sdf = new SimpleDateFormat("MM/dd HH:mm:ss");
-            String deathTime = sdf.format(new Date(death.getTimestamp()));
+            String deathTime = DATE_FORMAT.get().format(new Date(death.getTimestamp()));
             String cause = death.getCause().replace("_", " ");
             String killer = death.getKillerName() != null ? death.getKillerName() : "Environment";
 
