@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
@@ -22,6 +23,13 @@ public final class AbilityMenuListener implements Listener {
         this.plugin = plugin;
         this.abilityManager = abilityManager;
         this.messages = messages;
+    }
+
+    @EventHandler
+    public void onDrag(InventoryDragEvent event) {
+        if (event.getInventory().getHolder() instanceof AbilitiesMenu.Holder) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler
@@ -53,7 +61,7 @@ public final class AbilityMenuListener implements Listener {
         for (ItemStack dropped : player.getInventory().addItem(abilityManager.createItem(ability)).values()) {
             player.getWorld().dropItemNaturally(player.getLocation(), dropped);
         }
-        player.sendMessage(messages.get(player, "ability.gui-received")
+        player.sendMessage(messages.getChat(player, "ability.gui-received")
                 .append(MessageFormatter.deserialize(ability.getDisplayName()))
                 .append(Component.text(".")));
     }

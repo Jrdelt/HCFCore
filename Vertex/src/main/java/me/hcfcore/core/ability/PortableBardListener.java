@@ -8,6 +8,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -55,6 +56,13 @@ public final class PortableBardListener implements Listener {
     }
 
     @EventHandler
+    public void onDrag(InventoryDragEvent event) {
+        if (event.getInventory().getHolder() instanceof PortableBardMenu.Holder) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
     public void onClick(InventoryClickEvent event) {
         if (!(event.getInventory().getHolder() instanceof PortableBardMenu.Holder)) {
             return;
@@ -72,16 +80,24 @@ public final class PortableBardListener implements Listener {
         PotionEffectType effectType;
         int amplifier;
         switch (clicked.getType()) {
-            case BLAZE_POWDER -> {
-                effectType = PotionEffectType.STRENGTH;
-                amplifier = 2;
-            }
             case SUGAR -> {
                 effectType = PotionEffectType.SPEED;
-                amplifier = 2;
+                amplifier = 1;
+            }
+            case BLAZE_POWDER -> {
+                effectType = PotionEffectType.STRENGTH;
+                amplifier = 0;
+            }
+            case IRON_INGOT -> {
+                effectType = PotionEffectType.RESISTANCE;
+                amplifier = 0;
             }
             case GHAST_TEAR -> {
                 effectType = PotionEffectType.REGENERATION;
+                amplifier = 0;
+            }
+            case FEATHER -> {
+                effectType = PotionEffectType.JUMP_BOOST;
                 amplifier = 1;
             }
             default -> {
@@ -102,6 +118,5 @@ public final class PortableBardListener implements Listener {
             member.addPotionEffect(effect);
         }
         player.closeInventory();
-        player.sendMessage(messages.get(player, "ability.bard-shared"));
     }
 }

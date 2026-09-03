@@ -59,7 +59,7 @@ public final class RepairListener implements Listener {
         Player player = event.getPlayer();
 
         if (!LuckPermsHook.isAvailable()) {
-            player.sendMessage(messages.get(player, "ability.repair-no-luckperms"));
+            player.sendMessage(messages.getChat(player, "ability.repair-no-luckperms"));
             return;
         }
 
@@ -70,8 +70,8 @@ public final class RepairListener implements Listener {
         int durationSeconds = Math.max(1, ability.getInt("duration-seconds", 60));
         String permissionNode = ability.getString("permission-node", "essentials.fix");
 
-        LuckPermsHook.grantTemporaryPermission(player, permissionNode, durationSeconds);
-        player.sendMessage(messages.get(player, "ability.repair-granted", "seconds", String.valueOf(durationSeconds)));
+        LuckPermsHook.grantTemporaryPermission(plugin, player, permissionNode, durationSeconds);
+        player.sendMessage(messages.getChat(player, "ability.repair-granted", "seconds", String.valueOf(durationSeconds)));
 
         startCountdown(player.getUniqueId(), durationSeconds);
     }

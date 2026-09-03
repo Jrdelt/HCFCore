@@ -21,17 +21,18 @@ public final class HCFCoreCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length == 1 && args[0].equalsIgnoreCase("reload")) {
-            if (!sender.hasPermission("hcfcore.admin")) {
-                sender.sendMessage(messages.get(sender, "general.no-permission"));
-                return true;
-            }
-            plugin.reload();
-            sender.sendMessage(messages.get(sender, "admin.reloaded"));
+        if (!sender.hasPermission("hcfcore.admin")) {
+            sender.sendMessage(messages.getChat(sender, "general.no-permission"));
             return true;
         }
 
-        sender.sendMessage(messages.get(sender, "admin.usage"));
+        if (args.length == 1 && args[0].equalsIgnoreCase("reload")) {
+            plugin.reload();
+            sender.sendMessage(messages.getChat(sender, "admin.reloaded"));
+            return true;
+        }
+
+        sender.sendMessage(messages.getChat(sender, "admin.usage"));
         return true;
     }
 

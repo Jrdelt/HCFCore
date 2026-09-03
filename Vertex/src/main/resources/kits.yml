@@ -1,31 +1,412 @@
 kits:
-  starter:
-    permission: hcfcore.kit.starter
-    cooldown-seconds: 0
+  archer:
+    permission: hcfcore.kit.archer
+    cooldown-seconds: 600
     armor:
-      - {==: org.bukkit.inventory.ItemStack, type: LEATHER_HELMET, amount: 1}
-      - {==: org.bukkit.inventory.ItemStack, type: LEATHER_CHESTPLATE, amount: 1}
-      - {==: org.bukkit.inventory.ItemStack, type: LEATHER_LEGGINGS, amount: 1}
-      - {==: org.bukkit.inventory.ItemStack, type: LEATHER_BOOTS, amount: 1}
+      - material: LEATHER_HELMET
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+      - material: LEATHER_CHESTPLATE
+        amount: 1
+        enchantments:
+          PROTECTION: 1
+      - material: LEATHER_LEGGINGS
+        amount: 1
+        enchantments:
+          PROTECTION: 1
+      - material: LEATHER_BOOTS
+        amount: 1
+        enchantments:
+          PROTECTION: 2
     contents:
-      - {==: org.bukkit.inventory.ItemStack, type: STONE_SWORD, amount: 1}
-      - {==: org.bukkit.inventory.ItemStack, type: BREAD, amount: 16}
-      - {==: org.bukkit.inventory.ItemStack, type: COBBLESTONE, amount: 64}
+      - material: BOW
+        amount: 1
+        enchantments:
+          FLAME: 1
+      - material: ARROW
+        amount: 32
+      - material: BREAD
+        amount: 8
+    effects:
+      - type: SPEED
+        amplifier: 2
+      - type: JUMP_BOOST
+        amplifier: 1
 
-  fighter:
-    permission: hcfcore.kit.fighter
+  archer-donator:
+    permission: hcfcore.kit.archer.donator
     cooldown-seconds: 300
-    cost:
-      money: 250.0
-      item: DIAMOND
-      item-amount: 2
     armor:
-      - {==: org.bukkit.inventory.ItemStack, type: IRON_HELMET, amount: 1}
-      - {==: org.bukkit.inventory.ItemStack, type: IRON_CHESTPLATE, amount: 1}
-      - {==: org.bukkit.inventory.ItemStack, type: IRON_LEGGINGS, amount: 1}
-      - {==: org.bukkit.inventory.ItemStack, type: IRON_BOOTS, amount: 1}
+      - material: LEATHER_HELMET
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+          UNBREAKING: 3
+      - material: LEATHER_CHESTPLATE
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+          UNBREAKING: 3
+      - material: LEATHER_LEGGINGS
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+          UNBREAKING: 3
+      - material: LEATHER_BOOTS
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+          UNBREAKING: 3
     contents:
-      - {==: org.bukkit.inventory.ItemStack, type: IRON_SWORD, amount: 1}
-      - {==: org.bukkit.inventory.ItemStack, type: BOW, amount: 1}
-      - {==: org.bukkit.inventory.ItemStack, type: ARROW, amount: 32}
-      - {==: org.bukkit.inventory.ItemStack, type: GOLDEN_APPLE, amount: 4}
+      - material: BOW
+        amount: 1
+        enchantments:
+          FLAME: 1
+          UNBREAKING: 3
+      - material: ARROW
+        amount: 64
+      - material: BREAD
+        amount: 8
+    effects:
+      - type: SPEED
+        amplifier: 2
+      - type: JUMP_BOOST
+        amplifier: 1
+
+  miner:
+    permission: hcfcore.kit.miner
+    cooldown-seconds: 600
+    armor:
+      - material: IRON_HELMET
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+      - material: IRON_CHESTPLATE
+        amount: 1
+        enchantments:
+          PROTECTION: 1
+      - material: IRON_LEGGINGS
+        amount: 1
+        enchantments:
+          PROTECTION: 1
+      - material: IRON_BOOTS
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+    contents:
+      - material: IRON_PICKAXE
+        amount: 1
+      - material: TORCH
+        amount: 32
+      - material: BREAD
+        amount: 8
+    effects:
+      - type: HASTE
+        amplifier: 1
+      - type: NIGHT_VISION
+        amplifier: 0
+
+  miner-donator:
+    permission: hcfcore.kit.miner.donator
+    cooldown-seconds: 300
+    armor:
+      - material: IRON_HELMET
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+          UNBREAKING: 3
+      - material: IRON_CHESTPLATE
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+          UNBREAKING: 3
+      - material: IRON_LEGGINGS
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+          UNBREAKING: 3
+      - material: IRON_BOOTS
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+          UNBREAKING: 3
+    contents:
+      - material: IRON_PICKAXE
+        amount: 1
+        enchantments:
+          UNBREAKING: 3
+          EFFICIENCY: 1
+      - material: TORCH
+        amount: 64
+      - material: BREAD
+        amount: 8
+    effects:
+      - type: HASTE
+        amplifier: 1
+      - type: NIGHT_VISION
+        amplifier: 0
+
+  bard:
+    permission: hcfcore.kit.bard
+    cooldown-seconds: 600
+    armor:
+      - material: GOLDEN_HELMET
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+      - material: GOLDEN_CHESTPLATE
+        amount: 1
+        enchantments:
+          PROTECTION: 1
+      - material: GOLDEN_LEGGINGS
+        amount: 1
+        enchantments:
+          PROTECTION: 1
+      - material: GOLDEN_BOOTS
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+    contents:
+      - material: BREAD
+        amount: 8
+      - material: GOLDEN_APPLE
+        amount: 2
+      - material: NOTE_BLOCK
+        amount: 1
+        ability: portable-bard
+    effects:
+      - type: SPEED
+        amplifier: 1
+      - type: REGENERATION
+        amplifier: 1
+      - type: RESISTANCE
+        amplifier: 1
+      - type: WEAKNESS
+        amplifier: 3
+
+  bard-donator:
+    permission: hcfcore.kit.bard.donator
+    cooldown-seconds: 300
+    armor:
+      - material: GOLDEN_HELMET
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+          UNBREAKING: 3
+      - material: GOLDEN_CHESTPLATE
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+          UNBREAKING: 3
+      - material: GOLDEN_LEGGINGS
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+          UNBREAKING: 3
+      - material: GOLDEN_BOOTS
+        amount: 1
+        enchantments:
+          PROTECTION: 2
+          UNBREAKING: 3
+    contents:
+      - material: BREAD
+        amount: 8
+      - material: GOLDEN_APPLE
+        amount: 4
+      - material: NOTE_BLOCK
+        amount: 2
+        ability: portable-bard
+    effects:
+      - type: SPEED
+        amplifier: 1
+      - type: REGENERATION
+        amplifier: 1
+      - type: RESISTANCE
+        amplifier: 1
+      - type: WEAKNESS
+        amplifier: 3
+
+  diamond:
+    permission: hcfcore.kit.diamond
+    cooldown-seconds: 600
+    armor:
+      - material: DIAMOND_HELMET
+        amount: 1
+        enchantments: {PROTECTION: 2}
+      - material: DIAMOND_CHESTPLATE
+        amount: 1
+        enchantments: {PROTECTION: 1}
+      - material: DIAMOND_LEGGINGS
+        amount: 1
+        enchantments: {PROTECTION: 1}
+      - material: DIAMOND_BOOTS
+        amount: 1
+        enchantments: {PROTECTION: 2}
+    contents:
+      - material: DIAMOND_SWORD
+        amount: 1
+      - material: SPLASH_POTION
+        amount: 1
+        potion-effect: SPEED
+        potion-duration-ticks: 3600
+      - material: SPLASH_POTION
+        amount: 1
+        potion-effect: INSTANT_HEALTH
+        potion-duration-ticks: 1
+      - material: GOLDEN_APPLE
+        amount: 2
+    effects:
+      - type: SPEED
+        amplifier: 0
+      - type: ABSORPTION
+        amplifier: 0
+
+  diamond-donator:
+    permission: hcfcore.kit.diamond.donator
+    cooldown-seconds: 300
+    armor:
+      - material: DIAMOND_HELMET
+        amount: 1
+        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+      - material: DIAMOND_CHESTPLATE
+        amount: 1
+        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+      - material: DIAMOND_LEGGINGS
+        amount: 1
+        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+      - material: DIAMOND_BOOTS
+        amount: 1
+        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+    contents:
+      - material: DIAMOND_SWORD
+        amount: 1
+        enchantments: {UNBREAKING: 3}
+      - material: SPLASH_POTION
+        amount: 3
+      - material: GOLDEN_APPLE
+        amount: 3
+    effects:
+      - type: SPEED
+        amplifier: 0
+      - type: ABSORPTION
+        amplifier: 0
+
+  rogue:
+    permission: hcfcore.kit.rogue
+    cooldown-seconds: 600
+    armor:
+      - material: CHAINMAIL_HELMET
+        amount: 1
+        enchantments: {PROTECTION: 2}
+      - material: CHAINMAIL_CHESTPLATE
+        amount: 1
+        enchantments: {PROTECTION: 1}
+      - material: CHAINMAIL_LEGGINGS
+        amount: 1
+        enchantments: {PROTECTION: 1}
+      - material: CHAINMAIL_BOOTS
+        amount: 1
+        enchantments: {PROTECTION: 2}
+    contents:
+      - material: GOLDEN_SWORD
+        amount: 2
+        ability: rogue-backstab
+      - material: BREAD
+        amount: 8
+    effects:
+      - type: SPEED
+        amplifier: 2
+      - type: JUMP_BOOST
+        amplifier: 1
+
+  rogue-donator:
+    permission: hcfcore.kit.rogue.donator
+    cooldown-seconds: 300
+    armor:
+      - material: CHAINMAIL_HELMET
+        amount: 1
+        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+      - material: CHAINMAIL_CHESTPLATE
+        amount: 1
+        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+      - material: CHAINMAIL_LEGGINGS
+        amount: 1
+        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+      - material: CHAINMAIL_BOOTS
+        amount: 1
+        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+    contents:
+      - material: GOLDEN_SWORD
+        amount: 3
+        ability: rogue-backstab
+        enchantments: {UNBREAKING: 3}
+      - material: BREAD
+        amount: 8
+    effects:
+      - type: SPEED
+        amplifier: 2
+      - type: JUMP_BOOST
+        amplifier: 1
+
+  mage:
+    permission: hcfcore.kit.mage
+    cooldown-seconds: 600
+    armor:
+      - material: GOLDEN_HELMET
+        amount: 1
+        enchantments: {PROTECTION: 2}
+      - material: CHAINMAIL_CHESTPLATE
+        amount: 1
+        enchantments: {PROTECTION: 1}
+      - material: CHAINMAIL_LEGGINGS
+        amount: 1
+        enchantments: {PROTECTION: 1}
+      - material: GOLDEN_BOOTS
+        amount: 1
+        enchantments: {PROTECTION: 2}
+    contents:
+      - material: WITHER_SKELETON_SKULL
+        amount: 1
+        ability: mage-wither
+      - material: COBWEB
+        amount: 1
+        ability: mage-slowness
+      - material: FERMENTED_SPIDER_EYE
+        amount: 1
+        ability: mage-weakness
+      - material: SPIDER_EYE
+        amount: 1
+        ability: mage-poison
+    effects: []
+
+  mage-donator:
+    permission: hcfcore.kit.mage.donator
+    cooldown-seconds: 300
+    armor:
+      - material: GOLDEN_HELMET
+        amount: 1
+        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+      - material: CHAINMAIL_CHESTPLATE
+        amount: 1
+        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+      - material: CHAINMAIL_LEGGINGS
+        amount: 1
+        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+      - material: GOLDEN_BOOTS
+        amount: 1
+        enchantments: {PROTECTION: 2, UNBREAKING: 3}
+    contents:
+      - material: WITHER_SKELETON_SKULL
+        amount: 2
+        ability: mage-wither
+      - material: COBWEB
+        amount: 2
+        ability: mage-slowness
+      - material: FERMENTED_SPIDER_EYE
+        amount: 2
+        ability: mage-weakness
+      - material: SPIDER_EYE
+        amount: 2
+        ability: mage-poison
+    effects: []

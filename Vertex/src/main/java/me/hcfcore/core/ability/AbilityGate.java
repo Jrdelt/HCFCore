@@ -47,31 +47,29 @@ public final class AbilityGate {
                                          Messages messages, Player player, Ability ability, boolean consumeItem) {
         if (abilityManager.isOnGlobalCooldown(player.getUniqueId())) {
             long remaining = (abilityManager.globalCooldownRemainingMillis(player.getUniqueId()) + 999) / 1000;
-            player.sendMessage(messages.get(player, "ability.on-global-cooldown", "seconds", String.valueOf(remaining)));
+            player.sendMessage(messages.getChat(player, "ability.on-global-cooldown", "seconds", String.valueOf(remaining)));
             return false;
         }
 
         User user = userManager.get(player.getUniqueId());
-        if (user == null && userManager.hasFailedLoad(player.getUniqueId())) {
-            player.sendMessage(messages.get(player, "general.data-unavailable"));
+        if (user == null) {
+            player.sendMessage(messages.getChat(player, "general.data-unavailable"));
             return false;
         }
-        if (user != null && abilityManager.isOnCooldown(user, ability)) {
+        if (abilityManager.isOnCooldown(user, ability)) {
             long remaining = (abilityManager.remainingCooldownMillis(user, ability) + 999) / 1000;
-            player.sendMessage(messages.get(player, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
+            player.sendMessage(messages.getChat(player, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
             return false;
         }
 
         Set<String> disabledRegions = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-regions"));
         if (WorldGuardHook.isInDisabledRegion(player, disabledRegions)) {
-            player.sendMessage(messages.get(player, "ability.region-blocked"));
+            player.sendMessage(messages.getChat(player, "ability.region-blocked"));
             return false;
         }
 
         abilityManager.markGlobalCooldown(player.getUniqueId());
-        if (user != null) {
-            abilityManager.startCooldown(player, user, ability);
-        }
+        abilityManager.startCooldown(player, user, ability);
         if (consumeItem) {
             consumeMainHand(player);
         }
@@ -80,6 +78,9 @@ public final class AbilityGate {
 
     private static void consumeMainHand(Player player) {
         ItemStack item = player.getInventory().getItemInMainHand();
+        if (item.getType().isAir()) {
+            return;
+        }
         if (item.getAmount() <= 1) {
             player.getInventory().setItemInMainHand(null);
         } else {

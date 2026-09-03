@@ -28,27 +28,27 @@ public final class CombatCheckCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("hcfcore.combat.check")) {
-            sender.sendMessage(messages.get(sender, "general.no-permission"));
+            sender.sendMessage(messages.getChat(sender, "general.no-permission"));
             return true;
         }
         if (args.length < 1) {
-            sender.sendMessage(messages.get(sender, "combat.check-usage"));
+            sender.sendMessage(messages.getChat(sender, "combat.check-usage"));
             return true;
         }
 
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            sender.sendMessage(messages.get(sender, "general.player-not-found"));
+            sender.sendMessage(messages.getChat(sender, "general.player-not-found"));
             return true;
         }
 
         if (!combatManager.isTagged(target.getUniqueId())) {
-            sender.sendMessage(messages.get(sender, "combat.check-not-tagged", "player", target.getName()));
+            sender.sendMessage(messages.getChat(sender, "combat.check-not-tagged", "player", target.getName()));
             return true;
         }
 
         long remainingSeconds = (combatManager.remainingMillis(target.getUniqueId()) + 999) / 1000;
-        Component message = messages.get(sender, "combat.check-tagged-prefix", "player", target.getName())
+        Component message = messages.getChat(sender, "combat.check-tagged-prefix", "player", target.getName())
                 .append(messages.get(sender, "combat.check-time-left", "seconds", String.valueOf(remainingSeconds)));
 
         UUID opponentId = combatManager.getOpponentId(target.getUniqueId());

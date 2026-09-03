@@ -7,6 +7,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
@@ -21,6 +22,14 @@ public final class KitMenuListener implements Listener {
         this.plugin = plugin;
         this.kitManager = kitManager;
         this.messages = messages;
+    }
+
+    @EventHandler
+    public void onDrag(InventoryDragEvent event) {
+        if (event.getInventory().getHolder() instanceof KitPreviewMenu.Holder
+                || event.getInventory().getHolder() instanceof KitsMenu.Holder) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler

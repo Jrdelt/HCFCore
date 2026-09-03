@@ -2,6 +2,9 @@ package me.hcfcore.core.kit;
 
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffectType;
+
+import java.util.List;
 
 public final class Kit {
 
@@ -11,18 +14,25 @@ public final class Kit {
     private final ItemStack[] armor;
     private final ItemStack[] contents;
     private final Cost cost;
+    private final List<Effect> effects;
 
     public Kit(String name, String permission, int cooldownSeconds, ItemStack[] armor, ItemStack[] contents) {
-        this(name, permission, cooldownSeconds, armor, contents, Cost.NONE);
+        this(name, permission, cooldownSeconds, armor, contents, Cost.NONE, List.of());
     }
 
     public Kit(String name, String permission, int cooldownSeconds, ItemStack[] armor, ItemStack[] contents, Cost cost) {
+        this(name, permission, cooldownSeconds, armor, contents, cost, List.of());
+    }
+
+    public Kit(String name, String permission, int cooldownSeconds, ItemStack[] armor, ItemStack[] contents,
+                Cost cost, List<Effect> effects) {
         this.name = name;
         this.permission = permission;
         this.cooldownSeconds = cooldownSeconds;
         this.armor = cloneArray(armor);
         this.contents = cloneArray(contents);
         this.cost = cost;
+        this.effects = List.copyOf(effects);
     }
 
     public String getName() {
@@ -49,6 +59,10 @@ public final class Kit {
         return cloneArray(contents);
     }
 
+    public List<Effect> getEffects() {
+        return effects;
+    }
+
     private static ItemStack[] cloneArray(ItemStack[] source) {
         ItemStack[] copy = new ItemStack[source.length];
         for (int i = 0; i < source.length; i++) {
@@ -73,4 +87,12 @@ public final class Kit {
             return itemType != null && itemAmount > 0;
         }
     }
+
+    /**
+     * A passive "class" buff granted on claim. amplifier is 0-indexed, so
+     * amplifier 0 is the effect's level I.
+     */
+    public record Effect(PotionEffectType type, int amplifier) {
+    }
 }
+

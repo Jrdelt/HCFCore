@@ -15,6 +15,7 @@ public final class RebootManager {
     private final Plugin plugin;
     private final Messages messages;
     private final Set<Integer> sentReminders = new HashSet<>();
+    private final Set<Integer> sentFinalCountdownSeconds = new HashSet<>();
     private int defaultDelayMinutes;
     private List<Integer> reminderMinutes;
     private long rebootAt;
@@ -47,6 +48,10 @@ public final class RebootManager {
     public boolean schedule() {
         return schedule(defaultDelayMinutes);
     }
+    
+    public int getDefaultDelayMinutes() {
+        return defaultDelayMinutes;
+    }
 
     public boolean schedule(int delayMinutes) {
         if (rebootAt > System.currentTimeMillis()) {
@@ -54,16 +59,17 @@ public final class RebootManager {
         }
         rebootAt = System.currentTimeMillis() + (long) Math.max(1, delayMinutes) * 60_000L;
         sentReminders.clear();
+        sentFinalCountdownSeconds.clear();
         broadcast("reboot.started", "minutes", String.valueOf(Math.max(1, delayMinutes)));
         return true;
     }
-
     public boolean cancel() {
         if (rebootAt <= System.currentTimeMillis()) {
             return false;
         }
         rebootAt = 0;
         sentReminders.clear();
+        sentFinalCountdownSeconds.clear();
         broadcast("reboot.cancelled");
         return true;
     }
@@ -82,10 +88,10 @@ public final class RebootManager {
     public void sendNextReboot(org.bukkit.command.CommandSender sender) {
         long remainingSeconds = getRemainingSeconds();
         if (remainingSeconds < 0) {
-            sender.sendMessage(messages.get(sender, "reboot.none"));
+            sender.sendMessage(messages.getChat(sender, "reboot.none"));
             return;
         }
-        sender.sendMessage(messages.get(sender, "reboot.next", durationPlaceholders(remainingSeconds)));
+        sender.sendMessage(messages.getChat(sender, "reboot.next", durationPlaceholders(remainingSeconds)));
     }
 
     private void tick() {
@@ -96,9 +102,9 @@ public final class RebootManager {
         long remainingSeconds = getRemainingSeconds();
         if (remainingSeconds <= 0) {
             broadcast("reboot.now");
-            plugin.getLogger().log(Level.INFO, "Reboot countdown reached zero; shutting down server.");
-            Bukkit.shutdown();
             rebootAt = 0;
+            plugin.getLogger().log(Level.INFO, "Reboot countdown reached zero; scheduling graceful shutdown.");
+            Bukkit.getScheduler().runTask(plugin, () -> Bukkit.shutdown());
             return;
         }
 
@@ -107,20 +113,23 @@ public final class RebootManager {
                 broadcastDuration("reboot.reminder", remainingSeconds);
             }
         }
+        if (remainingSeconds <= 10 && sentFinalCountdownSeconds.add((int) remainingSeconds)) {
+            broadcast("reboot.final-countdown", "seconds", String.valueOf(remainingSeconds));
+        }
     }
 
     private void broadcast(String key, String... placeholders) {
         for (Player player : Bukkit.getOnlinePlayers()) {
-            player.sendMessage(messages.get(player, key, placeholders));
+            player.sendMessage(messages.getChat(player, key, placeholders));
         }
-        Bukkit.getConsoleSender().sendMessage(messages.get(Bukkit.getConsoleSender(), key, placeholders));
+        Bukkit.getConsoleSender().sendMessage(messages.getChat(Bukkit.getConsoleSender(), key, placeholders));
     }
 
     private void broadcastDuration(String key, long seconds) {
         for (Player player : Bukkit.getOnlinePlayers()) {
-            player.sendMessage(messages.get(player, key, durationPlaceholders(seconds)));
+            player.sendMessage(messages.getChat(player, key, durationPlaceholders(seconds)));
         }
-        Bukkit.getConsoleSender().sendMessage(messages.get(Bukkit.getConsoleSender(), key,
+        Bukkit.getConsoleSender().sendMessage(messages.getChat(Bukkit.getConsoleSender(), key,
                 durationPlaceholders(seconds)));
     }
 

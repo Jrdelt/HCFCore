@@ -25,28 +25,28 @@ public final class UncombatCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("hcfcore.combat.uncombat")) {
-            sender.sendMessage(messages.get(sender, "general.no-permission"));
+            sender.sendMessage(messages.getChat(sender, "general.no-permission"));
             return true;
         }
         if (args.length < 1) {
-            sender.sendMessage(messages.get(sender, "combat.uncombat-usage"));
+            sender.sendMessage(messages.getChat(sender, "combat.uncombat-usage"));
             return true;
         }
 
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            sender.sendMessage(messages.get(sender, "general.player-not-found"));
+            sender.sendMessage(messages.getChat(sender, "general.player-not-found"));
             return true;
         }
 
         if (!combatManager.isTagged(target.getUniqueId())) {
-            sender.sendMessage(messages.get(sender, "combat.uncombat-not-tagged", "player", target.getName()));
+            sender.sendMessage(messages.getChat(sender, "combat.uncombat-not-tagged", "player", target.getName()));
             return true;
         }
 
         combatManager.clear(target.getUniqueId());
-        sender.sendMessage(messages.get(sender, "combat.uncombat-cleared-sender", "player", target.getName()));
-        target.sendMessage(messages.get(target, "combat.uncombat-cleared-target"));
+        sender.sendMessage(messages.getChat(sender, "combat.uncombat-cleared-sender", "player", target.getName()));
+        target.sendMessage(messages.getChat(target, "combat.uncombat-cleared-target"));
         return true;
     }
 

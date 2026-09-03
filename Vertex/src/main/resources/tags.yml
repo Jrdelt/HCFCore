@@ -1,0 +1,30 @@
+tags:
+  newcomer:
+    display: "Newcomer"
+    permission: hcfcore.tag.newcomer
+    rarity: COMMON
+    created-at: 1725235200000
+    uses: 0
+    color: '<gray>'
+  veteran:
+    display: "Veteran"
+    permission: hcfcore.tag.veteran
+    rarity: RARE
+    created-at: 1725235200000
+    uses: 0
+    color: '<aqua>'
+  founder:
+    display: "Founder"
+    permission: hcfcore.tag.founder
+    rarity: EPIC
+    created-at: 1725235200000
+    uses: 0
+    color: '<light_purple>'
+  legend:
+    display: "Legend"
+    permission: hcfcore.tag.legend
+    rarity: LEGENDARY
+    created-at: 1725235200000
+    uses: 0
+    color: '<gradient:#facc15:#f97316>'
+players: {}

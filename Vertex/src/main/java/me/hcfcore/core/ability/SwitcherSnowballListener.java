@@ -62,7 +62,12 @@ public final class SwitcherSnowballListener implements Listener {
             return;
         }
 
-        trackedSnowballs.put(snowball.getUniqueId(), player.getUniqueId());
+        UUID snowballId = snowball.getUniqueId();
+        trackedSnowballs.put(snowballId, player.getUniqueId());
+        // Safety net: if the snowball is removed by a chunk unload/world
+        // change instead of ProjectileHitEvent, this guarantees the entry
+        // is still reclaimed instead of leaking forever.
+        Bukkit.getScheduler().runTaskLater(plugin, () -> trackedSnowballs.remove(snowballId), 200L);
     }
 
     @EventHandler

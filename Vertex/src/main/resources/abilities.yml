@@ -1,4 +1,21 @@
 abilities:
+  pearl-stunner:
+    material: END_ROD
+    name: '<light_purple>Pearl Stunner'
+    lore:
+      - '<gray>Hit a player to stop them from'
+      - '<gray>using pearls for a short time.'
+    cooldown-seconds: 30
+    stun-seconds: 8
+
+  rabbits-feed:
+    material: FEATHER
+    name: '<light_purple>Rabbit''s Feed'
+    lore:
+      - '<gray>Right-click for Speed V.'
+    cooldown-seconds: 30
+    speed-duration-seconds: 8
+
   anti-blockup-bone:
     material: BONE
     name: '<light_purple>Anti-Blockup Bone'
@@ -39,6 +56,58 @@ abilities:
     cooldown-seconds: 45
     forward-multiplier: 1.4
     y-multiplier: 0.6
+    effect-type: SPEED
+    effect-amplifier: 4
+    effect-duration-seconds: 5
+
+  rogue-backstab:
+    material: GOLDEN_SWORD
+    name: '<light_purple>Gold Dagger'
+    lore:
+      - '<gray>Hit an enemy from behind for 3 hearts.'
+      - '<gray>Consumed on use.'
+    cooldown-seconds: 20
+    damage: 6.0
+
+  mage-wither:
+    material: WITHER_SKELETON_SKULL
+    name: '<light_purple>Wither Spell'
+    lore:
+      - '<gray>Hit an enemy to apply Wither.'
+    cooldown-seconds: 25
+    effect-type: WITHER
+    effect-amplifier: 0
+    effect-duration-seconds: 5
+
+  mage-slowness:
+    material: COBWEB
+    name: '<light_purple>Slowness Spell'
+    lore:
+      - '<gray>Hit an enemy to apply Slowness.'
+    cooldown-seconds: 20
+    effect-type: SLOWNESS
+    effect-amplifier: 1
+    effect-duration-seconds: 5
+
+  mage-weakness:
+    material: FERMENTED_SPIDER_EYE
+    name: '<light_purple>Weakness Spell'
+    lore:
+      - '<gray>Hit an enemy to apply Weakness.'
+    cooldown-seconds: 20
+    effect-type: WEAKNESS
+    effect-amplifier: 0
+    effect-duration-seconds: 6
+
+  mage-poison:
+    material: SPIDER_EYE
+    name: '<light_purple>Poison Spell'
+    lore:
+      - '<gray>Hit an enemy to apply Poison.'
+    cooldown-seconds: 25
+    effect-type: POISON
+    effect-amplifier: 0
+    effect-duration-seconds: 5
 
   portable-bard:
     material: NOTE_BLOCK

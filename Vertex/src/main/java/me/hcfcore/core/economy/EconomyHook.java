@@ -16,6 +16,10 @@ public final class EconomyHook {
     private EconomyHook() {
     }
 
+    public static boolean isAvailable() {
+        return Bukkit.getServicesManager().getRegistration(Economy.class) != null;
+    }
+
     public static Economy getEconomy() {
         RegisteredServiceProvider<Economy> provider = Bukkit.getServicesManager().getRegistration(Economy.class);
         return provider == null ? null : provider.getProvider();

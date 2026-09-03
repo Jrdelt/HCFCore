@@ -11,6 +11,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,8 +21,10 @@ public final class GetItemCommand implements CommandExecutor, TabCompleter {
 
     private final AbilityManager abilityManager;
     private final Messages messages;
+    private final Plugin plugin;
 
-    public GetItemCommand(AbilityManager abilityManager, Messages messages) {
+    public GetItemCommand(Plugin plugin, AbilityManager abilityManager, Messages messages) {
+        this.plugin = plugin;
         this.abilityManager = abilityManager;
         this.messages = messages;
     }
@@ -29,27 +32,35 @@ public final class GetItemCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("hcfcore.ability.give")) {
-            sender.sendMessage(messages.get(sender, "general.no-permission"));
+            sender.sendMessage(messages.getChat(sender, "general.no-permission"));
             return true;
         }
         if (args.length < 2) {
-            sender.sendMessage(messages.get(sender, "ability.getitem-usage"));
+            sender.sendMessage(messages.getChat(sender, "ability.getitem-usage"));
             return true;
         }
 
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            sender.sendMessage(messages.get(sender, "general.player-not-found"));
+            sender.sendMessage(messages.getChat(sender, "general.player-not-found"));
             return true;
         }
 
         Ability ability = abilityManager.get(args[1]);
         if (ability == null) {
-            sender.sendMessage(messages.get(sender, "ability.getitem-not-found", "ability", args[1]));
+            sender.sendMessage(messages.getChat(sender, "ability.getitem-not-found", "ability", args[1]));
             return true;
         }
 
-        int amount = Math.max(1, args.length > 2 ? parseIntOrDefault(args[2], 1) : 1);
+        int maxAmount = Math.max(1, plugin.getConfig().getInt("abilities.max-getitem-amount", 64));
+        Integer amount = 1;
+        if (args.length > 2) {
+            amount = parseIntInRange(args[2], 1, maxAmount);
+        }
+        if (amount == null) {
+            sender.sendMessage(messages.getChat(sender, "ability.getitem-usage"));
+            return true;
+        }
 
         List<ItemStack> items = new ArrayList<>();
         for (int i = 0; i < amount; i++) {
@@ -62,21 +73,22 @@ public final class GetItemCommand implements CommandExecutor, TabCompleter {
         }
 
         Component abilityName = MessageFormatter.deserialize(ability.getDisplayName());
-        sender.sendMessage(messages.get(sender, "ability.getitem-given-sender",
+        sender.sendMessage(messages.getChat(sender, "ability.getitem-given-sender",
                         "player", target.getName(), "amount", String.valueOf(amount))
                 .append(abilityName)
                 .append(Component.text(".")));
-        target.sendMessage(messages.get(target, "ability.getitem-given-target", "amount", String.valueOf(amount))
+        target.sendMessage(messages.getChat(target, "ability.getitem-given-target", "amount", String.valueOf(amount))
                 .append(abilityName)
                 .append(Component.text(".")));
         return true;
     }
 
-    private static int parseIntOrDefault(String input, int fallback) {
+    private static Integer parseIntInRange(String input, int minimum, int maximum) {
         try {
-            return Integer.parseInt(input);
+            int value = Integer.parseInt(input);
+            return value >= minimum && value <= maximum ? value : null;
         } catch (NumberFormatException e) {
-            return fallback;
+            return null;
         }
     }
 

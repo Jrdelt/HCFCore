@@ -25,7 +25,7 @@ public final class Ability {
         this.id = id;
         this.material = material;
         this.displayName = displayName;
-        this.lore = lore;
+        this.lore = lore == null ? List.of() : List.copyOf(lore);
         this.cooldownSeconds = cooldownSeconds;
         this.settings = settings;
     }

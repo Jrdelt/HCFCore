@@ -99,12 +99,12 @@ public final class KitsMenu {
     }
 
     private static ItemStack buildIcon(Kit kit) {
-        for (ItemStack item : kit.getContents()) {
+        for (ItemStack item : kit.getArmor()) {
             if (item != null && item.getType() != Material.AIR) {
                 return item.clone();
             }
         }
-        for (ItemStack item : kit.getArmor()) {
+        for (ItemStack item : kit.getContents()) {
             if (item != null && item.getType() != Material.AIR) {
                 return item.clone();
             }

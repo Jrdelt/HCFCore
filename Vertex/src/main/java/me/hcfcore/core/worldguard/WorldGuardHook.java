@@ -29,7 +29,11 @@ public final class WorldGuardHook {
 
     private static boolean checkRegions(Player player, Set<String> disabledRegionIds) {
         RegionQuery query = WorldGuard.getInstance().getPlatform().getRegionContainer().createQuery();
-        for (ProtectedRegion region : query.getApplicableRegions(BukkitAdapter.adapt(player.getLocation()))) {
+        Iterable<ProtectedRegion> regions = query.getApplicableRegions(BukkitAdapter.adapt(player.getLocation()));
+        if (regions == null) {
+            return false;
+        }
+        for (ProtectedRegion region : regions) {
             if (disabledRegionIds.contains(region.getId())) {
                 return true;
             }

@@ -4,9 +4,12 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import java.util.regex.Pattern;
+
 public final class MessageFormatter {
 
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
+    private static final Pattern LEGACY_HEX = Pattern.compile("&#([A-Fa-f0-9]{6})");
 
     private MessageFormatter() {
     }
@@ -17,6 +20,7 @@ public final class MessageFormatter {
     }
 
     private static String normalize(String message) {
+        message = LEGACY_HEX.matcher(message).replaceAll("<#$1>");
         return message
                 .replace("<deny>", "<red>")
                 .replace("</deny>", "</red>")

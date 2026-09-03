@@ -22,7 +22,7 @@ public final class AbilitiesCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.get(sender, "general.players-only"));
+            sender.sendMessage(messages.getChat(sender, "general.players-only"));
             return true;
         }
         AbilitiesMenu.open(player, plugin, abilityManager, messages);

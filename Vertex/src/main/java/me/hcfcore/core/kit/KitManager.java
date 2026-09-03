@@ -9,25 +9,40 @@ import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.Arrays;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
+import org.yaml.snakeyaml.Yaml;
+import org.bukkit.scheduler.BukkitTask;
 
 public final class KitManager {
 
@@ -35,7 +50,14 @@ public final class KitManager {
     private final Storage storage;
     private final UserManager userManager;
     private final Messages messages;
-    private final File file;
+    private final AtomicLong saveGeneration = new AtomicLong();
+    private volatile boolean shuttingDown;
+    private volatile Future<?> pendingPersist;
+    private final Object persistLock = new Object();
+    private final Map<UUID, Long> effectWarmups = new ConcurrentHashMap<>();
+    private final AtomicLong effectWarmupGeneration = new AtomicLong();
+    private final Map<UUID, Kit> activeEffectKits = new ConcurrentHashMap<>();
+    private BukkitTask armorMonitorTask;
     private final Map<String, Kit> kits = new LinkedHashMap<>();
     // Single thread so concurrent /kit save and /kit delete calls persist in
     // the order they happened, instead of racing on kits.yml.
@@ -50,52 +72,148 @@ public final class KitManager {
         this.storage = storage;
         this.userManager = userManager;
         this.messages = messages;
-        this.file = new File(plugin.getDataFolder(), "kits.yml");
+    }
+
+    private File resolveFile() {
+        File dataFolder = plugin.getDataFolder();
+        if (dataFolder == null) {
+            return new File("kits.yml");
+        }
+        if (!dataFolder.exists() && !dataFolder.mkdirs()) {
+            return new File(dataFolder, "kits.yml");
+        }
+        return new File(dataFolder, "kits.yml");
     }
 
     public void load() {
-        if (!file.exists()) {
+        File configFile = resolveFile();
+        if (!configFile.exists()) {
             plugin.saveResource("kits.yml", false);
         }
 
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-        ConfigurationSection root = config.getConfigurationSection("kits");
+        Map<String, Object> root = loadRawConfig(configFile);
         kits.clear();
-        if (root == null) {
+        if (root == null || root.isEmpty()) {
             return;
         }
 
-        for (String name : root.getKeys(false)) {
-            ConfigurationSection section = root.getConfigurationSection(name);
-            if (section == null) {
+        Object kitsValue = root.get("kits");
+        if (!(kitsValue instanceof Map<?, ?> kitsMap)) {
+            return;
+        }
+
+        for (Map.Entry<?, ?> entry : kitsMap.entrySet()) {
+            String name = String.valueOf(entry.getKey());
+            Object value = entry.getValue();
+            if (!(value instanceof Map<?, ?> sectionMap)) {
                 continue;
             }
-            String permission = section.getString("permission", "hcfcore.kit." + name.toLowerCase(Locale.ROOT));
-                int cooldown = section.getInt("cooldown-seconds",
+
+            String permission = asString(sectionMap.get("permission"), "hcfcore.kit." + name.toLowerCase(Locale.ROOT));
+            int cooldown = asInt(sectionMap.get("cooldown-seconds"),
                     plugin.getConfig().getInt("kits.default-cooldown-seconds", 0));
-            ItemStack[] armor = readItems(section, "armor");
-            ItemStack[] contents = readItems(section, "contents");
-            Kit.Cost cost = readCost(section.getConfigurationSection("cost"));
-            kits.put(name.toLowerCase(Locale.ROOT), new Kit(name, permission, cooldown, armor, contents, cost));
+            ItemStack[] armor = readItems(sectionMap.get("armor"));
+            ItemStack[] contents = readItems(sectionMap.get("contents"));
+            Kit.Cost cost = readCost(sectionMap.get("cost"));
+            List<Kit.Effect> effects = readEffects(sectionMap.get("effects"));
+            kits.put(name.toLowerCase(Locale.ROOT), new Kit(name, permission, cooldown, armor, contents, cost, effects));
         }
     }
 
-    private Kit.Cost readCost(ConfigurationSection section) {
-        if (section == null) {
+    private Map<String, Object> loadRawConfig(File file) {
+        try (InputStream stream = new FileInputStream(file)) {
+            Object loaded = new Yaml().load(stream);
+            if (loaded instanceof Map<?, ?> root) {
+                return toStringMap(root);
+            }
+            return Collections.emptyMap();
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Failed to parse kits.yml with raw YAML fallback; resetting kit data.", e);
+            return Collections.emptyMap();
+        }
+    }
+
+    private static Map<String, Object> toStringMap(Map<?, ?> source) {
+        Map<String, Object> converted = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : source.entrySet()) {
+            converted.put(String.valueOf(entry.getKey()), entry.getValue());
+        }
+        return converted;
+    }
+
+    private Kit.Cost readCost(Object section) {
+        if (!(section instanceof Map<?, ?> costMap)) {
             return Kit.Cost.NONE;
         }
-        double money = section.getDouble("money", 0.0);
+        double money = asDouble(costMap.get("money"), 0.0);
         Material itemType = null;
-        String itemName = section.getString("item");
-        if (itemName != null && !itemName.isEmpty()) {
+        Object itemName = costMap.get("item");
+        if (itemName != null) {
             try {
-                itemType = Material.valueOf(itemName.toUpperCase(Locale.ROOT));
+                itemType = Material.valueOf(String.valueOf(itemName).toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException e) {
                 plugin.getLogger().log(Level.WARNING, "Unknown cost item material '" + itemName + "' in kits.yml", e);
             }
         }
-        int itemAmount = section.getInt("item-amount", 1);
+        int itemAmount = asInt(costMap.get("item-amount"), 1);
         return new Kit.Cost(money, itemType, itemType == null ? 0 : itemAmount);
+    }
+
+    private List<Kit.Effect> readEffects(Object rawValue) {
+        if (!(rawValue instanceof List<?> raw)) {
+            return List.of();
+        }
+        List<Kit.Effect> effects = new ArrayList<>();
+        for (Object entry : raw) {
+            if (!(entry instanceof Map<?, ?> map)) {
+                continue;
+            }
+            Object typeValue = map.get("type");
+            if (typeValue == null) {
+                continue;
+            }
+            PotionEffectType type = Registry.EFFECT.get(
+                    NamespacedKey.minecraft(String.valueOf(typeValue).toLowerCase(Locale.ROOT)));
+            if (type == null) {
+                plugin.getLogger().warning("Unknown potion effect type '" + typeValue + "' in kits.yml");
+                continue;
+            }
+            int amplifier = Math.max(0, asInt(map.get("amplifier"), 0));
+            effects.add(new Kit.Effect(type, amplifier));
+        }
+        return effects;
+    }
+
+    private static String asString(Object value, String defaultValue) {
+        return value == null ? defaultValue : String.valueOf(value);
+    }
+
+    private static int asInt(Object value, int defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value));
+        } catch (NumberFormatException ignored) {
+            return defaultValue;
+        }
+    }
+
+    private static double asDouble(Object value, double defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        try {
+            return Double.parseDouble(String.valueOf(value));
+        } catch (NumberFormatException ignored) {
+            return defaultValue;
+        }
     }
 
     static String formatMaterial(Material material) {
@@ -110,16 +228,111 @@ public final class KitManager {
         return result.toString();
     }
 
-    private ItemStack[] readItems(ConfigurationSection section, String path) {
-        List<?> raw = section.getList(path);
-        if (raw == null) {
+    private ItemStack[] readItems(Object rawValue) {
+        if (!(rawValue instanceof List<?> raw)) {
             return new ItemStack[0];
         }
         ItemStack[] items = new ItemStack[raw.size()];
         for (int i = 0; i < raw.size(); i++) {
-            items[i] = raw.get(i) instanceof ItemStack stack ? stack : null;
+            items[i] = parseItem(raw.get(i));
         }
         return items;
+    }
+
+    private ItemStack parseItem(Object value) {
+        if (value instanceof ItemStack itemStack) {
+            return itemStack.clone();
+        }
+        if (!(value instanceof Map<?, ?> map)) {
+            return null;
+        }
+        Object materialValue = map.get("material");
+        if (materialValue == null) {
+            materialValue = map.get("type");
+        }
+        if (materialValue == null) {
+            return null;
+        }
+        Material material;
+        try {
+            material = Material.valueOf(String.valueOf(materialValue).toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+        int amount = asInt(map.get("amount"), asInt(map.get("count"), 1));
+        ItemStack item = new ItemStack(material, Math.max(1, amount));
+        applyEnchantments(item, map.get("enchantments"));
+        applyPotionEffect(item, map);
+        Object abilityId = map.get("ability");
+        if (abilityId != null) {
+            ItemMeta meta = item.getItemMeta();
+            meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "ability_id"),
+                org.bukkit.persistence.PersistentDataType.STRING, String.valueOf(abilityId));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private void applyPotionEffect(ItemStack item, Map<?, ?> map) {
+        if (!(item.getItemMeta() instanceof PotionMeta meta) || map.get("potion-effect") == null) {
+            return;
+        }
+        PotionEffectType type = Registry.EFFECT.get(
+                NamespacedKey.minecraft(String.valueOf(map.get("potion-effect")).toLowerCase(Locale.ROOT)));
+        if (type == null) {
+            return;
+        }
+        int duration = Math.max(1, asInt(map.get("potion-duration-ticks"), 100));
+        int amplifier = Math.max(0, asInt(map.get("potion-amplifier"), 0));
+        meta.addCustomEffect(new PotionEffect(type, duration, amplifier), true);
+        item.setItemMeta(meta);
+    }
+
+    private static void applyEnchantments(ItemStack item, Object rawValue) {
+        if (!(rawValue instanceof Map<?, ?> map)) {
+            return;
+        }
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            Enchantment enchantment = Enchantment.getByName(String.valueOf(entry.getKey()).toUpperCase(Locale.ROOT));
+            if (enchantment == null) {
+                continue;
+            }
+            int level = asInt(entry.getValue(), 1);
+            item.addUnsafeEnchantment(enchantment, Math.max(1, level));
+        }
+    }
+
+    private static List<Map<String, Object>> serializeItems(ItemStack[] items) {
+        List<Map<String, Object>> serialized = new ArrayList<>();
+        for (ItemStack item : items) {
+            if (item == null || item.getType() == Material.AIR) {
+                serialized.add(null);
+                continue;
+            }
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("material", item.getType().name());
+            entry.put("amount", item.getAmount());
+            if (!item.getEnchantments().isEmpty()) {
+                Map<String, Object> enchantments = new LinkedHashMap<>();
+                for (Map.Entry<Enchantment, Integer> enchant : item.getEnchantments().entrySet()) {
+                    enchantments.put(enchant.getKey().getKey().getKey().toUpperCase(Locale.ROOT), enchant.getValue());
+                }
+                entry.put("enchantments", enchantments);
+            }
+            serialized.add(entry);
+        }
+        return serialized;
+    }
+
+    private static List<Map<String, Object>> serializeEffects(List<Kit.Effect> effects) {
+        List<Map<String, Object>> serialized = new ArrayList<>();
+        for (Kit.Effect effect : effects) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("type", effect.type().getKey().getKey().toUpperCase(Locale.ROOT));
+            entry.put("amplifier", effect.amplifier());
+            serialized.add(entry);
+        }
+        return serialized;
     }
 
     public Kit get(String name) {
@@ -130,24 +343,30 @@ public final class KitManager {
         return kits;
     }
 
+    public void start() {
+        stopArmorMonitor();
+        armorMonitorTask = plugin.getServer().getScheduler().runTaskTimer(plugin,
+            this::checkArmorEffects, 1L, 1L);
+    }
+
     public void apply(Player player, Kit kit) {
         if (kit.getPermission() != null && !kit.getPermission().isEmpty() && !player.hasPermission(kit.getPermission())) {
-            player.sendMessage(messages.get(player, "kit.no-kit-permission"));
+            player.sendMessage(messages.getChat(player, "kit.no-kit-permission"));
             return;
         }
 
         String key = kit.getName().toLowerCase(Locale.ROOT);
         User user = userManager.get(player.getUniqueId());
-        if (user == null && userManager.hasFailedLoad(player.getUniqueId())) {
-            player.sendMessage(messages.get(player, "general.data-unavailable"));
+        if (user == null) {
+            player.sendMessage(messages.getChat(player, "general.data-unavailable"));
             return;
         }
         long now = System.currentTimeMillis();
-        long expiry = user == null ? 0L : user.getCooldownExpiry(key);
+        long expiry = user.getCooldownExpiry(key);
 
         if (expiry > now && !player.hasPermission("hcfcore.kit.bypasscooldown")) {
             long remaining = (expiry - now) / 1000L;
-            player.sendMessage(messages.get(player, "kit.cooldown", "seconds", String.valueOf(remaining)));
+            player.sendMessage(messages.getChat(player, "kit.cooldown", "seconds", String.valueOf(remaining)));
             return;
         }
 
@@ -158,19 +377,20 @@ public final class KitManager {
         // Check the side-effect-free item cost first, so a failed money
         // check below never leaves us having already removed items.
         if (!bypassCost && cost.hasItemCost() && !inventory.containsAtLeast(new ItemStack(cost.itemType()), cost.itemAmount())) {
-            player.sendMessage(messages.get(player, "kit.cost-item-needed",
+            player.sendMessage(messages.getChat(player, "kit.cost-item-needed",
                     "amount", String.valueOf(cost.itemAmount()), "item", formatMaterial(cost.itemType())));
             return;
         }
 
+        Economy economy = null;
         if (!bypassCost && cost.hasMoneyCost()) {
-            Economy economy = EconomyHook.getEconomy();
+            economy = EconomyHook.getEconomy();
             if (economy == null) {
-                player.sendMessage(messages.get(player, "kit.cost-no-economy"));
+                player.sendMessage(messages.getChat(player, "kit.cost-no-economy"));
                 return;
             }
             if (!economy.has(player, cost.money())) {
-                player.sendMessage(messages.get(player, "kit.cost-money-needed", "amount", EconomyHook.format(cost.money())));
+                player.sendMessage(messages.getChat(player, "kit.cost-money-needed", "amount", EconomyHook.format(cost.money())));
                 return;
             }
         }
@@ -183,15 +403,18 @@ public final class KitManager {
         }
         addNonEmpty(itemsToStore, kit.getContents());
         if (!canStore(inventory, itemsToStore, !bypassCost && cost.hasItemCost() ? cost : Kit.Cost.NONE)) {
-            player.sendMessage(messages.get(player, "kit.inventory-full"));
+            player.sendMessage(messages.getChat(player, "kit.inventory-full"));
             return;
         }
 
         if (!bypassCost && cost.hasMoneyCost()) {
-            Economy economy = EconomyHook.getEconomy();
+            if (economy == null) {
+                player.sendMessage(messages.getChat(player, "kit.cost-no-economy"));
+                return;
+            }
             EconomyResponse response = economy.withdrawPlayer(player, cost.money());
             if (!response.transactionSuccess()) {
-                player.sendMessage(messages.get(player, "kit.cost-withdraw-failed"));
+                player.sendMessage(messages.getChat(player, "kit.cost-withdraw-failed"));
                 return;
             }
         }
@@ -209,9 +432,9 @@ public final class KitManager {
             }
         }
 
-        player.sendMessage(messages.get(player, "kit.applied", "kit", kit.getName()));
+        player.sendMessage(messages.getChat(player, "kit.applied", "kit", kit.getName()));
 
-        if (kit.getCooldownSeconds() > 0 && user != null) {
+        if (kit.getCooldownSeconds() > 0) {
             long newExpiry = now + kit.getCooldownSeconds() * 1000L;
             user.setCooldownExpiry(key, newExpiry);
 
@@ -225,12 +448,136 @@ public final class KitManager {
         }
     }
 
+    private void checkArmorEffects() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            Kit matchingKit = findArmorKit(player);
+            UUID uuid = player.getUniqueId();
+            Kit activeKit = activeEffectKits.get(uuid);
+
+            if (matchingKit == null) {
+                effectWarmups.remove(uuid);
+                if (activeKit != null) {
+                    clearEffects(player, activeKit);
+                    activeEffectKits.remove(uuid);
+                    player.sendMessage(messages.getChat(player, "kit.effects-removed"));
+                }
+                continue;
+            }
+            if (activeKit != null && activeKit.getName().equalsIgnoreCase(matchingKit.getName())
+                    && hasAllEffects(player, activeKit)) {
+                continue;
+            }
+            if (activeKit != null) {
+                clearEffects(player, activeKit);
+                activeEffectKits.remove(uuid);
+            }
+            if (!matchingKit.getEffects().isEmpty() && !effectWarmups.containsKey(uuid)) {
+                startEffectWarmup(player, matchingKit);
+            }
+        }
+    }
+
+    private Kit findArmorKit(Player player) {
+        ItemStack[] actualArmor = player.getInventory().getArmorContents();
+        for (Kit kit : kits.values()) {
+            if (!kit.getEffects().isEmpty()
+                    && hasSameArmor(actualArmor, toBukkitArmorOrder(kit.getArmor()))) {
+                return kit;
+            }
+        }
+        return null;
+    }
+
+    private void startEffectWarmup(Player player, Kit kit) {
+        int warmupSeconds = Math.max(0, plugin.getConfig().getInt("kits.effect-warmup-seconds", 3));
+        if (warmupSeconds == 0) {
+            applyEffects(player, kit);
+            activeEffectKits.put(player.getUniqueId(), kit);
+            return;
+        }
+
+        UUID uuid = player.getUniqueId();
+        long token = effectWarmupGeneration.incrementAndGet();
+        effectWarmups.put(uuid, token);
+        player.sendMessage(messages.getChat(player, "kit.effects-warmup",
+                "seconds", String.valueOf(warmupSeconds)));
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (!tokenEquals(uuid, token)) {
+                return;
+            }
+            effectWarmups.remove(uuid, token);
+            Player onlinePlayer = Bukkit.getPlayer(uuid);
+            if (onlinePlayer == null || findArmorKit(onlinePlayer) != kit) {
+                return;
+            }
+            applyEffects(onlinePlayer, kit);
+            activeEffectKits.put(uuid, kit);
+        }, warmupSeconds * 20L);
+    }
+
+    private boolean tokenEquals(UUID uuid, long token) {
+        return effectWarmups.getOrDefault(uuid, -1L) == token;
+    }
+
+    private static boolean hasSameArmor(ItemStack[] actual, ItemStack[] expected) {
+        if (actual.length != expected.length) {
+            return false;
+        }
+        for (int i = 0; i < actual.length; i++) {
+            ItemStack actualItem = actual[i];
+            ItemStack expectedItem = expected[i];
+            if (actualItem == null || expectedItem == null) {
+                if (actualItem != expectedItem) {
+                    return false;
+                }
+            } else if (!actualItem.isSimilar(expectedItem)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static void applyEffects(Player player, Kit kit) {
+        for (Kit.Effect effect : kit.getEffects()) {
+            player.addPotionEffect(new PotionEffect(effect.type(), Integer.MAX_VALUE, effect.amplifier(), false, false));
+        }
+    }
+
+    private static void clearEffects(Player player, Kit kit) {
+        for (Kit.Effect effect : kit.getEffects()) {
+            PotionEffect current = player.getPotionEffect(effect.type());
+            if (current != null && current.getAmplifier() == effect.amplifier()) {
+                player.removePotionEffect(effect.type());
+            }
+        }
+    }
+
+    private static boolean hasAllEffects(Player player, Kit kit) {
+        for (Kit.Effect effect : kit.getEffects()) {
+            PotionEffect current = player.getPotionEffect(effect.type());
+            if (current == null || current.getAmplifier() != effect.amplifier()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void stopArmorMonitor() {
+        if (armorMonitorTask != null) {
+            armorMonitorTask.cancel();
+            armorMonitorTask = null;
+        }
+        effectWarmups.clear();
+        activeEffectKits.clear();
+    }
+
     public void save(String name, Player player, String permission, int cooldownSeconds, Kit.Cost cost) {
         PlayerInventory inventory = player.getInventory();
         Kit kit = new Kit(name, permission, cooldownSeconds,
             fromBukkitArmorOrder(inventory.getArmorContents()), inventory.getStorageContents(), cost);
         kits.put(name.toLowerCase(Locale.ROOT), kit);
         persistAsync();
+        waitForPendingPersist();
     }
 
     private static ItemStack[] toBukkitArmorOrder(ItemStack[] armor) {
@@ -286,6 +633,7 @@ public final class KitManager {
             return false;
         }
         persistAsync();
+        waitForPendingPersist();
         return true;
     }
 
@@ -296,38 +644,103 @@ public final class KitManager {
      */
     private void persistAsync() {
         List<Kit> snapshot = List.copyOf(kits.values());
-        ioExecutor.submit(() -> {
-            YamlConfiguration config = new YamlConfiguration();
-            for (Kit kit : snapshot) {
-                String path = "kits." + kit.getName();
-                config.set(path + ".permission", kit.getPermission());
-                config.set(path + ".cooldown-seconds", kit.getCooldownSeconds());
-                Kit.Cost cost = kit.getCost();
-                config.set(path + ".cost.money", cost.money());
-                if (cost.itemType() != null) {
-                    config.set(path + ".cost.item", cost.itemType().name());
-                    config.set(path + ".cost.item-amount", cost.itemAmount());
+        long generation = saveGeneration.incrementAndGet();
+        Future<?> task;
+        synchronized (persistLock) {
+            task = ioExecutor.submit(() -> {
+                if (shuttingDown || generation != saveGeneration.get() || !plugin.isEnabled()) {
+                    return;
                 }
-                config.set(path + ".armor", Arrays.asList(kit.getArmor()));
-                config.set(path + ".contents", Arrays.asList(kit.getContents()));
+
+                File target = resolveFile();
+                File parent = target.getParentFile();
+                if (parent != null) {
+                    if (!parent.exists() && !parent.mkdirs()) {
+                        plugin.getLogger().warning("Could not create plugin data folder before saving kits.yml: " + parent.getAbsolutePath());
+                        return;
+                    }
+                    if (!parent.isDirectory()) {
+                        plugin.getLogger().warning("Plugin data path is not a directory: " + parent.getAbsolutePath());
+                        return;
+                    }
+                }
+                if (generation != saveGeneration.get() || shuttingDown) {
+                    return;
+                }
+
+                YamlConfiguration config = new YamlConfiguration();
+                for (Kit kit : snapshot) {
+                    String path = "kits." + kit.getName();
+                    config.set(path + ".permission", kit.getPermission());
+                    config.set(path + ".cooldown-seconds", kit.getCooldownSeconds());
+                    Kit.Cost cost = kit.getCost();
+                    config.set(path + ".cost.money", cost.money());
+                    if (cost.itemType() != null) {
+                        config.set(path + ".cost.item", cost.itemType().name());
+                        config.set(path + ".cost.item-amount", cost.itemAmount());
+                    }
+                    config.set(path + ".armor", serializeItems(kit.getArmor()));
+                    config.set(path + ".contents", serializeItems(kit.getContents()));
+                    if (!kit.getEffects().isEmpty()) {
+                        config.set(path + ".effects", serializeEffects(kit.getEffects()));
+                    }
+                }
+
+                try {
+                    if (generation != saveGeneration.get() || shuttingDown) {
+                        return;
+                    }
+                    if (!target.exists() && !target.createNewFile()) {
+                        plugin.getLogger().warning("Could not create kits.yml before saving: " + target.getAbsolutePath());
+                        return;
+                    }
+                    config.save(target);
+                } catch (IOException e) {
+                    plugin.getLogger().log(Level.SEVERE, "Failed to save kits.yml to " + target.getAbsolutePath(), e);
+                }
+            });
+            pendingPersist = task;
+        }
+    }
+
+    private void waitForPendingPersist() {
+        Future<?> task;
+        synchronized (persistLock) {
+            task = pendingPersist;
+        }
+        if (task == null) {
+            return;
+        }
+        try {
+            task.get(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Timed out waiting for kits.yml save to finish.", e);
+        } finally {
+            synchronized (persistLock) {
+                if (pendingPersist == task) {
+                    pendingPersist = null;
+                }
             }
-            try {
-                config.save(file);
-            } catch (IOException e) {
-                plugin.getLogger().log(Level.SEVERE, "Failed to save kits.yml", e);
-            }
-        });
+        }
     }
 
     /**
      * Flushes any pending kit saves/deletes before the plugin shuts down.
      */
     public void shutdown() {
+        shuttingDown = true;
+        stopArmorMonitor();
+        saveGeneration.incrementAndGet();
+        waitForPendingPersist();
         ioExecutor.shutdown();
         try {
-            ioExecutor.awaitTermination(5, TimeUnit.SECONDS);
+            if (!ioExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                plugin.getLogger().warning("Forcing pending kit writes to stop during shutdown.");
+                ioExecutor.shutdownNow();
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            ioExecutor.shutdownNow();
         }
     }
 }

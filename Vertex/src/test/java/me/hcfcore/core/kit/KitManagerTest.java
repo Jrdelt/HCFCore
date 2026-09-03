@@ -8,8 +8,10 @@ import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.ServicePriority;
+import org.bukkit.potion.PotionEffectType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,7 +19,9 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.plugin.PluginMock;
+import org.mockbukkit.mockbukkit.scheduler.BukkitSchedulerMock;
 
+import java.io.File;
 import java.util.Map;
 import java.util.UUID;
 import java.util.Arrays;
@@ -78,6 +82,20 @@ class KitManagerTest {
     }
 
     @Test
+    void saveWritesToTheCurrentPluginDataFolder() {
+        PlayerMock player = server.addPlayer("Frank");
+        player.getInventory().setItem(0, new ItemStack(Material.DIAMOND_SWORD));
+
+        File liveFile = new File(plugin.getDataFolder(), "kits.yml");
+        assertFalse(liveFile.exists(), "test starts without a generated kits.yml");
+
+        kitManager.save("Starter", player, "hcfcore.kit.starter", 0, Kit.Cost.NONE);
+        kitManager.shutdown();
+
+        assertTrue(liveFile.exists(), "save should create the live kits.yml in the active plugin data folder");
+    }
+
+    @Test
     void savedKitIsNotChangedWhenPlayerInventoryChanges() {
         PlayerMock player = server.addPlayer("Frank");
         player.getInventory().setItem(0, new ItemStack(Material.DIAMOND_SWORD));
@@ -111,6 +129,7 @@ class KitManagerTest {
         }),
             "armor should not be saved as kit contents");
 
+        userManager.load(player.getUniqueId());
         player.getInventory().setArmorContents(new ItemStack[4]);
         kitManager.apply(player, kit);
         ItemStack[] appliedArmor = player.getInventory().getArmorContents();
@@ -193,6 +212,60 @@ class KitManagerTest {
         assertTrue(player.nextMessage().contains("Applied kit"));
         assertFalse(player.getInventory().containsAtLeast(new ItemStack(Material.DIAMOND), 1),
                 "the 4 diamonds should have been consumed as payment");
+    }
+
+    @Test
+    void applyGrantsTheKitsPotionEffects() {
+        PlayerMock player = server.addPlayer("Grant");
+        player.addAttachment(plugin, "hcfcore.kit.archer", true);
+        userManager.load(player.getUniqueId());
+        kitManager.load();
+        Kit kit = kitManager.get("archer");
+
+        kitManager.start();
+        kitManager.apply(player, kit);
+
+        assertFalse(player.hasPotionEffect(PotionEffectType.SPEED));
+        ((BukkitSchedulerMock) server.getScheduler()).performTicks(61);
+        assertTrue(player.hasPotionEffect(PotionEffectType.SPEED));
+        assertEquals(2, player.getPotionEffect(PotionEffectType.SPEED).getAmplifier());
+        assertTrue(player.hasPotionEffect(PotionEffectType.JUMP_BOOST));
+        assertEquals(1, player.getPotionEffect(PotionEffectType.JUMP_BOOST).getAmplifier());
+
+        player.nextMessage();
+        player.nextMessage();
+        ItemStack[] archerArmor = player.getInventory().getArmorContents();
+        player.getInventory().setArmorContents(new ItemStack[4]);
+        ((BukkitSchedulerMock) server.getScheduler()).performOneTick();
+        assertFalse(player.hasPotionEffect(PotionEffectType.SPEED));
+        assertTrue(player.nextMessage().contains("Class effects removed"));
+
+        player.getInventory().setArmorContents(archerArmor);
+        ((BukkitSchedulerMock) server.getScheduler()).performTicks(60);
+        assertFalse(player.hasPotionEffect(PotionEffectType.SPEED));
+        ((BukkitSchedulerMock) server.getScheduler()).performOneTick();
+        assertTrue(player.hasPotionEffect(PotionEffectType.SPEED));
+    }
+
+    @Test
+    void loadParsesTheBundledArcherAndDonatorKits() {
+        kitManager.load();
+
+        Kit archer = kitManager.get("archer");
+        assertEquals(2, archer.getEffects().size());
+        assertTrue(archer.getEffects().contains(new Kit.Effect(PotionEffectType.SPEED, 2)));
+        assertTrue(archer.getEffects().contains(new Kit.Effect(PotionEffectType.JUMP_BOOST, 1)));
+        ItemStack[] archerArmor = archer.getArmor();
+        assertEquals(2, archerArmor[0].getEnchantmentLevel(Enchantment.PROTECTION));
+        assertEquals(1, archerArmor[1].getEnchantmentLevel(Enchantment.PROTECTION));
+        assertEquals(1, archerArmor[2].getEnchantmentLevel(Enchantment.PROTECTION));
+        assertEquals(2, archerArmor[3].getEnchantmentLevel(Enchantment.PROTECTION));
+
+        Kit archerDonator = kitManager.get("archer-donator");
+        assertTrue(Arrays.stream(archerDonator.getArmor()).allMatch(
+            item -> item.getEnchantmentLevel(Enchantment.UNBREAKING) == 3
+                && item.getEnchantmentLevel(Enchantment.PROTECTION) == 2),
+            "the donator archer kit's armor should have Unbreaking III and Protection II");
     }
 
     private static final class FakeEconomy implements Economy {

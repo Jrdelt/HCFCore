@@ -1,10 +1,8 @@
 package me.hcfcore.core.scoreboard;
 
 import me.hcfcore.core.factions.FactionsHook;
-import me.hcfcore.core.ability.Ability;
 import me.hcfcore.core.ability.AbilityManager;
 import me.hcfcore.core.lang.MessageFormatter;
-import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
 import io.papermc.paper.scoreboard.numbers.NumberFormat;
 import net.kyori.adventure.text.Component;
@@ -19,10 +17,11 @@ import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -36,47 +35,23 @@ public final class ScoreboardManager {
     private static final String[] ENTRY_CODES = buildEntryCodes();
 
     private final Plugin plugin;
-    private final UserManager userManager;
-    private final AbilityManager abilityManager;
-    private final Component title;
+    private final String titleTemplate;
+    private final DateTimeFormatter dateFormatter;
     private final List<String> lineTemplates;
     private final long intervalTicks;
     private final Map<UUID, PlayerBoard> boards = new ConcurrentHashMap<>();
     private final Map<UUID, Map<String, String>> customPlaceholders = new ConcurrentHashMap<>();
+    private volatile String lastRenderedTitle;
     private BukkitTask task;
 
     public ScoreboardManager(Plugin plugin, FileConfiguration config, UserManager userManager,
                              AbilityManager abilityManager) {
         this.plugin = plugin;
-        this.userManager = userManager;
-        this.abilityManager = abilityManager;
-        this.title = MessageFormatter.deserialize(
-                config.getString("scoreboard.title", "&b&lHCFCore"));
+        this.titleTemplate = config.getString("scoreboard.title", "&b&lHCFCore");
+        this.dateFormatter = DateTimeFormatter.ofPattern(config.getString("scoreboard.date-format", "MM/dd"));
         List<String> configuredLines = new ArrayList<>(config.getStringList("scoreboard.lines"));
-        boolean cooldownsEnabled = config.getBoolean("scoreboard.cooldowns.enabled",
-                config.getBoolean("scoreboard.ability-cooldown.enabled", true));
-        int cooldownLineIndex = findCooldownLine(configuredLines);
-        if (cooldownsEnabled) {
-            String header = config.getString("scoreboard.cooldowns.header", "<light_purple>Cooldowns:");
-            String line = config.getString("scoreboard.cooldowns.line", "<gray>{ability_cooldowns}");
-            if (cooldownLineIndex < 0) {
-                configuredLines.add(header);
-                configuredLines.add(line);
-            } else if (cooldownLineIndex == 0 || !configuredLines.get(cooldownLineIndex - 1).equals(header)) {
-                configuredLines.add(cooldownLineIndex, header);
-            }
-        }
         this.lineTemplates = List.copyOf(configuredLines);
         this.intervalTicks = Math.max(1, config.getLong("scoreboard.update-interval-ticks", 20));
-    }
-
-    private static int findCooldownLine(List<String> lines) {
-        for (int i = 0; i < lines.size(); i++) {
-            if (lines.get(i).contains("{ability_cooldowns}")) {
-                return i;
-            }
-        }
-        return -1;
     }
 
     public void start() {
@@ -94,11 +69,12 @@ public final class ScoreboardManager {
             }
         }
         boards.clear();
+        customPlaceholders.clear();
     }
 
     public void setup(Player player) {
         Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("hcfcore", Criteria.DUMMY, title);
+        Objective objective = scoreboard.registerNewObjective("hcfcore", Criteria.DUMMY, currentTitleComponent());
         objective.setDisplaySlot(DisplaySlot.SIDEBAR);
 
         List<Team> teams = new ArrayList<>();
@@ -145,9 +121,27 @@ public final class ScoreboardManager {
     }
 
     private void tick() {
+        String resolvedTitle = resolveTitle();
+        if (!resolvedTitle.equals(lastRenderedTitle)) {
+            lastRenderedTitle = resolvedTitle;
+            Component titleComponent = MessageFormatter.deserialize(resolvedTitle);
+            for (PlayerBoard board : boards.values()) {
+                board.objective().displayName(titleComponent);
+            }
+        }
         for (Player player : Bukkit.getOnlinePlayers()) {
             renderFor(player);
         }
+    }
+
+    private String resolveTitle() {
+        return titleTemplate.replace("{date}", LocalDate.now().format(dateFormatter));
+    }
+
+    private Component currentTitleComponent() {
+        String resolved = resolveTitle();
+        lastRenderedTitle = resolved;
+        return MessageFormatter.deserialize(resolved);
     }
 
     private void renderFor(Player player) {
@@ -168,57 +162,15 @@ public final class ScoreboardManager {
 
     private String resolvePlaceholders(Player player, String template) {
         Map<String, String> custom = customPlaceholders.getOrDefault(player.getUniqueId(), Map.of());
-        AbilityCooldown abilityCooldown = getActiveAbilityCooldown(player);
         return template
+                .replace("{date}", LocalDate.now().format(dateFormatter))
                 .replace("{online}", String.valueOf(Bukkit.getOnlinePlayers().size()))
                 .replace("{faction}", FactionsHook.getFactionTag(player))
                 .replace("{faction_role}", FactionsHook.getRoleName(player))
-                .replace("{repair}", custom.getOrDefault("repair", ""))
-                .replace("{ability}", abilityCooldown.abilityId())
-                .replace("{ability_cooldown}", abilityCooldown.remainingSeconds())
-                .replace("{ability_cooldowns}", getAbilityCooldowns(player));
-    }
-
-    private AbilityCooldown getActiveAbilityCooldown(Player player) {
-        User user = userManager.get(player.getUniqueId());
-        if (user == null) {
-            return AbilityCooldown.EMPTY;
-        }
-
-        long now = System.currentTimeMillis();
-        long soonestExpiry = Long.MAX_VALUE;
-        String abilityId = "";
-        for (Ability ability : abilityManager.getAbilities().values()) {
-            long expiry = user.getCooldownExpiry("ability:" + ability.getId());
-            if (expiry > now && expiry < soonestExpiry) {
-                soonestExpiry = expiry;
-                abilityId = ability.getId();
-            }
-        }
-        if (abilityId.isEmpty()) {
-            return AbilityCooldown.EMPTY;
-        }
-        return new AbilityCooldown(abilityId, String.valueOf((soonestExpiry - now + 999) / 1000) + "s");
-    }
-
-    private String getAbilityCooldowns(Player player) {
-        User user = userManager.get(player.getUniqueId());
-        if (user == null) {
-            return "";
-        }
-
-        long now = System.currentTimeMillis();
-        return abilityManager.getAbilities().values().stream()
-                .map(ability -> {
-                    long expiry = user.getCooldownExpiry("ability:" + ability.getId());
-                    if (expiry <= now) {
-                        return null;
-                    }
-                    long seconds = (expiry - now + 999) / 1000;
-                    return ability.getId() + " " + seconds + "s";
-                })
-                .filter(value -> value != null)
-                .collect(Collectors.joining(", "));
+                .replace("{ftop}", FactionsHook.getFactionTop(player))
+                .replace("{power}", FactionsHook.getFactionPower(player))
+                .replace("{fplayers_online}", FactionsHook.getOnlineFactionCount(player))
+                .replace("{repair}", custom.getOrDefault("repair", ""));
     }
 
     private static String[] buildEntryCodes() {
@@ -236,7 +188,4 @@ public final class ScoreboardManager {
     private record PlayerBoard(Scoreboard scoreboard, Objective objective, List<Team> teams, List<String> lastRendered) {
     }
 
-    private record AbilityCooldown(String abilityId, String remainingSeconds) {
-        private static final AbilityCooldown EMPTY = new AbilityCooldown("", "");
-    }
 }

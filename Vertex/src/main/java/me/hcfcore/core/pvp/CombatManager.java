@@ -6,7 +6,6 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
-import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
@@ -78,6 +77,7 @@ public final class CombatManager {
         }
         taggedUntil.clear();
         opponents.clear();
+        clickTimestamps.clear();
     }
 
     public void tag(Player a, Player b) {
@@ -218,41 +218,43 @@ public final class CombatManager {
         double timeFraction = combatDurationMillis <= 0 ? 0 : clamp01((double) remainingMillis / combatDurationMillis);
         TextColor timeColor = gradient(1 - timeFraction);
 
-        Component result = messages.get(player, "combat.actionbar-prefix")
-                .append(messages.get(player, "combat.actionbar-label"));
+        Component result = messages.get(player, "combat.actionbar-label").appendSpace();
 
         UUID opponentId = opponents.get(player.getUniqueId());
         boolean realOpponent = false;
         if (SERVER_UUID.equals(opponentId)) {
-            result = result.append(messages.get(player, "combat.actionbar-server"));
+            result = result.append(messages.get(player, "combat.actionbar-server")).appendSpace();
         } else {
             Player opponent = opponentId == null ? null : Bukkit.getPlayer(opponentId);
             if (opponent != null && opponent.isOnline()) {
                 realOpponent = true;
                 double health = Math.max(0, opponent.getHealth());
-                var maxHealthAttribute = opponent.getAttribute(Attribute.MAX_HEALTH);
-                double maxHealth = Math.max(1, maxHealthAttribute == null ? 20.0 : maxHealthAttribute.getValue());
-                TextColor healthColor = gradient(clamp01(health / maxHealth));
 
                 result = result
-                        .append(Component.text(opponent.getName() + " ", NamedTextColor.WHITE))
-                        .append(Component.text(String.format(Locale.ROOT, "%.0f", health) + "❤  ", healthColor));
+                        .append(Component.text(opponent.getName(), NamedTextColor.WHITE))
+                        .appendSpace()
+                        .append(Component.text("❤" + String.format(Locale.ROOT, "%.0f", health), NamedTextColor.GREEN))
+                        .appendSpace();
             }
         }
 
-        result = result.append(Component.text(remainingSeconds + "s", timeColor, TextDecoration.BOLD));
+        result = result.append(Component.text("(" + remainingSeconds + "s)", timeColor, TextDecoration.BOLD));
 
         result = result
+                .appendSpace()
                 .append(messages.get(player, "combat.actionbar-you"))
-                .append(Component.text(getCps(player.getUniqueId()), NamedTextColor.WHITE));
+                .appendSpace()
+                .append(Component.text("(" + getCps(player.getUniqueId()) + "cps)", NamedTextColor.WHITE));
 
         if (realOpponent) {
             result = result
+                    .appendSpace()
                     .append(messages.get(player, "combat.actionbar-them"))
-                    .append(Component.text(getCps(opponentId), NamedTextColor.WHITE));
+                    .appendSpace()
+                    .append(Component.text("(" + getCps(opponentId) + "cps)", NamedTextColor.WHITE));
         }
 
-        return result.append(messages.get(player, "combat.actionbar-suffix"));
+        return result;
     }
 
     private static TextColor gradient(double greenFraction) {

@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +32,9 @@ public final class LanguageCommand implements CommandExecutor, TabCompleter {
     private final UserManager userManager;
     private final Messages messages;
     private final Set<CompletableFuture<Void>> pendingWrites = ConcurrentHashMap.newKeySet();
+    // Chains each player's saves so a slower earlier write can't complete
+    // after a later one and leave a stale locale value in storage.
+    private final java.util.Map<UUID, CompletableFuture<Void>> writeChains = new ConcurrentHashMap<>();
 
     public LanguageCommand(Plugin plugin, Storage storage, UserManager userManager, Messages messages) {
         this.plugin = plugin;
@@ -42,7 +46,7 @@ public final class LanguageCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.get(sender, "general.players-only"));
+            sender.sendMessage(messages.getChat(sender, "general.players-only"));
             return true;
         }
 
@@ -51,14 +55,14 @@ public final class LanguageCommand implements CommandExecutor, TabCompleter {
         if (args.length == 0) {
             User user = userManager.get(player.getUniqueId());
             String current = user != null && user.getLocale() != null ? user.getLocale() : messages.getDefaultLocale();
-            player.sendMessage(messages.get(player, "language.current", "locale", current));
-            player.sendMessage(messages.get(player, "language.available", "locales", available));
+            player.sendMessage(messages.getChat(player, "language.current", "locale", current));
+            player.sendMessage(messages.getChat(player, "language.available", "locales", available));
             return true;
         }
 
         String code = args[0].toLowerCase(Locale.ROOT);
         if (!messages.isAvailable(code)) {
-            player.sendMessage(messages.get(player, "language.unknown", "code", args[0], "locales", available));
+            player.sendMessage(messages.getChat(player, "language.unknown", "code", args[0], "locales", available));
             return true;
         }
 
@@ -66,17 +70,20 @@ public final class LanguageCommand implements CommandExecutor, TabCompleter {
         if (user != null) {
             user.setLocale(code);
         }
-        CompletableFuture<Void> write = CompletableFuture.runAsync(() -> {
+        UUID uuid = player.getUniqueId();
+        CompletableFuture<Void> previous = writeChains.getOrDefault(uuid, CompletableFuture.completedFuture(null));
+        CompletableFuture<Void> write = previous.handle((ignored, error) -> null).thenRunAsync(() -> {
             try {
-                storage.saveLocale(player.getUniqueId(), code);
+                storage.saveLocale(uuid, code);
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to persist locale for " + player.getUniqueId(), e);
+                plugin.getLogger().log(Level.WARNING, "Failed to persist locale for " + uuid, e);
             }
         });
+        writeChains.put(uuid, write);
         pendingWrites.add(write);
         write.whenComplete((ignored, error) -> pendingWrites.remove(write));
 
-        player.sendMessage(messages.get(player, "language.changed", "locale", code));
+        player.sendMessage(messages.getChat(player, "language.changed", "locale", code));
         return true;
     }
 

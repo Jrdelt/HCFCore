@@ -32,38 +32,38 @@ public final class CombatTagCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("hcfcore.combat.tag")) {
-            sender.sendMessage(messages.get(sender, "general.no-permission"));
+            sender.sendMessage(messages.getChat(sender, "general.no-permission"));
             return true;
         }
         if (args.length < 1) {
-            sender.sendMessage(messages.get(sender, "combat.tag-usage"));
+            sender.sendMessage(messages.getChat(sender, "combat.tag-usage"));
             return true;
         }
 
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            sender.sendMessage(messages.get(sender, "general.player-not-found"));
+            sender.sendMessage(messages.getChat(sender, "general.player-not-found"));
             return true;
         }
 
         if (args.length < 2 || args[1].equalsIgnoreCase("server")) {
             combatManager.tagAgainstServer(target);
-            sender.sendMessage(messages.get(sender, "combat.tag-server-success", "player", target.getName()));
+            sender.sendMessage(messages.getChat(sender, "combat.tag-server-success", "player", target.getName()));
             return true;
         }
 
         Player opponent = Bukkit.getPlayerExact(args[1]);
         if (opponent == null) {
-            sender.sendMessage(messages.get(sender, "combat.tag-opponent-not-found"));
+            sender.sendMessage(messages.getChat(sender, "combat.tag-opponent-not-found"));
             return true;
         }
         if (target.getUniqueId().equals(opponent.getUniqueId())) {
-            sender.sendMessage(messages.get(sender, "combat.tag-self"));
+            sender.sendMessage(messages.getChat(sender, "combat.tag-self"));
             return true;
         }
 
         combatManager.tag(target, opponent);
-        sender.sendMessage(messages.get(sender, "combat.tag-success",
+        sender.sendMessage(messages.getChat(sender, "combat.tag-success",
                 "player", target.getName(), "opponent", opponent.getName()));
         return true;
     }

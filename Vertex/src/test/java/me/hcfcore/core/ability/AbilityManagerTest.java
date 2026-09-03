@@ -30,7 +30,9 @@ class AbilityManagerTest {
 
     private static final String[] EXPECTED_IDS = {
             "anti-blockup-bone", "fake-pearl", "grappling-hook", "leap",
-            "portable-bard", "repair", "switcher-snowball", "time-warp-pearl"
+            "pearl-stunner", "portable-bard", "rabbits-feed", "repair", "rogue-backstab",
+            "mage-wither", "mage-slowness", "mage-weakness", "mage-poison",
+            "switcher-snowball", "time-warp-pearl"
     };
 
     private ServerMock server;
@@ -51,7 +53,7 @@ class AbilityManagerTest {
     }
 
     @Test
-    void loadRegistersAllEightShippedAbilities() {
+    void loadRegistersAllShippedAbilities() {
         assertEquals(EXPECTED_IDS.length, abilityManager.getAbilities().size());
         for (String id : EXPECTED_IDS) {
             assertNotNull(abilityManager.get(id), "expected ability '" + id + "' to be registered");

@@ -83,21 +83,24 @@ public final class AntiBlockupBoneListener implements Listener {
             abilityManager.startCooldown(attacker, user, ability);
         }
         ItemStack item = attacker.getInventory().getItemInMainHand();
+        if (item == null || item.getType().isAir()) {
+            return;
+        }
         if (item.getAmount() <= 1) {
             attacker.getInventory().setItemInMainHand(null);
         } else {
             item.setAmount(item.getAmount() - 1);
         }
-        attacker.sendMessage(messages.get(attacker, "ability.bone-attacker",
+        attacker.sendMessage(messages.getChat(attacker, "ability.bone-attacker",
                 "player", victim.getName(), "seconds", String.valueOf(denySeconds)));
-        victim.sendMessage(messages.get(victim, "ability.bone-victim", "seconds", String.valueOf(denySeconds)));
+        victim.sendMessage(messages.getChat(victim, "ability.bone-victim", "seconds", String.valueOf(denySeconds)));
     }
 
     @EventHandler(ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
         if (tracker.isDenied(event.getPlayer().getUniqueId())) {
             event.setCancelled(true);
-            event.getPlayer().sendMessage(messages.get(event.getPlayer(), "ability.bone-place-denied"));
+            event.getPlayer().sendMessage(messages.getChat(event.getPlayer(), "ability.bone-place-denied"));
         }
     }
 

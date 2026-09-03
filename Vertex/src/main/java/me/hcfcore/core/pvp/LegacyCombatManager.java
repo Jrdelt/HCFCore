@@ -82,6 +82,7 @@ public final class LegacyCombatManager implements Listener {
     }
 
     private boolean isEnabledIn(World world) {
-        return enabled && (worlds.isEmpty() || worlds.contains(world.getName().toLowerCase(Locale.ROOT)));
+        return world != null && enabled
+                && (worlds.isEmpty() || worlds.contains(world.getName().toLowerCase(Locale.ROOT)));
     }
 }

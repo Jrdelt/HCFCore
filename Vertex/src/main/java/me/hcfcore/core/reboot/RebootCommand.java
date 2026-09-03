@@ -18,21 +18,26 @@ public final class RebootCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("hcfcore.reboot.start")) {
-            sender.sendMessage(messages.get(sender, "general.no-permission"));
+            sender.sendMessage(messages.getChat(sender, "general.no-permission"));
             return true;
         }
         if (args.length > 1 || (args.length == 1 && !args[0].equalsIgnoreCase("cancel"))) {
-            sender.sendMessage(messages.get(sender, "reboot.usage"));
+            sender.sendMessage(messages.getChat(sender, "reboot.usage"));
             return true;
         }
         if (args.length == 1) {
             if (!rebootManager.cancel()) {
-                sender.sendMessage(messages.get(sender, "reboot.not-scheduled"));
+                sender.sendMessage(messages.getChat(sender, "reboot.not-scheduled"));
+            } else {
+                sender.sendMessage(messages.getChat(sender, "reboot.cancelled"));
             }
             return true;
         }
         if (!rebootManager.schedule()) {
-            sender.sendMessage(messages.get(sender, "reboot.already-scheduled"));
+            sender.sendMessage(messages.getChat(sender, "reboot.already-scheduled"));
+        } else {
+            sender.sendMessage(messages.getChat(sender, "reboot.started",
+                    "minutes", String.valueOf(rebootManager.getDefaultDelayMinutes())));
         }
         return true;
     }

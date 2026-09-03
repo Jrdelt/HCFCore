@@ -15,21 +15,29 @@ mysql:
 
 scoreboard:
   update-interval-ticks: 20
-  title: '<aqua><bold>HCF<white><bold>Core'
+  title: '<white><bold>FACTIONS<reset>   <gray>{date}'
+  date-format: 'MM/dd'
   lines:
     - ''
-    - '<gray>Online: <white>{online}'
-    - '<gray>Faction: <white>{faction}'
-    - '<gray>Role: <white>{faction_role}'
+    - '<white>{faction} <gray>[<yellow>#{ftop}<gray>]'
+    - '<gray> <red>• Power: <white>{power}'
+    - '<gray> <red>• Online: <white>{fplayers_online}'
     - ''
-    - '<gray>play.example.com'
-  cooldowns:
-    enabled: true
-    header: '<light_purple>Cooldowns:'
-    line: '<gray>{ability_cooldowns}'
+    - '<aqua>play.example.com'
+
+chat:
+  prefix: '<gradient:#38bdf8:#a855f7>❖</gradient>'
+  separator: '<gray>»</gray>'
+  faction-format: '<gold>[{faction}]</gold> '
+  tag-format: '<aqua>[{tag}]</aqua> '
+  rank-format: '<light_purple>[{rank}]</light_purple> '
+  name-format: '<white>{name}</white>'
 
 pvp:
   combat-tag-seconds: 30
+  pearl-cooldown-seconds: 15
+  golden-apple-cooldown-seconds: 10
+  enchanted-golden-apple-cooldown-seconds: 30
   logout-penalty: true
   actionbar-update-interval-ticks: 4
   legacy-combat:
@@ -48,9 +56,16 @@ factions:
 
 kits:
   default-cooldown-seconds: 300
+  effect-warmup-seconds: 3
+  max-cooldown-seconds: 86400
+  max-money-cost: 1000000000.0
+  max-cost-item-amount: 64
 
 abilities:
   global-cooldown-seconds: 3
+  max-getitem-amount: 64
+  pearl-stunner-seconds: 8
+  rabbits-feed-speed-seconds: 8
   disabled-regions:
     - spawn
 

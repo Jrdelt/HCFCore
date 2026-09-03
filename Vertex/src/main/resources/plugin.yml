@@ -41,6 +41,12 @@ commands:
   language:
     description: View or change your language.
     usage: /<command> [code]
+  cooldowns:
+    description: View your active kit and ability cooldowns.
+    usage: /<command>
+  tags:
+    description: Browse and select server tags.
+    usage: /<command>
   reboot:
     description: Start or cancel a server reboot countdown.
     usage: /<command> [cancel]

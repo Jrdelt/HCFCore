@@ -3,15 +3,22 @@ package me.hcfcore.core;
 import me.hcfcore.core.ability.AbilitiesCommand;
 import me.hcfcore.core.ability.AbilityManager;
 import me.hcfcore.core.ability.AbilityMenuListener;
+import me.hcfcore.core.ability.CooldownsCommand;
 import me.hcfcore.core.ability.AntiBlockupBoneListener;
 import me.hcfcore.core.ability.FakePearlListener;
 import me.hcfcore.core.ability.GetItemCommand;
 import me.hcfcore.core.ability.GrapplingHookListener;
 import me.hcfcore.core.ability.LeapListener;
+import me.hcfcore.core.ability.MageSpellListener;
 import me.hcfcore.core.ability.PortableBardListener;
 import me.hcfcore.core.ability.RepairListener;
+import me.hcfcore.core.ability.RogueBackstabListener;
 import me.hcfcore.core.ability.SwitcherSnowballListener;
 import me.hcfcore.core.ability.TimeWarpPearlListener;
+import me.hcfcore.core.ability.VanillaCooldownListener;
+import me.hcfcore.core.chat.ChatFormatterListener;
+import me.hcfcore.core.ability.PearlStunnerListener;
+import me.hcfcore.core.ability.RabbitsFeedListener;
 import me.hcfcore.core.factions.FactionCommandListener;
 import me.hcfcore.core.kit.KitCommand;
 import me.hcfcore.core.kit.KitManager;
@@ -34,9 +41,15 @@ import me.hcfcore.core.storage.Database;
 import me.hcfcore.core.storage.MySQLStorage;
 import me.hcfcore.core.storage.Storage;
 import me.hcfcore.core.user.UserManager;
+import me.hcfcore.core.tag.TagManager;
+import me.hcfcore.core.tag.TagsCommand;
+import me.hcfcore.core.tag.TagMenuListener;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.List;
 import java.util.logging.Level;
 
 public final class HCFCorePlugin extends JavaPlugin {
@@ -54,10 +67,16 @@ public final class HCFCorePlugin extends JavaPlugin {
     private RebootManager rebootManager;
     private PlayerConnectionListener playerConnectionListener;
     private RepairListener repairListener;
+    private TagManager tagManager;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
+
+        if (!validateRuntimeDependencies()) {
+            Bukkit.getPluginManager().disablePlugin(this);
+            return;
+        }
 
         try {
             database = new Database(getConfig());
@@ -77,8 +96,11 @@ public final class HCFCorePlugin extends JavaPlugin {
         messages.load();
         kitManager = new KitManager(this, storage, userManager, messages);
         kitManager.load();
+        kitManager.start();
         abilityManager = new AbilityManager(this, storage);
         abilityManager.load();
+        tagManager = new TagManager(this);
+        tagManager.load();
 
         scoreboardManager = new ScoreboardManager(this, getConfig(), userManager, abilityManager);
         scoreboardManager.start();
@@ -99,11 +121,15 @@ public final class HCFCorePlugin extends JavaPlugin {
         rebootManager.start();
 
         Bukkit.getPluginManager().registerEvents(new CombatListener(combatManager), this);
-        playerConnectionListener = new PlayerConnectionListener(userManager, scoreboardManager, combatManager);
+        playerConnectionListener = new PlayerConnectionListener(this, userManager, scoreboardManager, combatManager);
         Bukkit.getPluginManager().registerEvents(playerConnectionListener, this);
         Bukkit.getPluginManager().registerEvents(new AbilityMenuListener(this, abilityManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new AntiBlockupBoneListener(this, abilityManager, userManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+            new MageSpellListener(this, abilityManager, userManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+            new RogueBackstabListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new FakePearlListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
@@ -117,9 +143,14 @@ public final class HCFCorePlugin extends JavaPlugin {
                 new SwitcherSnowballListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new TimeWarpPearlListener(this, abilityManager, userManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new VanillaCooldownListener(this), this);
+        Bukkit.getPluginManager().registerEvents(new PearlStunnerListener(this, abilityManager, userManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new RabbitsFeedListener(this, abilityManager, userManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new TagMenuListener(this), this);
+        Bukkit.getPluginManager().registerEvents(new ChatFormatterListener(tagManager, getConfig()), this);
         Bukkit.getPluginManager().registerEvents(new FactionCommandListener(this, messages), this);
 
-        KitCommand kitCommand = new KitCommand(kitManager, messages);
+        KitCommand kitCommand = new KitCommand(this, kitManager, messages);
         getCommand("kit").setExecutor(kitCommand);
         getCommand("kit").setTabCompleter(kitCommand);
         getCommand("kits").setExecutor(new KitsCommand(this, kitManager, userManager, messages));
@@ -130,6 +161,8 @@ public final class HCFCorePlugin extends JavaPlugin {
         languageCommand = new LanguageCommand(this, storage, userManager, messages);
         getCommand("language").setExecutor(languageCommand);
         getCommand("language").setTabCompleter(languageCommand);
+        getCommand("cooldowns").setExecutor(new CooldownsCommand(kitManager, abilityManager, userManager, messages));
+        getCommand("tags").setExecutor(new TagsCommand(tagManager, messages));
 
         UncombatCommand uncombatCommand = new UncombatCommand(combatManager, messages);
         getCommand("uncombat").setExecutor(uncombatCommand);
@@ -143,7 +176,7 @@ public final class HCFCorePlugin extends JavaPlugin {
         getCommand("combattag").setExecutor(combatTagCommand);
         getCommand("combattag").setTabCompleter(combatTagCommand);
 
-        GetItemCommand getItemCommand = new GetItemCommand(abilityManager, messages);
+        GetItemCommand getItemCommand = new GetItemCommand(this, abilityManager, messages);
         getCommand("getitem").setExecutor(getItemCommand);
         getCommand("getitem").setTabCompleter(getItemCommand);
         getCommand("abilities").setExecutor(new AbilitiesCommand(this, abilityManager, messages));
@@ -183,27 +216,72 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
     }
 
-    public void reload() {
-        reloadConfig();
-        messages.load();
-        kitManager.load();
-        abilityManager.load();
-        if (scoreboardManager != null) {
-            scoreboardManager.stop();
-        }
-        scoreboardManager = new ScoreboardManager(this, getConfig(), userManager, abilityManager);
-        scoreboardManager.start();
-        playerConnectionListener.setScoreboardManager(scoreboardManager);
-        repairListener.setScoreboardManager(scoreboardManager);
-        for (var player : Bukkit.getOnlinePlayers()) {
-            scoreboardManager.setup(player);
+    public static boolean hasRequiredDependency(PluginManager pluginManager) {
+        Plugin factions = pluginManager.getPlugin("FactionsUUID");
+        return factions != null;
+    }
+
+    public boolean validateRuntimeDependencies() {
+        if (!hasRequiredDependency(Bukkit.getPluginManager())) {
+            getLogger().severe("Missing required dependency: FactionsUUID. Disabling HCFCore.");
+            return false;
         }
 
-        combatManager.reconfigure(
-                getConfig().getInt("pvp.combat-tag-seconds", 30),
-                getConfig().getBoolean("pvp.logout-penalty", true),
-                getConfig().getInt("pvp.actionbar-update-interval-ticks", 4));
-        legacyCombatManager.reconfigure();
-        rebootManager.reconfigure();
+        List<String> optionalDependencies = List.of("Vault", "WorldGuard", "LuckPerms");
+        for (String dependency : optionalDependencies) {
+            if (Bukkit.getPluginManager().getPlugin(dependency) == null) {
+                getLogger().warning("Optional dependency not detected: " + dependency + ". Related features will be disabled.");
+            }
+        }
+
+        return true;
+    }
+
+    public void reload() {
+        reloadConfig();
+
+        if (messages != null) {
+            messages.load();
+        }
+        if (kitManager != null) {
+            kitManager.load();
+        }
+        if (abilityManager != null) {
+            abilityManager.load();
+        }
+
+        if (scoreboardManager != null) {
+            scoreboardManager.stop();
+            scoreboardManager = null;
+        }
+        if (userManager != null && abilityManager != null) {
+            scoreboardManager = new ScoreboardManager(this, getConfig(), userManager, abilityManager);
+            scoreboardManager.start();
+        }
+
+        if (playerConnectionListener != null) {
+            playerConnectionListener.setScoreboardManager(scoreboardManager);
+        }
+        if (repairListener != null) {
+            repairListener.setScoreboardManager(scoreboardManager);
+        }
+        if (scoreboardManager != null) {
+            for (var player : Bukkit.getOnlinePlayers()) {
+                scoreboardManager.setup(player);
+            }
+        }
+
+        if (combatManager != null) {
+            combatManager.reconfigure(
+                    getConfig().getInt("pvp.combat-tag-seconds", 30),
+                    getConfig().getBoolean("pvp.logout-penalty", true),
+                    getConfig().getInt("pvp.actionbar-update-interval-ticks", 4));
+        }
+        if (legacyCombatManager != null) {
+            legacyCombatManager.reconfigure();
+        }
+        if (rebootManager != null) {
+            rebootManager.reconfigure();
+        }
     }
 }

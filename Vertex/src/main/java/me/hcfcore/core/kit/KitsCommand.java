@@ -25,7 +25,7 @@ public final class KitsCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.get(sender, "general.players-only"));
+            sender.sendMessage(messages.getChat(sender, "general.players-only"));
             return true;
         }
         KitsMenu.open(player, plugin, kitManager, userManager, messages);

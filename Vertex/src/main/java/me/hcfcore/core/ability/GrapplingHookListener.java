@@ -3,6 +3,7 @@ package me.hcfcore.core.ability;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.UserManager;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.FishHook;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -101,6 +102,9 @@ public final class GrapplingHookListener implements Listener {
 
     private void consumeUse(Player player, int maximumUses) {
         ItemStack item = player.getInventory().getItemInMainHand();
+        if (item == null || item.getType() == Material.AIR) {
+            return;
+        }
         ItemMeta meta = item.getItemMeta();
         if (meta == null) {
             return;

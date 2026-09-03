@@ -42,7 +42,7 @@ public final class FactionCommandListener implements Listener {
         }
 
         event.setCancelled(true);
-        player.sendMessage(messages.get(player, "factions.leader-cannot-leave"));
+        player.sendMessage(messages.getChat(player, "factions.leader-cannot-leave"));
     }
 
     private boolean isFactionCommand(String command) {

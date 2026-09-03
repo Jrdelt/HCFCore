@@ -71,7 +71,7 @@ public final class TimeWarpPearlListener implements Listener {
 
         Location origin = lastPearlOrigin.get(player.getUniqueId());
         if (origin == null) {
-            player.sendMessage(messages.get(player, "ability.timewarp-none"));
+            player.sendMessage(messages.getChat(player, "ability.timewarp-none"));
             return;
         }
 
@@ -81,7 +81,7 @@ public final class TimeWarpPearlListener implements Listener {
 
         lastPearlOrigin.remove(player.getUniqueId());
         player.teleport(origin);
-        player.sendMessage(messages.get(player, "ability.timewarp-warped"));
+        player.sendMessage(messages.getChat(player, "ability.timewarp-warped"));
     }
 
     @EventHandler
