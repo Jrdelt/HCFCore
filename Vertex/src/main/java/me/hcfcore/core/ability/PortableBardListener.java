@@ -90,7 +90,8 @@ public final class PortableBardListener implements Listener {
         }
 
         Ability ability = abilityManager.get(ABILITY_ID);
-        if (ability == null || !AbilityGate.checkAndStart(plugin, abilityManager, userManager,
+        if (ability == null || !AbilityGate.isAbility(plugin, player.getInventory().getItemInMainHand(), ABILITY_ID)
+            || !AbilityGate.checkAndStart(plugin, abilityManager, userManager,
                 messages, player, ability)) {
             return;
         }

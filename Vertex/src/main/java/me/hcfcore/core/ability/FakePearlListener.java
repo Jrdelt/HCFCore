@@ -69,6 +69,8 @@ public final class FakePearlListener implements Listener {
 
         player.launchProjectile(EnderPearl.class);
         pendingFakePearl.add(player.getUniqueId());
+        plugin.getServer().getScheduler().runTaskLater(plugin,
+            () -> pendingFakePearl.remove(player.getUniqueId()), 200L);
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)

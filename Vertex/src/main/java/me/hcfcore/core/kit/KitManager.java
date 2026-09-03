@@ -71,7 +71,8 @@ public final class KitManager {
                 continue;
             }
             String permission = section.getString("permission", "hcfcore.kit." + name.toLowerCase(Locale.ROOT));
-            int cooldown = section.getInt("cooldown-seconds", 0);
+                int cooldown = section.getInt("cooldown-seconds",
+                    plugin.getConfig().getInt("kits.default-cooldown-seconds", 0));
             ItemStack[] armor = readItems(section, "armor");
             ItemStack[] contents = readItems(section, "contents");
             Kit.Cost cost = readCost(section.getConfigurationSection("cost"));

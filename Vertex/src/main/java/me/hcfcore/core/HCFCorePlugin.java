@@ -52,6 +52,8 @@ public final class HCFCorePlugin extends JavaPlugin {
     private CombatManager combatManager;
     private LegacyCombatManager legacyCombatManager;
     private RebootManager rebootManager;
+    private PlayerConnectionListener playerConnectionListener;
+    private RepairListener repairListener;
 
     @Override
     public void onEnable() {
@@ -97,8 +99,8 @@ public final class HCFCorePlugin extends JavaPlugin {
         rebootManager.start();
 
         Bukkit.getPluginManager().registerEvents(new CombatListener(combatManager), this);
-        Bukkit.getPluginManager().registerEvents(
-                new PlayerConnectionListener(userManager, scoreboardManager, combatManager), this);
+        playerConnectionListener = new PlayerConnectionListener(userManager, scoreboardManager, combatManager);
+        Bukkit.getPluginManager().registerEvents(playerConnectionListener, this);
         Bukkit.getPluginManager().registerEvents(new AbilityMenuListener(this, abilityManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new AntiBlockupBoneListener(this, abilityManager, userManager, messages), this);
@@ -109,8 +111,8 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new LeapListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new PortableBardListener(this, abilityManager, userManager, messages), this);
-        Bukkit.getPluginManager().registerEvents(
-                new RepairListener(this, abilityManager, userManager, scoreboardManager, messages), this);
+        repairListener = new RepairListener(this, abilityManager, userManager, scoreboardManager, messages);
+        Bukkit.getPluginManager().registerEvents(repairListener, this);
         Bukkit.getPluginManager().registerEvents(
                 new SwitcherSnowballListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
@@ -191,6 +193,8 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
         scoreboardManager = new ScoreboardManager(this, getConfig(), userManager, abilityManager);
         scoreboardManager.start();
+        playerConnectionListener.setScoreboardManager(scoreboardManager);
+        repairListener.setScoreboardManager(scoreboardManager);
         for (var player : Bukkit.getOnlinePlayers()) {
             scoreboardManager.setup(player);
         }

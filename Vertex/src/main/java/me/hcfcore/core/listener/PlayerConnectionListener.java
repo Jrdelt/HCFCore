@@ -14,13 +14,17 @@ import org.bukkit.event.player.PlayerQuitEvent;
 public final class PlayerConnectionListener implements Listener {
 
     private final UserManager userManager;
-    private final ScoreboardManager scoreboardManager;
+    private volatile ScoreboardManager scoreboardManager;
     private final CombatManager combatManager;
 
     public PlayerConnectionListener(UserManager userManager, ScoreboardManager scoreboardManager, CombatManager combatManager) {
         this.userManager = userManager;
         this.scoreboardManager = scoreboardManager;
         this.combatManager = combatManager;
+    }
+
+    public void setScoreboardManager(ScoreboardManager scoreboardManager) {
+        this.scoreboardManager = scoreboardManager;
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

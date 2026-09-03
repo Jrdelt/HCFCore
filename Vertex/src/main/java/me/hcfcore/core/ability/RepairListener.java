@@ -23,7 +23,7 @@ public final class RepairListener implements Listener {
     private final Plugin plugin;
     private final AbilityManager abilityManager;
     private final UserManager userManager;
-    private final ScoreboardManager scoreboardManager;
+    private volatile ScoreboardManager scoreboardManager;
     private final Messages messages;
 
     public RepairListener(Plugin plugin, AbilityManager abilityManager, UserManager userManager,
@@ -33,6 +33,10 @@ public final class RepairListener implements Listener {
         this.userManager = userManager;
         this.scoreboardManager = scoreboardManager;
         this.messages = messages;
+    }
+
+    public void setScoreboardManager(ScoreboardManager scoreboardManager) {
+        this.scoreboardManager = scoreboardManager;
     }
 
     @EventHandler

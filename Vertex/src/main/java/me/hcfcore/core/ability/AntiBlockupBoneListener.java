@@ -60,6 +60,9 @@ public final class AntiBlockupBoneListener implements Listener {
             return;
         }
         User user = userManager.get(attacker.getUniqueId());
+        if (user == null && userManager.hasFailedLoad(attacker.getUniqueId())) {
+            return;
+        }
         if (user != null && abilityManager.isOnCooldown(user, ability)) {
             return;
         }

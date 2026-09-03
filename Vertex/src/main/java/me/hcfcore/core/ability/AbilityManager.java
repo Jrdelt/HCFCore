@@ -148,6 +148,10 @@ public final class AbilityManager {
             }
         });
         pendingWrites.add(write);
+        write.whenComplete((ignored, error) -> pendingWrites.remove(write));
+    }
+
+    public void awaitWrites() {
         try {
             CompletableFuture.allOf(pendingWrites.toArray(new CompletableFuture[0]))
                     .get(5, TimeUnit.SECONDS);
@@ -158,10 +162,6 @@ public final class AbilityManager {
         } catch (Exception e) {
             plugin.getLogger().log(Level.WARNING, "Failed while waiting for ability cooldown writes.", e);
         }
-    }
-
-    public void awaitWrites() {
-        CompletableFuture.allOf(pendingWrites.toArray(new CompletableFuture[0])).join();
     }
 
     public boolean isOnGlobalCooldown(UUID uuid) {

@@ -20,7 +20,9 @@ public final class BlockupTracker {
      * counter) -- the caller only applies cooldowns/messages on that hit.
      */
     public boolean recordHit(UUID victim, int hitsRequired, long denySeconds) {
-        int count = hitCounts.merge(victim, 1, Integer::sum);
+        Integer previous = hitCounts.get(victim);
+        int count = previous == null ? 1 : previous + 1;
+        hitCounts.put(victim, count);
         if (count < hitsRequired) {
             return false;
         }

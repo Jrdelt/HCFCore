@@ -15,6 +15,7 @@ public final class UserManager {
     private final Storage storage;
     private final Map<UUID, User> users = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> failedLoads = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> loadGenerations = new ConcurrentHashMap<>();
 
     public UserManager(Plugin plugin, Storage storage) {
         this.plugin = plugin;
@@ -25,6 +26,7 @@ public final class UserManager {
      * Must be called off the main thread, e.g. from AsyncPlayerPreLoginEvent.
      */
     public void load(UUID uuid) {
+        long generation = nextGeneration(uuid);
         try {
             Map<String, Long> cooldowns = new HashMap<>(storage.loadCooldowns(uuid));
             // Ability cooldowns live in their own table but share this same
@@ -34,16 +36,21 @@ public final class UserManager {
                 cooldowns.put("ability:" + entry.getKey(), entry.getValue());
             }
             String locale = storage.loadLocale(uuid);
-            users.put(uuid, new User(uuid, cooldowns, locale));
-            failedLoads.remove(uuid);
+            if (loadGenerations.getOrDefault(uuid, 0L) == generation) {
+                users.put(uuid, new User(uuid, cooldowns, locale));
+                failedLoads.remove(uuid);
+            }
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to load user data for " + uuid, e);
-            users.remove(uuid);
-            failedLoads.put(uuid, Boolean.TRUE);
+            if (loadGenerations.getOrDefault(uuid, 0L) == generation) {
+                users.remove(uuid);
+                failedLoads.put(uuid, Boolean.TRUE);
+            }
         }
     }
 
     public void unload(UUID uuid) {
+        nextGeneration(uuid);
         users.remove(uuid);
         failedLoads.remove(uuid);
     }
@@ -54,5 +61,12 @@ public final class UserManager {
 
     public boolean hasFailedLoad(UUID uuid) {
         return failedLoads.containsKey(uuid);
+    }
+
+    private long nextGeneration(UUID uuid) {
+        Long previous = loadGenerations.get(uuid);
+        long generation = previous == null ? 1L : previous + 1L;
+        loadGenerations.put(uuid, generation);
+        return generation;
     }
 }

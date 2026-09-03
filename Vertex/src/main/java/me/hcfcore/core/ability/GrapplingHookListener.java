@@ -67,6 +67,10 @@ public final class GrapplingHookListener implements Listener {
         Player player = event.getPlayer();
 
         FishHook activeHook = activeHooks.get(player.getUniqueId());
+        if (activeHook != null && activeHook.isDead()) {
+            activeHooks.remove(player.getUniqueId());
+            activeHook = null;
+        }
         if (activeHook != null) {
             reelIn(player, activeHook, ability);
             return;

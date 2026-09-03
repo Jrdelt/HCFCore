@@ -104,8 +104,9 @@ public final class CombatManager {
      */
     public void tagAgainstServer(Player player) {
         long until = System.currentTimeMillis() + combatDurationMillis;
+        UUID oldOpponent = opponents.put(player.getUniqueId(), SERVER_UUID);
+        clearStaleOpponent(player.getUniqueId(), oldOpponent, SERVER_UUID);
         taggedUntil.put(player.getUniqueId(), until);
-        opponents.put(player.getUniqueId(), SERVER_UUID);
     }
 
     public boolean isTagged(UUID uuid) {
