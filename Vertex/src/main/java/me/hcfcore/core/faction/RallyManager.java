@@ -18,6 +18,7 @@ public final class RallyManager {
     private final Plugin plugin;
     private final Messages messages;
     private final Map<Integer, Long> rallyExpires = new HashMap<>(); // factionId -> expiry time
+    private final Map<Integer, org.bukkit.Location> rallyLocations = new HashMap<>(); // factionId -> location
     private static final long RALLY_DURATION_MILLIS = 4 * 60 * 1000; // 4 minutes
 
     public RallyManager(Plugin plugin, Messages messages) {
@@ -26,12 +27,18 @@ public final class RallyManager {
         startUpdateTask();
     }
 
+    public void setRally(int factionId, org.bukkit.Location location) {
+        rallyLocations.put(factionId, location.clone());
+        rallyExpires.put(factionId, System.currentTimeMillis() + RALLY_DURATION_MILLIS);
+    }
+
     public void setRallyExpiry(int factionId) {
         rallyExpires.put(factionId, System.currentTimeMillis() + RALLY_DURATION_MILLIS);
     }
 
     public void clearRally(int factionId) {
         rallyExpires.remove(factionId);
+        rallyLocations.remove(factionId);
     }
 
     private boolean isRallyActive(int factionId) {
@@ -45,14 +52,9 @@ public final class RallyManager {
     }
 
     private RallyPoint getRallyFromFaction(int factionId) {
-        try {
-            for (Faction faction : dev.kitteh.factions.Factions.factions().all()) {
-                if (faction != null && faction.id() == factionId && faction.home() != null) {
-                    return new RallyPoint(factionId, faction.home(), System.currentTimeMillis());
-                }
-            }
-        } catch (Exception e) {
-            // Faction doesn't have rally/home set
+        org.bukkit.Location location = rallyLocations.get(factionId);
+        if (location != null) {
+            return new RallyPoint(factionId, location, System.currentTimeMillis());
         }
         return null;
     }
@@ -143,5 +145,6 @@ public final class RallyManager {
 
     public void shutdown() {
         rallyExpires.clear();
+        rallyLocations.clear();
     }
 }

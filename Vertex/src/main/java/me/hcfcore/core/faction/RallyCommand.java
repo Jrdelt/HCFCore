@@ -4,7 +4,6 @@ import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.Messages;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -37,7 +36,7 @@ public final class RallyCommand implements CommandExecutor {
 
         if (args.length == 0) {
             // /rally with no args - set rally at current location
-            rallyManager.setRallyExpiry(factionId);
+            rallyManager.setRally(factionId, player.getLocation());
             sender.sendMessage(Component.text("Rally set at your location! It will last 4 minutes.").color(NamedTextColor.GREEN));
             return true;
         }
@@ -45,7 +44,7 @@ public final class RallyCommand implements CommandExecutor {
         String action = args[0].toLowerCase();
 
         if (action.equals("set")) {
-            rallyManager.setRallyExpiry(factionId);
+            rallyManager.setRally(factionId, player.getLocation());
             sender.sendMessage(Component.text("Rally set at your location! It will last 4 minutes.").color(NamedTextColor.GREEN));
             return true;
         } else if (action.equals("clear")) {
