@@ -98,4 +98,8 @@ public final class FakePearlListener implements Listener {
     static boolean isThrowingFakePearl(UUID playerId) {
         return THROWING_FAKE_PEARL.contains(playerId);
     }
+
+    public static void clearAll() {
+        THROWING_FAKE_PEARL.clear();
+    }
 }

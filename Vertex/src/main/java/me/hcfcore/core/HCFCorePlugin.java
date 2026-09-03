@@ -216,7 +216,6 @@ public final class HCFCorePlugin extends JavaPlugin {
         for (var player : Bukkit.getOnlinePlayers()) {
             var uuid = player.getUniqueId();
             Bukkit.getScheduler().runTaskAsynchronously(this, () -> userManager.load(uuid));
-            scoreboardManager.setup(player);
         }
     }
 
@@ -240,9 +239,13 @@ public final class HCFCorePlugin extends JavaPlugin {
         if (languageCommand != null) {
             languageCommand.awaitWrites();
         }
+        if (deathManager != null) {
+            deathManager.awaitWrites();
+        }
         if (rallyManager != null) {
             rallyManager.shutdown();
         }
+        FakePearlListener.clearAll();
         if (storage != null) {
             storage.close();
         }

@@ -62,6 +62,7 @@ public final class KitManager {
     private final java.util.Set<CompletableFuture<Void>> pendingCooldownWrites = ConcurrentHashMap.newKeySet();
     private BukkitTask armorMonitorTask;
     private final Map<String, Kit> kits = new LinkedHashMap<>();
+    private volatile List<Kit> kitsWithEffects = new ArrayList<>();
     // Single thread so concurrent /kit save and /kit delete calls persist in
     // the order they happened, instead of racing on kits.yml.
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(r -> {
@@ -124,6 +125,15 @@ public final class KitManager {
             kits.put(name.toLowerCase(Locale.ROOT),
                     new Kit(name, permission, cooldown, armor, contents, cost, effects, icon, purpose));
         }
+
+        // Rebuild cache of kits with effects for armor checking optimization
+        List<Kit> effectKits = new ArrayList<>();
+        for (Kit kit : kits.values()) {
+            if (!kit.getEffects().isEmpty()) {
+                effectKits.add(kit);
+            }
+        }
+        kitsWithEffects = effectKits;
     }
 
     private Map<String, Object> loadRawConfig(File file) {
@@ -496,9 +506,8 @@ public final class KitManager {
 
     private Kit findArmorKit(Player player) {
         ItemStack[] actualArmor = player.getInventory().getArmorContents();
-        for (Kit kit : kits.values()) {
-            if (!kit.getEffects().isEmpty()
-                    && hasSameArmor(actualArmor, toBukkitArmorOrder(kit.getArmor()))) {
+        for (Kit kit : kitsWithEffects) {
+            if (hasSameArmor(actualArmor, toBukkitArmorOrder(kit.getArmor()))) {
                 return kit;
             }
         }
