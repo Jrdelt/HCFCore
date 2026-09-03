@@ -2,14 +2,12 @@ package me.hcfcore.core.faction;
 
 import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.Messages;
+import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import dev.kitteh.factions.FPlayer;
-import dev.kitteh.factions.FPlayers;
-import dev.kitteh.factions.Faction;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +17,7 @@ public final class RallyManager {
     private final Messages messages;
     private final Map<Integer, Long> rallyExpires = new HashMap<>(); // factionId -> expiry time
     private final Map<Integer, org.bukkit.Location> rallyLocations = new HashMap<>(); // factionId -> location
+    private final Map<Player, BossBar> playerBossBars = new HashMap<>();
     private static final long RALLY_DURATION_MILLIS = 4 * 60 * 1000; // 4 minutes
 
     public RallyManager(Plugin plugin, Messages messages) {
@@ -39,6 +38,15 @@ public final class RallyManager {
     public void clearRally(int factionId) {
         rallyExpires.remove(factionId);
         rallyLocations.remove(factionId);
+        // Clear boss bars for faction members
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (FactionsHook.getFactionId(player) == factionId) {
+                BossBar bar = playerBossBars.remove(player);
+                if (bar != null) {
+                    player.hideBossBar(bar);
+                }
+            }
+        }
     }
 
     private boolean isRallyActive(int factionId) {
@@ -67,15 +75,27 @@ public final class RallyManager {
         for (Player player : Bukkit.getOnlinePlayers()) {
             int factionId = FactionsHook.getFactionId(player);
             if (factionId == FactionsHook.NO_FACTION) {
+                BossBar bar = playerBossBars.remove(player);
+                if (bar != null) {
+                    player.hideBossBar(bar);
+                }
                 continue;
             }
 
             if (!isRallyActive(factionId)) {
+                BossBar bar = playerBossBars.remove(player);
+                if (bar != null) {
+                    player.hideBossBar(bar);
+                }
                 continue;
             }
 
             RallyPoint rally = getRallyFromFaction(factionId);
             if (rally == null) {
+                BossBar bar = playerBossBars.remove(player);
+                if (bar != null) {
+                    player.hideBossBar(bar);
+                }
                 continue;
             }
 
@@ -101,10 +121,18 @@ public final class RallyManager {
         // Determine arrow based on relative direction
         String arrowSymbol = getArrowForDirection(relativeAngle);
 
-        Component text = Component.text(arrowSymbol + " FACTION-RALLY: " + distanceInt + " Blocks Away!")
+        Component text = Component.text(arrowSymbol + " FACTION-RALLY: " + distanceInt + " Blocks")
                 .color(NamedTextColor.GREEN);
 
-        player.sendActionBar(text);
+        // Update or create bossbar
+        BossBar bar = playerBossBars.get(player);
+        if (bar == null) {
+            bar = BossBar.bossBar(text, 1.0f, BossBar.Color.GREEN, BossBar.Overlay.PROGRESS);
+            playerBossBars.put(player, bar);
+            player.showBossBar(bar);
+        } else {
+            bar.name(text);
+        }
 
         // Point compass towards rally
         player.setCompassTarget(rally.getLocation());
@@ -117,7 +145,7 @@ public final class RallyManager {
         double dx = to.getX() - from.getX();
         double dz = to.getZ() - from.getZ();
 
-        float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        float yaw = (float) Math.toDegrees(Math.atan2(dx, dz));
         return yaw;
     }
 
@@ -126,19 +154,19 @@ public final class RallyManager {
         if (relativeAngle >= -22.5 && relativeAngle < 22.5) {
             return "⬇ "; // Rally ahead
         } else if (relativeAngle >= 22.5 && relativeAngle < 67.5) {
-            return "⬇↙ "; // Rally forward-left
+            return "⬇➡ "; // Rally forward-right
         } else if (relativeAngle >= 67.5 && relativeAngle < 112.5) {
-            return "⬅ "; // Rally left
+            return "➡ "; // Rally right
         } else if (relativeAngle >= 112.5 && relativeAngle < 157.5) {
-            return "⬅↖ "; // Rally back-left
+            return "⬆➡ "; // Rally back-right
         } else if (relativeAngle >= 157.5 || relativeAngle < -157.5) {
             return "⬆ "; // Rally behind
         } else if (relativeAngle >= -157.5 && relativeAngle < -112.5) {
-            return "⬆↗ "; // Rally back-right
+            return "⬆⬅ "; // Rally back-left
         } else if (relativeAngle >= -112.5 && relativeAngle < -67.5) {
-            return "➡ "; // Rally right
+            return "⬅ "; // Rally left
         } else if (relativeAngle >= -67.5 && relativeAngle < -22.5) {
-            return "➡↘ "; // Rally forward-right
+            return "⬅⬇ "; // Rally forward-left
         }
         return "➜ ";
     }
@@ -146,5 +174,9 @@ public final class RallyManager {
     public void shutdown() {
         rallyExpires.clear();
         rallyLocations.clear();
+        for (BossBar bar : playerBossBars.values()) {
+            // Bossbars are automatically hidden when no players show them
+        }
+        playerBossBars.clear();
     }
 }
