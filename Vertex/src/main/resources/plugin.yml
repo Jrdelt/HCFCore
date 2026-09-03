@@ -56,9 +56,6 @@ commands:
   rollback:
     description: View and restore items from a player's death history.
     usage: /<command> <player>
-  frally:
-    description: Set or clear faction rally point for navigation.
-    usage: /<command> set|clear
 
 permissions:
   hcfcore.admin:
@@ -96,7 +93,4 @@ permissions:
     default: op
   hcfcore.staff.rollback:
     description: View and restore items from a player's death history.
-    default: op
-  hcfcore.faction.rally:
-    description: Set or clear faction rally point.
     default: op

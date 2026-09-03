@@ -40,7 +40,6 @@ import me.hcfcore.core.reboot.NextRebootCommand;
 import me.hcfcore.core.reboot.RebootCommand;
 import me.hcfcore.core.reboot.RebootManager;
 import me.hcfcore.core.scoreboard.ScoreboardManager;
-import me.hcfcore.core.faction.RallyCommand;
 import me.hcfcore.core.faction.RallyListener;
 import me.hcfcore.core.faction.RallyManager;
 import me.hcfcore.core.staff.DeathListener;
@@ -214,9 +213,6 @@ public final class HCFCorePlugin extends JavaPlugin {
         RollbackCommand rollbackCommand = new RollbackCommand(this, deathManager, messages);
         getCommand("rollback").setExecutor(rollbackCommand);
         getCommand("rollback").setTabCompleter(rollbackCommand);
-
-        RallyCommand rallyCommand = new RallyCommand(rallyManager, messages);
-        getCommand("frally").setExecutor(rallyCommand);
 
         for (var player : Bukkit.getOnlinePlayers()) {
             var uuid = player.getUniqueId();

@@ -7,16 +7,18 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import dev.kitteh.factions.FPlayer;
+import dev.kitteh.factions.FPlayers;
+import dev.kitteh.factions.Faction;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 public final class RallyManager {
     private final Plugin plugin;
     private final Messages messages;
-    private final Map<Integer, RallyPoint> rallyPoints = new HashMap<>();
-    private final Map<UUID, Component> bossBarCache = new HashMap<>();
+    private final Map<Integer, Long> rallyExpires = new HashMap<>(); // factionId -> expiry time
+    private static final long RALLY_DURATION_MILLIS = 4 * 60 * 1000; // 4 minutes
 
     public RallyManager(Plugin plugin, Messages messages) {
         this.plugin = plugin;
@@ -24,18 +26,31 @@ public final class RallyManager {
         startUpdateTask();
     }
 
-    public void setRally(int factionId, org.bukkit.Location location) {
-        rallyPoints.put(factionId, new RallyPoint(factionId, location.clone(), System.currentTimeMillis()));
-        bossBarCache.clear();
+    public void setRallyExpiry(int factionId) {
+        rallyExpires.put(factionId, System.currentTimeMillis() + RALLY_DURATION_MILLIS);
     }
 
-    public void clearRally(int factionId) {
-        rallyPoints.remove(factionId);
-        bossBarCache.clear();
+    private boolean isRallyActive(int factionId) {
+        Long expiry = rallyExpires.get(factionId);
+        if (expiry == null) return false;
+        if (System.currentTimeMillis() >= expiry) {
+            rallyExpires.remove(factionId);
+            return false;
+        }
+        return true;
     }
 
-    public RallyPoint getRally(int factionId) {
-        return rallyPoints.get(factionId);
+    private RallyPoint getRallyFromFaction(int factionId) {
+        try {
+            for (Faction faction : dev.kitteh.factions.Factions.factions().all()) {
+                if (faction != null && faction.id() == factionId && faction.home() != null) {
+                    return new RallyPoint(factionId, faction.home(), System.currentTimeMillis());
+                }
+            }
+        } catch (Exception e) {
+            // Faction doesn't have rally/home set
+        }
+        return null;
     }
 
     private void startUpdateTask() {
@@ -49,7 +64,11 @@ public final class RallyManager {
                 continue;
             }
 
-            RallyPoint rally = rallyPoints.get(factionId);
+            if (!isRallyActive(factionId)) {
+                continue;
+            }
+
+            RallyPoint rally = getRallyFromFaction(factionId);
             if (rally == null) {
                 continue;
             }
@@ -119,7 +138,6 @@ public final class RallyManager {
     }
 
     public void shutdown() {
-        rallyPoints.clear();
-        bossBarCache.clear();
+        rallyExpires.clear();
     }
 }
