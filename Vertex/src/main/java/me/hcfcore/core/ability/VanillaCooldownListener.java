@@ -36,7 +36,7 @@ public final class VanillaCooldownListener implements Listener {
         if (item == null) return;
         if (item.getType() == Material.ENDER_PEARL && !AbilityGate.isAbility(plugin, item, "fake-pearl")
                 && !isBlockUse(event)) {
-            applyPearl(event, player);
+            checkPearlCooldown(event, player);
         }
     }
 
@@ -96,7 +96,12 @@ public final class VanillaCooldownListener implements Listener {
         if (remaining > 0L) {
             event.setCancelled(true);
             sendCooldownMessage(player, "ender-pearl", remaining);
+            return;
         }
+
+        // Pearl was thrown - start cooldown for next pearl
+        int cooldownSeconds = plugin.getConfig().getInt("pvp.pearl-cooldown-seconds", 12);
+        cooldownManager.start(player.getUniqueId(), Material.ENDER_PEARL, cooldownSeconds);
     }
 
     @EventHandler
@@ -104,15 +109,12 @@ public final class VanillaCooldownListener implements Listener {
         cooldownManager.clearIfExpired(event.getPlayer().getUniqueId());
     }
 
-    private void applyPearl(PlayerInteractEvent event, Player player) {
+    private void checkPearlCooldown(PlayerInteractEvent event, Player player) {
         long remaining = cooldownManager.remainingMillis(player.getUniqueId(), Material.ENDER_PEARL);
         if (remaining > 0L) {
             event.setCancelled(true);
             sendCooldownMessage(player, "ender-pearl", remaining);
-            return;
         }
-        cooldownManager.start(player.getUniqueId(), Material.ENDER_PEARL,
-                Math.max(0, plugin.getConfig().getInt("pvp.pearl-cooldown-seconds", 0)));
     }
 
     private void sendCooldownMessage(Player player, String itemKey, long remainingMillis) {
