@@ -10,6 +10,7 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.plugin.PluginMock;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RebootCommandTest {
@@ -35,17 +36,21 @@ class RebootCommandTest {
     }
 
     @Test
-    void successfulScheduleConfirmsDirectlyToTheSender() {
+    void successfulScheduleBroadcastsExactlyOnce() {
+        // Regression test: RebootManager.schedule() already broadcasts
+        // reboot.started to every online player (including the sender);
+        // RebootCommand used to also send it directly to the sender,
+        // doubling it up for whoever ran the command.
         PlayerMock player = authorizedPlayer("Alice");
 
         command.onCommand(player, null, "reboot", new String[0]);
 
         assertTrue(player.nextMessage().contains("server reboot has been scheduled"));
-        assertTrue(player.nextMessage().contains("server reboot has been scheduled"));
+        assertNull(player.nextMessage(), "the sender should only see the broadcast once");
     }
 
     @Test
-    void successfulCancelConfirmsDirectlyToTheSender() {
+    void successfulCancelBroadcastsExactlyOnce() {
         PlayerMock player = authorizedPlayer("Bob");
         rebootManager.schedule();
         player.nextMessage();
@@ -53,7 +58,7 @@ class RebootCommandTest {
         command.onCommand(player, null, "reboot", new String[]{"cancel"});
 
         assertTrue(player.nextMessage().contains("scheduled reboot was cancelled"));
-        assertTrue(player.nextMessage().contains("scheduled reboot was cancelled"));
+        assertNull(player.nextMessage(), "the sender should only see the broadcast once");
     }
 
     private PlayerMock authorizedPlayer(String name) {

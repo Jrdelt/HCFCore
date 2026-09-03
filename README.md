@@ -377,8 +377,6 @@ tags:
     permission: hcfcore.tag.legend
     created-at: 1725235200000
     owners: 0
-    material: NETHER_STAR
-    custom-model-data: 1001
     lore:
       - '<gray>A name known by all.'
 players: {}
@@ -394,12 +392,12 @@ players: {}
 - `owners` — a lifetime counter of how many times players have equipped
   this tag (not a live "currently equipped" count — unequipping doesn't
   roll it back).
-- `material` / `custom-model-data` — optional icon override for the GUI;
-  falls back to `NAME_TAG` if unset, and to `IRON_BARS` whenever the
-  viewing player hasn't unlocked the tag (regardless of `material`), so
-  locked tags stay visually distinct.
 - `lore` — optional extra flavor lines shown under the equipped/unequipped
   status line, above the auto-generated Created/Owners lines.
+- `material` / `custom-model-data` are still read and round-tripped by
+  `TagManager` but currently unused by the GUI — every tag renders as a
+  plain `NAME_TAG`, including locked ones (there's no separate locked
+  icon anymore either).
 - `players` — per-player state (equipped tag id, nickname-match on/off,
   nickname-match reversed), keyed by UUID; managed entirely by the plugin,
   not meant for hand-editing.
@@ -410,8 +408,10 @@ count), **sort** (Alphabetical/Age — click to cycle, shift-click to flip
 direction), **search** (opens an anvil to type a query; right-click
 clears it), **prev/next page**, and a **nickname-match** preview (top
 middle) that recolors your name in chat to match your equipped tag,
-including a "reversed" gradient-direction option. Clicking an unlocked
-tag equips it; clicking your already-equipped tag unequips it.
+including a "reversed" gradient-direction option. There's no close
+button — leave the GUI the normal way (Esc / click outside). Clicking an
+unlocked tag equips it and announces it in chat (`<tag> EQUIPPED`);
+clicking your already-equipped tag unequips it (`<tag> UNEQUIPPED`).
 
 Reloaded along with everything else on `/hcfcore reload`.
 
@@ -431,7 +431,7 @@ shows any player the currently scheduled countdown, if one is running.
 | `/kit <name>` | kit's own permission (blank for the six base kits — open to everyone; the `-donator` variants require theirs) | Applies the kit to your inventory, respecting its cooldown and cost. |
 | `/kit create <name> [permission] [cooldownSeconds] [cost] [costItem[:amount]]` | `hcfcore.kit.create` | Saves your current inventory as a kit. `costItem` is a Material name, e.g. `DIAMOND:2`; amount defaults to 1. The older `/kit save` alias remains supported (`hcfcore.kit.save`). |
 | `/kit delete <name>` | `hcfcore.kit.delete` | Deletes a kit. |
-| `/kits` | *(none — open to all players)* | Opens a GUI of every kit you can see. **Left-click** claims it, **right-click** previews its contents read-only. |
+| `/kits` | *(none — open to all players)* | Opens a fixed 5-row GUI: non-donor kits fill row 2, each one's `-donator` variant sits directly below it in row 3 (same column), both kept off the outer columns. **Left-click** claims it, **right-click** previews its contents read-only. |
 
 ### Tags
 

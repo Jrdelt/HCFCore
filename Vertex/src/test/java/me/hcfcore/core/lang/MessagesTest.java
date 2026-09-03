@@ -67,7 +67,7 @@ class MessagesTest {
         // Overridden in xx_test.
         assertEquals("&aCustom applied text.", messages.getRaw(player, "kit.applied"));
         // Not present in xx_test -- must fall back to en_us's real text.
-        assertEquals("<red>No permission.", messages.getRaw(player, "kit.gui-no-access"));
+        assertEquals("<dark_red><bold>UNCLAIMABLE", messages.getRaw(player, "kit.gui-no-access"));
     }
 
     @Test

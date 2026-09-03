@@ -1,5 +1,8 @@
 package me.hcfcore.core.tag;
 
+import me.hcfcore.core.lang.MessageFormatter;
+import me.hcfcore.core.lang.Messages;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
@@ -65,7 +68,7 @@ public final class TagMenuListener implements Listener {
         int slot = event.getRawSlot();
 
         if (TagMenu.isTagSlot(slot)) {
-            selectTag(player, manager, event.getCurrentItem());
+            selectTag(player, manager, holder.messages(), event.getCurrentItem());
             return;
         }
 
@@ -110,13 +113,12 @@ public final class TagMenuListener implements Listener {
                 }
                 TagMenu.open(player, manager, holder.messages(), state);
             }
-            case TagMenu.SLOT_CLOSE -> player.closeInventory();
             default -> {
             }
         }
     }
 
-    private void selectTag(Player player, TagManager manager, ItemStack clicked) {
+    private void selectTag(Player player, TagManager manager, Messages messages, ItemStack clicked) {
         if (clicked == null || !clicked.hasItemMeta()) {
             return;
         }
@@ -129,9 +131,23 @@ public final class TagMenuListener implements Listener {
         boolean alreadyEquipped = tag.id().equalsIgnoreCase(manager.getPlayerTag(player.getUniqueId()));
         if (alreadyEquipped) {
             manager.unselect(player.getUniqueId());
+            player.sendMessage(equipStatusMessage(messages, player, tag, "tags.unequipped"));
         } else {
             manager.select(player.getUniqueId(), tag.id());
+            player.sendMessage(equipStatusMessage(messages, player, tag, "tags.equipped"));
         }
         player.closeInventory();
+    }
+
+    /**
+     * `tag.display()` is admin-authored (tags.yml) and already carries its
+     * own color/gradient, so this is built by concatenating it directly
+     * with the raw (undeserialized) status template rather than through
+     * Messages' escaped-placeholder substitution -- that escaping exists
+     * to guard untrusted values, and would otherwise render the tag's own
+     * color tags as literal text.
+     */
+    private static Component equipStatusMessage(Messages messages, Player player, TagManager.Tag tag, String statusKey) {
+        return MessageFormatter.deserialize(tag.display() + " " + messages.getRaw(player, statusKey));
     }
 }

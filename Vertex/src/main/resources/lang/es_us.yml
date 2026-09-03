@@ -43,7 +43,6 @@ tags:
   nickname-reversed-suffix: '<gray> (Invertido)'
   nickname-hint-toggle: '<gray>Clic para alternar.'
   nickname-hint-reverse: '<gray>Shift + Clic para invertir el degradado.'
-  close: '<red>Cerrar'
   previous-page: '<yellow>Pagina anterior'
   next-page: '<yellow>Pagina siguiente'
 
@@ -76,8 +75,8 @@ kit:
   cost-withdraw-failed: '<red>El pago fallo, por lo que el kit no fue reclamado.'
   inventory-full: '<red>✖</red> <deny>Tu inventario esta demasiado lleno para reclamar este kit.'
   gui-title: 'Kits'
-  gui-access: '<green>Tienes acceso.'
-  gui-no-access: '<red>Sin permiso.'
+  gui-access: '<green><bold>RECLAMABLE'
+  gui-no-access: '<dark_red><bold>NO RECLAMABLE'
   gui-cooldown: '<red>Espera: {seconds}s'
   gui-ready: '<green>Listo para reclamar.'
   gui-cost-money: '<white>Costo: {amount}'

@@ -29,7 +29,6 @@ public final class TagMenu {
     static final int SLOT_PREV_PAGE = 48;
     static final int SLOT_SEARCH = 49;
     static final int SLOT_NEXT_PAGE = 50;
-    static final int SLOT_CLOSE = 52;
     static final int SLOT_SORT = 53;
 
     private TagMenu() {
@@ -60,7 +59,6 @@ public final class TagMenu {
         inventory.setItem(SLOT_NICKNAME, nicknameButton(player, manager, messages));
         inventory.setItem(SLOT_NEXT_PAGE, pageButton(messages, player, "tags.next-page",
                 Material.LIME_DYE, page < totalPages - 1));
-        inventory.setItem(SLOT_CLOSE, plainButton(Material.BARRIER, messages.get(player, "tags.close")));
 
         player.openInventory(inventory);
     }
@@ -107,19 +105,10 @@ public final class TagMenu {
         };
     }
 
-    @SuppressWarnings("deprecation")
     private static ItemStack tagIcon(Player player, TagManager manager, Messages messages, TagManager.Tag tag) {
         boolean unlocked = manager.isUnlocked(player, tag);
-        Material material = unlocked ? resolveMaterial(tag.material(), Material.NAME_TAG) : Material.IRON_BARS;
-        ItemStack item = new ItemStack(material);
+        ItemStack item = new ItemStack(Material.NAME_TAG);
         ItemMeta meta = item.getItemMeta();
-        if (tag.customModelData() != null) {
-            // The legacy single-int overload -- simplest to author as a
-            // single tags.yml field. The 1.21.5+ CustomModelDataComponent
-            // API adds float/flag/string/color lists that aren't needed
-            // for a plain per-tag model-data override.
-            meta.setCustomModelData(tag.customModelData());
-        }
 
         meta.displayName(noItalic(MessageFormatter.deserialize(tag.display())));
 
@@ -143,19 +132,6 @@ public final class TagMenu {
                 PersistentDataType.STRING, tag.id());
         item.setItemMeta(meta);
         return item;
-    }
-
-    /**
-     * tags.yml's `material` is an optional admin-authored override for the
-     * tag's icon; an unset or unrecognized value falls back to the default
-     * (NAME_TAG when unlocked) rather than failing the whole menu render.
-     */
-    private static Material resolveMaterial(String name, Material fallback) {
-        if (name == null || name.isBlank()) {
-            return fallback;
-        }
-        Material material = Material.matchMaterial(name);
-        return material != null ? material : fallback;
     }
 
     /**
@@ -274,14 +250,6 @@ public final class TagMenu {
             lore.add(messages.get(player, "tags.nickname-hint-reverse"));
         }
         return button(Material.NAME_TAG, Component.text("Nickname Match", NamedTextColor.LIGHT_PURPLE), lore);
-    }
-
-    private static ItemStack plainButton(Material material, Component name) {
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(name));
-        item.setItemMeta(meta);
-        return item;
     }
 
     private static ItemStack button(Material material, Component name, List<Component> lore) {

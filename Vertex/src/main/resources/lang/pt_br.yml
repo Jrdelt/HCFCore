@@ -43,7 +43,6 @@ tags:
   nickname-reversed-suffix: '<gray> (Invertido)'
   nickname-hint-toggle: '<gray>Clique para alternar.'
   nickname-hint-reverse: '<gray>Shift + Clique para inverter o degrade.'
-  close: '<red>Fechar'
   previous-page: '<yellow>Pagina anterior'
   next-page: '<yellow>Proxima pagina'
 
@@ -76,8 +75,8 @@ kit:
   cost-withdraw-failed: '<red>O pagamento falhou, entao o kit nao foi resgatado.'
   inventory-full: '<red>✖</red> <deny>Seu inventario esta cheio demais para resgatar este kit.'
   gui-title: 'Kits'
-  gui-access: '<green>Voce tem acesso.'
-  gui-no-access: '<red>Sem permissao.'
+  gui-access: '<green><bold>RESGATAVEL'
+  gui-no-access: '<dark_red><bold>NAO RESGATAVEL'
   gui-cooldown: '<red>Espera: {seconds}s'
   gui-ready: '<green>Pronto para resgatar.'
   gui-cost-money: '<white>Custo: {amount}'

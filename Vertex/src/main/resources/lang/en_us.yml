@@ -43,7 +43,6 @@ tags:
   nickname-reversed-suffix: '<gray> (Reversed)'
   nickname-hint-toggle: '<gray>Click to toggle.'
   nickname-hint-reverse: '<gray>Shift-click to reverse the gradient.'
-  close: '<red>Close'
   previous-page: '<yellow>Previous Page'
   next-page: '<yellow>Next Page'
 
@@ -76,8 +75,8 @@ kit:
   cost-withdraw-failed: '<red>The payment failed, so the kit was not claimed.'
   inventory-full: '<red>✖</red> <deny>Your inventory is too full to claim this kit.'
   gui-title: 'Kits'
-  gui-access: '<green>You have access.'
-  gui-no-access: '<red>No permission.'
+  gui-access: '<green><bold>CLAIMABLE'
+  gui-no-access: '<dark_red><bold>UNCLAIMABLE'
   gui-cooldown: '<red>Cooldown: {seconds}s'
   gui-ready: '<green>Ready to claim.'
   gui-cost-money: '<white>Cost: {amount}'

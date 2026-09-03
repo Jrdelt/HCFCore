@@ -26,18 +26,18 @@ public final class RebootCommand implements CommandExecutor {
             return true;
         }
         if (args.length == 1) {
+            // On success, RebootManager.cancel() already broadcasts
+            // reboot.cancelled to every online player and the console --
+            // sending it again here would double it up for the sender.
             if (!rebootManager.cancel()) {
                 sender.sendMessage(messages.getChat(sender, "reboot.not-scheduled"));
-            } else {
-                sender.sendMessage(messages.getChat(sender, "reboot.cancelled"));
             }
             return true;
         }
+        // Same as above: RebootManager.schedule() already broadcasts
+        // reboot.started on success.
         if (!rebootManager.schedule()) {
             sender.sendMessage(messages.getChat(sender, "reboot.already-scheduled"));
-        } else {
-            sender.sendMessage(messages.getChat(sender, "reboot.started",
-                    "minutes", String.valueOf(rebootManager.getDefaultDelayMinutes())));
         }
         return true;
     }

@@ -4,7 +4,6 @@ tags:
     permission: hcfcore.tag.gladiator
     created-at: 1725235200000
     owners: 0
-    material: IRON_SWORD
     lore:
       - '<gray>Bred for the arena.'
   berserker:
@@ -12,7 +11,6 @@ tags:
     permission: hcfcore.tag.berserker
     created-at: 1725235200000
     owners: 0
-    material: AXE
     lore:
       - '<gray>Driven by pure rage.'
   warlord:
@@ -20,7 +18,6 @@ tags:
     permission: hcfcore.tag.warlord
     created-at: 1725235200000
     owners: 0
-    material: GOLDEN_SWORD
     lore:
       - '<gray>Commands the battlefield.'
   assassin:
@@ -28,7 +25,6 @@ tags:
     permission: hcfcore.tag.assassin
     created-at: 1725235200000
     owners: 0
-    material: SHEARS
     lore:
       - '<gray>Strikes from the shadows.'
   shadow:
@@ -36,7 +32,6 @@ tags:
     permission: hcfcore.tag.shadow
     created-at: 1725235200000
     owners: 0
-    material: COAL
     lore:
       - '<gray>Unseen and lethal.'
   sniper:
@@ -44,7 +39,6 @@ tags:
     permission: hcfcore.tag.sniper
     created-at: 1725235200000
     owners: 0
-    material: BOW
     lore:
       - '<gray>One shot, one kill.'
   juggernaut:
@@ -52,7 +46,6 @@ tags:
     permission: hcfcore.tag.juggernaut
     created-at: 1725235200000
     owners: 0
-    material: IRON_CHESTPLATE
     lore:
       - '<gray>An unstoppable force.'
   immortal:
@@ -60,7 +53,6 @@ tags:
     permission: hcfcore.tag.immortal
     created-at: 1725235200000
     owners: 0
-    material: TOTEM_OF_UNDYING
     lore:
       - '<gray>Refuses to stay down.'
   executioner:
@@ -68,7 +60,6 @@ tags:
     permission: hcfcore.tag.executioner
     created-at: 1725235200000
     owners: 0
-    material: NETHERITE_AXE
     lore:
       - '<gray>Delivers the final blow.'
   reaper:
@@ -76,7 +67,6 @@ tags:
     permission: hcfcore.tag.reaper
     created-at: 1725235200000
     owners: 0
-    material: WITHER_ROSE
     lore:
       - '<gray>Harvesting souls daily.'
   apex:
@@ -84,7 +74,6 @@ tags:
     permission: hcfcore.tag.apex
     created-at: 1725235200000
     owners: 0
-    material: BLAZE_ROD
     lore:
       - '<gray>At the top of the food chain.'
   overlord:
@@ -92,7 +81,6 @@ tags:
     permission: hcfcore.tag.overlord
     created-at: 1725235200000
     owners: 0
-    material: NETHERITE_HELMET
     lore:
       - '<gray>Rules with an iron fist.'
   champion:
@@ -100,7 +88,6 @@ tags:
     permission: hcfcore.tag.champion
     created-at: 1725235200000
     owners: 0
-    material: GOLD_BLOCK
     lore:
       - '<gray>Victorious in every clash.'
   destroyer:
@@ -108,7 +95,6 @@ tags:
     permission: hcfcore.tag.destroyer
     created-at: 1725235200000
     owners: 0
-    material: TNT
     lore:
       - '<gray>Leaves nothing behind.'
   vanguard:
@@ -116,7 +102,6 @@ tags:
     permission: hcfcore.tag.vanguard
     created-at: 1725235200000
     owners: 0
-    material: SHIELD
     lore:
       - '<gray>Leads the charge.'
   venom:
@@ -124,7 +109,6 @@ tags:
     permission: hcfcore.tag.venom
     created-at: 1725235200000
     owners: 0
-    material: SPIDER_EYE
     lore:
       - '<gray>Slow and painful demise.'
   phantom:
@@ -132,7 +116,6 @@ tags:
     permission: hcfcore.tag.phantom
     created-at: 1725235200000
     owners: 0
-    material: PHANTOM_MEMBRANE
     lore:
       - '<gray>Here one second, gone the next.'
   titan:
@@ -140,7 +123,6 @@ tags:
     permission: hcfcore.tag.titan
     created-at: 1725235200000
     owners: 0
-    material: ANVIL
     lore:
       - '<gray>Massive presence, heavy hits.'
   demon:
@@ -148,7 +130,6 @@ tags:
     permission: hcfcore.tag.demon
     created-at: 1725235200000
     owners: 0
-    material: MAGMA_CREAM
     lore:
       - '<gray>Unleashed from the depths.'
   spectre:
@@ -156,7 +137,6 @@ tags:
     permission: hcfcore.tag.spectre
     created-at: 1725235200000
     owners: 0
-    material: GHAST_TEAR
     lore:
       - '<gray>Haunts the enemy spawn.'
   storm:
@@ -164,7 +144,6 @@ tags:
     permission: hcfcore.tag.storm
     created-at: 1725235200000
     owners: 0
-    material: LIGHTNING_ROD
     lore:
       - '<gray>Strikes fast and heavy.'
   blitz:
@@ -172,7 +151,6 @@ tags:
     permission: hcfcore.tag.blitz
     created-at: 1725235200000
     owners: 0
-    material: SUGAR
     lore:
       - '<gray>Speed kills.'
   goliath:
@@ -180,7 +158,6 @@ tags:
     permission: hcfcore.tag.goliath
     created-at: 1725235200000
     owners: 0
-    material: PODZOL
     lore:
       - '<gray>The bigger they are...'
   savage:
@@ -188,7 +165,6 @@ tags:
     permission: hcfcore.tag.savage
     created-at: 1725235200000
     owners: 0
-    material: BONE
     lore:
       - '<gray>Shows zero mercy.'
   merciless:
@@ -196,7 +172,6 @@ tags:
     permission: hcfcore.tag.merciless
     created-at: 1725235200000
     owners: 0
-    material: WITHER_SKELETON_SKULL
     lore:
       - '<gray>No quarter given.'
   striker:
@@ -204,7 +179,6 @@ tags:
     permission: hcfcore.tag.striker
     created-at: 1725235200000
     owners: 0
-    material: TRIDENT
     lore:
       - '<gray>Precise and deadly strikes.'
   renegade:
@@ -212,7 +186,6 @@ tags:
     permission: hcfcore.tag.renegade
     created-at: 1725235200000
     owners: 0
-    material: CROSSBOW
     lore:
       - '<gray>Fights by no rules.'
   predator:
@@ -220,7 +193,6 @@ tags:
     permission: hcfcore.tag.predator
     created-at: 1725235200000
     owners: 0
-    material: RABBIT_FOOT
     lore:
       - '<gray>Tracks down every target.'
   stalker:
@@ -228,7 +200,6 @@ tags:
     permission: hcfcore.tag.stalker
     created-at: 1725235200000
     owners: 0
-    material: ENDER_EYE
     lore:
       - '<gray>Always watching from behind.'
   warlock:
@@ -236,7 +207,6 @@ tags:
     permission: hcfcore.tag.warlock
     created-at: 1725235200000
     owners: 0
-    material: BREWING_STAND
     lore:
       - '<gray>Master of potions and debuffs.'
   paladin:
@@ -244,7 +214,6 @@ tags:
     permission: hcfcore.tag.paladin
     created-at: 1725235200000
     owners: 0
-    material: GOLDEN_HELMET
     lore:
       - '<gray>Holy defense in battle.'
   inquisitor:
@@ -252,7 +221,6 @@ tags:
     permission: hcfcore.tag.inquisitor
     created-at: 1725235200000
     owners: 0
-    material: FLINT_AND_STEEL
     lore:
       - '<gray>Purging the enemies.'
   brawler:
@@ -260,7 +228,6 @@ tags:
     permission: hcfcore.tag.brawler
     created-at: 1725235200000
     owners: 0
-    material: LEATHER_CHESTPLATE
     lore:
       - '<gray>Loves a messy close-up fight.'
   glitch:
@@ -268,7 +235,6 @@ tags:
     permission: hcfcore.tag.glitch
     created-at: 1725235200000
     owners: 0
-    material: CLOCK
     lore:
       - '<gray>Breaking the combat system.'
   rage:
@@ -276,7 +242,6 @@ tags:
     permission: hcfcore.tag.rage
     created-at: 1725235200000
     owners: 0
-    material: REDSTONE_BLOCK
     lore:
       - '<gray>Fueled by pure adrenaline.'
   hazard:
@@ -284,7 +249,6 @@ tags:
     permission: hcfcore.tag.hazard
     created-at: 1725235200000
     owners: 0
-    material: SLIME_BALL
     lore:
       - '<gray>Dangerous to be near.'
   bandit:
@@ -292,7 +256,6 @@ tags:
     permission: hcfcore.tag.bandit
     created-at: 1725235200000
     owners: 0
-    material: LEATHER_HELMET
     lore:
       - '<gray>Loot, pillage, repeat.'
   frostbite:
@@ -300,7 +263,6 @@ tags:
     permission: hcfcore.tag.frostbite
     created-at: 1725235200000
     owners: 0
-    material: PACKED_ICE
     lore:
       - '<gray>Freezing out the competition.'
   inferno:
@@ -308,7 +270,6 @@ tags:
     permission: hcfcore.tag.inferno
     created-at: 1725235200000
     owners: 0
-    material: LAVA_BUCKET
     lore:
       - '<gray>Burning down enemy bases.'
   spectator:
@@ -316,7 +277,6 @@ tags:
     permission: hcfcore.tag.spectator
     created-at: 1725235200000
     owners: 0
-    material: GLASS
     lore:
       - '<gray>Watching them fall.'
   cavalry:
@@ -324,7 +284,6 @@ tags:
     permission: hcfcore.tag.cavalry
     created-at: 1725235200000
     owners: 0
-    material: SADDLE
     lore:
       - '<gray>Charging headfirst.'
   sentinel:
@@ -332,7 +291,6 @@ tags:
     permission: hcfcore.tag.sentinel
     created-at: 1725235200000
     owners: 0
-    material: END_ROD
     lore:
       - '<gray>Guarding the territory.'
   mutiny:
@@ -340,7 +298,6 @@ tags:
     permission: hcfcore.tag.mutiny
     created-at: 1725235200000
     owners: 0
-    material: MUSIC_DISC_PIGSTEP
     lore:
       - '<gray>Turning against the faction.'
   anarchy:
@@ -348,7 +305,6 @@ tags:
     permission: hcfcore.tag.anarchy
     created-at: 1725235200000
     owners: 0
-    material: FIRE_CHARGE
     lore:
       - '<gray>Order through chaos.'
   colossus:
@@ -356,7 +312,6 @@ tags:
     permission: hcfcore.tag.colossus
     created-at: 1725235200000
     owners: 0
-    material: OBSIDIAN
     lore:
       - '<gray>Harder to break than stone.'
   vengeance:
@@ -364,7 +319,6 @@ tags:
     permission: hcfcore.tag.vengeance
     created-at: 1725235200000
     owners: 0
-    material: ENDER_PEARL
     lore:
       - '<gray>Returning for payback.'
   viper:
@@ -372,7 +326,6 @@ tags:
     permission: hcfcore.tag.viper
     created-at: 1725235200000
     owners: 0
-    material: LIME_DYE
     lore:
       - '<gray>Quick strike, toxic finish.'
   dominator:
@@ -380,7 +333,6 @@ tags:
     permission: hcfcore.tag.dominator
     created-at: 1725235200000
     owners: 0
-    material: NETHERITE_SWORD
     lore:
       - '<gray>Total battlefield control.'
   unstoppable:
@@ -388,7 +340,6 @@ tags:
     permission: hcfcore.tag.unstoppable
     created-at: 1725235200000
     owners: 0
-    material: DIAMOND_SWORD
     lore:
       - '<gray>Nothing can block this path.'
 players: {}

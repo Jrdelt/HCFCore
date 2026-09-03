@@ -43,7 +43,6 @@ tags:
   nickname-reversed-suffix: '<gray> (Umgekehrt)'
   nickname-hint-toggle: '<gray>Klicke zum Umschalten.'
   nickname-hint-reverse: '<gray>Umschalt + Klick, um den Farbverlauf umzukehren.'
-  close: '<red>Schliessen'
   previous-page: '<yellow>Vorherige Seite'
   next-page: '<yellow>Naechste Seite'
 
@@ -76,8 +75,8 @@ kit:
   cost-withdraw-failed: '<red>Die Zahlung ist fehlgeschlagen, daher wurde das Kit nicht erhalten.'
   inventory-full: '<red>✖</red> <deny>Dein Inventar ist zu voll, um dieses Kit zu erhalten.'
   gui-title: 'Kits'
-  gui-access: '<green>Du hast Zugriff.'
-  gui-no-access: '<red>Keine Berechtigung.'
+  gui-access: '<green><bold>EINLOESBAR'
+  gui-no-access: '<dark_red><bold>NICHT EINLOESBAR'
   gui-cooldown: '<red>Abklingzeit: {seconds}s'
   gui-ready: '<green>Bereit zum Abholen.'
   gui-cost-money: '<white>Kosten: {amount}'
