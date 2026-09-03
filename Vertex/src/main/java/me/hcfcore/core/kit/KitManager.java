@@ -808,15 +808,29 @@ public final class KitManager {
     }
 
     private void awaitCooldownWrites() {
-        try {
-            CompletableFuture.allOf(pendingCooldownWrites.toArray(new CompletableFuture[0]))
-                    .get(5, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (java.util.concurrent.TimeoutException e) {
-            plugin.getLogger().warning("Timed out waiting for kit cooldown writes during shutdown.");
-        } catch (Exception e) {
-            plugin.getLogger().log(Level.WARNING, "Failed while waiting for kit cooldown writes.", e);
+        long timeout = System.currentTimeMillis() + 5000;
+        while (true) {
+            CompletableFuture<?>[] snapshot = pendingCooldownWrites.toArray(new CompletableFuture[0]);
+            if (snapshot.length == 0) {
+                return;
+            }
+            long remaining = timeout - System.currentTimeMillis();
+            if (remaining <= 0) {
+                plugin.getLogger().warning("Timed out waiting for kit cooldown writes during shutdown.");
+                return;
+            }
+            try {
+                CompletableFuture.allOf(snapshot).get(remaining, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (java.util.concurrent.TimeoutException e) {
+                plugin.getLogger().warning("Timed out waiting for kit cooldown writes during shutdown.");
+                return;
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "Failed while waiting for kit cooldown writes.", e);
+                return;
+            }
         }
     }
 }

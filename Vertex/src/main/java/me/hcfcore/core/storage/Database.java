@@ -30,6 +30,10 @@ public final class Database {
         hikariConfig.setUsername(username);
         hikariConfig.setPassword(password);
         hikariConfig.setMaximumPoolSize(poolSize);
+        hikariConfig.setMinimumIdle(Math.max(2, poolSize / 3));
+        hikariConfig.setConnectionTimeout(10000);
+        hikariConfig.setIdleTimeout(600000);
+        hikariConfig.setMaxLifetime(1800000);
         hikariConfig.setPoolName("HCFCore-Pool");
 
         this.dataSource = new HikariDataSource(hikariConfig);

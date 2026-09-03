@@ -92,10 +92,8 @@ public final class CombatManager {
 
     private void clearStaleOpponent(UUID playerId, UUID oldOpponentId, UUID newOpponentId) {
         if (oldOpponentId != null && !oldOpponentId.equals(newOpponentId)) {
-            synchronized (this) {
-                opponents.remove(oldOpponentId, playerId);
-                taggedUntil.remove(oldOpponentId);
-            }
+            opponents.remove(oldOpponentId, playerId);
+            taggedUntil.remove(oldOpponentId);
         }
     }
 

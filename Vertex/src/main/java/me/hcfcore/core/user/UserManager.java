@@ -68,9 +68,9 @@ public final class UserManager {
     }
 
     private long nextGeneration(UUID uuid) {
-        Long previous = loadGenerations.get(uuid);
-        long generation = previous == null ? 1L : previous + 1L;
-        loadGenerations.put(uuid, generation);
-        return generation;
+        return loadGenerations.compute(uuid, (id, previous) -> {
+            long generation = previous == null ? 1L : previous + 1L;
+            return generation;
+        });
     }
 }

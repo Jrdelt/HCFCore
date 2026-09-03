@@ -33,6 +33,7 @@ public final class Messages {
     private final UserManager userManager;
     private final Map<String, YamlConfiguration> locales = new HashMap<>();
     private String defaultLocale = "en_us";
+    private Set<String> cachedAvailableLocales = new TreeSet<>();
 
     public Messages(Plugin plugin, UserManager userManager) {
         this.plugin = plugin;
@@ -66,6 +67,7 @@ public final class Messages {
         }
 
         defaultLocale = plugin.getConfig().getString("language.default", "en_us").toLowerCase(Locale.ROOT);
+        cachedAvailableLocales = new TreeSet<>(locales.keySet());
     }
 
     /**
@@ -74,7 +76,7 @@ public final class Messages {
      * it becomes selectable with no code change.
      */
     public Set<String> getAvailableLocales() {
-        return new TreeSet<>(locales.keySet());
+        return cachedAvailableLocales;
     }
 
     public boolean isAvailable(String locale) {
