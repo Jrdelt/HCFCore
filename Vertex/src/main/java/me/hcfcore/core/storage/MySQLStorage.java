@@ -181,21 +181,33 @@ public final class MySQLStorage implements Storage {
 
     @Override
     public void saveDeath(UUID uuid, Death death) throws SQLException {
-        try (Connection connection = database.getConnection();
-             PreparedStatement statement = connection.prepareStatement(INSERT_DEATH)) {
-            statement.setString(1, uuid.toString());
-            statement.setLong(2, death.getTimestamp());
-            statement.setString(3, death.getCause());
-            statement.setString(4, death.getKillerName());
-            statement.setBytes(5, serializeItemList(death.getItems()));
-            statement.setBytes(6, serializeItem(death.getHelmet()));
-            statement.setBytes(7, serializeItem(death.getChestplate()));
-            statement.setBytes(8, serializeItem(death.getLeggings()));
-            statement.setBytes(9, serializeItem(death.getBoots()));
-            statement.setBytes(10, serializeItem(death.getOffhand()));
-            statement.executeUpdate();
+        try (Connection connection = database.getConnection()) {
+            boolean previousAutoCommit = connection.getAutoCommit();
+            try {
+                connection.setAutoCommit(false);
 
-            cleanupOldDeaths(uuid, connection);
+                try (PreparedStatement statement = connection.prepareStatement(INSERT_DEATH)) {
+                    statement.setString(1, uuid.toString());
+                    statement.setLong(2, death.getTimestamp());
+                    statement.setString(3, death.getCause());
+                    statement.setString(4, death.getKillerName());
+                    statement.setBytes(5, serializeItemList(death.getItems()));
+                    statement.setBytes(6, serializeItem(death.getHelmet()));
+                    statement.setBytes(7, serializeItem(death.getChestplate()));
+                    statement.setBytes(8, serializeItem(death.getLeggings()));
+                    statement.setBytes(9, serializeItem(death.getBoots()));
+                    statement.setBytes(10, serializeItem(death.getOffhand()));
+                    statement.executeUpdate();
+                }
+
+                cleanupOldDeaths(uuid, connection);
+                connection.commit();
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(previousAutoCommit);
+            }
         }
     }
 
