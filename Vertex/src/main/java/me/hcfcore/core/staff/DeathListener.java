@@ -20,8 +20,8 @@ public final class DeathListener implements Listener {
         if (player.getLastDamageCause() != null && player.getLastDamageCause().getCause() != null) {
             cause = player.getLastDamageCause().getCause().toString();
         }
-        String killer = null;
 
+        String killer = null;
         if (player.getKiller() != null) {
             killer = player.getKiller().getName();
         }
