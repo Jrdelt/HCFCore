@@ -7,22 +7,29 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-public final class RallyManager {
+public final class RallyManager implements Listener {
     private final Plugin plugin;
     private final Messages messages;
-    private final Map<Integer, Long> rallyExpires = new HashMap<>(); // factionId -> expiry time
-    private final Map<Integer, org.bukkit.Location> rallyLocations = new HashMap<>(); // factionId -> location
-    private final Map<Player, BossBar> playerBossBars = new HashMap<>();
+    private final Map<Integer, Long> rallyExpires = new ConcurrentHashMap<>(); // factionId -> expiry time
+    private final Map<Integer, org.bukkit.Location> rallyLocations = new ConcurrentHashMap<>(); // factionId -> location
+    private final Map<Player, BossBar> playerBossBars = new ConcurrentHashMap<>();
+    private BukkitTask updateTask;
     private static final long RALLY_DURATION_MILLIS = 4 * 60 * 1000; // 4 minutes
 
     public RallyManager(Plugin plugin, Messages messages) {
         this.plugin = plugin;
         this.messages = messages;
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
         startUpdateTask();
     }
 
@@ -38,13 +45,9 @@ public final class RallyManager {
     public void clearRally(int factionId) {
         rallyExpires.remove(factionId);
         rallyLocations.remove(factionId);
-        // Clear boss bars for faction members
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (FactionsHook.getFactionId(player) == factionId) {
-                BossBar bar = playerBossBars.remove(player);
-                if (bar != null) {
-                    player.hideBossBar(bar);
-                }
+                hideBossBarForPlayer(player);
             }
         }
     }
@@ -68,34 +71,25 @@ public final class RallyManager {
     }
 
     private void startUpdateTask() {
-        plugin.getServer().getScheduler().runTaskTimer(plugin, this::updateRallyDisplay, 0L, 5L);
+        updateTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::updateRallyDisplay, 0L, 5L);
     }
 
     private void updateRallyDisplay() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             int factionId = FactionsHook.getFactionId(player);
             if (factionId == FactionsHook.NO_FACTION) {
-                BossBar bar = playerBossBars.remove(player);
-                if (bar != null) {
-                    player.hideBossBar(bar);
-                }
+                hideBossBarForPlayer(player);
                 continue;
             }
 
             if (!isRallyActive(factionId)) {
-                BossBar bar = playerBossBars.remove(player);
-                if (bar != null) {
-                    player.hideBossBar(bar);
-                }
+                hideBossBarForPlayer(player);
                 continue;
             }
 
             RallyPoint rally = getRallyFromFaction(factionId);
             if (rally == null) {
-                BossBar bar = playerBossBars.remove(player);
-                if (bar != null) {
-                    player.hideBossBar(bar);
-                }
+                hideBossBarForPlayer(player);
                 continue;
             }
 
@@ -104,6 +98,9 @@ public final class RallyManager {
     }
 
     private void updatePlayerRallyDisplay(Player player, RallyPoint rally) {
+        org.bukkit.Location rallyLoc = rally.getLocation();
+        if (rallyLoc == null) return;
+
         double distance = rally.getDistance(player);
         int distanceInt = (int) Math.round(distance);
 
@@ -135,12 +132,14 @@ public final class RallyManager {
         }
 
         // Point compass towards rally
-        player.setCompassTarget(rally.getLocation());
+        player.setCompassTarget(rallyLoc);
     }
 
     private float getDirectionToRally(Player player, RallyPoint rally) {
         org.bukkit.Location from = player.getLocation();
         org.bukkit.Location to = rally.getLocation();
+
+        if (from == null || to == null) return 0;
 
         double dx = to.getX() - from.getX();
         double dz = to.getZ() - from.getZ();
@@ -171,12 +170,24 @@ public final class RallyManager {
         return "➜ ";
     }
 
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        hideBossBarForPlayer(event.getPlayer());
+    }
+
+    private void hideBossBarForPlayer(Player player) {
+        BossBar bar = playerBossBars.remove(player);
+        if (bar != null) {
+            player.hideBossBar(bar);
+        }
+    }
+
     public void shutdown() {
+        if (updateTask != null) {
+            updateTask.cancel();
+        }
         rallyExpires.clear();
         rallyLocations.clear();
-        for (BossBar bar : playerBossBars.values()) {
-            // Bossbars are automatically hidden when no players show them
-        }
         playerBossBars.clear();
     }
 }

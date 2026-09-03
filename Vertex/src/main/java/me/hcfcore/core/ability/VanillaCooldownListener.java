@@ -20,11 +20,13 @@ public final class VanillaCooldownListener implements Listener {
     private final Plugin plugin;
     private final Messages messages;
     private final VanillaCooldownManager cooldownManager;
+    private final int pearlCooldownSeconds;
 
     public VanillaCooldownListener(Plugin plugin, Messages messages, VanillaCooldownManager cooldownManager) {
         this.plugin = plugin;
         this.messages = messages;
         this.cooldownManager = cooldownManager;
+        this.pearlCooldownSeconds = plugin.getConfig().getInt("pvp.pearl-cooldown-seconds", 12);
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -94,7 +96,7 @@ public final class VanillaCooldownListener implements Listener {
         Player player = (Player) projectile.getShooter();
 
         // Skip cooldown for fake pearls
-        if (FakePearlListener.THROWING_FAKE_PEARL.contains(player.getUniqueId())) {
+        if (FakePearlListener.isThrowingFakePearl(player.getUniqueId())) {
             return;
         }
 
@@ -106,8 +108,7 @@ public final class VanillaCooldownListener implements Listener {
         }
 
         // Pearl was thrown - start cooldown for next pearl
-        int cooldownSeconds = plugin.getConfig().getInt("pvp.pearl-cooldown-seconds", 12);
-        cooldownManager.start(player.getUniqueId(), Material.ENDER_PEARL, cooldownSeconds);
+        cooldownManager.start(player.getUniqueId(), Material.ENDER_PEARL, pearlCooldownSeconds);
     }
 
     @EventHandler

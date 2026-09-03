@@ -78,8 +78,8 @@ public final class InvRestoreMenuListener implements Listener {
 
         for (ItemStack item : death.getAllItems()) {
             if (item != null && !item.getType().isAir()) {
-                if (staffPlayer.getInventory().firstEmpty() != -1) {
-                    staffPlayer.getInventory().addItem(item);
+                java.util.Map<Integer, ItemStack> couldNotAdd = staffPlayer.getInventory().addItem(item);
+                if (couldNotAdd.isEmpty()) {
                     added++;
                 } else {
                     staffPlayer.getWorld().dropItemNaturally(staffPlayer.getLocation(), item);

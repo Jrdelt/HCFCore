@@ -16,7 +16,10 @@ public final class DeathListener implements Listener {
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
-        String cause = player.getLastDamageCause() != null ? player.getLastDamageCause().getCause().toString() : "UNKNOWN";
+        String cause = "UNKNOWN";
+        if (player.getLastDamageCause() != null && player.getLastDamageCause().getCause() != null) {
+            cause = player.getLastDamageCause().getCause().toString();
+        }
         String killer = null;
 
         if (player.getKiller() != null) {
