@@ -35,12 +35,12 @@ public final class RollbackCommand implements CommandExecutor, TabCompleter {
         }
 
         if (!(sender instanceof Player)) {
-            sender.sendMessage(Component.text("Only players can use this command").color(NamedTextColor.RED));
+            sender.sendMessage(messages.getChat(sender, "general.players-only"));
             return true;
         }
 
         if (args.length < 1) {
-            sender.sendMessage(Component.text("Usage: /rollback <player>").color(NamedTextColor.RED));
+            sender.sendMessage(messages.getChat(sender, "staff.rollback-usage"));
             return true;
         }
 
@@ -52,9 +52,8 @@ public final class RollbackCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        InvRestoreMenu.open(staffPlayer, targetPlayer, plugin, deathManager);
-        sender.sendMessage(Component.text("Opening death history for " + targetPlayer.getName())
-                .color(NamedTextColor.GREEN));
+        InvRestoreMenu.open(staffPlayer, targetPlayer, plugin, deathManager, messages);
+        sender.sendMessage(messages.getChat(sender, "staff.rollback-opened", "player", targetPlayer.getName()));
         return true;
     }
 

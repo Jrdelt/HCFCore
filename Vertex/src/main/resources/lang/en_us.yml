@@ -175,3 +175,24 @@ reboot:
 
 factions:
   leader-cannot-leave: '<red>ʏᴏᴜ ᴄᴀɴɴᴏᴛ ʟᴇᴀᴠᴇ ʏᴏᴜʀ ғᴀᴄᴛɪᴏɴ ᴀs ʟᴇᴀᴅᴇʀ. ᴜsᴇ /ғ ᴅɪsʙᴀɴᴅ ᴛᴏ ᴅɪsʙᴀɴᴅ ɪᴛ.'
+  must-be-in-faction: '<red>ʏᴏᴜ ᴍᴜsᴛ ʙᴇ ɪɴ ᴀ ғᴀᴄᴛɪᴏɴ ᴛᴏ sᴇᴛ ᴀ ʀᴀʟʟʏ.'
+  rally-usage: '<red>ᴜsᴀɢᴇ: /ғ ʀᴀʟʟʏ [sᴇᴛ|ᴄʟᴇᴀʀ]'
+  rally-set: '<green>ʀᴀʟʟʏ sᴇᴛ ᴀᴛ ʏᴏᴜʀ ʟᴏᴄᴀᴛɪᴏɴ! ɪᴛ ᴡɪʟʟ ʟᴀsᴛ 4 ᴍɪɴᴜᴛᴇs.'
+  rally-cleared: '<green>ʀᴀʟʟʏ ᴄʟᴇᴀʀᴇᴅ!'
+  rally-bossbar-title: '<green><bold>ғᴀᴄᴛɪᴏɴ ʀᴀʟʟʏ'
+  rally-bossbar-distance: '<white>ʙʟᴏᴄᴋs ᴀᴡᴀʏ'
+
+staff:
+  players-only: '<red>ᴏɴʟʏ ᴘʟᴀʏᴇʀs ᴄᴀɴ ᴜsᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ.'
+  rollback-usage: '<red>ᴜsᴀɢᴇ: /ʀᴏʟʟʙᴀᴄᴋ <ᴘʟᴀʏᴇʀ>'
+  rollback-opened: '<green>ᴏᴘᴇɴɪɴɢ ᴅᴇᴀᴛʜ ʜɪsᴛᴏʀʏ ғᴏʀ {player}'
+  no-deaths-found: '<red>ɴᴏ ᴅᴇᴀᴛʜs ғᴏᴜɴᴅ ғᴏʀ ᴛʜɪs ᴘʟᴀʏᴇʀ.'
+  deaths-title: 'ᴅᴇᴀᴛʜs - {uuid}'
+  death-contents-title: 'ᴅᴇᴀᴛʜ ᴄᴏɴᴛᴇɴᴛs'
+  menu-back: '<red><bold>ʙᴀᴄᴋ'
+  death-cause: '<gray>ᴄᴀᴜsᴇ: {cause}'
+  death-killer: '<gray>ᴋɪʟʟᴇʀ: {killer}'
+  death-lore-left: '<yellow>ʟᴇғᴛ ᴄʟɪᴄᴋ: ʀᴇsᴛᴏʀᴇ ᴛᴏ ʏᴏᴜʀ ɪɴᴠᴇɴᴛᴏʀʏ'
+  death-lore-right: '<yellow>ʀɪɢʜᴛ ᴄʟɪᴄᴋ: ᴠɪᴇᴡ ᴄᴏɴᴛᴇɴᴛs'
+  restore-success: '<green>ʀᴇsᴛᴏʀᴇᴅ {added} ɪᴛᴇᴍs ᴛᴏ ʏᴏᴜʀ ɪɴᴠᴇɴᴛᴏʀʏ'
+  restore-overflow: '<yellow>{dropped} ɪᴛᴇᴍs ᴡᴇʀᴇ ᴅʀᴏᴘᴘᴇᴅ ᴏɴ ᴛʜᴇ ɢʀᴏᴜɴᴅ (ɪɴᴠᴇɴᴛᴏʀʏ ғᴜʟʟ)'

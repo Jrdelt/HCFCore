@@ -1,5 +1,6 @@
 package me.hcfcore.core.staff;
 
+import me.hcfcore.core.lang.Messages;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.NamespacedKey;
@@ -17,10 +18,12 @@ public final class InvRestoreMenuListener implements Listener {
 
     private final Plugin plugin;
     private final DeathManager deathManager;
+    private final Messages messages;
 
-    public InvRestoreMenuListener(Plugin plugin, DeathManager deathManager) {
+    public InvRestoreMenuListener(Plugin plugin, DeathManager deathManager, Messages messages) {
         this.plugin = plugin;
         this.deathManager = deathManager;
+        this.messages = messages;
     }
 
     @EventHandler
@@ -61,12 +64,12 @@ public final class InvRestoreMenuListener implements Listener {
                 if (event.getClick() == ClickType.LEFT) {
                     restoreToInventory(player, death);
                 } else if (event.getClick() == ClickType.RIGHT) {
-                    InvRestoreMenu.openContentsView(player, death, plugin, holder.targetUUID);
+                    InvRestoreMenu.openContentsView(player, death, plugin, holder.targetUUID, messages);
                 }
             }
         } else if (action.equals("back")) {
             if (holder.targetUUID != null) {
-                InvRestoreMenu.openByUUID(player, holder.targetUUID, plugin, deathManager);
+                InvRestoreMenu.openByUUID(player, holder.targetUUID, plugin, deathManager, messages);
             }
         }
     }
@@ -88,11 +91,9 @@ public final class InvRestoreMenuListener implements Listener {
             }
         }
 
-        staffPlayer.sendMessage(Component.text("Restored " + added + " items to your inventory")
-                .color(NamedTextColor.GREEN));
+        staffPlayer.sendMessage(messages.getChat(staffPlayer, "staff.restore-success", "added", String.valueOf(added)));
         if (dropped > 0) {
-            staffPlayer.sendMessage(Component.text(dropped + " items were dropped on the ground (inventory full)")
-                    .color(NamedTextColor.YELLOW));
+            staffPlayer.sendMessage(messages.getChat(staffPlayer, "staff.restore-overflow", "dropped", String.valueOf(dropped)));
         }
     }
 }

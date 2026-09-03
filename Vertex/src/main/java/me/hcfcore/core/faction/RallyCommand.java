@@ -22,7 +22,7 @@ public final class RallyCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage(Component.text("Only players can use this command").color(NamedTextColor.RED));
+            sender.sendMessage(messages.getChat(sender, "general.players-only"));
             return true;
         }
 
@@ -30,14 +30,14 @@ public final class RallyCommand implements CommandExecutor {
         int factionId = FactionsHook.getFactionId(player);
 
         if (factionId == FactionsHook.NO_FACTION) {
-            sender.sendMessage(Component.text("You must be in a faction to set a rally").color(NamedTextColor.RED));
+            sender.sendMessage(messages.getChat(sender, "factions.must-be-in-faction"));
             return true;
         }
 
         if (args.length == 0) {
             // /rally with no args - set rally at current location
             rallyManager.setRally(factionId, player.getLocation());
-            sender.sendMessage(Component.text("Rally set at your location! It will last 4 minutes.").color(NamedTextColor.GREEN));
+            sender.sendMessage(messages.getChat(sender, "factions.rally-set"));
             return true;
         }
 
@@ -45,15 +45,15 @@ public final class RallyCommand implements CommandExecutor {
 
         if (action.equals("set")) {
             rallyManager.setRally(factionId, player.getLocation());
-            sender.sendMessage(Component.text("Rally set at your location! It will last 4 minutes.").color(NamedTextColor.GREEN));
+            sender.sendMessage(messages.getChat(sender, "factions.rally-set"));
             return true;
         } else if (action.equals("clear")) {
             rallyManager.clearRally(factionId);
-            sender.sendMessage(Component.text("Rally cleared!").color(NamedTextColor.GREEN));
+            sender.sendMessage(messages.getChat(sender, "factions.rally-cleared"));
             return true;
         }
 
-        sender.sendMessage(Component.text("Usage: /" + label + " [set|clear]").color(NamedTextColor.RED));
+        sender.sendMessage(messages.getChat(sender, "factions.rally-usage"));
         return true;
     }
 }

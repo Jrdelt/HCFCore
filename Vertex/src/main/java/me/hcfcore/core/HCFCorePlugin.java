@@ -137,7 +137,7 @@ public final class HCFCorePlugin extends JavaPlugin {
 
         deathManager = new DeathManager(this, storage);
         Bukkit.getPluginManager().registerEvents(new DeathListener(deathManager), this);
-        Bukkit.getPluginManager().registerEvents(new InvRestoreMenuListener(this, deathManager), this);
+        Bukkit.getPluginManager().registerEvents(new InvRestoreMenuListener(this, deathManager, messages), this);
 
         rallyManager = new RallyManager(this, messages);
         RallyCommand rallyCommand = new RallyCommand(rallyManager, messages);

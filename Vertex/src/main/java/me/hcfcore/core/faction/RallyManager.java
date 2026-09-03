@@ -119,11 +119,13 @@ public final class RallyManager implements Listener {
         // Determine arrow based on relative direction
         String arrowSymbol = getArrowForDirection(relativeAngle);
 
+        String rallyTitle = messages.getRaw(player, "factions.rally-bossbar-title");
+        String distanceLabel = messages.getRaw(player, "factions.rally-bossbar-distance");
         Component text = Component.empty()
-                .append(Component.text("FACTION RALLY ")
+                .append(Component.text(rallyTitle + " ")
                         .color(NamedTextColor.GREEN)
                         .decorate(TextDecoration.BOLD))
-                .append(Component.text(distanceInt + " Blocks Away ")
+                .append(Component.text(distanceInt + " " + distanceLabel + " ")
                         .color(NamedTextColor.WHITE))
                 .append(Component.text(arrowSymbol)
                         .color(NamedTextColor.GREEN)
