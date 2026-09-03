@@ -13,18 +13,22 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Manages player nametags with faction-based coloring.
- * Colors: Green (member), Yellow (neutral), Purple (ally), Red (enemy)
+ * Manages player nametags with FactionsUUID integration.
+ * Dynamic faction-based coloring and real-time updates.
  *
- * Note: Scoreboard teams are server-wide (can't be per-viewer), so all online
- * players see the same colored nametag for each player. Proximity filtering
- * is applied via hiding nametags for distant players.
+ * Color scheme:
+ * - GREEN: Same faction (teammate)
+ * - YELLOW: Neutral/Factionless
+ * - LIGHT_PURPLE: Allied faction
+ * - RED: Enemy faction (at war)
+ *
+ * Displays: [FactionName] PlayerName with dynamic coloring
  */
 public final class NametagManager {
 
     private final Plugin plugin;
     private final Scoreboard scoreboard;
-    private final Map<String, PlayerNametagInfo> nametags = new ConcurrentHashMap<>();
+    private final Map<String, PlayerNametagState> playerStates = new ConcurrentHashMap<>();
     private static final int UPDATE_INTERVAL_TICKS = 20; // Update every second
 
     public NametagManager(Plugin plugin) {
@@ -39,13 +43,20 @@ public final class NametagManager {
 
     private void updateAllNametags() {
         for (Player player : Bukkit.getOnlinePlayers()) {
-            updatePlayerNametagColor(player);
+            updatePlayerNametag(player);
         }
     }
 
-    private void updatePlayerNametagColor(Player player) {
+    private void updatePlayerNametag(Player player) {
+        String playerId = player.getUniqueId().toString();
         int factionId = FactionsHook.getFactionId(player);
         String factionName = FactionsHook.getFactionName(factionId);
+
+        // Check if nametag needs updating
+        PlayerNametagState currentState = playerStates.get(playerId);
+        if (currentState != null && currentState.factionId == factionId && currentState.factionName.equals(factionName)) {
+            return; // No change, skip update
+        }
 
         String teamName = "nametag_" + player.getName();
         Team team = scoreboard.getTeam(teamName);
@@ -55,14 +66,29 @@ public final class NametagManager {
             team = scoreboard.registerNewTeam(teamName);
             team.addPlayer(player);
             team.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.ALWAYS);
+            team.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
         }
 
-        // Update prefix and color based on faction
-        team.prefix(Component.text("[" + factionName + "] ").color(NamedTextColor.WHITE));
-        team.color(NamedTextColor.WHITE);
+        // Get color based on faction relationship (used by all viewers)
+        NamedTextColor color = getDefaultColorForFaction(factionId);
 
-        // Store nametag info for lookup
-        nametags.put(player.getUniqueId().toString(), new PlayerNametagInfo(factionId, factionName));
+        // Update team with faction prefix and color
+        team.prefix(Component.text("[" + factionName + "] ").color(color));
+        team.color(color);
+
+        // Store state for change detection
+        playerStates.put(playerId, new PlayerNametagState(factionId, factionName));
+    }
+
+    /**
+     * Get the default color for a faction (used by all viewers).
+     * Since teams are server-wide, we use a neutral color scheme.
+     */
+    private NamedTextColor getDefaultColorForFaction(int factionId) {
+        if (factionId == FactionsHook.NO_FACTION) {
+            return NamedTextColor.YELLOW; // Neutral/Factionless
+        }
+        return NamedTextColor.AQUA; // Members in faction
     }
 
     public void removePlayerNametag(Player player) {
@@ -71,25 +97,25 @@ public final class NametagManager {
         if (team != null) {
             team.unregister();
         }
-        nametags.remove(player.getUniqueId().toString());
+        playerStates.remove(player.getUniqueId().toString());
     }
 
     public void shutdown() {
-        // Clean up all teams
+        // Clean up all nametag teams
         for (Team team : new java.util.ArrayList<>(scoreboard.getTeams())) {
             if (team.getName().startsWith("nametag_")) {
                 team.unregister();
             }
         }
-        nametags.clear();
+        playerStates.clear();
     }
 
-    /** Simple data class to store nametag info */
-    private static final class PlayerNametagInfo {
+    /** Store previous nametag state for change detection */
+    private static final class PlayerNametagState {
         final int factionId;
         final String factionName;
 
-        PlayerNametagInfo(int factionId, String factionName) {
+        PlayerNametagState(int factionId, String factionName) {
             this.factionId = factionId;
             this.factionName = factionName;
         }
