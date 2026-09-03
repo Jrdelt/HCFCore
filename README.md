@@ -244,6 +244,25 @@ clicking your already-equipped tag unequips it (`<tag> UNEQUIPPED`).
 
 Reloaded along with everything else on `/hcfcore reload`.
 
+## Nametags
+
+Players see colorful nametags above each other's heads showing faction affiliation:
+- **AQUA** — Players in a faction
+- **YELLOW** — Neutral/Factionless players
+- Format: `[FactionName] PlayerName`
+- Updates every second based on faction changes
+- Fully integrated with FactionsUUID
+
+## Faction Compatibility
+
+**All abilities respect faction relationships:**
+- ✅ Abilities can NOT be used on faction members/allies (except faction buffs)
+- ✅ Portable Bard buffs work on faction members (Strength, Speed, etc.)
+- ✅ Mage spells, Pearl Stunner, Backstab, etc. blocked on teammates
+- ✅ Melee combat works normally on everyone
+- ✅ Archer tag can't mark faction members
+- ✅ Full FactionsUUID 4.4.0+ compatibility
+
 ## Archer tag
 
 A player wearing the full **leather** set (the `archer` kit or its donator
