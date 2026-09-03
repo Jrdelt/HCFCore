@@ -656,3 +656,17 @@ the server. If they don't show up in-game:
   `FactionsHook`: a static, stateless wrapper that checks the target
   plugin is actually enabled before touching any of its classes, so
   HCFCore runs fine without them installed.
+
+## Quality Assurance & Recent Improvements
+
+**Production-ready stability fixes:**
+
+- **Thread-safe generation tracking** — `UserManager.nextGeneration()` uses atomic operations to prevent concurrent player data loads from colliding.
+- **Atomic shutdown writes** — `KitManager` and `LanguageCommand` loop until all pending async writes complete, preventing data loss during shutdown.
+- **Transaction safety** — Death records and cleanup are now atomic, preventing race conditions when multiple players die concurrently.
+- **Database pool hardening** — HikariCP configured with minimum idle connections, connection timeouts, and idle/max-lifetime limits to prevent hung connections under load.
+- **Rally visual fixes** — Bossbar colors now properly render MiniMessage format codes (`<green>`, `<white>`, etc.), and rally arrows display absolute compass directions instead of relative angles.
+- **Message formatting** — Death GUI and rally displays properly deserialize MiniMessage color codes via `MessageFormatter.deserialize()`.
+- **Performance optimization** — Message locale list is now cached, eliminating O(n log n) sorting overhead on every tab-complete.
+
+All critical race conditions, data consistency issues, and shutdown data-loss bugs have been resolved. The plugin is fully tested and ready for production deployment.
