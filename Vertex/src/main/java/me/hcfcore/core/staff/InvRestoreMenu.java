@@ -43,12 +43,9 @@ public final class InvRestoreMenu {
             }
 
             Holder holder = new Holder(deaths, targetUUID);
-            String titleText = messages.getRaw(staffPlayer, "staff.deaths-title")
-                    .replace("{uuid}", targetUUID.toString());
             Inventory inventory = Bukkit.createInventory(holder, GRID_SIZE,
-                    Component.text(titleText)
-                            .color(NamedTextColor.LIGHT_PURPLE)
-                            .decorate(TextDecoration.BOLD));
+                    Component.text("ᴅᴇᴀᴛʜs")
+                            .color(NamedTextColor.LIGHT_PURPLE));
             holder.inventory = inventory;
 
             NamespacedKey deathIndexKey = new NamespacedKey(plugin, DEATH_INDEX_KEY);
@@ -56,7 +53,7 @@ public final class InvRestoreMenu {
 
             for (int i = 0; i < deaths.size() && i < 45; i++) {
                 Death death = deaths.get(i);
-                ItemStack icon = createDeathIcon(death, i, staffPlayer, messages);
+                ItemStack icon = createDeathIcon(death, i, targetUUID, staffPlayer, messages);
                 ItemMeta meta = icon.getItemMeta();
                 if (meta != null) {
                     meta.getPersistentDataContainer().set(deathIndexKey, PersistentDataType.INTEGER, i);
@@ -72,11 +69,9 @@ public final class InvRestoreMenu {
 
     public static void openContentsView(Player staffPlayer, Death death, Plugin plugin, java.util.UUID targetUUID, Messages messages) {
         Holder holder = new Holder(List.of(death), targetUUID);
-        String contentsTitle = messages.getRaw(staffPlayer, "staff.death-contents-title");
         Inventory inventory = Bukkit.createInventory(holder, GRID_SIZE,
-                Component.text(contentsTitle)
-                        .color(NamedTextColor.LIGHT_PURPLE)
-                        .decorate(TextDecoration.BOLD));
+                Component.text("ᴅᴇᴀᴛʜ ᴄᴏɴᴛᴇɴᴛs")
+                        .color(NamedTextColor.LIGHT_PURPLE));
         holder.inventory = inventory;
 
         NamespacedKey deathActionKey = new NamespacedKey(plugin, DEATH_ACTION_KEY);
@@ -112,7 +107,7 @@ public final class InvRestoreMenu {
         staffPlayer.openInventory(inventory);
     }
 
-    private static ItemStack createDeathIcon(Death death, int index, Player player, Messages messages) {
+    private static ItemStack createDeathIcon(Death death, int index, java.util.UUID playerUUID, Player player, Messages messages) {
         ItemStack icon = new ItemStack(Material.SKELETON_SKULL);
         ItemMeta meta = icon.getItemMeta();
         if (meta != null) {
@@ -125,6 +120,8 @@ public final class InvRestoreMenu {
                     .decorate(TextDecoration.BOLD));
 
             List<Component> lore = new ArrayList<>();
+            lore.add(Component.text(playerUUID.toString()).color(NamedTextColor.GRAY));
+            lore.add(Component.empty());
             String causeText = messages.getRaw(player, "staff.death-cause").replace("{cause}", cause);
             String killerText = messages.getRaw(player, "staff.death-killer").replace("{killer}", killer);
             lore.add(Component.text(causeText).color(NamedTextColor.GRAY));
