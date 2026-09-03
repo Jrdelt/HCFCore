@@ -5,6 +5,7 @@ import me.hcfcore.core.lang.Messages;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -118,8 +119,15 @@ public final class RallyManager implements Listener {
         // Determine arrow based on relative direction
         String arrowSymbol = getArrowForDirection(relativeAngle);
 
-        Component text = Component.text(arrowSymbol + " FACTION-RALLY: " + distanceInt + " Blocks")
-                .color(NamedTextColor.GREEN);
+        Component text = Component.empty()
+                .append(Component.text("FACTION RALLY ")
+                        .color(NamedTextColor.GREEN)
+                        .decorate(TextDecoration.BOLD))
+                .append(Component.text(distanceInt + " Blocks Away ")
+                        .color(NamedTextColor.WHITE))
+                .append(Component.text(arrowSymbol)
+                        .color(NamedTextColor.GREEN)
+                        .decorate(TextDecoration.BOLD));
 
         // Update or create bossbar
         BossBar bar = playerBossBars.get(player);
@@ -151,23 +159,23 @@ public final class RallyManager implements Listener {
     private String getArrowForDirection(float relativeAngle) {
         // Determine arrow based on where rally is relative to player's facing direction
         if (relativeAngle >= -22.5 && relativeAngle < 22.5) {
-            return "⬇ "; // Rally ahead
+            return "↑"; // Rally ahead
         } else if (relativeAngle >= 22.5 && relativeAngle < 67.5) {
-            return "⬇➡ "; // Rally forward-right
+            return "↗"; // Rally forward-right
         } else if (relativeAngle >= 67.5 && relativeAngle < 112.5) {
-            return "➡ "; // Rally right
+            return "→"; // Rally right
         } else if (relativeAngle >= 112.5 && relativeAngle < 157.5) {
-            return "⬆➡ "; // Rally back-right
+            return "↘"; // Rally back-right
         } else if (relativeAngle >= 157.5 || relativeAngle < -157.5) {
-            return "⬆ "; // Rally behind
+            return "↓"; // Rally behind
         } else if (relativeAngle >= -157.5 && relativeAngle < -112.5) {
-            return "⬆⬅ "; // Rally back-left
+            return "↙"; // Rally back-left
         } else if (relativeAngle >= -112.5 && relativeAngle < -67.5) {
-            return "⬅ "; // Rally left
+            return "←"; // Rally left
         } else if (relativeAngle >= -67.5 && relativeAngle < -22.5) {
-            return "⬅⬇ "; // Rally forward-left
+            return "↖"; // Rally forward-left
         }
-        return "➜ ";
+        return "↑";
     }
 
     @EventHandler
