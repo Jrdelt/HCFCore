@@ -50,6 +50,8 @@ import me.hcfcore.core.storage.Database;
 import me.hcfcore.core.storage.MySQLStorage;
 import me.hcfcore.core.storage.Storage;
 import me.hcfcore.core.user.UserManager;
+import me.hcfcore.core.nametag.NametagManager;
+import me.hcfcore.core.nametag.NametagListener;
 import me.hcfcore.core.tag.TagManager;
 import me.hcfcore.core.tag.TagsCommand;
 import me.hcfcore.core.tag.TagMenuListener;
@@ -82,6 +84,7 @@ public final class HCFCorePlugin extends JavaPlugin {
     private DeathManager deathManager;
     private RallyManager rallyManager;
     private ArcherTagListener archerTagListener;
+    private NametagManager nametagManager;
 
     @Override
     public void onEnable() {
@@ -143,6 +146,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         rallyManager = new RallyManager(this, messages);
         RallyCommand rallyCommand = new RallyCommand(rallyManager, messages);
         getCommand("frally").setExecutor(rallyCommand);
+
+        nametagManager = new NametagManager(this);
+        Bukkit.getPluginManager().registerEvents(new NametagListener(nametagManager), this);
 
         Bukkit.getPluginManager().registerEvents(new CombatListener(combatManager), this);
         playerConnectionListener = new PlayerConnectionListener(userManager, scoreboardManager, combatManager);
@@ -248,6 +254,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
         if (rallyManager != null) {
             rallyManager.shutdown();
+        }
+        if (nametagManager != null) {
+            nametagManager.shutdown();
         }
         FakePearlListener.clearAll();
         if (storage != null) {

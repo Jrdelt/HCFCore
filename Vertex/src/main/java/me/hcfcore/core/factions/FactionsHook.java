@@ -115,6 +115,34 @@ public final class FactionsHook {
         return faction == null ? "0" : String.valueOf(faction.membersOnlineAsPlayers().size());
     }
 
+    /**
+     * Get faction name from faction id, or "Neutral" if not in a faction.
+     */
+    public static String getFactionName(int factionId) {
+        if (factionId == NO_FACTION) {
+            return "Neutral";
+        }
+        for (Faction faction : Factions.factions().all()) {
+            if (faction != null && faction.id() == factionId) {
+                return faction.tag();
+            }
+        }
+        return "Neutral";
+    }
+
+    /**
+     * Check if two factions are the same (for alliance/teamwork purposes).
+     * Note: FactionsUUID doesn't expose formal alliance API, so this just checks same faction.
+     */
+    public static boolean isAlly(int factionId1, int factionId2) {
+        // Not in a faction = not allies
+        if (factionId1 == NO_FACTION || factionId2 == NO_FACTION) {
+            return false;
+        }
+        // Same faction id = allies
+        return factionId1 == factionId2;
+    }
+
     private static Faction getFaction(Player player) {
         FPlayer fPlayer = FPlayers.fPlayers().get(player.getUniqueId());
         return fPlayer == null || !fPlayer.hasFaction() ? null : fPlayer.faction();
