@@ -85,8 +85,11 @@ public final class InvRestoreMenuListener implements Listener {
                 if (couldNotAdd.isEmpty()) {
                     added++;
                 } else {
-                    staffPlayer.getWorld().dropItemNaturally(staffPlayer.getLocation(), item);
-                    dropped++;
+                    // Drop only the items that couldn't fit, not the original
+                    for (ItemStack overflow : couldNotAdd.values()) {
+                        staffPlayer.getWorld().dropItemNaturally(staffPlayer.getLocation(), overflow);
+                        dropped++;
+                    }
                 }
             }
         }
