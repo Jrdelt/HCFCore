@@ -109,8 +109,8 @@ public final class RallyManager implements Listener {
         float directionToRally = getDirectionToRally(player, rally);
         float playerYaw = player.getYaw() % 360;
 
-        // Calculate relative angle (where rally is relative to player's view direction)
-        float relativeAngle = directionToRally - playerYaw;
+        // Calculate relative angle (opposite of where player is facing)
+        float relativeAngle = playerYaw - directionToRally;
 
         // Normalize to -180 to 180
         while (relativeAngle > 180) relativeAngle -= 360;
