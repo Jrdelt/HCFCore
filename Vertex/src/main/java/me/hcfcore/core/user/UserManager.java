@@ -49,6 +49,10 @@ public final class UserManager {
         }
     }
 
+    public void clearFailedLoad(UUID uuid) {
+        failedLoads.remove(uuid);
+    }
+
     public void unload(UUID uuid) {
         nextGeneration(uuid);
         users.remove(uuid);

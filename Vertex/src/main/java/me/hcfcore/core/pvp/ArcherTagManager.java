@@ -91,6 +91,11 @@ public final class ArcherTagManager {
         }
     }
 
+    /** Cleanup all expired entries in the map. Call periodically to prevent unbounded growth. */
+    public void cleanupExpired() {
+        tags.values().removeIf(Entry::isExpired);
+    }
+
     private Entry liveEntry(UUID victimId) {
         Entry entry = tags.get(victimId);
         if (entry == null) {

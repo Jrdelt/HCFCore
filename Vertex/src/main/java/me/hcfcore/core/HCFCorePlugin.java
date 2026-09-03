@@ -168,6 +168,8 @@ public final class HCFCorePlugin extends JavaPlugin {
                 new TimeWarpPearlListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new VanillaCooldownListener(this, messages, vanillaCooldownManager), this);
         Bukkit.getPluginManager().registerEvents(new ArcherTagListener(this, archerTagManager, messages), this);
+        // Periodic cleanup of expired archer tag entries to prevent unbounded map growth
+        Bukkit.getScheduler().runTaskTimer(this, archerTagManager::cleanupExpired, 300L, 300L);
         Bukkit.getPluginManager().registerEvents(new PearlStunnerListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new RabbitsFeedListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new TagMenuListener(this), this);
