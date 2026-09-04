@@ -17,6 +17,7 @@ staff chat, claim-bypass build mode) — built for Paper and integrated with
 - **Vault** — Enables money costs on kits. Without it, only item/free kits work.
 - **WorldGuard** — Enables disabling abilities in specific regions (like spawn). Without it, abilities work everywhere.
 - **LuckPerms** — Shows player ranks in chat and enables the Repair ability. Without it, those features are disabled.
+- **PlaceholderAPI** — Lets `chat.*` and `scoreboard.lines` templates use `%placeholder%` tokens (from LuckPerms' own expansion, or any other installed one) alongside this plugin's own `{curly}` placeholders. Without it, any `%...%` you put in a template is left as literal text.
 
 ## Installation
 
@@ -73,7 +74,14 @@ mysql:
 - `{exp}` — player's XP level
 - `{balance}` — player's money (if using Vault economy)
 
-**Chat** — Control the live chat format with `chat.separator`, `chat.faction-format`, `chat.rank-format`. `chat.rank-format` supports the same `{rank}` / `{prefix}` choice as the scoreboard above — `{prefix}` is substituted raw (not escaped) since it's expected to carry its own color/formatting, same treatment as a tag's `display` string. Leave `rank-format` blank if not using LuckPerms.
+With **PlaceholderAPI** installed, any line can also use its `%percent%`
+placeholders (e.g. `%luckperms_prefix%`, or anything from another
+installed expansion) mixed in alongside the `{curly}` ones above —
+they're expanded as a final pass over the whole resolved line, per
+viewing player. Without PlaceholderAPI, a `%...%` token is left as
+literal text.
+
+**Chat** — Control the live chat format with `chat.separator`, `chat.faction-format`, `chat.rank-format`. `chat.rank-format` supports the same `{rank}` / `{prefix}` choice as the scoreboard above — `{prefix}` is substituted raw (not escaped) since it's expected to carry its own color/formatting, same treatment as a tag's `display` string. Leave `rank-format` blank if not using LuckPerms. `chat.*` templates get the same PlaceholderAPI `%percent%` support as scoreboard lines.
 
 **PvP Cooldowns** — These override vanilla Minecraft cooldowns:
 - `pearl-cooldown-seconds` — ender pearl reuse timer

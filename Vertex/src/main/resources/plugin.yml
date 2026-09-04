@@ -12,6 +12,7 @@ softdepend:
   - Vault
   - WorldGuard
   - LuckPerms
+  - PlaceholderAPI
 
 commands:
   kit:

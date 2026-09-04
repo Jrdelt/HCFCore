@@ -5,6 +5,7 @@ import io.papermc.paper.event.player.AsyncChatEvent;
 import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.luckperms.LuckPermsHook;
+import me.hcfcore.core.placeholderapi.PlaceholderApiHook;
 import me.hcfcore.core.tag.TagManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -55,7 +56,7 @@ public final class ChatFormatterListener implements Listener {
 
         String faction = FactionsHook.getFactionTag(player);
         if (!"None".equalsIgnoreCase(faction)) {
-            result = result.append(deserializeTemplate("chat.faction-format", "<gold>[{faction}]</gold> ", "faction", faction));
+            result = result.append(deserializeTemplate(player, "chat.faction-format", "<gold>[{faction}]</gold> ", "faction", faction));
         }
 
         TagManager.Tag tag = selectedTag(player);
@@ -66,11 +67,11 @@ public final class ChatFormatterListener implements Listener {
         String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
         String prefix = LuckPermsHook.getPrefix(player);
         if ((rank != null && !rank.isBlank()) || prefix != null) {
-            result = result.append(rankComponent(rank, prefix));
+            result = result.append(rankComponent(player, rank, prefix));
         }
 
         return result.append(nameComponent(player))
-                    .append(deserializeTemplate("chat.separator", "<gray>»</gray>"))
+                    .append(deserializeTemplate(player, "chat.separator", "<gray>»</gray>"))
                     .append(message);
     }
 
@@ -84,11 +85,11 @@ public final class ChatFormatterListener implements Listener {
      * through the escaped substitution since it isn't meant to carry
      * markup of its own.
      */
-    private Component rankComponent(String rank, String prefix) {
+    private Component rankComponent(Player player, String rank, String prefix) {
         String template = plugin.getConfig().getString("chat.rank-format", "<light_purple>[{rank}]</light_purple> ");
         template = template.replace("{prefix}", prefix == null ? "" : prefix);
         template = template.replace("{rank}", MiniMessage.miniMessage().escapeTags(rank == null ? "" : rank));
-        return MessageFormatter.deserialize(template);
+        return MessageFormatter.deserialize(PlaceholderApiHook.apply(player, template));
     }
 
     /**
@@ -116,15 +117,15 @@ public final class ChatFormatterListener implements Listener {
         if (nicknameColor != null) {
             return MessageFormatter.deserialize(nicknameColor + player.getName());
         }
-        return deserializeTemplate("chat.name-format", "<white>{name}</white>", "name", player.getName());
+        return deserializeTemplate(player, "chat.name-format", "<white>{name}</white>", "name", player.getName());
     }
 
-    private Component deserializeTemplate(String path, String fallback, String... values) {
+    private Component deserializeTemplate(Player player, String path, String fallback, String... values) {
         String template = plugin.getConfig().getString(path, fallback);
         for (int i = 0; i + 1 < values.length; i += 2) {
             template = template.replace("{" + values[i] + "}", MiniMessage.miniMessage().escapeTags(values[i + 1]));
         }
-        return MessageFormatter.deserialize(template);
+        return MessageFormatter.deserialize(PlaceholderApiHook.apply(player, template));
     }
 
     private TagManager.Tag selectedTag(Player player) {

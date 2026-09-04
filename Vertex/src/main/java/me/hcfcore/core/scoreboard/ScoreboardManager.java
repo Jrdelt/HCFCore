@@ -5,6 +5,7 @@ import me.hcfcore.core.ability.AbilityManager;
 import me.hcfcore.core.economy.EconomyHook;
 import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.luckperms.LuckPermsHook;
+import me.hcfcore.core.placeholderapi.PlaceholderApiHook;
 import me.hcfcore.core.user.UserManager;
 import io.papermc.paper.scoreboard.numbers.NumberFormat;
 import net.kyori.adventure.text.Component;
@@ -167,7 +168,7 @@ public final class ScoreboardManager {
         String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
         String rankPrefix = rank == null || rank.isBlank() ? "" : "[" + rank + "] ";
         String prefix = LuckPermsHook.getPrefix(player);
-        return template
+        String resolved = template
                 .replace("{date}", LocalDate.now().format(dateFormatter))
                 .replace("{online}", String.valueOf(Bukkit.getOnlinePlayers().size()))
                 .replace("{name}", player.getName())
@@ -182,6 +183,9 @@ public final class ScoreboardManager {
                 .replace("{power}", FactionsHook.getFactionPower(player))
                 .replace("{fplayers_online}", FactionsHook.getOnlineFactionCount(player))
                 .replace("{repair}", custom.getOrDefault("repair", ""));
+        // Applied last so a template can mix the {curly} placeholders above
+        // with any %percent% PlaceholderAPI expansion (e.g. %luckperms_prefix%).
+        return PlaceholderApiHook.apply(player, resolved);
     }
 
     private static String[] buildEntryCodes() {
