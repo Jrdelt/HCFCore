@@ -95,6 +95,7 @@ public final class GrapplingHookListener implements Listener {
             pull.multiply(forwardMultiplier / length);
             pull.setY(pull.getY() + yMultiplier);
             player.setVelocity(pull);
+            FallDamageImmunity.grant(player.getUniqueId(), 8);
             consumeUse(player, ability.getInt("uses", 8));
         }
         hook.remove();

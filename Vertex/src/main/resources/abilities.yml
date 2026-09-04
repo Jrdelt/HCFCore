@@ -142,3 +142,13 @@ abilities:
       - '<gray>place you actually ender'
       - '<gray>pearled from.'
     cooldown-seconds: 30
+
+  ninja-star:
+    material: NETHER_STAR
+    name: '<light_purple>Ninja Star'
+    lore:
+      - '<gray>Teleport to whoever hit you'
+      - '<gray>last, after a 5s warning to'
+      - '<gray>them. Needs a hit within the'
+      - '<gray>last 15s and both of you in combat.'
+    cooldown-seconds: 60

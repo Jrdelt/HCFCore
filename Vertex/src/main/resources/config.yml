@@ -46,7 +46,7 @@ scoreboard:
   # Supports: {name}, {rank_prefix}, {rank}, {prefix}, {exp}, {balance}, {faction}, {power}, {fplayers_online}, {ftop}
   # Also supports PlaceholderAPI %placeholder% tokens (e.g. %luckperms_prefix%) if PlaceholderAPI is installed.
   lines:
-    - '     <gray>Season I'
+    - '     <gray>ꜱᴇᴀꜱᴏɴ 𝟣'
     - '%luckperms_prefix%<gray>{name}'
     - '<gray>• <red>Balance: <white>{balance}'
     - '<gray>• <red>Experience: <white>{exp}'
@@ -141,6 +141,16 @@ factions:
     - f
     - factions
 
+  # Faction claim names where all block breaking (including pistons) is
+  # blocked outright, regardless of who's building. Matches by the
+  # claiming faction's tag/name, case-insensitive -- NOT the system
+  # WarZone/SafeZone API flags (/f warzone, /f safezone), since a claim
+  # can be named this way without ever having those flags set, which is
+  # why blocking was silently not applying for some setups.
+  no-build-claim-names:
+    - warzone
+    - safezone
+
 # ============================================
 # KITS
 # ============================================
@@ -193,7 +203,7 @@ nametags:
   # How often to update nametags (in ticks; 20 ticks = 1 second)
   update-interval-ticks: 20
 
-  # Nametag format is fixed: &8[&a<ftop>&8] &8[<color>(faction)&8] &e<player>
+  # Nametag format is fixed: &8[&a<ftop>&8] &8[<color>faction&8] &e<player>
   # Note: nametags use a shared scoreboard team, so the faction-name color
   # below is the SAME for every viewer -- Minecraft's scoreboard API has no
   # per-viewer color, so true "red to enemies, purple to allies" coloring

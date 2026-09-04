@@ -9,7 +9,9 @@ import me.hcfcore.core.ability.FakePearlListener;
 import me.hcfcore.core.ability.GetItemCommand;
 import me.hcfcore.core.ability.GrapplingHookListener;
 import me.hcfcore.core.ability.LeapListener;
+import me.hcfcore.core.ability.FallDamageImmunityListener;
 import me.hcfcore.core.ability.MageSpellListener;
+import me.hcfcore.core.ability.NinjaStarListener;
 import me.hcfcore.core.ability.PortableBardListener;
 import me.hcfcore.core.ability.RepairListener;
 import me.hcfcore.core.ability.RogueBackstabListener;
@@ -33,6 +35,7 @@ import me.hcfcore.core.pvp.CombatCheckCommand;
 import me.hcfcore.core.pvp.ArcherTagListener;
 import me.hcfcore.core.pvp.ArcherTagManager;
 import me.hcfcore.core.pvp.CombatManager;
+import me.hcfcore.core.pvp.FullHealSplashListener;
 import me.hcfcore.core.pvp.CombatTagCommand;
 import me.hcfcore.core.pvp.UncombatCommand;
 import me.hcfcore.core.pvp.LegacyCombatManager;
@@ -172,7 +175,7 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new VanishListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new StaffChatListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new StaffBuildListener(staffManager), this);
-        Bukkit.getPluginManager().registerEvents(new ZoneBlockProtectionListener(staffManager), this);
+        Bukkit.getPluginManager().registerEvents(new ZoneBlockProtectionListener(this, staffManager), this);
         Bukkit.getPluginManager().registerEvents(new FreezeListener(staffManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new InvseeMenuListener(this), this);
         getCommand("staff").setExecutor(new StaffCommand(staffManager, messages));
@@ -212,6 +215,10 @@ public final class HCFCorePlugin extends JavaPlugin {
                 new SwitcherSnowballListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new TimeWarpPearlListener(this, abilityManager, userManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new NinjaStarListener(this, abilityManager, userManager, combatManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new FallDamageImmunityListener(), this);
+        Bukkit.getPluginManager().registerEvents(new FullHealSplashListener(), this);
         Bukkit.getPluginManager().registerEvents(new VanillaCooldownListener(this, messages, vanillaCooldownManager), this);
         archerTagListener = new ArcherTagListener(this, archerTagManager, messages);
         Bukkit.getPluginManager().registerEvents(archerTagListener, this);

@@ -304,6 +304,9 @@ kits:
       - material: GOLDEN_SWORD
         amount: 2
         ability: rogue-backstab
+      - material: NETHER_STAR
+        amount: 1
+        ability: ninja-star
       - material: BREAD
         amount: 8
     effects:
@@ -333,6 +336,9 @@ kits:
         amount: 3
         ability: rogue-backstab
         enchantments: {UNBREAKING: 3}
+      - material: NETHER_STAR
+        amount: 1
+        ability: ninja-star
       - material: BREAD
         amount: 8
     effects:

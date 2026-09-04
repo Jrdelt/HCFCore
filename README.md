@@ -180,7 +180,7 @@ Edit `kits.yml` to create kits. Each kit has:
 
 ## Abilities
 
-Fifteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
+Sixteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
 - **material** / **name** / **lore** — fully customizable appearance
 - **cooldown-seconds** — reuse timer (saved to database, persists across restarts)
 - **uses** — number of uses before breaking (optional)
@@ -191,10 +191,15 @@ Fifteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
 - **Rabbits Feed** (right-click) — Speed V buff
 - **Anti-Blockup Bone** (melee) — Block placement denial after N hits
 - **Fake Pearl** (right-click) — Looks like ender pearl but no teleport
-- **Grappling Hook** (right-click) — Fish hook pull mechanic (8 uses)
-- **Leap** (right-click) — Jump forward with velocity
+- **Grappling Hook** (right-click) — Fish hook pull mechanic (8 uses); no fall damage on landing
+- **Leap** (right-click) — Jump forward with velocity; no fall damage on landing
 - **Rogue Backstab** (melee from behind) — Extra damage
-- **Mage Debuffs** (melee) — Wither/Slowness/Weakness/Poison
+- **Mage Debuffs** (melee) — Wither/Slowness/Poison
+- **Ninja Star** (right-click, in the rogue kits) — Teleports you to whoever hit
+  you last, after warning them with a 5-second countdown in chat. Requires
+  that hit to have landed within the last 15 seconds and both of you to
+  currently be in combat. On arrival you get Regeneration II, Strength
+  III, and Speed V, each for 3 seconds.
 - **Portable Bard** (right-click) — Pick a buff for your faction (in gold armor set)
 - **Repair** (right-click) — Grant block-breaking permission (needs LuckPerms)
 - **Switcher Snowball** (throw) — Swap positions with enemy
@@ -216,6 +221,13 @@ Fifteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
     case-insensitively, so it also covers the system SafeZone/WarZone
     factions (`/f safezone`, `/f warzone`) if you've kept their default
     names.
+
+**Splash potions of Healing** (I or II — the only levels Instant Health
+has) always hit for the full effect, on everyone caught in the splash,
+regardless of how far they were from the impact point. Vanilla scales a
+splash potion's strength down toward the edge of its radius; this plugin
+overrides that specifically for healing potions so a diamond kit's gapple
+alternative doesn't feel like a coin flip.
 
 ## Tags (`tags.yml`)
 
@@ -254,7 +266,8 @@ players: {}
   not meant for hand-editing.
 
 `/tags` opens a 4×9 grid of tag icons (rows 2-5, full width) with a
-control row: **filter** (Your/Unowned/All, each with a live count),
+control row: **filter** (Your/Unowned/All, each with a live count —
+opens to **Your Tags** by default),
 **sort** (Alphabetical/Age/Rarity — click to cycle, shift-click to flip
 direction; Rarity orders by lifetime owner count, fewest first when
 ascending), **search** (opens an anvil to type a query; right-click
@@ -409,11 +422,20 @@ open won't show up until it's reopened.
 ### WarZone / SafeZone protection
 
 Independent of the ability zone restriction above, block breaking is
-blocked outright in the system WarZone and SafeZone factions (`/f
-warzone`, `/f safezone`) — not just `BlockBreakEvent`, but
-`BlockDamageEvent` (the moment a player starts hitting a block) and
-piston push/pull, so there's no partial-break or piston-glitch way to
-grief protected terrain. `/staffbuild` bypasses this too.
+blocked outright in claims named in `config.yml` under
+`factions.no-build-claim-names` (default: `warzone`, `safezone`) — not
+just `BlockBreakEvent`, but `BlockDamageEvent` (the moment a player
+starts hitting a block) and piston push/pull, so there's no
+partial-break or piston-glitch way to grief protected terrain.
+`/staffbuild` bypasses this too.
+
+Matches by the claim's faction **name**, case-insensitive — not the
+system WarZone/SafeZone API flags (`/f warzone`, `/f safezone`) a
+faction can be formally marked with. A claim can be named "warzone"
+without ever having that flag set (e.g. a plain `/f create warzone`),
+which is why name matching is what's actually checked: it's the one
+thing guaranteed to reflect what the claim is actually called, matching
+the same approach the ability zone restriction above already uses.
 
 ## Reboot scheduling
 
@@ -476,6 +498,17 @@ live and can't be a fixed color in a static template — everything else
 in the wording, colors, and layout is yours to rearrange. CPS (clicks per
 second) is tracked from arm swings for every online player, not just
 tagged ones, so the count is already warm the instant a tag starts.
+
+### Rally
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/f rally [set\|clear]` (alias `/frally`) | *(none — open to all faction members)* | With no argument, sets a rally at your current location, visible to your whole faction for 4 minutes. `clear` removes it early. |
+
+Faction members see a green bossbar with the distance and a compass arrow
+pointing toward the rally, refreshing every 2 ticks (10×/second) to keep
+up with fast movement. The arrow shows a true compass bearing (north stays
+north) rather than one relative to which way you're facing.
 
 ### Reboot
 
@@ -628,7 +661,7 @@ the server. If they don't show up in-game:
 - **Atomic shutdown writes** — `KitManager` and `LanguageCommand` loop until all pending async writes complete, preventing data loss during shutdown.
 - **Transaction safety** — Death records and cleanup are now atomic, preventing race conditions when multiple players die concurrently.
 - **Database pool hardening** — HikariCP configured with minimum idle connections, connection timeouts, and idle/max-lifetime limits to prevent hung connections under load.
-- **Rally visual fixes** — Bossbar colors now properly render MiniMessage format codes (`<green>`, `<white>`, etc.), and rally arrows display absolute compass directions instead of relative angles.
+- **Rally visual fixes** — Bossbar colors now properly render MiniMessage format codes (`<green>`, `<white>`, etc.); rally arrows use a true compass bearing (see **Rally** under Commands & Permissions) — an earlier version of that bearing formula had north and south swapped, since Minecraft's +Z axis is south while the formula assumed the opposite.
 - **Message formatting** — Death GUI and rally displays properly deserialize MiniMessage color codes via `MessageFormatter.deserialize()`.
 - **Performance optimization** — Message locale list is now cached, eliminating O(n log n) sorting overhead on every tab-complete.
 

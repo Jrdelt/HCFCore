@@ -32,7 +32,7 @@ class AbilityManagerTest {
             "anti-blockup-bone", "fake-pearl", "grappling-hook", "leap",
             "pearl-stunner", "portable-bard", "rabbits-feed", "repair", "rogue-backstab",
             "mage-wither", "mage-slowness", "mage-poison",
-            "switcher-snowball", "time-warp-pearl"
+            "switcher-snowball", "time-warp-pearl", "ninja-star"
     };
 
     private ServerMock server;

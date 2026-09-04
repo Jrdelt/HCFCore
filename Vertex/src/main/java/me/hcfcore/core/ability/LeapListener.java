@@ -60,5 +60,6 @@ public final class LeapListener implements Listener {
         Vector direction = eye.getDirection().normalize();
         Vector boost = direction.multiply(forwardMultiplier).setY(direction.getY() * forwardMultiplier + yMultiplier);
         player.setVelocity(boost);
+        FallDamageImmunity.grant(player.getUniqueId(), 8);
     }
 }

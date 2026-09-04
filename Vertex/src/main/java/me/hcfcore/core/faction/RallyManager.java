@@ -74,7 +74,7 @@ public final class RallyManager implements Listener {
     }
 
     private void startUpdateTask() {
-        updateTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::updateRallyDisplay, 0L, 5L);
+        updateTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::updateRallyDisplay, 0L, 2L);
     }
 
     private void updateRallyDisplay() {
@@ -139,6 +139,16 @@ public final class RallyManager implements Listener {
         player.setCompassTarget(rallyLoc);
     }
 
+    /**
+     * A compass bearing to the rally (0=north, 90=east, 180=south,
+     * 270/-90=west), matching the labels {@link #getArrowForDirection}
+     * checks against. Minecraft's +Z axis is south, the opposite of the
+     * standard "+Z is north" convention most atan2-bearing formulas
+     * assume -- atan2(dx, dz) without negating dz had north and south
+     * (and every diagonal) swapped; east/west happened to still come out
+     * right since they don't involve dz at all, which is what made the
+     * arrow look correct some of the time and backwards the rest.
+     */
     private float getDirectionToRally(Player player, RallyPoint rally) {
         org.bukkit.Location from = player.getLocation();
         org.bukkit.Location to = rally.getLocation();
@@ -148,7 +158,7 @@ public final class RallyManager implements Listener {
         double dx = to.getX() - from.getX();
         double dz = to.getZ() - from.getZ();
 
-        float yaw = (float) Math.toDegrees(Math.atan2(dx, dz));
+        float yaw = (float) Math.toDegrees(Math.atan2(dx, -dz));
         return yaw;
     }
 

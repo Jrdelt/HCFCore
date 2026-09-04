@@ -193,7 +193,7 @@ public final class NametagManager {
     private PrefixAndColor buildPrefixAndColor(int factionId, String factionName) {
         String ftop = factionId == FactionsHook.NO_FACTION ? "-" : String.valueOf(FactionsHook.getFactionRank(factionId));
         NamedTextColor factionColor = factionId == FactionsHook.NO_FACTION ? neutralColor : sameFactionColor;
-        String prefix = "&8[&a" + ftop + "&8] &8[" + toLegacyCode(factionColor) + "(" + factionName + ")&8] &e";
+        String prefix = "&8[&a" + ftop + "&8] &8[" + toLegacyCode(factionColor) + factionName + "&8] &e";
         return new PrefixAndColor(MessageFormatter.deserialize(prefix), NamedTextColor.WHITE);
     }
 

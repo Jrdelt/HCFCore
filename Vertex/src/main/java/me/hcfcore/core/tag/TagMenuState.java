@@ -9,7 +9,7 @@ public record TagMenuState(TagManager.Sort sort, boolean ascending, TagManager.F
                             String searchQuery) {
 
     public static TagMenuState initial() {
-        return new TagMenuState(TagManager.Sort.ALPHABETICAL, true, TagManager.Filter.ALL, 0, null);
+        return new TagMenuState(TagManager.Sort.ALPHABETICAL, true, TagManager.Filter.YOUR, 0, null);
     }
 
     public TagMenuState withSort(TagManager.Sort newSort) {

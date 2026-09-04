@@ -265,7 +265,7 @@ public final class TagMenu {
         if (color != null && color.contains("gradient")) {
             lore.add(messages.get(player, "tags.nickname-hint-reverse"));
         }
-        return skullButton(player, Component.text("Nickname Match", NamedTextColor.LIGHT_PURPLE), lore);
+        return skullButton(player, Component.text("Nickname Match", NamedTextColor.YELLOW), lore);
     }
 
     /**
