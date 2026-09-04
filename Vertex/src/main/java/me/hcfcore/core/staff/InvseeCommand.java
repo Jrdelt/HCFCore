@@ -13,9 +13,10 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Opens the target's live inventory -- Bukkit's {@code openInventory} on
- * another player's actual {@code PlayerInventory} is a two-way live view,
- * no custom GUI needed: edits either side makes show up for both.
+ * Opens the target's inventory, including armor and offhand -- see
+ * {@link InvseeMenu}. A plain {@code openInventory(target.getInventory())}
+ * only shows the 36 storage/hotbar slots; there's no vanilla container
+ * type that also shows someone else's equipment.
  */
 public final class InvseeCommand implements CommandExecutor, TabCompleter {
 
@@ -45,7 +46,7 @@ public final class InvseeCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        viewer.openInventory(target.getInventory());
+        InvseeMenu.open(viewer, target);
         viewer.sendMessage(messages.get(viewer, "staff.invsee-opened", "player", target.getName()));
         return true;
     }

@@ -385,11 +385,21 @@ survive a server restart.
 
 ### Invsee / Endersee
 
-`/invsee <player>` and `/endersee <player>` (permissions
-`hcfcore.staff.invsee` / `hcfcore.staff.endersee`) open the target's
-**live** inventory or ender chest — Bukkit's `openInventory` on another
+`/endersee <player>` (permission `hcfcore.staff.endersee`) opens the
+target's **live** ender chest — Bukkit's `openInventory` on another
 player's actual inventory object is a real two-way view with no custom
 GUI involved: an edit on either side shows up for both immediately.
+
+`/invsee <player>` (permission `hcfcore.staff.invsee`) opens a custom
+GUI showing the target's hotbar, main storage, **and their equipped
+armor and offhand item** — there's no vanilla container type that shows
+someone else's equipment, so a plain inventory view (like `/endersee`
+above) only ever shows the 36 storage/hotbar slots. Unlike `/endersee`,
+this isn't a live shared reference: edits are synced back to the target
+one tick after each click, and armor slots reject anything that isn't
+actually that armor piece (a diamond sword can't end up in the helmet
+slot). A change the target makes to their own gear while the menu is
+open won't show up until it's reopened.
 
 ### WarZone / SafeZone protection
 
@@ -502,7 +512,7 @@ Each player's death history persists to MySQL and stores the last 20 deaths auto
 | `/staffchat` | `hcfcore.staff.staffchat` | Toggles redirecting your chat to the staff-only channel; also needed to read it. |
 | `/staffbuild` | `hcfcore.staff.staffbuild` | Toggles bypassing claim protection everywhere. |
 | `/freeze <player>` | `hcfcore.staff.freeze` | Toggles freezing a player in place; also needed to see the leave-while-frozen ban alert. |
-| `/invsee <player>` | `hcfcore.staff.invsee` | Opens the target's live inventory. |
+| `/invsee <player>` | `hcfcore.staff.invsee` | Opens a GUI with the target's storage, armor, and offhand; synced back on each edit (not a live shared view). |
 | `/endersee <player>` | `hcfcore.staff.endersee` | Opens the target's live ender chest. |
 
 ### Admin / reload
