@@ -1,5 +1,6 @@
 package me.hcfcore.core.listener;
 
+import me.hcfcore.core.essentials.EssentialsHook;
 import me.hcfcore.core.luckperms.LuckPermsHook;
 import me.hcfcore.core.pvp.CombatManager;
 import me.hcfcore.core.scoreboard.ScoreboardManager;
@@ -44,11 +45,12 @@ public final class PlayerConnectionListener implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
-        // Set player display name with rank
+        // Set player display name with rank (and Essentials nickname, if any)
         String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
-        if (rank != null && !rank.isBlank()) {
-            player.displayName(Component.text("[" + rank + "] " + player.getName()));
-        }
+        String displayName = EssentialsHook.resolveName(player);
+        player.displayName(Component.text(rank != null && !rank.isBlank()
+                ? "[" + rank + "] " + displayName
+                : displayName));
 
         if (scoreboardManager == null) {
             return;

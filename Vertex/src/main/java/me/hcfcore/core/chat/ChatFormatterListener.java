@@ -2,6 +2,7 @@ package me.hcfcore.core.chat;
 
 import io.papermc.paper.chat.ChatRenderer;
 import io.papermc.paper.event.player.AsyncChatEvent;
+import me.hcfcore.core.essentials.EssentialsHook;
 import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.luckperms.LuckPermsHook;
@@ -116,11 +117,12 @@ public final class ChatFormatterListener implements Listener {
      * needed here either.
      */
     private Component nameComponent(Player player) {
+        String displayName = EssentialsHook.resolveName(player);
         String nicknameColor = tagManager.getNicknameColor(player);
         if (nicknameColor != null) {
-            return MessageFormatter.deserialize(nicknameColor + player.getName());
+            return MessageFormatter.deserialize(nicknameColor + displayName);
         }
-        return deserializeTemplate(player, "chat.name-format", "<white>{name}</white>", "name", player.getName());
+        return deserializeTemplate(player, "chat.name-format", "<white>{name}</white>", "name", displayName);
     }
 
     private Component deserializeTemplate(Player player, String path, String fallback, String... values) {

@@ -13,6 +13,7 @@ softdepend:
   - WorldGuard
   - LuckPerms
   - PlaceholderAPI
+  - Essentials
 
 commands:
   kit:

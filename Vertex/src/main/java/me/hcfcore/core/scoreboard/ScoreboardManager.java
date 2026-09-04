@@ -3,6 +3,7 @@ package me.hcfcore.core.scoreboard;
 import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.ability.AbilityManager;
 import me.hcfcore.core.economy.EconomyHook;
+import me.hcfcore.core.essentials.EssentialsHook;
 import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.luckperms.LuckPermsHook;
 import me.hcfcore.core.placeholderapi.PlaceholderApiHook;
@@ -171,7 +172,7 @@ public final class ScoreboardManager {
         String resolved = template
                 .replace("{date}", LocalDate.now().format(dateFormatter))
                 .replace("{online}", String.valueOf(Bukkit.getOnlinePlayers().size()))
-                .replace("{name}", player.getName())
+                .replace("{name}", EssentialsHook.resolveName(player))
                 .replace("{rank_prefix}", rankPrefix)
                 .replace("{rank}", rank == null ? "" : rank)
                 .replace("{prefix}", prefix == null ? "" : prefix)

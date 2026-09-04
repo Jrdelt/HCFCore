@@ -18,6 +18,7 @@ staff chat, claim-bypass build mode) — built for Paper and integrated with
 - **WorldGuard** — Enables disabling abilities in specific regions (like spawn). Without it, abilities work everywhere.
 - **LuckPerms** — Shows player ranks in chat and enables the Repair ability. Without it, those features are disabled.
 - **PlaceholderAPI** — Lets `chat.*` and `scoreboard.lines` templates use `%placeholder%` tokens (from LuckPerms' own expansion, or any other installed one) alongside this plugin's own `{curly}` placeholders. Without it, any `%...%` you put in a template is left as literal text.
+- **EssentialsX** — Wherever a player's name is shown (chat, scoreboard, tags GUI nickname preview, default join/quit/death messages), their EssentialsX `/nick` nickname is used instead of their real username. Without it, or for players with no nickname set, the real username is used as before.
 
 ## Installation
 
@@ -63,7 +64,7 @@ mysql:
 **Database** — `mysql.pool-size` (default: 10) controls how many concurrent database connections are allowed. Increase for larger servers.
 
 **Scoreboard** — Customize with `scoreboard.lines`. Use these placeholders:
-- `{name}` — player name
+- `{name}` — player name (EssentialsX nickname if one is set, otherwise the real username)
 - `{rank_prefix}` — player's LuckPerms **group's** display name, wrapped in `[brackets]` by the plugin (blank without LuckPerms, or in the built-in `default` group)
 - `{rank}` — same group display name, unwrapped/uncolored
 - `{prefix}` — the player's actual LuckPerms **prefix meta** (`/lp user <name> meta setprefix "..."`), with whatever color/brackets you configured in LuckPerms already baked in — use this instead of `{rank_prefix}` if you want per-user prefixes rather than one per group
@@ -126,7 +127,7 @@ Each part is optional:
   player's own prefix meta depending on whether `chat.rank-format` uses
   `{rank}` or `{prefix}` (see **Configuration Guide** above); omitted
   without LuckPerms
-- **name » message** — the actual chat message
+- **name » message** — the actual chat message; this is the player's EssentialsX nickname when one is set (see **Requirements** above), otherwise their real username
 
 Players can enable **nickname-match** on tags to recolor their name to match the tag's color.
 

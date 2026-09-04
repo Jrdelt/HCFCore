@@ -1,5 +1,6 @@
 package me.hcfcore.core.tag;
 
+import me.hcfcore.core.essentials.EssentialsHook;
 import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.lang.Messages;
@@ -251,11 +252,12 @@ public final class TagMenu {
         if (color != null) {
             Component chatPrefix = chatPreviewPrefix(player, manager, equippedTag);
             String sample = messages.getRaw(player, "tags.nickname-sample-message");
+            String displayName = EssentialsHook.resolveName(player);
             lore.add(messages.get(player, "tags.nickname-preview-heading"));
-            lore.add(chatPrefix.append(MessageFormatter.deserialize(color + player.getName()
+            lore.add(chatPrefix.append(MessageFormatter.deserialize(color + displayName
                     + "<gray>: " + sample)));
             if (color.contains("gradient")) {
-                lore.add(chatPrefix.append(MessageFormatter.deserialize(GradientColor.reverse(color) + player.getName()
+                lore.add(chatPrefix.append(MessageFormatter.deserialize(GradientColor.reverse(color) + displayName
                         + "<gray>: " + sample))
                         .append(messages.get(player, "tags.nickname-reversed-suffix")));
             }
