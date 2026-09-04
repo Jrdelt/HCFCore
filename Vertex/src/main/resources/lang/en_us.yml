@@ -55,7 +55,10 @@ cooldowns:
   ender-pearl: 'Ender Pearl'
   golden-apple: 'Golden Apple'
   enchanted-golden-apple: 'Enchanted Golden Apple'
-  item-on-cooldown: '<red>{item} is on cooldown for another {seconds}s.'
+  ender-pearl-colored: '<green>Ender Pearl'
+  golden-apple-colored: '<yellow>Golden Apple'
+  enchanted-golden-apple-colored: '<gold>Enchanted Golden Apple'
+  item-on-cooldown: '<red>✖ <gray>{item} <gray>is on cooldown for another <red>{seconds}s<gray>.'
 
 language:
   usage: '<red>Usage: /language <code>'

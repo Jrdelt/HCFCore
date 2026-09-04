@@ -55,7 +55,10 @@ cooldowns:
   ender-pearl: 'Enderperle'
   golden-apple: 'Goldener Apfel'
   enchanted-golden-apple: 'Verzauberter goldener Apfel'
-  item-on-cooldown: '<red>{item} hat noch {seconds}s Abklingzeit.'
+  ender-pearl-colored: '<green>Enderperle'
+  golden-apple-colored: '<yellow>Goldener Apfel'
+  enchanted-golden-apple-colored: '<gold>Verzauberter goldener Apfel'
+  item-on-cooldown: '<red>✖ <gray>{item} <gray>hat noch <red>{seconds}s<gray> Abklingzeit.'
 
 language:
   usage: '<red>Verwendung: /language <Code>'

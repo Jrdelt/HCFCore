@@ -1,5 +1,6 @@
 package me.hcfcore.core.ability;
 
+import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.lang.Messages;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -124,10 +125,20 @@ public final class VanillaCooldownListener implements Listener {
         }
     }
 
+    /**
+     * Built by hand rather than through {@link Messages#getChat}'s
+     * escaped-placeholder substitution: {@code cooldowns.*-colored} is
+     * admin-authored and meant to carry its own item color (green for
+     * pearl, yellow for golden apple, etc.), and the escaping path would
+     * render that color's markup as literal text instead of applying it --
+     * same reasoning as a tag's `display` string or LuckPerms' `{prefix}`.
+     */
     private void sendCooldownMessage(Player player, String itemKey, long remainingMillis) {
         long remainingSeconds = (remainingMillis + 999L) / 1000L;
-        player.sendMessage(messages.getChat(player, "cooldowns.item-on-cooldown",
-                "item", messages.getRaw(player, "cooldowns." + itemKey),
-                "seconds", String.valueOf(remainingSeconds)));
+        String coloredItem = messages.getRaw(player, "cooldowns." + itemKey + "-colored");
+        String template = messages.getRaw(player, "cooldowns.item-on-cooldown")
+                .replace("{item}", coloredItem)
+                .replace("{seconds}", String.valueOf(remainingSeconds));
+        player.sendMessage(MessageFormatter.deserialize(template));
     }
 }

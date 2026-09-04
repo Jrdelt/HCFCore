@@ -55,7 +55,10 @@ cooldowns:
   ender-pearl: 'Pérola do End'
   golden-apple: 'Maçã dourada'
   enchanted-golden-apple: 'Maçã dourada encantada'
-  item-on-cooldown: '<red>{item} está em recarga por mais {seconds}s.'
+  ender-pearl-colored: '<green>Pérola do End'
+  golden-apple-colored: '<yellow>Maçã dourada'
+  enchanted-golden-apple-colored: '<gold>Maçã dourada encantada'
+  item-on-cooldown: '<red>✖ <gray>{item} <gray>está em recarga por mais <red>{seconds}s<gray>.'
 
 language:
   usage: '<red>Uso: /language <codigo>'

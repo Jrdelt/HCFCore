@@ -55,7 +55,10 @@ cooldowns:
   ender-pearl: 'Perla de Ender'
   golden-apple: 'Manzana dorada'
   enchanted-golden-apple: 'Manzana dorada encantada'
-  item-on-cooldown: '<red>{item} está en enfriamiento durante otros {seconds}s.'
+  ender-pearl-colored: '<green>Perla de Ender'
+  golden-apple-colored: '<yellow>Manzana dorada'
+  enchanted-golden-apple-colored: '<gold>Manzana dorada encantada'
+  item-on-cooldown: '<red>✖ <gray>{item} <gray>está en enfriamiento durante otros <red>{seconds}s<gray>.'
 
 language:
   usage: '<red>Uso: /language <codigo>'
