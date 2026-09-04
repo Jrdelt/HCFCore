@@ -207,3 +207,27 @@ staff:
   mode-enabled: '&c&lSTAFF&r &7> <green>Staff mode enabled (vanish + staff-build).'
 
   mode-disabled: '&c&lSTAFF&r &7> <red>Staff mode disabled.'
+
+  freeze-usage: '<red>Usage: /freeze <player>'
+
+  freeze-enabled-sender: '&c&lSTAFF&r &7> <green>Froze {player}.'
+
+  freeze-disabled-sender: '&c&lSTAFF&r &7> <red>Unfroze {player}.'
+
+  freeze-enabled-target: '&c&lFROZEN&r &7> <red>You have been frozen by staff. Do <bold>NOT</bold> log out or you will be temporarily banned!'
+
+  freeze-disabled-target: '&c&lFROZEN&r &7> <green>You have been unfrozen.'
+
+  freeze-blocked-command: '&c&lFROZEN&r &7> <red>You cannot use commands while frozen.'
+
+  freeze-ban-reason: '&c&lFROZEN&r &7> <red>You left the game while frozen by staff. Banned for 3 hours.'
+
+  freeze-quit-alert: '&c&lSTAFF&r &7> <red>{player} left while frozen and has been banned for 3 hours.'
+
+  invsee-usage: '<red>Usage: /invsee <player>'
+
+  invsee-opened: '&c&lSTAFF&r &7> <green>Viewing {player}''s inventory.'
+
+  endersee-usage: '<red>Usage: /endersee <player>'
+
+  endersee-opened: '&c&lSTAFF&r &7> <green>Viewing {player}''s ender chest.'

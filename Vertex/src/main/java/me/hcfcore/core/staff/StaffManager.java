@@ -19,6 +19,7 @@ public final class StaffManager {
     private final Set<UUID> vanished = ConcurrentHashMap.newKeySet();
     private final Set<UUID> staffBuild = ConcurrentHashMap.newKeySet();
     private final Set<UUID> staffChat = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> frozen = ConcurrentHashMap.newKeySet();
 
     public StaffManager(Plugin plugin) {
         this.plugin = plugin;
@@ -34,6 +35,10 @@ public final class StaffManager {
 
     public boolean isStaffChat(UUID uuid) {
         return staffChat.contains(uuid);
+    }
+
+    public boolean isFrozen(UUID uuid) {
+        return frozen.contains(uuid);
     }
 
     /**
@@ -107,17 +112,38 @@ public final class StaffManager {
     }
 
     /**
-     * Toggles full staff mode: vanish and staff-build together. Only
-     * counts as "already on" when both are -- so if a player turned one
-     * off individually via /vanish or /staffbuild, this turns both back on
-     * rather than surprising them by finishing the job of turning both off.
+     * Toggles full staff mode: vanish, staff-build, godmode, and flight
+     * together. Only counts as "already on" when vanish and staff-build
+     * both are -- so if a player turned one off individually via /vanish
+     * or /staffbuild, this turns everything back on rather than
+     * surprising them by finishing the job of turning it off.
      */
     public boolean toggleStaffMode(Player player) {
         boolean bothOn = isVanished(player.getUniqueId()) && isStaffBuild(player.getUniqueId());
         boolean nowOn = !bothOn;
         setVanish(player, nowOn);
         setStaffBuild(player, nowOn);
+        player.setInvulnerable(nowOn);
+        player.setAllowFlight(nowOn);
+        player.setFlying(nowOn);
         return nowOn;
+    }
+
+    /**
+     * Toggles freeze: a frozen player can't move, break/place blocks,
+     * interact, deal or take damage, drop items, click their inventory, or
+     * run commands -- see {@link FreezeListener}. Leaving the server while
+     * frozen is a separate, harsher consequence handled by
+     * {@link FreezeListener#onQuit}, not this method.
+     */
+    public boolean toggleFreeze(Player player) {
+        boolean now = !frozen.contains(player.getUniqueId());
+        if (now) {
+            frozen.add(player.getUniqueId());
+        } else {
+            frozen.remove(player.getUniqueId());
+        }
+        return now;
     }
 
     public boolean toggleStaffChat(Player player) {
@@ -134,5 +160,6 @@ public final class StaffManager {
         vanished.remove(uuid);
         staffBuild.remove(uuid);
         staffChat.remove(uuid);
+        frozen.remove(uuid);
     }
 }

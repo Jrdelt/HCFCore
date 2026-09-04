@@ -73,6 +73,15 @@ commands:
   staffbuild:
     description: Toggle build/break bypass in claimed land.
     usage: /<command>
+  freeze:
+    description: Freeze or unfreeze a player in place.
+    usage: /<command> <player>
+  invsee:
+    description: View a player's live inventory.
+    usage: /<command> <player>
+  endersee:
+    description: View a player's live ender chest.
+    usage: /<command> <player>
 
 permissions:
   hcfcore.admin:
@@ -122,4 +131,13 @@ permissions:
     default: op
   hcfcore.staff.staffbuild:
     description: Bypass claim protection to build/break/interact anywhere.
+    default: op
+  hcfcore.staff.freeze:
+    description: Freeze/unfreeze a player, and see freeze-related alerts.
+    default: op
+  hcfcore.staff.invsee:
+    description: View a player's live inventory.
+    default: op
+  hcfcore.staff.endersee:
+    description: View a player's live ender chest.
     default: op

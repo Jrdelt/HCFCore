@@ -331,9 +331,33 @@ combat tags), all gated behind their own `hcfcore.staff.*` permission:
   block break/place, containers/doors, buckets, item frames/paintings,
   and entity interaction all work in any claim while it's on.
 - **`/staff`** — toggles vanish + staff-build together as one "full staff
-  mode" switch. Treats them as already "on" only when *both* are — so if
-  you'd turned one off individually, `/staff` turns both back on rather
-  than finishing the job of turning them off.
+  mode" switch, and also grants **godmode** (invulnerability) and
+  **flight** for the duration. Treats everything as already "on" only
+  when vanish and staff-build both are — so if you'd turned one off
+  individually, `/staff` turns everything back on rather than finishing
+  the job of turning it off.
+
+### Freeze
+
+`/freeze <player>` (permission `hcfcore.staff.freeze`) locks a player in
+place while staff investigate — a suspected cheater doesn't get a
+ban's tip-off. While frozen, a player can't move (they can still look
+around), break/place blocks, interact, deal or take any damage, drop
+items, click their own inventory, or run any command. They're warned in
+chat not to log out; **disconnecting while frozen bans them for 3
+hours** (`Player.ban(...)`, not a kick — `/freeze` itself never kicks or
+bans on its own, only leaving while frozen does), and every other online
+staff member with the permission is alerted. `/freeze` again unfreezes.
+Freeze state is session-scoped like the other toggles above — it doesn't
+survive a server restart.
+
+### Invsee / Endersee
+
+`/invsee <player>` and `/endersee <player>` (permissions
+`hcfcore.staff.invsee` / `hcfcore.staff.endersee`) open the target's
+**live** inventory or ender chest — Bukkit's `openInventory` on another
+player's actual inventory object is a real two-way view with no custom
+GUI involved: an edit on either side shows up for both immediately.
 
 ### WarZone / SafeZone protection
 
@@ -441,10 +465,13 @@ Each player's death history persists to MySQL and stores the last 20 deaths auto
 
 | Command | Permission | Notes |
 |---|---|---|
-| `/staff` | `hcfcore.staff.mode` | Toggles vanish + staff-build together. |
+| `/staff` | `hcfcore.staff.mode` | Toggles vanish + staff-build + godmode + flight together. |
 | `/vanish` | `hcfcore.staff.vanish` | Toggles vanish; this permission also lets you see other vanished staff. |
 | `/staffchat` | `hcfcore.staff.staffchat` | Toggles redirecting your chat to the staff-only channel; also needed to read it. |
 | `/staffbuild` | `hcfcore.staff.staffbuild` | Toggles bypassing claim protection everywhere. |
+| `/freeze <player>` | `hcfcore.staff.freeze` | Toggles freezing a player in place; also needed to see the leave-while-frozen ban alert. |
+| `/invsee <player>` | `hcfcore.staff.invsee` | Opens the target's live inventory. |
+| `/endersee <player>` | `hcfcore.staff.endersee` | Opens the target's live ender chest. |
 
 ### Admin / reload
 
@@ -457,8 +484,9 @@ Each player's death history persists to MySQL and stores the last 20 deaths auto
 Every command above (`kit`, `kits`, `hcfcore`, `getitem`, `abilities`,
 `language`, `cooldowns`, `tags`, `reboot`, `nextreboot`, `uncombat`,
 `combatcheck`, `combattag`, `rollback`, `staff`, `vanish`, `staffchat`,
-`staffbuild`) registers its own `TabCompleter` (except the
-argument-less ones like `kits`/`abilities`/`tags`/`cooldowns`/`staff`/`vanish`/`staffchat`/`staffbuild`), so
+`staffbuild`, `freeze`, `invsee`, `endersee`) registers its own
+`TabCompleter` (except the argument-less ones like
+`kits`/`abilities`/`tags`/`cooldowns`/`staff`/`vanish`/`staffchat`/`staffbuild`), so
 suggestions should appear as soon as the freshly built jar is running on
 the server. If they don't show up in-game:
 
