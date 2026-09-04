@@ -317,13 +317,17 @@ bard uses) marks whoever their arrows hit:
 
 ## Staff Tools
 
-Four session-scoped toggles (nothing persists across a rejoin — same as
+Session-scoped toggles (nothing persists across a rejoin — same as
 combat tags), all gated behind their own `hcfcore.staff.*` permission:
 
 - **`/vanish`** — hides you from anyone without `hcfcore.staff.vanish`.
   Applies immediately to every online viewer and to anyone who joins
   afterward; your quit message is suppressed while vanished so leaving
-  doesn't announce your name.
+  doesn't announce your name. Mobs stop targeting you the instant you
+  vanish (any mob already mid-chase has its target cleared, and nothing
+  can pick you as a new target while vanished) — otherwise a mob
+  visibly swinging at empty air would give away that someone invisible
+  is standing there.
 - **`/staffchat`** — toggles a mode where *all* your normal chat goes to
   a staff-only channel (visible to `hcfcore.staff.staffchat`) instead of
   public chat, until you toggle it off again.

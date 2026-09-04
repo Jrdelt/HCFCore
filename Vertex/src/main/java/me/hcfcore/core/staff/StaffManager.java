@@ -1,6 +1,8 @@
 package me.hcfcore.core.staff;
 
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -68,6 +70,23 @@ public final class StaffManager {
                 viewer.hidePlayer(plugin, player);
             } else {
                 viewer.showPlayer(plugin, player);
+            }
+        }
+        if (hidden) {
+            clearMobTargets(player);
+        }
+    }
+
+    /**
+     * Stops any mob already mid-chase from continuing to visibly swing at
+     * an invisible player -- {@link VanishListener#onTarget} only catches
+     * *new* targeting attempts, not a target a mob picked up before this
+     * player vanished.
+     */
+    private void clearMobTargets(Player player) {
+        for (Entity entity : player.getNearbyEntities(64, 64, 64)) {
+            if (entity instanceof Mob mob && player.equals(mob.getTarget())) {
+                mob.setTarget(null);
             }
         }
     }
