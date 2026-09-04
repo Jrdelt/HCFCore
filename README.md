@@ -330,9 +330,11 @@ combat tags), all gated behind their own `hcfcore.staff.*` permission:
   afterward; your quit message is suppressed while vanished so leaving
   doesn't announce your name. Mobs stop targeting you the instant you
   vanish (any mob already mid-chase has its target cleared, and nothing
-  can pick you as a new target while vanished) — otherwise a mob
-  visibly swinging at empty air would give away that someone invisible
-  is standing there.
+  can pick you as a new target while vanished), and you can't deal
+  damage to anything — mobs or players, melee or projectile — while
+  vanished either. Both exist for the same reason: a mob swinging at
+  empty air, or a player getting hit/knocked back by nothing, gives
+  away that someone invisible is there.
 - **`/staffchat`** — toggles a mode where *all* your normal chat goes to
   a staff-only channel (visible to `hcfcore.staff.staffchat`) instead of
   public chat, until you toggle it off again.

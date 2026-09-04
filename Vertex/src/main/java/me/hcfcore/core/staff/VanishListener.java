@@ -1,9 +1,12 @@
 package me.hcfcore.core.staff;
 
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityTargetEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -40,6 +43,31 @@ public final class VanishListener implements Listener {
         if (event.getTarget() instanceof Player player && staffManager.isVanished(player.getUniqueId())) {
             event.setCancelled(true);
         }
+    }
+
+    /**
+     * A vanished player hitting a mob or player is just as much a giveaway
+     * as a mob targeting one -- the victim (or anyone watching) sees
+     * damage/knockback/hit sounds coming from thin air. Covers projectiles
+     * (arrows, thrown potions, tridents, etc.) by resolving the shooter,
+     * not just direct melee.
+     */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onDamage(EntityDamageByEntityEvent event) {
+        Player attacker = resolveAttacker(event.getDamager());
+        if (attacker != null && staffManager.isVanished(attacker.getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    private static Player resolveAttacker(Entity damager) {
+        if (damager instanceof Player player) {
+            return player;
+        }
+        if (damager instanceof Projectile projectile && projectile.getShooter() instanceof Player player) {
+            return player;
+        }
+        return null;
     }
 
     @EventHandler

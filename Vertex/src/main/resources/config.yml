@@ -99,8 +99,7 @@ pvp:
     # Tagged against "the server" (no live opponent -- e.g. after a combat logout)
     vs-server: '<gray>Combat<gray>: <red>server <gray>{seconds} <green>you <white>({your_cps}cps)'
     # Tagged against another online player
-    vs-player: '<gray>Combat<gray>: <red>{opponent} <gray>(<green>{health} <red>♥<gray>) <gray>Ends: <green>{seconds} | <gray>CPS: <green>You: <gray>(<green>{your_cps}<gray>) <red>Them <gray>(<red>{their_cps}<gray>)'
-    # Tagged, but the opponent is offline or otherwise unresolvable
+    vs-player: '<red>⚔ <gray>Combat<gray>: <red>{opponent} <gray>(<green>{health}<gray>) <gray>Ends: <green>{seconds} <gray>CPS: <green>You: <gray>(<green>{your_cps}<gray>) <red>Them <gray>(<red>{their_cps}<gray>) <red>⚔'    # Tagged, but the opponent is offline or otherwise unresolvable
     vs-unknown: '<red><bold>Combat</bold><gray>: {seconds} <green>you <white>({your_cps}cps)'
 
   # ---- ARCHER CLASS ----
