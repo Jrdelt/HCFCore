@@ -182,8 +182,6 @@ kits:
         amplifier: 1
       - type: RESISTANCE
         amplifier: 1
-      - type: WEAKNESS
-        amplifier: 0
 
   bard-donator:
     permission: hcfcore.kit.bard.donator
@@ -224,8 +222,6 @@ kits:
         amplifier: 1
       - type: RESISTANCE
         amplifier: 1
-      - type: WEAKNESS
-        amplifier: 0
 
   diamond:
     permission: ''
@@ -369,9 +365,6 @@ kits:
       - material: COBWEB
         amount: 1
         ability: mage-slowness
-      - material: FERMENTED_SPIDER_EYE
-        amount: 1
-        ability: mage-weakness
       - material: SPIDER_EYE
         amount: 1
         ability: mage-poison
@@ -401,9 +394,6 @@ kits:
       - material: COBWEB
         amount: 2
         ability: mage-slowness
-      - material: FERMENTED_SPIDER_EYE
-        amount: 2
-        ability: mage-weakness
       - material: SPIDER_EYE
         amount: 2
         ability: mage-poison

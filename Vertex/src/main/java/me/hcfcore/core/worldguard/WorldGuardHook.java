@@ -24,17 +24,17 @@ public final class WorldGuardHook {
         if (disabledRegionIds.isEmpty() || !Bukkit.getPluginManager().isPluginEnabled("WorldGuard")) {
             return false;
         }
-        return checkRegions(player, disabledRegionIds);
+        return isInAnyRegion(player, disabledRegionIds);
     }
 
-    private static boolean checkRegions(Player player, Set<String> disabledRegionIds) {
+    private static boolean isInAnyRegion(Player player, Set<String> regionIds) {
         RegionQuery query = WorldGuard.getInstance().getPlatform().getRegionContainer().createQuery();
         Iterable<ProtectedRegion> regions = query.getApplicableRegions(BukkitAdapter.adapt(player.getLocation()));
         if (regions == null) {
             return false;
         }
         for (ProtectedRegion region : regions) {
-            if (disabledRegionIds.contains(region.getId())) {
+            if (regionIds.contains(region.getId())) {
                 return true;
             }
         }

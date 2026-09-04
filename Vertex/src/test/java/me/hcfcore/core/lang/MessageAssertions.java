@@ -38,21 +38,21 @@ public final class MessageAssertions {
     }
 
     /**
-     * Whether {@code actual} is the rendering of the chat-prefixed
-     * {@code key} as {@code viewer} would see it -- the counterpart to
-     * {@link Messages#getChat}, which is how nearly every message in the
-     * plugin is sent.
+     * Whether {@code actual} is the rendering of {@code key} as
+     * {@code viewer} would see it. {@link Messages#getChat} and
+     * {@link Messages#get} are equivalent now -- neither adds a prefix,
+     * any prefix (e.g. "&e&lABILITES &7>") is baked into the lang string
+     * itself -- so there's no longer a meaningful distinction between a
+     * "chat" and a "bare" message; this one helper covers both.
      */
     public static boolean isChatMessage(Messages messages, CommandSender viewer, Component actual, String key) {
-        return isMessage(messages.getRaw(viewer, "general.prefix") + messages.getRaw(viewer, key), actual);
+        return isMessage(messages.getRaw(viewer, key), actual);
     }
 
-    /**
-     * Whether {@code actual} is the rendering of {@code key} with no chat
-     * prefix -- for the handful of callers that use {@link Messages#get}.
-     */
+    /** @deprecated identical to {@link #isChatMessage} now; kept for existing call sites. */
+    @Deprecated
     public static boolean isBareMessage(Messages messages, CommandSender viewer, Component actual, String key) {
-        return isMessage(messages.getRaw(viewer, key), actual);
+        return isChatMessage(messages, viewer, actual, key);
     }
 
     private static boolean isMessage(String rawTemplate, Component actual) {

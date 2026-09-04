@@ -206,6 +206,10 @@ class TagManagerTest {
         tagManager.select(player.getUniqueId(), "legend");
         tagManager.setNicknameMatchEnabled(player.getUniqueId(), true);
         tagManager.setNicknameReversed(player.getUniqueId(), true);
+        // Saves are queued onto an executor now (see TagManager.save()), so
+        // a "restart" here has to wait for the pending write the same way
+        // HCFCorePlugin.onDisable() does in production, or this read races it.
+        tagManager.awaitWrites();
 
         TagManager reloaded = new TagManager(plugin);
         reloaded.load();
@@ -250,6 +254,7 @@ class TagManagerTest {
         assertEquals(List.of("<gray>A name known by all.", "<gray>Second line."), legend.lore());
 
         tagManager.save();
+        tagManager.awaitWrites();
         TagManager reloaded = new TagManager(plugin);
         reloaded.load();
 

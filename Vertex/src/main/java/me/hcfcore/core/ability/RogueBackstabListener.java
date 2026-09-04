@@ -1,7 +1,7 @@
 package me.hcfcore.core.ability;
 
 import me.hcfcore.core.factions.FactionsHook;
-import me.hcfcore.core.lang.Messages;
+import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
 import org.bukkit.entity.Player;
@@ -11,6 +11,8 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
+import java.util.Set;
+
 
 public final class RogueBackstabListener implements Listener {
 
@@ -18,14 +20,11 @@ public final class RogueBackstabListener implements Listener {
     private final Plugin plugin;
     private final AbilityManager abilityManager;
     private final UserManager userManager;
-    private final Messages messages;
 
-    public RogueBackstabListener(Plugin plugin, AbilityManager abilityManager, UserManager userManager,
-                                  Messages messages) {
+    public RogueBackstabListener(Plugin plugin, AbilityManager abilityManager, UserManager userManager) {
         this.plugin = plugin;
         this.abilityManager = abilityManager;
         this.userManager = userManager;
-        this.messages = messages;
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -41,10 +40,12 @@ public final class RogueBackstabListener implements Listener {
         }
         Ability ability = abilityManager.get(ABILITY_ID);
         User user = userManager.get(attacker.getUniqueId());
+        Set<String> disabledClaims = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-claim-names"));
         if (ability == null || user == null
                 || abilityManager.isOnGlobalCooldown(attacker.getUniqueId())
                 || abilityManager.isOnCooldown(user, ability)
-                || !isBehind(attacker, victim)) {
+                || !isBehind(attacker, victim)
+                || FactionsHook.isDisabledClaim(attacker.getLocation(), disabledClaims)) {
             return;
         }
 
@@ -52,7 +53,8 @@ public final class RogueBackstabListener implements Listener {
         abilityManager.startCooldown(attacker, user, ability);
         consume(attacker);
         event.setDamage(Math.max(0.0, ability.getDouble("damage", 6.0)));
-        attacker.sendMessage(messages.getChat(attacker, "ability.rogue-backstab"));
+        attacker.sendMessage(MessageFormatter.deserialize("&e&lABILITES &7> <gold>Backstab landed for 3 hearts."));
+        victim.sendMessage(MessageFormatter.deserialize("&e&lABILITES &7> <red>You were backstabbed!"));
     }
 
     private static boolean isBehind(Player attacker, Player victim) {

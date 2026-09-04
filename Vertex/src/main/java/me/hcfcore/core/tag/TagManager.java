@@ -13,10 +13,17 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 
 public final class TagManager {
 
@@ -27,6 +34,14 @@ public final class TagManager {
     private final Map<String, Tag> tags = new HashMap<>();
     private final Map<UUID, PlayerPrefs> playerPrefs = new HashMap<>();
     private final Map<String, Integer> owners = new HashMap<>();
+    /** Every tag id a player has ever equipped, so `owners` counts distinct players, not selections. */
+    private final Map<UUID, Set<String>> everOwned = new HashMap<>();
+    private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "hcfcore-tags-io");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private volatile CompletableFuture<Void> pendingWrite = CompletableFuture.completedFuture(null);
 
     public TagManager(Plugin plugin) {
         this.plugin = plugin;
@@ -45,6 +60,7 @@ public final class TagManager {
         tags.clear();
         playerPrefs.clear();
         owners.clear();
+        everOwned.clear();
 
         ConfigurationSection definitions = config.getConfigurationSection("tags");
         if (definitions != null) {
@@ -78,11 +94,16 @@ public final class TagManager {
                         playerSection.getString("tag"),
                         playerSection.getBoolean("nickname-match", false),
                         playerSection.getBoolean("nickname-reversed", false)));
+                    List<String> owned = playerSection.getStringList("owned-tags");
+                    if (!owned.isEmpty()) {
+                        everOwned.put(uuid, new HashSet<>(owned));
+                    }
                 } else {
                     // Backward-compat: a bare string value is just a tag id.
                     String legacyTagId = players.getString(uuidKey);
                     if (legacyTagId != null) {
                         playerPrefs.put(uuid, new PlayerPrefs(legacyTagId, false, false));
+                        everOwned.put(uuid, new HashSet<>(Set.of(legacyTagId.toLowerCase(Locale.ROOT))));
                     }
                 }
             }
@@ -124,9 +145,13 @@ public final class TagManager {
             return;
         }
         PlayerPrefs current = playerPrefs.getOrDefault(uuid, PlayerPrefs.DEFAULT);
-        String previous = current.tagId();
         playerPrefs.put(uuid, current.withTag(tag.id()));
-        if (previous == null || !previous.equalsIgnoreCase(tag.id())) {
+
+        // Owners counts distinct players who have ever equipped this tag,
+        // not selections -- so re-selecting a tag the player already owned
+        // (e.g. A -> B -> A) must not increment it again.
+        Set<String> owned = everOwned.computeIfAbsent(uuid, key -> new HashSet<>());
+        if (owned.add(tag.id().toLowerCase(Locale.ROOT))) {
             owners.merge(tag.id().toLowerCase(Locale.ROOT), 1, Integer::sum);
         }
         save();
@@ -178,6 +203,12 @@ public final class TagManager {
         return prefs.nicknameReversed() ? GradientColor.reverse(color) : color;
     }
 
+    /**
+     * Builds the config snapshot synchronously (cheap, and safe to read the
+     * plain HashMaps from since only the main thread ever mutates them),
+     * then writes it to disk on {@link #ioExecutor} so a tag-menu click
+     * never blocks the main thread on file I/O.
+     */
     public void save() {
         YamlConfiguration config = new YamlConfiguration();
         for (Tag tag : tags.values()) {
@@ -204,15 +235,40 @@ public final class TagManager {
             }
             config.set(path + ".nickname-match", prefs.nicknameMatch());
             config.set(path + ".nickname-reversed", prefs.nicknameReversed());
-        }
-        try {
-            File parent = file.getParentFile();
-            if (parent != null) {
-                parent.mkdirs();
+            Set<String> owned = everOwned.get(entry.getKey());
+            if (owned != null && !owned.isEmpty()) {
+                config.set(path + ".owned-tags", List.copyOf(owned));
             }
-            config.save(file);
-        } catch (IOException e) {
-            plugin.getLogger().warning("Could not save tags.yml: " + e.getMessage());
+        }
+
+        pendingWrite = CompletableFuture.runAsync(() -> {
+            try {
+                File parent = file.getParentFile();
+                if (parent != null) {
+                    parent.mkdirs();
+                }
+                config.save(file);
+            } catch (IOException e) {
+                plugin.getLogger().log(Level.WARNING, "Could not save tags.yml", e);
+            }
+        }, ioExecutor);
+    }
+
+    /** Blocks until the most recently queued save has finished -- call on plugin disable. */
+    public void awaitWrites() {
+        try {
+            pendingWrite.get(5, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Timed out waiting for tags.yml to save", e);
+        }
+        ioExecutor.shutdown();
+        try {
+            if (!ioExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                ioExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            ioExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
         }
     }
 

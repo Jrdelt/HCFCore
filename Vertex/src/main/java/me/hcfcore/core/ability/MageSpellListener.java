@@ -14,6 +14,8 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
+import java.util.Set;
+
 public final class MageSpellListener implements Listener {
 
     private final Plugin plugin;
@@ -52,9 +54,22 @@ public final class MageSpellListener implements Listener {
         }
         Ability ability = abilityManager.get(abilityId);
         User user = userManager.get(attacker.getUniqueId());
-        if (ability == null || user == null
-                || abilityManager.isOnGlobalCooldown(attacker.getUniqueId())
-                || abilityManager.isOnCooldown(user, ability)) {
+        if (ability == null || user == null) {
+            return;
+        }
+        if (abilityManager.isOnGlobalCooldown(attacker.getUniqueId())) {
+            long remaining = (abilityManager.globalCooldownRemainingMillis(attacker.getUniqueId()) + 999) / 1000;
+            attacker.sendMessage(messages.get(attacker, "ability.on-global-cooldown", "seconds", String.valueOf(remaining)));
+            return;
+        }
+        if (abilityManager.isOnCooldown(user, ability)) {
+            long remaining = (abilityManager.remainingCooldownMillis(user, ability) + 999) / 1000;
+            attacker.sendMessage(messages.get(attacker, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
+            return;
+        }
+        Set<String> disabledClaims = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-claim-names"));
+        if (FactionsHook.isDisabledClaim(attacker.getLocation(), disabledClaims)) {
+            attacker.sendMessage(messages.get(attacker, "ability.region-blocked"));
             return;
         }
         PotionEffectType type = PotionEffectType.getByName(ability.getString("effect-type", ""));
@@ -67,10 +82,11 @@ public final class MageSpellListener implements Listener {
                 Math.max(1, ability.getInt("effect-duration-seconds", 5)) * 20,
                 Math.max(0, ability.getInt("effect-amplifier", 0)), false, true));
         consume(attacker);
+        attacker.sendMessage(messages.get(attacker, "ability.mage-spell-cast"));
     }
 
     private String findSpell(ItemStack item) {
-        for (String id : new String[]{"mage-wither", "mage-slowness", "mage-weakness", "mage-poison"}) {
+        for (String id : new String[]{"mage-wither", "mage-slowness", "mage-poison"}) {
             if (AbilityGate.isAbility(plugin, item, id)) {
                 return id;
             }

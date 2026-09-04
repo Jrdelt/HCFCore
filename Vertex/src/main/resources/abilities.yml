@@ -49,7 +49,7 @@ abilities:
 
   leap:
     material: FIREWORK_ROCKET
-    name: '<light_red>Leap'
+    name: '<red>Leap'
     lore:
       - '<gray>Launches you forward and'
       - '<gray>slightly upward.'
@@ -81,7 +81,7 @@ abilities:
 
   mage-slowness:
     material: COBWEB
-    name: '<brown>Slowness Spell'
+    name: '<#8B4513>Slowness Spell'
     lore:
       - '<gray>Hit an enemy to apply Slowness.'
     cooldown-seconds: 20
@@ -89,19 +89,9 @@ abilities:
     effect-amplifier: 1
     effect-duration-seconds: 5
 
-  mage-weakness:
-    material: FERMENTED_SPIDER_EYE
-    name: '<light_purple>Weakness Spell'
-    lore:
-      - '<gray>Hit an enemy to apply Weakness.'
-    cooldown-seconds: 20
-    effect-type: WEAKNESS
-    effect-amplifier: 0
-    effect-duration-seconds: 6
-
   mage-poison:
     material: SPIDER_EYE
-    name: '<w green>Poison Spell'
+    name: '<green>Poison Spell'
     lore:
       - '<gray>Hit an enemy to apply Poison.'
     cooldown-seconds: 25

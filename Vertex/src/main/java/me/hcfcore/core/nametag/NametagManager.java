@@ -1,44 +1,69 @@
 package me.hcfcore.core.nametag;
 
 import me.hcfcore.core.factions.FactionsHook;
-import net.kyori.adventure.text.Component;
+import me.hcfcore.core.lang.MessageFormatter;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.Configuration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages player nametags with FactionsUUID integration.
  * Dynamic faction-based coloring and real-time updates.
- *
- * Color scheme:
- * - GREEN: Same faction (teammate)
- * - YELLOW: Neutral/Factionless
- * - LIGHT_PURPLE: Allied faction
- * - RED: Enemy faction (at war)
- *
- * Displays: [FactionName] PlayerName with dynamic coloring
+ * Configuration-driven via config.yml nametags section.
  */
 public final class NametagManager {
+
+    /**
+     * Teams are keyed by UUID (not player name) so a Mojang username change
+     * can't orphan a team under the old name -- {@code nt_} keeps the full
+     * 36-char UUID under the 40-char team name limit and doubles as a
+     * marker prefix so {@link #cleanupStaleTeams()} can find our teams
+     * among any other plugin's.
+     */
+    private static final String TEAM_PREFIX = "nt_";
 
     private final Plugin plugin;
     private final Scoreboard scoreboard;
     private final Map<String, PlayerNametagState> playerStates = new ConcurrentHashMap<>();
-    private static final int UPDATE_INTERVAL_TICKS = 20; // Update every second
+    private boolean enabled;
+    private int updateIntervalTicks;
+    private NamedTextColor sameFactionColor;
+    private NamedTextColor neutralColor;
 
     public NametagManager(Plugin plugin) {
         this.plugin = plugin;
         this.scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
-        startNametagUpdateTask();
+        loadConfiguration();
+        if (enabled) {
+            startNametagUpdateTask();
+        }
+    }
+
+    private void loadConfiguration() {
+        Configuration config = plugin.getConfig();
+        enabled = config.getBoolean("nametags.enabled", true);
+        updateIntervalTicks = config.getInt("nametags.update-interval-ticks", 20);
+
+        sameFactionColor = parseColor(config.getString("nametags.colors.same-faction", "green"));
+        neutralColor = parseColor(config.getString("nametags.colors.neutral", "gray"));
+    }
+
+    private NamedTextColor parseColor(String colorName) {
+        NamedTextColor color = NamedTextColor.NAMES.value(colorName.toLowerCase());
+        return color != null ? color : NamedTextColor.WHITE;
     }
 
     private void startNametagUpdateTask() {
-        plugin.getServer().getScheduler().runTaskTimer(plugin, this::updateAllNametags, 20, UPDATE_INTERVAL_TICKS);
+        plugin.getServer().getScheduler().runTaskTimer(plugin, this::updateAllNametags, 20, updateIntervalTicks);
     }
 
     private void updateAllNametags() {
@@ -47,7 +72,7 @@ public final class NametagManager {
         }
     }
 
-    private void updatePlayerNametag(Player player) {
+    public void updatePlayerNametag(Player player) {
         String playerId = player.getUniqueId().toString();
         int factionId = FactionsHook.getFactionId(player);
         String factionName = FactionsHook.getFactionName(factionId);
@@ -58,7 +83,7 @@ public final class NametagManager {
             return; // No change, skip update
         }
 
-        String teamName = "nametag_" + player.getName();
+        String teamName = TEAM_PREFIX + player.getUniqueId();
         Team team = scoreboard.getTeam(teamName);
 
         // Create team if doesn't exist
@@ -69,30 +94,45 @@ public final class NametagManager {
             team.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
         }
 
-        // Get color based on faction relationship (used by all viewers)
-        NamedTextColor color = getDefaultColorForFaction(factionId);
+        // Build nametag: &8[&a<ftop>&8] &8[<factioncolor>(name)&8] &e<player>
+        // Note: team prefixes are shared across every viewer -- Minecraft's
+        // scoreboard API has no per-viewer color, so this can't show red to
+        // enemies and purple to allies of the specific viewer looking at it.
+        // It uses one fixed color: green for players in a faction, gray for
+        // factionless, matching nametags.colors.same-faction/neutral in config.yml.
+        String ftop = factionId == FactionsHook.NO_FACTION ? "-" : String.valueOf(FactionsHook.getFactionRank(factionId));
+        NamedTextColor factionColor = factionId == FactionsHook.NO_FACTION ? neutralColor : sameFactionColor;
+        String factionColorCode = toLegacyCode(factionColor);
 
-        // Update team with faction prefix and color
-        team.prefix(Component.text("[" + factionName + "] ").color(color));
-        team.color(color);
+        String prefix = "&8[&a" + ftop + "&8] &8[" + factionColorCode + "(" + factionName + ")&8] &e";
+        team.prefix(MessageFormatter.deserialize(prefix));
+        team.color(NamedTextColor.WHITE);
 
         // Store state for change detection
         playerStates.put(playerId, new PlayerNametagState(factionId, factionName));
     }
 
-    /**
-     * Get the default color for a faction (used by all viewers).
-     * Since teams are server-wide, we use a neutral color scheme.
-     */
-    private NamedTextColor getDefaultColorForFaction(int factionId) {
-        if (factionId == FactionsHook.NO_FACTION) {
-            return NamedTextColor.YELLOW; // Neutral/Factionless
-        }
-        return NamedTextColor.AQUA; // Members in faction
+    private String toLegacyCode(NamedTextColor color) {
+        if (color.equals(NamedTextColor.BLACK)) return "&0";
+        if (color.equals(NamedTextColor.DARK_BLUE)) return "&1";
+        if (color.equals(NamedTextColor.DARK_GREEN)) return "&2";
+        if (color.equals(NamedTextColor.DARK_AQUA)) return "&3";
+        if (color.equals(NamedTextColor.DARK_RED)) return "&4";
+        if (color.equals(NamedTextColor.DARK_PURPLE)) return "&5";
+        if (color.equals(NamedTextColor.GOLD)) return "&6";
+        if (color.equals(NamedTextColor.GRAY)) return "&7";
+        if (color.equals(NamedTextColor.DARK_GRAY)) return "&8";
+        if (color.equals(NamedTextColor.BLUE)) return "&9";
+        if (color.equals(NamedTextColor.GREEN)) return "&a";
+        if (color.equals(NamedTextColor.AQUA)) return "&b";
+        if (color.equals(NamedTextColor.RED)) return "&c";
+        if (color.equals(NamedTextColor.LIGHT_PURPLE)) return "&d";
+        if (color.equals(NamedTextColor.YELLOW)) return "&e";
+        return "&f";
     }
 
     public void removePlayerNametag(Player player) {
-        String teamName = "nametag_" + player.getName();
+        String teamName = TEAM_PREFIX + player.getUniqueId();
         Team team = scoreboard.getTeam(teamName);
         if (team != null) {
             team.unregister();
@@ -100,10 +140,36 @@ public final class NametagManager {
         playerStates.remove(player.getUniqueId().toString());
     }
 
+    /**
+     * Removes any of our teams left behind for players who aren't currently
+     * online -- covers a team orphaned by a crash, a plugin reload racing a
+     * quit, or any other path that skipped {@link #removePlayerNametag}.
+     * Safe to call anytime; called from {@code HCFCorePlugin.reload()} since
+     * that's the one path (unlike a normal disable) where the plugin keeps
+     * running afterward with these teams still registered.
+     */
+    public void cleanupStaleTeams() {
+        for (Team team : new ArrayList<>(scoreboard.getTeams())) {
+            if (!team.getName().startsWith(TEAM_PREFIX)) {
+                continue;
+            }
+            String uuidPart = team.getName().substring(TEAM_PREFIX.length());
+            try {
+                UUID uuid = UUID.fromString(uuidPart);
+                if (Bukkit.getPlayer(uuid) == null) {
+                    team.unregister();
+                    playerStates.remove(uuid.toString());
+                }
+            } catch (IllegalArgumentException ignored) {
+                // Not one of ours despite the prefix match -- leave it alone.
+            }
+        }
+    }
+
     public void shutdown() {
         // Clean up all nametag teams
-        for (Team team : new java.util.ArrayList<>(scoreboard.getTeams())) {
-            if (team.getName().startsWith("nametag_")) {
+        for (Team team : new ArrayList<>(scoreboard.getTeams())) {
+            if (team.getName().startsWith(TEAM_PREFIX)) {
                 team.unregister();
             }
         }

@@ -6,15 +6,18 @@ import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.EnderPearl;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -48,9 +51,11 @@ public final class PearlStunnerListener implements Listener {
         }
         Ability ability = abilityManager.get(ABILITY_ID);
         User user = userManager.get(attacker.getUniqueId());
+        Set<String> disabledClaims = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-claim-names"));
         if (ability == null || user == null
                 || abilityManager.isOnGlobalCooldown(attacker.getUniqueId())
-                || abilityManager.isOnCooldown(user, ability)) {
+                || abilityManager.isOnCooldown(user, ability)
+                || FactionsHook.isDisabledClaim(attacker.getLocation(), disabledClaims)) {
             return;
         }
         long durationSeconds = Math.max(1, ability.getInt("stun-seconds", 8));
@@ -58,11 +63,11 @@ public final class PearlStunnerListener implements Listener {
         abilityManager.startCooldown(attacker, user, ability);
         stunnedUntil.put(victim.getUniqueId(), System.currentTimeMillis() + durationSeconds * 1000L);
         consume(attacker);
-        victim.sendMessage(messages.getChat(victim, "ability.pearl-stunned", "seconds", String.valueOf(durationSeconds)));
-        attacker.sendMessage(messages.getChat(attacker, "ability.pearl-stunner-hit"));
+        victim.sendMessage(messages.get(victim, "ability.pearl-stunned", "seconds", String.valueOf(durationSeconds)));
+        attacker.sendMessage(messages.get(attacker, "ability.pearl-stunner-hit"));
     }
 
-    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPearlAttempt(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         if (!isStunned(player.getUniqueId())) {
@@ -75,7 +80,27 @@ public final class PearlStunnerListener implements Listener {
         }
         event.setCancelled(true);
         long remaining = (stunnedUntil.get(player.getUniqueId()) - System.currentTimeMillis() + 999L) / 1000L;
-        player.sendMessage(messages.getChat(player, "ability.pearl-stunned", "seconds", String.valueOf(Math.max(1L, remaining))));
+        player.sendMessage(messages.get(player, "ability.pearl-stunned", "seconds", String.valueOf(Math.max(1L, remaining))));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPearlLaunch(ProjectileLaunchEvent event) {
+        if (!(event.getEntity() instanceof EnderPearl pearl)) {
+            return;
+        }
+        if (!(pearl.getShooter() instanceof Player player)) {
+            return;
+        }
+        if (!isStunned(player.getUniqueId())) {
+            return;
+        }
+        // Don't block fake pearls
+        if (AbilityGate.isAbility(plugin, player.getInventory().getItemInMainHand(), "fake-pearl")) {
+            return;
+        }
+        event.setCancelled(true);
+        long remaining = (stunnedUntil.get(player.getUniqueId()) - System.currentTimeMillis() + 999L) / 1000L;
+        player.sendMessage(messages.get(player, "ability.pearl-stunned", "seconds", String.valueOf(Math.max(1L, remaining))));
     }
 
     private boolean isStunned(UUID uuid) {

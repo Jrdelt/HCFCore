@@ -1,8 +1,10 @@
 package me.hcfcore.core.listener;
 
+import me.hcfcore.core.luckperms.LuckPermsHook;
 import me.hcfcore.core.pvp.CombatManager;
 import me.hcfcore.core.scoreboard.ScoreboardManager;
 import me.hcfcore.core.user.UserManager;
+import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -40,6 +42,14 @@ public final class PlayerConnectionListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+
+        // Set player display name with rank
+        String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
+        if (rank != null && !rank.isBlank()) {
+            player.displayName(Component.text("[" + rank + "] " + player.getName()));
+        }
+
         if (scoreboardManager == null) {
             return;
         }
@@ -48,7 +58,7 @@ public final class PlayerConnectionListener implements Listener {
         // object.  Setting it up immediately avoids a one-tick race with a
         // slow MySQL login load, which otherwise left players without a
         // scoreboard for the rest of their session.
-        scoreboardManager.setup(event.getPlayer());
+        scoreboardManager.setup(player);
     }
 
     @EventHandler

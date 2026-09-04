@@ -64,8 +64,8 @@ chat:
   separator: ' <gray>» </gray>'
 
   # Chat format components (use MiniMessage or legacy & color codes)
-  faction-format: '<gray>[{faction}]</gray> '
-  rank-format: '<gray>[{rank}]</gray> '
+  faction-format: '&8[<gray>{faction}</gray>&8] '
+  rank-format: '&8[<gray>{rank}</gray>&8] '
   name-format: '{name} '
 
 # ============================================
@@ -154,6 +154,33 @@ abilities:
   # Per-ability settings (cooldowns, durations) go in abilities.yml
   disabled-regions:
     - spawn
+
+  # Faction claim names abilities are disabled in -- abilities work
+  # everywhere else (wilderness and any other faction's claimed land),
+  # this is only a blocklist. Matches the faction's tag/name
+  # case-insensitively, including the system SafeZone/WarZone factions
+  # (set via /f safezone, /f warzone) if you've named them this way.
+  disabled-claim-names:
+    - safezone
+
+# ============================================
+# NAMETAGS
+# ============================================
+nametags:
+  # Enable/disable nametags above player heads
+  enabled: true
+
+  # How often to update nametags (in ticks; 20 ticks = 1 second)
+  update-interval-ticks: 20
+
+  # Nametag format is fixed: &8[&a<ftop>&8] &8[<color>(faction)&8] &e<player>
+  # Note: nametags use a shared scoreboard team, so the faction-name color
+  # below is the SAME for every viewer -- Minecraft's scoreboard API has no
+  # per-viewer color, so true "red to enemies, purple to allies" coloring
+  # would require a packet library (e.g. ProtocolLib) and isn't implemented.
+  colors:
+    same-faction: 'green'      # Players in a faction
+    neutral: 'gray'            # Factionless players
 
 # ============================================
 # REBOOT SYSTEM

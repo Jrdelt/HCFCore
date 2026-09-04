@@ -98,12 +98,10 @@ public final class Messages {
         return MessageFormatter.deserialize(getRaw(sender, key, placeholders));
     }
 
+    /** @deprecated identical to {@link #get}; kept only because many call sites still use it. */
+    @Deprecated
     public Component getChat(CommandSender sender, String key, String... placeholders) {
-        return MessageFormatter.deserialize(getRaw(sender, "general.prefix") + getRaw(sender, key, placeholders));
-    }
-
-    public Component getChatPrefix(CommandSender sender, Component message) {
-        return MessageFormatter.deserialize(getRaw(sender, "general.prefix")).append(message);
+        return get(sender, key, placeholders);
     }
 
     /**

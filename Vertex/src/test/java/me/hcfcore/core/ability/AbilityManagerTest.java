@@ -31,7 +31,7 @@ class AbilityManagerTest {
     private static final String[] EXPECTED_IDS = {
             "anti-blockup-bone", "fake-pearl", "grappling-hook", "leap",
             "pearl-stunner", "portable-bard", "rabbits-feed", "repair", "rogue-backstab",
-            "mage-wither", "mage-slowness", "mage-weakness", "mage-poison",
+            "mage-wither", "mage-slowness", "mage-poison",
             "switcher-snowball", "time-warp-pearl"
     };
 

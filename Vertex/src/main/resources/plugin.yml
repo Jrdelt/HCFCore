@@ -61,6 +61,18 @@ commands:
     usage: /f rally [set|clear]
     aliases:
       - f rally
+  staff:
+    description: Toggle full staff mode (vanish + staff-build).
+    usage: /<command>
+  vanish:
+    description: Toggle vanish, hiding you from non-staff players.
+    usage: /<command>
+  staffchat:
+    description: Toggle staff-only chat mode.
+    usage: /<command>
+  staffbuild:
+    description: Toggle build/break bypass in claimed land.
+    usage: /<command>
 
 permissions:
   hcfcore.admin:
@@ -98,4 +110,16 @@ permissions:
     default: op
   hcfcore.staff.rollback:
     description: View and restore items from a player's death history.
+    default: op
+  hcfcore.staff.mode:
+    description: Toggle full staff mode (vanish + staff-build).
+    default: op
+  hcfcore.staff.vanish:
+    description: Toggle vanish, and see other vanished staff.
+    default: op
+  hcfcore.staff.staffchat:
+    description: Toggle staff chat, and read staff chat messages.
+    default: op
+  hcfcore.staff.staffbuild:
+    description: Bypass claim protection to build/break/interact anywhere.
     default: op

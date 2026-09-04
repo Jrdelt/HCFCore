@@ -1,15 +1,19 @@
 package me.hcfcore.core.factions;
 
+import dev.kitteh.factions.Board;
+import dev.kitteh.factions.FLocation;
 import dev.kitteh.factions.FPlayer;
 import dev.kitteh.factions.FPlayers;
 import dev.kitteh.factions.Faction;
 import dev.kitteh.factions.Factions;
 import dev.kitteh.factions.permissible.Role;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
 import java.util.List;
 import java.util.Comparator;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Thin wrapper around the dev.kitteh:factions API. Claims/teams stay owned
@@ -141,6 +145,55 @@ public final class FactionsHook {
         }
         // Same faction id = allies
         return factionId1 == factionId2;
+    }
+
+    public static int getFactionRank(int factionId) {
+        if (factionId == NO_FACTION) {
+            return -1;
+        }
+        List<Faction> factions = Factions.factions().all().stream()
+                .filter(candidate -> candidate != null && candidate.isNormal())
+                .sorted(Comparator.comparingDouble(Faction::powerExact).reversed()
+                        .thenComparing(Faction::tag, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        for (int i = 0; i < factions.size(); i++) {
+            if (factions.get(i).id() == factionId) {
+                return i + 1;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * The tag of the faction claiming this location -- the system
+     * WarZone/SafeZone factions included, since they're claimed the same
+     * way as any player faction -- or null for unclaimed wilderness.
+     */
+    public static String getClaimFactionTag(Location location) {
+        Faction faction = Board.board().factionAt(new FLocation(location));
+        return faction == null || faction.isWilderness() ? null : faction.tag();
+    }
+
+    /**
+     * True when the claim at this location belongs to a faction whose name
+     * is in `disabledNames` (case-insensitive) -- e.g. a SafeZone claim
+     * listed in abilities.disabled-claim-names. Wilderness and any claim
+     * not in the list return false.
+     */
+    public static boolean isDisabledClaim(Location location, Set<String> disabledNames) {
+        if (disabledNames.isEmpty()) {
+            return false;
+        }
+        String tag = getClaimFactionTag(location);
+        if (tag == null) {
+            return false;
+        }
+        for (String disabled : disabledNames) {
+            if (tag.equalsIgnoreCase(disabled)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Faction getFaction(Player player) {

@@ -54,9 +54,14 @@ public final class UserManager {
     }
 
     public void unload(UUID uuid) {
-        nextGeneration(uuid);
+        long generation = nextGeneration(uuid);
         users.remove(uuid);
         failedLoads.remove(uuid);
+        // Conditional remove: only clears the entry if nothing bumped the
+        // generation again since (e.g. an instant rejoin's load() racing
+        // this unload()) -- an unconditional remove could wipe out a newer
+        // in-flight load's fence and make it always lose its own race.
+        loadGenerations.remove(uuid, generation);
     }
 
     public User get(UUID uuid) {

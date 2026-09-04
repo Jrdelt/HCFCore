@@ -52,6 +52,14 @@ import me.hcfcore.core.storage.Storage;
 import me.hcfcore.core.user.UserManager;
 import me.hcfcore.core.nametag.NametagManager;
 import me.hcfcore.core.nametag.NametagListener;
+import me.hcfcore.core.staff.StaffBuildCommand;
+import me.hcfcore.core.staff.StaffBuildListener;
+import me.hcfcore.core.staff.StaffChatCommand;
+import me.hcfcore.core.staff.StaffChatListener;
+import me.hcfcore.core.staff.StaffCommand;
+import me.hcfcore.core.staff.StaffManager;
+import me.hcfcore.core.staff.VanishCommand;
+import me.hcfcore.core.staff.VanishListener;
 import me.hcfcore.core.tag.TagManager;
 import me.hcfcore.core.tag.TagsCommand;
 import me.hcfcore.core.tag.TagMenuListener;
@@ -85,6 +93,7 @@ public final class HCFCorePlugin extends JavaPlugin {
     private RallyManager rallyManager;
     private ArcherTagListener archerTagListener;
     private NametagManager nametagManager;
+    private StaffManager staffManager;
 
     @Override
     public void onEnable() {
@@ -150,6 +159,15 @@ public final class HCFCorePlugin extends JavaPlugin {
         nametagManager = new NametagManager(this);
         Bukkit.getPluginManager().registerEvents(new NametagListener(nametagManager), this);
 
+        staffManager = new StaffManager(this);
+        Bukkit.getPluginManager().registerEvents(new VanishListener(staffManager), this);
+        Bukkit.getPluginManager().registerEvents(new StaffChatListener(staffManager), this);
+        Bukkit.getPluginManager().registerEvents(new StaffBuildListener(staffManager), this);
+        getCommand("staff").setExecutor(new StaffCommand(staffManager, messages));
+        getCommand("vanish").setExecutor(new VanishCommand(staffManager, messages));
+        getCommand("staffchat").setExecutor(new StaffChatCommand(staffManager, messages));
+        getCommand("staffbuild").setExecutor(new StaffBuildCommand(staffManager, messages));
+
         Bukkit.getPluginManager().registerEvents(new CombatListener(combatManager), this);
         playerConnectionListener = new PlayerConnectionListener(userManager, scoreboardManager, combatManager);
         Bukkit.getPluginManager().registerEvents(playerConnectionListener, this);
@@ -159,7 +177,7 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(
             new MageSpellListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
-            new RogueBackstabListener(this, abilityManager, userManager, messages), this);
+            new RogueBackstabListener(this, abilityManager, userManager), this);
         Bukkit.getPluginManager().registerEvents(
                 new FakePearlListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
@@ -252,6 +270,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         if (deathManager != null) {
             deathManager.awaitWrites();
         }
+        if (tagManager != null) {
+            tagManager.awaitWrites();
+        }
         if (rallyManager != null) {
             rallyManager.shutdown();
         }
@@ -299,6 +320,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
         if (tagManager != null) {
             tagManager.load();
+        }
+        if (nametagManager != null) {
+            nametagManager.cleanupStaleTeams();
         }
 
         if (scoreboardManager != null) {

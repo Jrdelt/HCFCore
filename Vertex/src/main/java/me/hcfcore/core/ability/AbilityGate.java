@@ -1,5 +1,6 @@
 package me.hcfcore.core.ability;
 
+import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
@@ -47,7 +48,7 @@ public final class AbilityGate {
                                          Messages messages, Player player, Ability ability, boolean consumeItem) {
         if (abilityManager.isOnGlobalCooldown(player.getUniqueId())) {
             long remaining = (abilityManager.globalCooldownRemainingMillis(player.getUniqueId()) + 999) / 1000;
-            player.sendMessage(messages.getChat(player, "ability.on-global-cooldown", "seconds", String.valueOf(remaining)));
+            player.sendMessage(messages.get(player, "ability.on-global-cooldown", "seconds", String.valueOf(remaining)));
             return false;
         }
 
@@ -58,13 +59,18 @@ public final class AbilityGate {
         }
         if (abilityManager.isOnCooldown(user, ability)) {
             long remaining = (abilityManager.remainingCooldownMillis(user, ability) + 999) / 1000;
-            player.sendMessage(messages.getChat(player, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
+            player.sendMessage(messages.get(player, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
             return false;
         }
 
         Set<String> disabledRegions = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-regions"));
         if (WorldGuardHook.isInDisabledRegion(player, disabledRegions)) {
-            player.sendMessage(messages.getChat(player, "ability.region-blocked"));
+            player.sendMessage(messages.get(player, "ability.region-blocked"));
+            return false;
+        }
+        Set<String> disabledClaims = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-claim-names"));
+        if (FactionsHook.isDisabledClaim(player.getLocation(), disabledClaims)) {
+            player.sendMessage(messages.get(player, "ability.region-blocked"));
             return false;
         }
 

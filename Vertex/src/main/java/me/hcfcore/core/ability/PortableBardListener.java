@@ -107,7 +107,7 @@ public final class PortableBardListener implements Listener {
         // cost the player nothing.
         long buffRemaining = abilityManager.buffCooldownRemainingMillis(player.getUniqueId(), ability, buff.id());
         if (buffRemaining > 0L) {
-            player.sendMessage(messages.getChat(player, "ability.on-cooldown",
+            player.sendMessage(messages.get(player, "ability.on-cooldown",
                     "seconds", String.valueOf((buffRemaining + 999L) / 1000L)));
             return;
         }
@@ -150,7 +150,7 @@ public final class PortableBardListener implements Listener {
             }
             long remaining = abilityManager.shortenBardCooldownForKitSwap(online, user);
             if (remaining >= 0L) {
-                online.sendMessage(messages.getChat(online, "ability.bard-cooldown-shortened",
+                online.sendMessage(messages.get(online, "ability.bard-cooldown-shortened",
                         "seconds", String.valueOf(remaining)));
             }
         });

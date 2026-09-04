@@ -75,6 +75,10 @@ public final class AntiBlockupBoneListener implements Listener {
         if (WorldGuardHook.isInDisabledRegion(attacker, disabledRegions)) {
             return;
         }
+        Set<String> disabledClaims = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-claim-names"));
+        if (FactionsHook.isDisabledClaim(attacker.getLocation(), disabledClaims)) {
+            return;
+        }
 
         int hitsRequired = Math.max(1, ability.getInt("hits-required", 3));
         long denySeconds = Math.max(1, ability.getInt("deny-seconds", 15));
@@ -96,16 +100,16 @@ public final class AntiBlockupBoneListener implements Listener {
         } else {
             item.setAmount(item.getAmount() - 1);
         }
-        attacker.sendMessage(messages.getChat(attacker, "ability.bone-attacker",
+        attacker.sendMessage(messages.get(attacker, "ability.bone-attacker",
                 "player", victim.getName(), "seconds", String.valueOf(denySeconds)));
-        victim.sendMessage(messages.getChat(victim, "ability.bone-victim", "seconds", String.valueOf(denySeconds)));
+        victim.sendMessage(messages.get(victim, "ability.bone-victim", "seconds", String.valueOf(denySeconds)));
     }
 
     @EventHandler(ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
         if (tracker.isDenied(event.getPlayer().getUniqueId())) {
             event.setCancelled(true);
-            event.getPlayer().sendMessage(messages.getChat(event.getPlayer(), "ability.bone-place-denied"));
+            event.getPlayer().sendMessage(messages.get(event.getPlayer(), "ability.bone-place-denied"));
         }
     }
 
