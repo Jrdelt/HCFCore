@@ -255,8 +255,9 @@ players: {}
 
 `/tags` opens a 4×9 grid of tag icons (rows 2-5, full width) with a
 control row: **filter** (Your/Unowned/All, each with a live count),
-**sort** (Alphabetical/Age — click to cycle, shift-click to flip
-direction), **search** (opens an anvil to type a query; right-click
+**sort** (Alphabetical/Age/Rarity — click to cycle, shift-click to flip
+direction; Rarity orders by lifetime owner count, fewest first when
+ascending), **search** (opens an anvil to type a query; right-click
 clears it — the anvil's result slot is a free, XP-cost-free confirm
 button that shows what will be searched for, and closing the anvil
 applies whatever is typed exactly once), **prev/next page**, and a

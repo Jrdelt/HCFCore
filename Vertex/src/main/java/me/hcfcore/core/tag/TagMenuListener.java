@@ -129,7 +129,8 @@ public final class TagMenuListener implements Listener {
                 } else {
                     TagManager.Sort next = switch (state.sort()) {
                         case ALPHABETICAL -> TagManager.Sort.AGE;
-                        case AGE -> TagManager.Sort.ALPHABETICAL;
+                        case AGE -> TagManager.Sort.RARITY;
+                        case RARITY -> TagManager.Sort.ALPHABETICAL;
                     };
                     TagMenu.open(player, manager, holder.messages(), state.withSort(next));
                 }

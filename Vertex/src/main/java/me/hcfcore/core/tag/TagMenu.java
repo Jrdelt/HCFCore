@@ -199,8 +199,7 @@ public final class TagMenu {
         lore.add(Component.empty());
         for (TagManager.Sort option : TagManager.Sort.values()) {
             NamedTextColor color = option == state.sort() ? NamedTextColor.GREEN : NamedTextColor.GRAY;
-            lore.add(Component.text(option == state.sort() ? "→ " : "  ", color)
-                    .append(messages.get(player, sortLabelKey(option)).color(color)));
+            lore.add(Component.text("→ ", color).append(messages.get(player, sortLabelKey(option)).color(color)));
         }
         lore.add(Component.empty());
         lore.add(messages.get(player, "tags.sort-hint-cycle"));
@@ -212,6 +211,7 @@ public final class TagMenu {
         return switch (sort) {
             case ALPHABETICAL -> "tags.sort-alphabetical";
             case AGE -> "tags.sort-age";
+            case RARITY -> "tags.sort-rarity";
         };
     }
 

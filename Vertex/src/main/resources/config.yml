@@ -48,8 +48,9 @@ scoreboard:
   lines:
     - '     <gray>Season I'
     - '%luckperms_prefix%<gray>{name}'
-    - '<gray>• <red>Experience: <white>{exp}'
     - '<gray>• <red>Balance: <white>{balance}'
+    - '<gray>• <red>Experience: <white>{exp}'
+    - '<gray>• <red>K/D: <white>%kdratio_kills%<gray>:<white>%kdratio_deaths%'
     - ''
     - '<white>{faction} <gray>[<yellow>#{ftop}<gray>]'
     - '<gray> <red>• Power: <white>{power}'

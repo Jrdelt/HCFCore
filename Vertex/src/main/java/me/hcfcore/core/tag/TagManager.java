@@ -116,6 +116,10 @@ public final class TagManager {
             case ALPHABETICAL -> Comparator.comparing(
                     tag -> GradientColor.stripLeadingColor(tag.display()), String.CASE_INSENSITIVE_ORDER);
             case AGE -> Comparator.comparingLong(Tag::createdAt);
+            // Fewest owners = rarest, so ascending naturally reads as
+            // "rarest first" -- same "extreme end first" convention as AGE
+            // ascending putting the oldest tag first.
+            case RARITY -> Comparator.comparingInt(tag -> owners(tag.id()));
         };
         if (!ascending) {
             comparator = comparator.reversed();
@@ -276,7 +280,7 @@ public final class TagManager {
         return CREATED_FORMAT.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneOffset.UTC));
     }
 
-    public enum Sort { ALPHABETICAL, AGE }
+    public enum Sort { ALPHABETICAL, AGE, RARITY }
 
     public enum Filter { YOUR, UNOWNED, ALL }
 
