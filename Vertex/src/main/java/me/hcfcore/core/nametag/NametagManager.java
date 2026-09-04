@@ -12,7 +12,9 @@ import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,13 +26,18 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class NametagManager {
 
     /**
-     * Teams are keyed by UUID (not player name) so a Mojang username change
-     * can't orphan a team under the old name -- {@code nt_} keeps the full
-     * 36-char UUID under the 40-char team name limit and doubles as a
-     * marker prefix so {@link #cleanupStaleTeams()} can find our teams
-     * among any other plugin's.
+     * Team names must fit in 16 characters -- that's the classic vanilla
+     * scoreboard-team limit, and while a modern Paper-to-Paper connection
+     * tolerates longer, a client on an older version (even bridged in via
+     * ViaVersion) is still held to it, silently breaking nametags for
+     * that client specifically. A full UUID is 36 characters on its own,
+     * so teams are keyed by a 12-hex-digit hash of the UUID instead
+     * ({@code nt} + hash = 14 chars) -- collisions are astronomically
+     * unlikely at any real player count, and {@link #teamName} being a
+     * pure function of the UUID means {@link #cleanupStaleTeams()} never
+     * needs to reverse a name back into one.
      */
-    private static final String TEAM_PREFIX = "nt_";
+    private static final String TEAM_PREFIX = "nt";
 
     private final Plugin plugin;
     private final Scoreboard scoreboard;
@@ -92,6 +99,11 @@ public final class NametagManager {
         return color != null ? color : NamedTextColor.WHITE;
     }
 
+    private static String teamName(UUID uuid) {
+        long hash = uuid.getMostSignificantBits() ^ uuid.getLeastSignificantBits();
+        return TEAM_PREFIX + String.format("%012x", hash & 0xFFFFFFFFFFFFL);
+    }
+
     private void startNametagUpdateTask() {
         task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::updateAllNametags, 20, updateIntervalTicks);
     }
@@ -113,7 +125,7 @@ public final class NametagManager {
             return; // No change, skip update
         }
 
-        String teamName = TEAM_PREFIX + player.getUniqueId();
+        String teamName = teamName(player.getUniqueId());
         Team team = scoreboard.getTeam(teamName);
 
         // Create team if doesn't exist
@@ -162,7 +174,7 @@ public final class NametagManager {
     }
 
     public void removePlayerNametag(Player player) {
-        String teamName = TEAM_PREFIX + player.getUniqueId();
+        String teamName = teamName(player.getUniqueId());
         Team team = scoreboard.getTeam(teamName);
         if (team != null) {
             team.unregister();
@@ -179,21 +191,19 @@ public final class NametagManager {
      * running afterward with these teams still registered.
      */
     public void cleanupStaleTeams() {
+        // teamName() is a hash, not reversible back to a UUID -- so instead
+        // of parsing names, compute the expected name for every currently
+        // online player and remove any of our teams that don't match one.
+        Set<String> expectedNames = new HashSet<>();
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            expectedNames.add(teamName(online.getUniqueId()));
+        }
         for (Team team : new ArrayList<>(scoreboard.getTeams())) {
-            if (!team.getName().startsWith(TEAM_PREFIX)) {
-                continue;
-            }
-            String uuidPart = team.getName().substring(TEAM_PREFIX.length());
-            try {
-                UUID uuid = UUID.fromString(uuidPart);
-                if (Bukkit.getPlayer(uuid) == null) {
-                    team.unregister();
-                    playerStates.remove(uuid.toString());
-                }
-            } catch (IllegalArgumentException ignored) {
-                // Not one of ours despite the prefix match -- leave it alone.
+            if (team.getName().startsWith(TEAM_PREFIX) && !expectedNames.contains(team.getName())) {
+                team.unregister();
             }
         }
+        playerStates.keySet().removeIf(uuidString -> Bukkit.getPlayer(UUID.fromString(uuidString)) == null);
     }
 
     public void shutdown() {

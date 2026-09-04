@@ -287,9 +287,14 @@ team on the main scoreboard:
 - Configurable in `config.yml` under `nametags:` — `enabled`,
   `update-interval-ticks`, and `colors.same-faction`/`colors.neutral`
   (any Adventure `NamedTextColor` name).
-- Teams are keyed by UUID (not player name), so a Mojang username change
-  can't orphan a stale team; `/hcfcore reload` sweeps any leftover team
-  for a player who's no longer online.
+- Teams are keyed by a short hash of the player's UUID (not their name),
+  so a Mojang username change can't orphan a stale team; `/hcfcore
+  reload` sweeps any leftover team for a player who's no longer online.
+  The name is kept to 14 characters, safely under the classic 16-char
+  vanilla scoreboard-team limit — a longer name works fine between
+  modern Paper clients, but silently breaks nametags for anyone on an
+  older client version (even bridged in via ViaVersion), which is still
+  held to that limit regardless of server version.
 
 ## Faction Compatibility
 
