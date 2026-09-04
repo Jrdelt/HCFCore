@@ -64,11 +64,14 @@ public final class ChatFormatterListener implements Listener {
             result = result.append(coloredTag(tag));
         }
 
+        // Not gated on rank/prefix being non-null: chat.rank-format may be
+        // entirely a PlaceholderAPI token like %luckperms_prefix% with no
+        // {rank}/{prefix} of ours in it, so those being null doesn't mean
+        // there's nothing to show -- rankComponent's PlaceholderApiHook
+        // call is the one that actually knows whether anything resolves.
         String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
         String prefix = LuckPermsHook.getPrefix(player);
-        if ((rank != null && !rank.isBlank()) || prefix != null) {
-            result = result.append(rankComponent(player, rank, prefix));
-        }
+        result = result.append(rankComponent(player, rank, prefix));
 
         return result.append(nameComponent(player))
                     .append(deserializeTemplate(player, "chat.separator", "<gray>»</gray>"))

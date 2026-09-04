@@ -4,6 +4,7 @@ import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.luckperms.LuckPermsHook;
+import me.hcfcore.core.placeholderapi.PlaceholderApiHook;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -279,9 +280,9 @@ public final class TagMenu {
 
         String faction = FactionsHook.getFactionTag(player);
         if (!"None".equalsIgnoreCase(faction)) {
-            String template = config.getString("chat.faction-format", "<gold>[{faction}]</gold> ");
-            result = result.append(MessageFormatter.deserialize(
-                    template.replace("{faction}", MiniMessage.miniMessage().escapeTags(faction))));
+            String template = config.getString("chat.faction-format", "<gold>[{faction}]</gold> ")
+                    .replace("{faction}", MiniMessage.miniMessage().escapeTags(faction));
+            result = result.append(MessageFormatter.deserialize(PlaceholderApiHook.apply(player, template)));
         }
 
         if (equippedTag != null) {
@@ -290,12 +291,15 @@ public final class TagMenu {
 
         String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
         String prefix = LuckPermsHook.getPrefix(player);
-        if ((rank != null && !rank.isBlank()) || prefix != null) {
-            String template = config.getString("chat.rank-format", "<light_purple>[{rank}]</light_purple> ")
-                    .replace("{prefix}", prefix == null ? "" : prefix)
-                    .replace("{rank}", MiniMessage.miniMessage().escapeTags(rank == null ? "" : rank));
-            result = result.append(MessageFormatter.deserialize(template));
-        }
+        // Not gated on rank/prefix being non-null: chat.rank-format may be
+        // entirely a PlaceholderAPI token like %luckperms_prefix% with no
+        // {rank}/{prefix} of ours in it at all, so those being null doesn't
+        // mean there's nothing to show -- PlaceholderApiHook.apply() is the
+        // one that actually knows whether anything resolves.
+        String template = config.getString("chat.rank-format", "<light_purple>[{rank}]</light_purple> ")
+                .replace("{prefix}", prefix == null ? "" : prefix)
+                .replace("{rank}", MiniMessage.miniMessage().escapeTags(rank == null ? "" : rank));
+        result = result.append(MessageFormatter.deserialize(PlaceholderApiHook.apply(player, template)));
 
         return result;
     }
