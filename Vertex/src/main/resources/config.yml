@@ -47,7 +47,7 @@ scoreboard:
   # Also supports PlaceholderAPI %placeholder% tokens (e.g. %luckperms_prefix%) if PlaceholderAPI is installed.
   lines:
     - '     <gray>Season I'
-    - '   %luckperms_prefix%<gray>{name}'
+    - '%luckperms_prefix%<gray>{name}'
     - '<gray>• <red>Experience: <white>{exp}'
     - '<gray>• <red>Balance: <white>{balance}'
     - ''

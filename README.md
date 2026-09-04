@@ -271,8 +271,7 @@ Reloaded along with everything else on `/hcfcore reload`.
 ## Nametags
 
 Players see nametags above each other's heads showing faction rank and
-affiliation, visible to everyone (not just the wearer) via a scoreboard
-team on the main scoreboard:
+affiliation, visible to everyone (not just the wearer):
 
 ```
 [ftop] [FactionName] PlayerName
@@ -287,14 +286,23 @@ team on the main scoreboard:
 - Configurable in `config.yml` under `nametags:` — `enabled`,
   `update-interval-ticks`, and `colors.same-faction`/`colors.neutral`
   (any Adventure `NamedTextColor` name).
+- Teams live on each **viewer's own scoreboard**, one team per
+  (viewer, subject) pair — not a single shared team on the main
+  scoreboard. Every player has their own `Scoreboard` object (assigned
+  by the sidebar system, which replaces whatever scoreboard they had),
+  and a team only renders for whoever's *currently active* scoreboard
+  it's actually registered on — a shared main-scoreboard team is only
+  visible on the main scoreboard, which nobody stays on once they have
+  a sidebar. Nametags are re-populated onto a player's scoreboard on
+  join and on every `/hcfcore reload` (both replace it with a fresh
+  one), and kept in sync incrementally as factions change in between.
 - Teams are keyed by a short hash of the player's UUID (not their name),
-  so a Mojang username change can't orphan a stale team; `/hcfcore
-  reload` sweeps any leftover team for a player who's no longer online.
-  The name is kept to 14 characters, safely under the classic 16-char
-  vanilla scoreboard-team limit — a longer name works fine between
-  modern Paper clients, but silently breaks nametags for anyone on an
-  older client version (even bridged in via ViaVersion), which is still
-  held to that limit regardless of server version.
+  so a Mojang username change can't orphan one. The name is kept to 14
+  characters, safely under the classic 16-char vanilla scoreboard-team
+  limit — a longer name works fine between modern Paper clients, but
+  silently breaks nametags for anyone on an older client version (even
+  bridged in via ViaVersion), which is still held to that limit
+  regardless of server version.
 
 ## Faction Compatibility
 

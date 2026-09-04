@@ -2,6 +2,7 @@ package me.hcfcore.core.nametag;
 
 import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.MessageFormatter;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.Configuration;
@@ -12,9 +13,7 @@ import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,6 +21,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * Manages player nametags with FactionsUUID integration.
  * Dynamic faction-based coloring and real-time updates.
  * Configuration-driven via config.yml nametags section.
+ *
+ * <p>Teams live on each <b>viewer's own active scoreboard</b>, one team
+ * per (viewer, subject) pair -- not on the main scoreboard. Every player
+ * has their own {@link Scoreboard} object (assigned by
+ * {@code ScoreboardManager} for the sidebar, replacing whatever scoreboard
+ * they had before), and a team only renders for players whose *currently
+ * active* scoreboard it's registered on. A shared main-scoreboard team was
+ * tried first and only visible on that main scoreboard -- which nobody
+ * stays on once {@code ScoreboardManager.setup()} gives them their own.
  */
 public final class NametagManager {
 
@@ -33,14 +41,11 @@ public final class NametagManager {
      * that client specifically. A full UUID is 36 characters on its own,
      * so teams are keyed by a 12-hex-digit hash of the UUID instead
      * ({@code nt} + hash = 14 chars) -- collisions are astronomically
-     * unlikely at any real player count, and {@link #teamName} being a
-     * pure function of the UUID means {@link #cleanupStaleTeams()} never
-     * needs to reverse a name back into one.
+     * unlikely at any real player count.
      */
     private static final String TEAM_PREFIX = "nt";
 
     private final Plugin plugin;
-    private final Scoreboard scoreboard;
     private final Map<String, PlayerNametagState> playerStates = new ConcurrentHashMap<>();
     private boolean enabled;
     private int updateIntervalTicks;
@@ -50,7 +55,6 @@ public final class NametagManager {
 
     public NametagManager(Plugin plugin) {
         this.plugin = plugin;
-        this.scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
         loadConfiguration();
         if (enabled) {
             startNametagUpdateTask();
@@ -114,44 +118,86 @@ public final class NametagManager {
         }
     }
 
-    public void updatePlayerNametag(Player player) {
-        String playerId = player.getUniqueId().toString();
-        int factionId = FactionsHook.getFactionId(player);
+    /**
+     * Pushes `subject`'s current faction/nametag data to every online
+     * viewer's own scoreboard -- skipped entirely if nothing changed since
+     * last time, so the periodic tick isn't O(playerCount^2) every second
+     * for players whose faction never changes.
+     */
+    public void updatePlayerNametag(Player subject) {
+        String subjectId = subject.getUniqueId().toString();
+        int factionId = FactionsHook.getFactionId(subject);
         String factionName = FactionsHook.getFactionName(factionId);
 
-        // Check if nametag needs updating
-        PlayerNametagState currentState = playerStates.get(playerId);
+        PlayerNametagState currentState = playerStates.get(subjectId);
         if (currentState != null && currentState.factionId == factionId && currentState.factionName.equals(factionName)) {
             return; // No change, skip update
         }
 
-        String teamName = teamName(player.getUniqueId());
-        Team team = scoreboard.getTeam(teamName);
+        PrefixAndColor prefixAndColor = buildPrefixAndColor(factionId, factionName);
+        String teamName = teamName(subject.getUniqueId());
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            applyToViewer(viewer, subject, teamName, prefixAndColor);
+        }
 
-        // Create team if doesn't exist
+        playerStates.put(subjectId, new PlayerNametagState(factionId, factionName));
+    }
+
+    /**
+     * Populates `viewer`'s scoreboard with every currently-online subject's
+     * nametag, bypassing the change-detection {@link #updatePlayerNametag}
+     * does -- for a viewer whose scoreboard object was just replaced (a
+     * fresh join, or {@code ScoreboardManager} rebuilding everyone's
+     * sidebar scoreboard on {@code /hcfcore reload}), that replacement is
+     * blank and needs every subject re-applied regardless of whether their
+     * faction state happens to have "changed" recently.
+     */
+    public void applyAllNametagsTo(Player viewer) {
+        for (Player subject : Bukkit.getOnlinePlayers()) {
+            PlayerNametagState state = playerStates.get(subject.getUniqueId().toString());
+            int factionId;
+            String factionName;
+            if (state != null) {
+                factionId = state.factionId;
+                factionName = state.factionName;
+            } else {
+                factionId = FactionsHook.getFactionId(subject);
+                factionName = FactionsHook.getFactionName(factionId);
+            }
+            applyToViewer(viewer, subject, teamName(subject.getUniqueId()), buildPrefixAndColor(factionId, factionName));
+        }
+    }
+
+    private void applyToViewer(Player viewer, Player subject, String teamName, PrefixAndColor prefixAndColor) {
+        Scoreboard board = viewer.getScoreboard();
+        Team team = board.getTeam(teamName);
         if (team == null) {
-            team = scoreboard.registerNewTeam(teamName);
-            team.addPlayer(player);
+            team = board.registerNewTeam(teamName);
+            team.addPlayer(subject);
             team.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.ALWAYS);
             team.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
         }
+        team.prefix(prefixAndColor.prefix());
+        team.color(prefixAndColor.color());
+    }
 
-        // Build nametag: &8[&a<ftop>&8] &8[<factioncolor>(name)&8] &e<player>
-        // Note: team prefixes are shared across every viewer -- Minecraft's
-        // scoreboard API has no per-viewer color, so this can't show red to
-        // enemies and purple to allies of the specific viewer looking at it.
-        // It uses one fixed color: green for players in a faction, gray for
-        // factionless, matching nametags.colors.same-faction/neutral in config.yml.
+    /**
+     * Build nametag: &8[&a<ftop>&8] &8[<factioncolor>(name)&8] &e<player>
+     * Note: a scoreboard team's prefix is the same for every viewer of
+     * that team -- Minecraft's scoreboard API has no way to color it
+     * differently per viewer (e.g. red to enemies, purple to allies of
+     * whoever's looking). It uses one fixed color: green for players in a
+     * faction, gray for factionless, matching
+     * nametags.colors.same-faction/neutral in config.yml.
+     */
+    private PrefixAndColor buildPrefixAndColor(int factionId, String factionName) {
         String ftop = factionId == FactionsHook.NO_FACTION ? "-" : String.valueOf(FactionsHook.getFactionRank(factionId));
         NamedTextColor factionColor = factionId == FactionsHook.NO_FACTION ? neutralColor : sameFactionColor;
-        String factionColorCode = toLegacyCode(factionColor);
+        String prefix = "&8[&a" + ftop + "&8] &8[" + toLegacyCode(factionColor) + "(" + factionName + ")&8] &e";
+        return new PrefixAndColor(MessageFormatter.deserialize(prefix), NamedTextColor.WHITE);
+    }
 
-        String prefix = "&8[&a" + ftop + "&8] &8[" + factionColorCode + "(" + factionName + ")&8] &e";
-        team.prefix(MessageFormatter.deserialize(prefix));
-        team.color(NamedTextColor.WHITE);
-
-        // Store state for change detection
-        playerStates.put(playerId, new PlayerNametagState(factionId, factionName));
+    private record PrefixAndColor(Component prefix, NamedTextColor color) {
     }
 
     private String toLegacyCode(NamedTextColor color) {
@@ -173,44 +219,24 @@ public final class NametagManager {
         return "&f";
     }
 
-    public void removePlayerNametag(Player player) {
-        String teamName = teamName(player.getUniqueId());
-        Team team = scoreboard.getTeam(teamName);
-        if (team != null) {
-            team.unregister();
-        }
-        playerStates.remove(player.getUniqueId().toString());
-    }
-
-    /**
-     * Removes any of our teams left behind for players who aren't currently
-     * online -- covers a team orphaned by a crash, a plugin reload racing a
-     * quit, or any other path that skipped {@link #removePlayerNametag}.
-     * Safe to call anytime; called from {@code HCFCorePlugin.reload()} since
-     * that's the one path (unlike a normal disable) where the plugin keeps
-     * running afterward with these teams still registered.
-     */
-    public void cleanupStaleTeams() {
-        // teamName() is a hash, not reversible back to a UUID -- so instead
-        // of parsing names, compute the expected name for every currently
-        // online player and remove any of our teams that don't match one.
-        Set<String> expectedNames = new HashSet<>();
-        for (Player online : Bukkit.getOnlinePlayers()) {
-            expectedNames.add(teamName(online.getUniqueId()));
-        }
-        for (Team team : new ArrayList<>(scoreboard.getTeams())) {
-            if (team.getName().startsWith(TEAM_PREFIX) && !expectedNames.contains(team.getName())) {
+    /** Unregisters `subject`'s team from every online viewer's scoreboard. */
+    public void removePlayerNametag(Player subject) {
+        String teamName = teamName(subject.getUniqueId());
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            Team team = viewer.getScoreboard().getTeam(teamName);
+            if (team != null) {
                 team.unregister();
             }
         }
-        playerStates.keySet().removeIf(uuidString -> Bukkit.getPlayer(UUID.fromString(uuidString)) == null);
+        playerStates.remove(subject.getUniqueId().toString());
     }
 
     public void shutdown() {
-        // Clean up all nametag teams
-        for (Team team : new ArrayList<>(scoreboard.getTeams())) {
-            if (team.getName().startsWith(TEAM_PREFIX)) {
-                team.unregister();
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            for (Team team : new ArrayList<>(viewer.getScoreboard().getTeams())) {
+                if (team.getName().startsWith(TEAM_PREFIX)) {
+                    team.unregister();
+                }
             }
         }
         playerStates.clear();

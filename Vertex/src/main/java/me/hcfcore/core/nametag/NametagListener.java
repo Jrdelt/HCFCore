@@ -22,6 +22,14 @@ public final class NametagListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        // updatePlayerNametag pushes this player's own nametag out to
+        // everyone (including themselves); applyAllNametagsTo populates
+        // their brand-new scoreboard (from ScoreboardManager.setup(),
+        // which already ran -- this listener is MONITOR priority) with
+        // every other already-online player's nametag, which the
+        // change-detection in updatePlayerNametag alone would skip since
+        // those players' faction state hasn't "changed".
+        nametagManager.applyAllNametagsTo(player);
         nametagManager.updatePlayerNametag(player);
     }
 

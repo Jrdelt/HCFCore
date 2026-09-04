@@ -342,7 +342,6 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
         if (nametagManager != null) {
             nametagManager.reload();
-            nametagManager.cleanupStaleTeams();
         }
 
         if (scoreboardManager != null) {
@@ -363,6 +362,12 @@ public final class HCFCorePlugin extends JavaPlugin {
         if (scoreboardManager != null) {
             for (var player : Bukkit.getOnlinePlayers()) {
                 scoreboardManager.setup(player);
+                // setup() just replaced this player's scoreboard object
+                // with a blank one -- nametag teams lived on the old one,
+                // so it needs every online player's nametag re-applied.
+                if (nametagManager != null) {
+                    nametagManager.applyAllNametagsTo(player);
+                }
             }
         }
 
