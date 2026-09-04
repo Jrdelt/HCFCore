@@ -86,6 +86,23 @@ pvp:
   # How often to update the combat action bar (ticks)
   actionbar-update-interval-ticks: 2
 
+  # Combat action bar templates (MiniMessage). {seconds} and {health} are
+  # pre-colored (countdown fades red->green, health is always red) --
+  # everything else in the template is yours to style freely.
+  # Placeholders:
+  #   {seconds}    remaining combat time, e.g. "(12s)"
+  #   {health}     opponent's health, e.g. "❤ 14"
+  #   {opponent}   opponent's name
+  #   {your_cps}   your clicks per second
+  #   {their_cps}  opponent's clicks per second
+  actionbar:
+    # Tagged against "the server" (no live opponent -- e.g. after a combat logout)
+    vs-server: '<red><bold>Combat</bold><gray>: <white>server <gray>{seconds} <green>you <white>({your_cps}cps)'
+    # Tagged against another online player
+    vs-player: '<red><bold>Combat</bold><gray>: {health}   <white>{opponent} <gray>{seconds} <green>you <white>({your_cps}cps) <red>them <white>({their_cps}cps)'
+    # Tagged, but the opponent is offline or otherwise unresolvable
+    vs-unknown: '<red><bold>Combat</bold><gray>: {seconds} <green>you <white>({your_cps}cps)'
+
   # ---- ARCHER CLASS ----
   # Archers mark victims with arrows. Each stack increases arrow damage and gives
   # the archer's faction a melee bonus against the marked player.

@@ -53,6 +53,7 @@ import me.hcfcore.core.user.UserManager;
 import me.hcfcore.core.nametag.NametagManager;
 import me.hcfcore.core.nametag.NametagListener;
 import me.hcfcore.core.staff.StaffBuildCommand;
+import me.hcfcore.core.factions.ZoneBlockProtectionListener;
 import me.hcfcore.core.staff.StaffBuildListener;
 import me.hcfcore.core.staff.StaffChatCommand;
 import me.hcfcore.core.staff.StaffChatListener;
@@ -138,7 +139,10 @@ public final class HCFCorePlugin extends JavaPlugin {
                 messages,
                 getConfig().getInt("pvp.combat-tag-seconds", 30),
                 getConfig().getBoolean("pvp.logout-penalty", true),
-                getConfig().getInt("pvp.actionbar-update-interval-ticks", 4));
+                getConfig().getInt("pvp.actionbar-update-interval-ticks", 4),
+                getConfig().getString("pvp.actionbar.vs-server", ""),
+                getConfig().getString("pvp.actionbar.vs-player", ""),
+                getConfig().getString("pvp.actionbar.vs-unknown", ""));
         combatManager.start();
 
         legacyCombatManager = new LegacyCombatManager(this);
@@ -163,6 +167,7 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new VanishListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new StaffChatListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new StaffBuildListener(staffManager), this);
+        Bukkit.getPluginManager().registerEvents(new ZoneBlockProtectionListener(staffManager), this);
         getCommand("staff").setExecutor(new StaffCommand(staffManager, messages));
         getCommand("vanish").setExecutor(new VanishCommand(staffManager, messages));
         getCommand("staffchat").setExecutor(new StaffChatCommand(staffManager, messages));
@@ -350,7 +355,10 @@ public final class HCFCorePlugin extends JavaPlugin {
             combatManager.reconfigure(
                     getConfig().getInt("pvp.combat-tag-seconds", 30),
                     getConfig().getBoolean("pvp.logout-penalty", true),
-                    getConfig().getInt("pvp.actionbar-update-interval-ticks", 4));
+                    getConfig().getInt("pvp.actionbar-update-interval-ticks", 4),
+                    getConfig().getString("pvp.actionbar.vs-server", ""),
+                    getConfig().getString("pvp.actionbar.vs-player", ""),
+                    getConfig().getString("pvp.actionbar.vs-unknown", ""));
         }
         if (archerTagListener != null) {
             archerTagListener.reloadConfig();

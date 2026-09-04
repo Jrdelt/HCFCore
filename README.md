@@ -2,8 +2,9 @@
 
 Kits with armor-based class effects, a live sidebar scoreboard, faction-aware
 chat formatting, an equippable tags system, PvP combat-tag timers, a
-scheduled reboot system, and PvP ability items — built for Paper and
-integrated with **FactionsUUID**.
+scheduled reboot system, PvP ability items, and a staff toolkit (vanish,
+staff chat, claim-bypass build mode) — built for Paper and integrated with
+**FactionsUUID**.
 
 ## Requirements
 
@@ -191,7 +192,17 @@ Fifteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
 - Cooldowns block usage again until timer expires
 - `/cooldowns` shows all active cooldown timers
 - **Global cooldown** (default 4s) blocks all abilities while active
-- Abilities disabled in regions (set in `config.yml`)
+- Abilities are disabled in two independent ways, both in `config.yml`
+  under `abilities:`:
+  - `disabled-regions` — WorldGuard region names (e.g. `spawn`). No effect
+    without WorldGuard installed.
+  - `disabled-claim-names` — faction **claim** names abilities are blocked
+    in (default: `safezone`); abilities work everywhere else, including
+    the wilderness and any other faction's claimed land. This is a
+    blocklist, not an allowlist — matches the claiming faction's tag
+    case-insensitively, so it also covers the system SafeZone/WarZone
+    factions (`/f safezone`, `/f warzone`) if you've kept their default
+    names.
 
 ## Tags (`tags.yml`)
 
@@ -246,12 +257,26 @@ Reloaded along with everything else on `/hcfcore reload`.
 
 ## Nametags
 
-Players see colorful nametags above each other's heads showing faction affiliation:
-- **AQUA** — Players in a faction
-- **YELLOW** — Neutral/Factionless players
-- Format: `[FactionName] PlayerName`
-- Updates every second based on faction changes
-- Fully integrated with FactionsUUID
+Players see nametags above each other's heads showing faction rank and
+affiliation, visible to everyone (not just the wearer) via a scoreboard
+team on the main scoreboard:
+
+```
+[ftop] [FactionName] PlayerName
+```
+
+- `[ftop]` — the faction's power-ranking position (`-` if factionless)
+- `[FactionName]` — `Neutral` if factionless
+- Color is one fixed color for everyone (green for faction members, gray
+  for factionless by default) — a Minecraft scoreboard team's prefix
+  can't show a different color to different viewers (e.g. red to
+  enemies, green to allies), so this isn't ally/enemy-relative.
+- Configurable in `config.yml` under `nametags:` — `enabled`,
+  `update-interval-ticks`, and `colors.same-faction`/`colors.neutral`
+  (any Adventure `NamedTextColor` name).
+- Teams are keyed by UUID (not player name), so a Mojang username change
+  can't orphan a stale team; `/hcfcore reload` sweeps any leftover team
+  for a player who's no longer online.
 
 ## Faction Compatibility
 
@@ -289,6 +314,35 @@ bard uses) marks whoever their arrows hit:
 - Archers can't mark their own faction members, and the mark clears on
   death. It deliberately survives a disconnect, so relogging isn't a way
   to shed it mid-fight.
+
+## Staff Tools
+
+Four session-scoped toggles (nothing persists across a rejoin — same as
+combat tags), all gated behind their own `hcfcore.staff.*` permission:
+
+- **`/vanish`** — hides you from anyone without `hcfcore.staff.vanish`.
+  Applies immediately to every online viewer and to anyone who joins
+  afterward; your quit message is suppressed while vanished so leaving
+  doesn't announce your name.
+- **`/staffchat`** — toggles a mode where *all* your normal chat goes to
+  a staff-only channel (visible to `hcfcore.staff.staffchat`) instead of
+  public chat, until you toggle it off again.
+- **`/staffbuild`** — bypasses FactionsUUID's claim protection entirely:
+  block break/place, containers/doors, buckets, item frames/paintings,
+  and entity interaction all work in any claim while it's on.
+- **`/staff`** — toggles vanish + staff-build together as one "full staff
+  mode" switch. Treats them as already "on" only when *both* are — so if
+  you'd turned one off individually, `/staff` turns both back on rather
+  than finishing the job of turning them off.
+
+### WarZone / SafeZone protection
+
+Independent of the ability zone restriction above, block breaking is
+blocked outright in the system WarZone and SafeZone factions (`/f
+warzone`, `/f safezone`) — not just `BlockBreakEvent`, but
+`BlockDamageEvent` (the moment a player starts hitting a block) and
+piston push/pull, so there's no partial-break or piston-glitch way to
+grief protected terrain. `/staffbuild` bypasses this too.
 
 ## Reboot scheduling
 
@@ -336,14 +390,21 @@ shows any player the currently scheduled countdown, if one is running.
 | `/combatcheck <player>` | `hcfcore.combat.check` | Reports tagged status, time left, and (if tagged) the opponent's name, health, and ping. |
 | `/combattag <player> [opponent\|server]` | `hcfcore.combat.tag` | Testing tool. With no second argument (or `server`), tags the target against a synthetic **"Server"** opponent — lets one admin alone see the action bar without a second player online. With a real opponent name, tags both players against each other. |
 
-While tagged, both players see an action bar:
-`Combat: ❤ {health}   {opponent} ({time}s) You ({yourCps}cps) Them ({theirCps}cps)`
-— the opponent's hearts lead, in red, spaced off from their name (the
-opponent segment just reads `Server`, with no health or "Them" CPS, when
-tagged via `/combattag <you> server`). The timer gradients from green to
-red as it runs down. CPS (clicks per second) is tracked from arm
-swings for every online player, not just tagged ones, so the count is
-already warm the instant a tag starts.
+While tagged, both players see an action bar built from a fully
+configurable MiniMessage template in `config.yml` under `pvp.actionbar`
+— three separate templates for the three cases:
+
+- `vs-player` — tagged against a real online opponent: `{health}`,
+  `{opponent}`, `{seconds}`, `{your_cps}`, `{their_cps}`
+- `vs-server` — tagged via `/combattag <you> server`: `{seconds}`, `{your_cps}`
+- `vs-unknown` — tagged, but the opponent went offline: `{seconds}`, `{your_cps}`
+
+`{seconds}` and `{health}` arrive pre-colored (the countdown fades
+green→red as it runs out, health is always red) since those are computed
+live and can't be a fixed color in a static template — everything else
+in the wording, colors, and layout is yours to rearrange. CPS (clicks per
+second) is tracked from arm swings for every online player, not just
+tagged ones, so the count is already warm the instant a tag starts.
 
 ### Reboot
 
@@ -376,6 +437,15 @@ Each player's death history persists to MySQL and stores the last 20 deaths auto
 4. **Right-click** to view exactly what items/armor/offhand the player had at that death
 5. The "Back" button in the contents view returns to the death list
 
+### Staff
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/staff` | `hcfcore.staff.mode` | Toggles vanish + staff-build together. |
+| `/vanish` | `hcfcore.staff.vanish` | Toggles vanish; this permission also lets you see other vanished staff. |
+| `/staffchat` | `hcfcore.staff.staffchat` | Toggles redirecting your chat to the staff-only channel; also needed to read it. |
+| `/staffbuild` | `hcfcore.staff.staffbuild` | Toggles bypassing claim protection everywhere. |
+
 ### Admin / reload
 
 | Command | Permission | Notes |
@@ -386,8 +456,9 @@ Each player's death history persists to MySQL and stores the last 20 deaths auto
 
 Every command above (`kit`, `kits`, `hcfcore`, `getitem`, `abilities`,
 `language`, `cooldowns`, `tags`, `reboot`, `nextreboot`, `uncombat`,
-`combatcheck`, `combattag`, `rollback`) registers its own `TabCompleter` (except the
-argument-less ones like `kits`/`abilities`/`tags`/`cooldowns`), so
+`combatcheck`, `combattag`, `rollback`, `staff`, `vanish`, `staffchat`,
+`staffbuild`) registers its own `TabCompleter` (except the
+argument-less ones like `kits`/`abilities`/`tags`/`cooldowns`/`staff`/`vanish`/`staffchat`/`staffbuild`), so
 suggestions should appear as soon as the freshly built jar is running on
 the server. If they don't show up in-game:
 
@@ -465,6 +536,14 @@ the server. If they don't show up in-game:
   `FactionsHook`: a static, stateless wrapper that checks the target
   plugin is actually enabled before touching any of its classes, so
   HCFCore runs fine without them installed.
+- `ChatFormatterListener` registers at `EventPriority.MONITOR`, not
+  `HIGHEST`. Paper's `AsyncChatEvent` has exactly one renderer slot — the
+  last handler to call `event.renderer(...)` wins outright, nothing
+  merges — and FactionsUUID ships its own Paper-native chat formatter
+  (enabled by default) that also sets a renderer at `HIGHEST`. At equal
+  priority it came down to plugin load order which formatter actually
+  showed in chat. `MONITOR` guarantees this always runs last so HCFCore's
+  format always wins, regardless of load order.
 
 ## Quality Assurance & Recent Improvements
 

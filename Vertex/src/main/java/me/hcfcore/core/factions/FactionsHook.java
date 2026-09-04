@@ -196,6 +196,17 @@ public final class FactionsHook {
         return false;
     }
 
+    /**
+     * True when the claim at this location belongs to the system WarZone or
+     * SafeZone faction (set via /f warzone or /f safezone in-game) --
+     * distinct from {@link #isDisabledClaim}, which matches by faction
+     * name rather than this built-in zone type.
+     */
+    public static boolean isWarzoneOrSafezone(Location location) {
+        Faction faction = Board.board().factionAt(new FLocation(location));
+        return faction != null && (faction.isWarZone() || faction.isSafeZone());
+    }
+
     private static Faction getFaction(Player player) {
         FPlayer fPlayer = FPlayers.fPlayers().get(player.getUniqueId());
         return fPlayer == null || !fPlayer.hasFaction() ? null : fPlayer.faction();

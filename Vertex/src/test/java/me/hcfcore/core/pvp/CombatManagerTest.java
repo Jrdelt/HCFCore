@@ -32,7 +32,11 @@ class CombatManagerTest {
         UserManager userManager = new UserManager(plugin, new NoOpStorage());
         Messages messages = new Messages(plugin, userManager);
         messages.load();
-        combatManager = new CombatManager(plugin, messages, 15, true, 4);
+        combatManager = new CombatManager(plugin, messages, 15, true, 4,
+                "<red><bold>Combat</bold><gray>: <white>server <gray>{seconds} <green>you <white>({your_cps}cps)",
+                "<red><bold>Combat</bold><gray>: {health}   <white>{opponent} <gray>{seconds} <green>you "
+                        + "<white>({your_cps}cps) <red>them <white>({their_cps}cps)",
+                "<red><bold>Combat</bold><gray>: {seconds} <green>you <white>({your_cps}cps)");
     }
 
     @AfterEach
@@ -169,7 +173,8 @@ class CombatManagerTest {
         PlayerMock alice = server.addPlayer("Alice");
         PlayerMock bob = server.addPlayer("Bob");
 
-        combatManager.reconfigure(5, false, 4);
+        combatManager.reconfigure(5, false, 4, "vs-server {seconds} {your_cps}",
+                "vs-player {health} {opponent} {seconds} {your_cps} {their_cps}", "vs-unknown {seconds} {your_cps}");
         combatManager.tag(alice, bob);
 
         assertFalse(combatManager.logoutPenaltyEnabled());

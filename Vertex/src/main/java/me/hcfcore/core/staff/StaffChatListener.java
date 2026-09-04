@@ -33,7 +33,7 @@ public final class StaffChatListener implements Listener {
         // The player's own message is appended as a Component rather than
         // interpolated into the MiniMessage string below, so nothing in it
         // (e.g. "<red>") is parsed as markup.
-        Component formatted = MessageFormatter.deserialize("&c&lSTAFF &7> &e" + player.getName() + "&7: &f")
+        Component formatted = MessageFormatter.deserialize("&c&lSTAFF&r &7> &e" + player.getName() + "&7: &f")
                 .append(event.message());
 
         for (Player viewer : Bukkit.getOnlinePlayers()) {

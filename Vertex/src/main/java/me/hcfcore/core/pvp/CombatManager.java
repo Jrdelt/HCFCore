@@ -1,10 +1,9 @@
 package me.hcfcore.core.pvp;
 
+import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.lang.Messages;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -34,18 +33,25 @@ public final class CombatManager {
     private volatile long combatDurationMillis;
     private volatile boolean logoutPenalty;
     private volatile long updateIntervalTicks;
+    private volatile String actionbarVsServer;
+    private volatile String actionbarVsPlayer;
+    private volatile String actionbarVsUnknown;
     private final Map<UUID, Long> taggedUntil = new ConcurrentHashMap<>();
     private final Map<UUID, UUID> opponents = new ConcurrentHashMap<>();
     private final Map<UUID, Deque<Long>> clickTimestamps = new ConcurrentHashMap<>();
     private BukkitTask task;
 
     public CombatManager(Plugin plugin, Messages messages, int combatSeconds, boolean logoutPenalty,
-                          int updateIntervalTicks) {
+                          int updateIntervalTicks, String actionbarVsServer, String actionbarVsPlayer,
+                          String actionbarVsUnknown) {
         this.plugin = plugin;
         this.messages = messages;
         this.combatDurationMillis = combatSeconds * 1000L;
         this.logoutPenalty = logoutPenalty;
         this.updateIntervalTicks = Math.max(1, updateIntervalTicks);
+        this.actionbarVsServer = actionbarVsServer;
+        this.actionbarVsPlayer = actionbarVsPlayer;
+        this.actionbarVsUnknown = actionbarVsUnknown;
     }
 
     public void start() {
@@ -58,9 +64,13 @@ public final class CombatManager {
      * stale on a config reload. Existing tags keep their already-computed
      * expiry; only new tags and the action-bar cadence pick up the change.
      */
-    public void reconfigure(int combatSeconds, boolean logoutPenalty, int updateIntervalTicks) {
+    public void reconfigure(int combatSeconds, boolean logoutPenalty, int updateIntervalTicks,
+                             String actionbarVsServer, String actionbarVsPlayer, String actionbarVsUnknown) {
         this.combatDurationMillis = combatSeconds * 1000L;
         this.logoutPenalty = logoutPenalty;
+        this.actionbarVsServer = actionbarVsServer;
+        this.actionbarVsPlayer = actionbarVsPlayer;
+        this.actionbarVsUnknown = actionbarVsUnknown;
         long newInterval = Math.max(1, updateIntervalTicks);
         if (newInterval != this.updateIntervalTicks) {
             this.updateIntervalTicks = newInterval;
@@ -213,51 +223,50 @@ public final class CombatManager {
         }
     }
 
+    /**
+     * Renders one of the three pvp.actionbar.* templates from config.yml,
+     * substituting {@code {seconds}}/{@code {health}} as pre-colored
+     * MiniMessage fragments (the countdown fades red->green, health is
+     * always red -- neither is a fixed color a template string could
+     * express on its own) and the rest as plain text.
+     */
     private Component render(Player player, long remainingMillis) {
         long remainingSeconds = (remainingMillis + 999) / 1000;
         double timeFraction = combatDurationMillis <= 0 ? 0 : clamp01((double) remainingMillis / combatDurationMillis);
-        TextColor timeColor = gradient(1 - timeFraction);
-
-        Component result = messages.get(player, "combat.actionbar-label").appendSpace();
+        String secondsFragment = "<#" + toHex(gradient(1 - timeFraction)) + "><bold>(" + remainingSeconds + "s)</bold>";
 
         UUID opponentId = opponents.get(player.getUniqueId());
-        boolean realOpponent = false;
+        String template;
         if (SERVER_UUID.equals(opponentId)) {
-            result = result.append(messages.get(player, "combat.actionbar-server")).appendSpace();
+            template = actionbarVsServer
+                    .replace("{seconds}", secondsFragment)
+                    .replace("{your_cps}", String.valueOf(getCps(player.getUniqueId())));
         } else {
             Player opponent = opponentId == null ? null : Bukkit.getPlayer(opponentId);
             if (opponent != null && opponent.isOnline()) {
-                realOpponent = true;
                 double health = Math.max(0, opponent.getHealth());
-
-                // Hearts lead, so the number a player is watching for is the
-                // first thing in the bar rather than something they have to
-                // read past the name to find.
-                result = result
-                        .append(Component.text("❤ " + String.format(Locale.ROOT, "%.0f", health), NamedTextColor.RED))
-                        .append(Component.text("   "))
-                        .append(Component.text(opponent.getName(), NamedTextColor.WHITE))
-                        .appendSpace();
+                String healthFragment = "<red>❤ " + String.format(Locale.ROOT, "%.0f", health) + "</red>";
+                template = actionbarVsPlayer
+                        .replace("{seconds}", secondsFragment)
+                        .replace("{health}", healthFragment)
+                        // A player's name can't contain MiniMessage syntax --
+                        // Minecraft restricts the character set -- so no
+                        // escaping is needed, same as elsewhere in the plugin.
+                        .replace("{opponent}", opponent.getName())
+                        .replace("{your_cps}", String.valueOf(getCps(player.getUniqueId())))
+                        .replace("{their_cps}", String.valueOf(getCps(opponentId)));
+            } else {
+                template = actionbarVsUnknown
+                        .replace("{seconds}", secondsFragment)
+                        .replace("{your_cps}", String.valueOf(getCps(player.getUniqueId())));
             }
         }
 
-        result = result.append(Component.text("(" + remainingSeconds + "s)", timeColor, TextDecoration.BOLD));
+        return MessageFormatter.deserialize(template);
+    }
 
-        result = result
-                .appendSpace()
-                .append(messages.get(player, "combat.actionbar-you"))
-                .appendSpace()
-                .append(Component.text("(" + getCps(player.getUniqueId()) + "cps)", NamedTextColor.WHITE));
-
-        if (realOpponent) {
-            result = result
-                    .appendSpace()
-                    .append(messages.get(player, "combat.actionbar-them"))
-                    .appendSpace()
-                    .append(Component.text("(" + getCps(opponentId) + "cps)", NamedTextColor.WHITE));
-        }
-
-        return result;
+    private static String toHex(TextColor color) {
+        return String.format(Locale.ROOT, "%06X", color.value());
     }
 
     private static TextColor gradient(double greenFraction) {

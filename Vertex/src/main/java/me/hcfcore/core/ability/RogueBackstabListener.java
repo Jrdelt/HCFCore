@@ -53,8 +53,8 @@ public final class RogueBackstabListener implements Listener {
         abilityManager.startCooldown(attacker, user, ability);
         consume(attacker);
         event.setDamage(Math.max(0.0, ability.getDouble("damage", 6.0)));
-        attacker.sendMessage(MessageFormatter.deserialize("&e&lABILITES &7> <gold>Backstab landed for 3 hearts."));
-        victim.sendMessage(MessageFormatter.deserialize("&e&lABILITES &7> <red>You were backstabbed!"));
+        attacker.sendMessage(MessageFormatter.deserialize("&e&lABILITES&r &7> <gold>Backstab landed for 3 hearts."));
+        victim.sendMessage(MessageFormatter.deserialize("&e&lABILITES&r &7> <red>You were backstabbed!"));
     }
 
     private static boolean isBehind(Player attacker, Player victim) {

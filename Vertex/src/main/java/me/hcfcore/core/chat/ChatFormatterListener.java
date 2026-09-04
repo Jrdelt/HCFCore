@@ -14,6 +14,18 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 
+/**
+ * On Paper, {@code AsyncChatEvent} has exactly one renderer slot -- the
+ * last handler to call {@code event.renderer(...)} wins outright, nobody's
+ * output is merged with anybody else's. FactionsUUID ships its own
+ * Paper-native chat formatter (enabled by default) that sets its renderer
+ * at {@code HIGHEST} too (see {@code ListenPaperChat.onPlayerChatLater} in
+ * dev.kitteh:factions), so at equal priority it came down to plugin load
+ * order which formatter actually showed up in chat -- sometimes ours,
+ * sometimes theirs. Registering at {@code MONITOR} instead guarantees this
+ * always runs after HIGHEST, so our renderer always wins regardless of
+ * load order.
+ */
 public final class ChatFormatterListener implements Listener {
 
     private final TagManager tagManager;
@@ -24,7 +36,7 @@ public final class ChatFormatterListener implements Listener {
         this.config = config;
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
         event.renderer(ChatRenderer.viewerUnaware((source, displayName, message) -> render(player, message)));
@@ -54,15 +66,16 @@ public final class ChatFormatterListener implements Listener {
     }
 
     /**
-     * `display` embeds its own tag color (tags.yml), so different tags
-     * already look different in chat without a separate color lookup.
-     * `display` is admin-authored (tags.yml), so this builds the
-     * component directly rather than through the escaped placeholder path
-     * in deserializeTemplate, which exists specifically to guard untrusted
+     * `display` embeds its own tag color and brackets (tags.yml), so
+     * different tags already look different in chat without a separate
+     * color lookup, and don't need brackets added again here. `display` is
+     * admin-authored (tags.yml), so this builds the component directly
+     * rather than through the escaped placeholder path in
+     * deserializeTemplate, which exists specifically to guard untrusted
      * values like a player's own name.
      */
     private Component coloredTag(TagManager.Tag tag) {
-        return MessageFormatter.deserialize("<gray>[</gray>" + tag.display() + "<gray>]</gray> ");
+        return MessageFormatter.deserialize(tag.display() + " ");
     }
 
     /**
