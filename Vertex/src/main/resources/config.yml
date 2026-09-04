@@ -43,10 +43,11 @@ scoreboard:
   date-format: 'MM/dd'
 
   # Scoreboard content lines
-  # Supports: {name}, {rank_prefix}, {exp}, {balance}, {faction}, {power}, {fplayers_online}, {ftop}
+  # Supports: {name}, {rank_prefix}, {rank}, {prefix}, {exp}, {balance}, {faction}, {power}, {fplayers_online}, {ftop}
+  # Also supports PlaceholderAPI %placeholder% tokens (e.g. %luckperms_prefix%) if PlaceholderAPI is installed.
   lines:
     - '     <gray>Season I'
-    - '   <gray>{rank_prefix}{name}'
+    - '   %luckperms_prefix%<gray>{name}'
     - '<gray>• <red>Experience: <white>{exp}'
     - '<gray>• <red>Balance: <white>{balance}'
     - ''
@@ -63,9 +64,11 @@ chat:
   # Separator between message components
   separator: ' <gray>» </gray>'
 
-  # Chat format components (use MiniMessage or legacy & color codes)
+  # Chat format components (use MiniMessage or legacy & color codes).
+  # rank-format also supports {rank}, {prefix}, or a PlaceholderAPI
+  # %placeholder% token like %luckperms_prefix% (needs PlaceholderAPI).
   faction-format: '&8[<gray>{faction}</gray>&8] '
-  rank-format: '&8[<gray>{rank}</gray>&8] '
+  rank-format: '%luckperms_prefix% '
   name-format: '{name} '
 
 # ============================================
