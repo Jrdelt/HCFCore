@@ -182,7 +182,7 @@ public final class NametagManager {
     }
 
     /**
-     * Build nametag: &8[&a<ftop>&8] &8[<factioncolor>(name)&8] &e<player>
+     * Build nametag: &8[&a<ftop>&8] &8[<factioncolor>name&8] &e<player>
      * Note: a scoreboard team's prefix is the same for every viewer of
      * that team -- Minecraft's scoreboard API has no way to color it
      * differently per viewer (e.g. red to enemies, purple to allies of

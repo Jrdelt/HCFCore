@@ -1,6 +1,7 @@
 package me.hcfcore.core.factions;
 
 import me.hcfcore.core.staff.StaffManager;
+import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
@@ -48,14 +49,14 @@ public final class ZoneBlockProtectionListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onDamage(BlockDamageEvent event) {
-        if (blocked(event.getPlayer())) {
+        if (blocked(event.getPlayer(), event.getBlock().getLocation())) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
-        if (blocked(event.getPlayer())) {
+        if (blocked(event.getPlayer(), event.getBlock().getLocation())) {
             event.setCancelled(true);
         }
     }
@@ -98,9 +99,16 @@ public final class ZoneBlockProtectionListener implements Listener {
         return false;
     }
 
-    private boolean blocked(Player player) {
+    /**
+     * Checks the location of the block itself, not the player's own
+     * position -- a player standing just outside a protected claim can
+     * still reach across the boundary and damage/break a block that's
+     * actually inside it (survival reach is ~4.5-6 blocks), so gating on
+     * where the player is standing let exactly that through.
+     */
+    private boolean blocked(Player player, Location blockLocation) {
         return !staffManager.isStaffBuild(player.getUniqueId())
-                && FactionsHook.isDisabledClaim(player.getLocation(), protectedClaimNames());
+                && FactionsHook.isDisabledClaim(blockLocation, protectedClaimNames());
     }
 
     private Set<String> protectedClaimNames() {

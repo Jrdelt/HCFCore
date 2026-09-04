@@ -2,6 +2,7 @@ package me.hcfcore.core.ability;
 
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.pvp.CombatManager;
+import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
@@ -91,6 +92,23 @@ public final class NinjaStarListener implements Listener {
         event.setCancelled(true);
         Player user = event.getPlayer();
 
+        // Checked before the ninja-star-specific preconditions below (not
+        // left to AbilityGate.checkAndStart alone) so a player on cooldown
+        // but not currently in combat -- the common case, just testing the
+        // item -- still finds out they're on cooldown instead of always
+        // seeing "you haven't been hit recently" with no mention of it.
+        if (abilityManager.isOnGlobalCooldown(user.getUniqueId())) {
+            long remaining = (abilityManager.globalCooldownRemainingMillis(user.getUniqueId()) + 999) / 1000;
+            user.sendMessage(messages.get(user, "ability.on-global-cooldown", "seconds", String.valueOf(remaining)));
+            return;
+        }
+        User cooldownUser = userManager.get(user.getUniqueId());
+        if (cooldownUser != null && abilityManager.isOnCooldown(cooldownUser, ability)) {
+            long remaining = (abilityManager.remainingCooldownMillis(cooldownUser, ability) + 999) / 1000;
+            user.sendMessage(messages.get(user, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
+            return;
+        }
+
         LastHit lastHit = lastHits.get(user.getUniqueId());
         if (lastHit == null || System.currentTimeMillis() - lastHit.timestampMillis > LAST_HIT_WINDOW_MILLIS) {
             user.sendMessage(messages.get(user, "ability.ninja-star-no-target"));
@@ -123,6 +141,20 @@ public final class NinjaStarListener implements Listener {
             public void run() {
                 Player user = Bukkit.getPlayer(userId);
                 Player target = Bukkit.getPlayer(targetId);
+                // The item/cooldown are already spent at this point (see
+                // AbilityGate.checkAndStart above) -- whoever's still online
+                // deserves to know why the teleport they were told about
+                // isn't coming, rather than it just silently not happening.
+                if (user == null && target != null) {
+                    target.sendMessage(messages.get(target, "ability.ninja-star-fizzled"));
+                    cancel();
+                    return;
+                }
+                if (target == null && user != null) {
+                    user.sendMessage(messages.get(user, "ability.ninja-star-fizzled"));
+                    cancel();
+                    return;
+                }
                 if (user == null || target == null) {
                     cancel();
                     return;

@@ -164,6 +164,7 @@ ability:
   ninja-star-not-in-combat: '&e&lABILITES&r &7> <red>Voce e seu alvo precisam estar em combate.'
   ninja-star-activated: '&e&lABILITES&r &7> <light_purple>Teletransportando para {player} em {seconds}s.'
   ninja-star-warning: '&e&lABILITES&r &7> <red>{player} ativou uma Ninja Star em voce e se teletransportara ate voce em {seconds}s.'
+  ninja-star-fizzled: '&e&lABILITES&r &7> <red>O outro jogador se desconectou, a teletransportacao da Ninja Star falhou.'
 
 reboot:
   usage: '<red>Uso: /reboot [cancel]'

@@ -164,6 +164,7 @@ ability:
   ninja-star-not-in-combat: '&e&lABILITES&r &7> <red>Both you and your target must be in combat.'
   ninja-star-activated: '&e&lABILITES&r &7> <light_purple>Teleporting to {player} in {seconds}s.'
   ninja-star-warning: '&e&lABILITES&r &7> <red>{player} activated a Ninja Star on you and will teleport to you in {seconds}s.'
+  ninja-star-fizzled: '&e&lABILITES&r &7> <red>The other player disconnected, so the Ninja Star teleport fizzled.'
 
 reboot:
   usage: '<red>Usage: /reboot [cancel]'
