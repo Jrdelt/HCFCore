@@ -1,18 +1,23 @@
 package me.hcfcore.core.tag;
 
+import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.lang.Messages;
+import me.hcfcore.core.luckperms.LuckPermsHook;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.configuration.Configuration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
@@ -22,7 +27,7 @@ import java.util.Locale;
 public final class TagMenu {
 
     static final int GRID_ROWS = 4;
-    static final int GRID_COLUMNS = 7;
+    static final int GRID_COLUMNS = 9;
     static final int PAGE_SIZE = GRID_ROWS * GRID_COLUMNS;
     static final int SLOT_NICKNAME = 4;
     static final int SLOT_FILTER = 45;
@@ -64,14 +69,14 @@ public final class TagMenu {
     }
 
     /**
-     * Keeps tag icons off the inventory's outer edge: row 0 (top) and
-     * columns 0/8 (left/right) are left empty, so tags only ever occupy
-     * the inset 4x7 block in rows 1-4. Row 5 is the control row.
+     * Tags fill the full width of rows 1-4 (rows 2-5 as a player counts
+     * them) -- row 0 is the header (nickname-match button) and row 5 is
+     * the control row, but nothing insets the columns.
      */
     private static int tagSlot(int index) {
         int row = index / GRID_COLUMNS;
         int column = index % GRID_COLUMNS;
-        return (row + 1) * 9 + (column + 1);
+        return (row + 1) * 9 + column;
     }
 
     private static List<TagManager.Tag> visibleTags(Player player, TagManager manager, TagMenuState state) {
@@ -154,8 +159,7 @@ public final class TagMenu {
             return false;
         }
         int row = slot / 9;
-        int column = slot % 9;
-        return row >= 1 && row <= GRID_ROWS && column >= 1 && column <= GRID_COLUMNS;
+        return row >= 1 && row <= GRID_ROWS;
     }
 
     private static ItemStack filterButton(Player player, TagManager manager, Messages messages, TagMenuState state) {
@@ -244,13 +248,14 @@ public final class TagMenu {
         TagManager.Tag equippedTag = tagId == null ? null : manager.get(tagId);
         String color = equippedTag == null ? null : GradientColor.extractLeadingColor(equippedTag.display());
         if (color != null) {
+            Component chatPrefix = chatPreviewPrefix(player, manager, equippedTag);
             String sample = messages.getRaw(player, "tags.nickname-sample-message");
             lore.add(messages.get(player, "tags.nickname-preview-heading"));
-            lore.add(MessageFormatter.deserialize(color + player.getName()
-                    + "<gray>: " + sample));
+            lore.add(chatPrefix.append(MessageFormatter.deserialize(color + player.getName()
+                    + "<gray>: " + sample)));
             if (color.contains("gradient")) {
-                lore.add(MessageFormatter.deserialize(GradientColor.reverse(color) + player.getName()
-                        + "<gray>: " + sample)
+                lore.add(chatPrefix.append(MessageFormatter.deserialize(GradientColor.reverse(color) + player.getName()
+                        + "<gray>: " + sample))
                         .append(messages.get(player, "tags.nickname-reversed-suffix")));
             }
             lore.add(Component.empty());
@@ -259,7 +264,50 @@ public final class TagMenu {
         if (color != null && color.contains("gradient")) {
             lore.add(messages.get(player, "tags.nickname-hint-reverse"));
         }
-        return button(Material.NAME_TAG, Component.text("Nickname Match", NamedTextColor.LIGHT_PURPLE), lore);
+        return skullButton(player, Component.text("Nickname Match", NamedTextColor.LIGHT_PURPLE), lore);
+    }
+
+    /**
+     * The faction/tag/rank part of the real chat line, ahead of the name --
+     * built the same way {@code ChatFormatterListener} does, so this
+     * preview is exactly what the player's chat will actually look like,
+     * not a fixed illustrative example.
+     */
+    private static Component chatPreviewPrefix(Player player, TagManager manager, TagManager.Tag equippedTag) {
+        Configuration config = manager.plugin().getConfig();
+        Component result = Component.empty();
+
+        String faction = FactionsHook.getFactionTag(player);
+        if (!"None".equalsIgnoreCase(faction)) {
+            String template = config.getString("chat.faction-format", "<gold>[{faction}]</gold> ");
+            result = result.append(MessageFormatter.deserialize(
+                    template.replace("{faction}", MiniMessage.miniMessage().escapeTags(faction))));
+        }
+
+        if (equippedTag != null) {
+            result = result.append(MessageFormatter.deserialize(equippedTag.display() + " "));
+        }
+
+        String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
+        String prefix = LuckPermsHook.getPrefix(player);
+        if ((rank != null && !rank.isBlank()) || prefix != null) {
+            String template = config.getString("chat.rank-format", "<light_purple>[{rank}]</light_purple> ")
+                    .replace("{prefix}", prefix == null ? "" : prefix)
+                    .replace("{rank}", MiniMessage.miniMessage().escapeTags(rank == null ? "" : rank));
+            result = result.append(MessageFormatter.deserialize(template));
+        }
+
+        return result;
+    }
+
+    private static ItemStack skullButton(Player owner, Component name, List<Component> lore) {
+        ItemStack item = new ItemStack(Material.PLAYER_HEAD);
+        SkullMeta meta = (SkullMeta) item.getItemMeta();
+        meta.setOwningPlayer(owner);
+        meta.displayName(noItalic(name));
+        meta.lore(lore.stream().map(TagMenu::noItalic).toList());
+        item.setItemMeta(meta);
+        return item;
     }
 
     private static ItemStack button(Material material, Component name, List<Component> lore) {

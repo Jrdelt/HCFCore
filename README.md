@@ -253,18 +253,22 @@ players: {}
   nickname-match reversed), keyed by UUID; managed entirely by the plugin,
   not meant for hand-editing.
 
-`/tags` opens a 4×7 grid of tag icons (kept off the inventory's outer
-edge) with a control row: **filter** (Your/Unowned/All, each with a live
-count), **sort** (Alphabetical/Age — click to cycle, shift-click to flip
+`/tags` opens a 4×9 grid of tag icons (rows 2-5, full width) with a
+control row: **filter** (Your/Unowned/All, each with a live count),
+**sort** (Alphabetical/Age — click to cycle, shift-click to flip
 direction), **search** (opens an anvil to type a query; right-click
 clears it — the anvil's result slot is a free, XP-cost-free confirm
 button that shows what will be searched for, and closing the anvil
-applies whatever is typed exactly once), **prev/next page**, and a **nickname-match** preview (top
-middle) that recolors your name in chat to match your equipped tag,
-including a "reversed" gradient-direction option. There's no close
-button — leave the GUI the normal way (Esc / click outside). Clicking an
-unlocked tag equips it and announces it in chat (`<tag> EQUIPPED`);
-clicking your already-equipped tag unequips it (`<tag> UNEQUIPPED`).
+applies whatever is typed exactly once), **prev/next page**, and a
+**nickname-match** button (top row, your own head as the icon) that
+recolors your name in chat to match your equipped tag, including a
+"reversed" gradient-direction option. Its preview shows the actual chat
+line it'll produce — your real faction tag, equipped cosmetic tag, and
+rank, run through the live `chat.faction-format`/`chat.rank-format`
+templates, not a fixed example. There's no close button — leave the GUI
+the normal way (Esc / click outside). Clicking an unlocked tag equips it
+and announces it in chat (`<tag> EQUIPPED`); clicking your
+already-equipped tag unequips it (`<tag> UNEQUIPPED`).
 
 Reloaded along with everything else on `/hcfcore reload`.
 
