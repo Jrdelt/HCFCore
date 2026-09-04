@@ -8,11 +8,11 @@ import me.hcfcore.core.luckperms.LuckPermsHook;
 import me.hcfcore.core.tag.TagManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.plugin.Plugin;
 
 /**
  * On Paper, {@code AsyncChatEvent} has exactly one renderer slot -- the
@@ -29,11 +29,19 @@ import org.bukkit.event.Listener;
 public final class ChatFormatterListener implements Listener {
 
     private final TagManager tagManager;
-    private final FileConfiguration config;
+    private final Plugin plugin;
 
-    public ChatFormatterListener(TagManager tagManager, FileConfiguration config) {
+    /**
+     * Takes the {@link Plugin} rather than a {@code FileConfiguration}
+     * snapshot -- {@code plugin.reloadConfig()} builds a brand-new config
+     * object rather than mutating the old one in place, so a reference
+     * captured once at construction would go stale after every
+     * {@code /hcfcore reload}. Calling {@code plugin.getConfig()} fresh
+     * each time picks up config changes immediately.
+     */
+    public ChatFormatterListener(TagManager tagManager, Plugin plugin) {
         this.tagManager = tagManager;
-        this.config = config;
+        this.plugin = plugin;
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -56,13 +64,31 @@ public final class ChatFormatterListener implements Listener {
         }
 
         String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
-        if (rank != null && !rank.isBlank()) {
-            result = result.append(deserializeTemplate("chat.rank-format", "<light_purple>[{rank}]</light_purple> ", "rank", rank));
+        String prefix = LuckPermsHook.getPrefix(player);
+        if ((rank != null && !rank.isBlank()) || prefix != null) {
+            result = result.append(rankComponent(rank, prefix));
         }
 
         return result.append(nameComponent(player))
                     .append(deserializeTemplate("chat.separator", "<gray>»</gray>"))
                     .append(message);
+    }
+
+    /**
+     * `{prefix}` is LuckPerms' own prefix meta ({@code /lp user <name>
+     * meta setprefix "..."}) -- admin-authored and already carrying
+     * whatever color/brackets the admin configured -- so it's substituted
+     * raw rather than through {@link #deserializeTemplate}'s
+     * escaped-placeholder path, same reasoning as {@link #coloredTag}.
+     * {@code {rank}} (the LuckPerms group's plain display name) still goes
+     * through the escaped substitution since it isn't meant to carry
+     * markup of its own.
+     */
+    private Component rankComponent(String rank, String prefix) {
+        String template = plugin.getConfig().getString("chat.rank-format", "<light_purple>[{rank}]</light_purple> ");
+        template = template.replace("{prefix}", prefix == null ? "" : prefix);
+        template = template.replace("{rank}", MiniMessage.miniMessage().escapeTags(rank == null ? "" : rank));
+        return MessageFormatter.deserialize(template);
     }
 
     /**
@@ -94,7 +120,7 @@ public final class ChatFormatterListener implements Listener {
     }
 
     private Component deserializeTemplate(String path, String fallback, String... values) {
-        String template = config.getString(path, fallback);
+        String template = plugin.getConfig().getString(path, fallback);
         for (int i = 0; i + 1 < values.length; i += 2) {
             template = template.replace("{" + values[i] + "}", MiniMessage.miniMessage().escapeTags(values[i + 1]));
         }

@@ -166,12 +166,14 @@ public final class ScoreboardManager {
         Map<String, String> custom = customPlaceholders.getOrDefault(player.getUniqueId(), Map.of());
         String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
         String rankPrefix = rank == null || rank.isBlank() ? "" : "[" + rank + "] ";
+        String prefix = LuckPermsHook.getPrefix(player);
         return template
                 .replace("{date}", LocalDate.now().format(dateFormatter))
                 .replace("{online}", String.valueOf(Bukkit.getOnlinePlayers().size()))
                 .replace("{name}", player.getName())
                 .replace("{rank_prefix}", rankPrefix)
                 .replace("{rank}", rank == null ? "" : rank)
+                .replace("{prefix}", prefix == null ? "" : prefix)
                 .replace("{exp}", String.valueOf(player.getLevel()))
                 .replace("{balance}", EconomyHook.getBalance(player))
                 .replace("{faction}", FactionsHook.getFactionTag(player))

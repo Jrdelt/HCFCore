@@ -7,6 +7,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.configuration.Configuration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
@@ -38,12 +39,41 @@ public final class NametagManager {
     private int updateIntervalTicks;
     private NamedTextColor sameFactionColor;
     private NamedTextColor neutralColor;
+    private BukkitTask task;
 
     public NametagManager(Plugin plugin) {
         this.plugin = plugin;
         this.scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
         loadConfiguration();
         if (enabled) {
+            startNametagUpdateTask();
+        }
+    }
+
+    /**
+     * Re-reads {@code nametags.*} and applies it live -- without this,
+     * {@code /hcfcore reload} left every setting here frozen at whatever
+     * it was on server start, same class of bug {@link
+     * me.hcfcore.core.chat.ChatFormatterListener} had for {@code chat.*}.
+     * Starts or stops the update task if {@code enabled} changed, and
+     * restarts it if the interval changed while already enabled.
+     */
+    public void reload() {
+        boolean wasEnabled = enabled;
+        int previousInterval = updateIntervalTicks;
+        loadConfiguration();
+
+        if (!enabled) {
+            if (task != null) {
+                task.cancel();
+                task = null;
+            }
+            return;
+        }
+        if (!wasEnabled || task == null) {
+            startNametagUpdateTask();
+        } else if (updateIntervalTicks != previousInterval) {
+            task.cancel();
             startNametagUpdateTask();
         }
     }
@@ -63,7 +93,7 @@ public final class NametagManager {
     }
 
     private void startNametagUpdateTask() {
-        plugin.getServer().getScheduler().runTaskTimer(plugin, this::updateAllNametags, 20, updateIntervalTicks);
+        task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::updateAllNametags, 20, updateIntervalTicks);
     }
 
     private void updateAllNametags() {

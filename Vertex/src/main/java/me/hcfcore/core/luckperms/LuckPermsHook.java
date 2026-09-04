@@ -72,6 +72,29 @@ public final class LuckPermsHook {
         return "default".equalsIgnoreCase(groupName) ? null : groupName;
     }
 
+    /**
+     * The player's LuckPerms prefix meta (set via {@code /lp user <name>
+     * meta setprefix "..."}, or inherited from a group), with LuckPerms'
+     * own weighted meta-stacking already resolved -- unlike
+     * {@link #getPrimaryGroupDisplayName}, this carries whatever color/
+     * bracket formatting the admin actually configured, rather than a
+     * bare group name this plugin wraps itself. Null if LuckPerms isn't
+     * installed, the player has no loaded LuckPerms user, or no prefix
+     * applies to them.
+     */
+    public static String getPrefix(Player player) {
+        if (!isAvailable()) {
+            return null;
+        }
+        LuckPerms api = LuckPermsProvider.get();
+        User user = api.getUserManager().getUser(player.getUniqueId());
+        if (user == null) {
+            return null;
+        }
+        String prefix = user.getCachedData().getMetaData().getPrefix();
+        return prefix == null || prefix.isBlank() ? null : prefix;
+    }
+
     private static void grant(Plugin plugin, Player player, String permissionNode, long seconds) {
         LuckPerms api = LuckPermsProvider.get();
         UserManager userManager = api.getUserManager();

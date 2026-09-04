@@ -63,7 +63,9 @@ mysql:
 
 **Scoreboard** — Customize with `scoreboard.lines`. Use these placeholders:
 - `{name}` — player name
-- `{rank_prefix}` — player's rank (if using LuckPerms)
+- `{rank_prefix}` — player's LuckPerms **group's** display name, wrapped in `[brackets]` by the plugin (blank without LuckPerms, or in the built-in `default` group)
+- `{rank}` — same group display name, unwrapped/uncolored
+- `{prefix}` — the player's actual LuckPerms **prefix meta** (`/lp user <name> meta setprefix "..."`), with whatever color/brackets you configured in LuckPerms already baked in — use this instead of `{rank_prefix}` if you want per-user prefixes rather than one per group
 - `{faction}` — player's faction name
 - `{power}` — faction power (current/max)
 - `{ftop}` — faction's position on power ranking
@@ -71,7 +73,7 @@ mysql:
 - `{exp}` — player's XP level
 - `{balance}` — player's money (if using Vault economy)
 
-**Chat** — Control the live chat format with `chat.separator`, `chat.faction-format`, `chat.rank-format`. Leave `rank-format` blank if not using LuckPerms.
+**Chat** — Control the live chat format with `chat.separator`, `chat.faction-format`, `chat.rank-format`. `chat.rank-format` supports the same `{rank}` / `{prefix}` choice as the scoreboard above — `{prefix}` is substituted raw (not escaped) since it's expected to carry its own color/formatting, same treatment as a tag's `display` string. Leave `rank-format` blank if not using LuckPerms.
 
 **PvP Cooldowns** — These override vanilla Minecraft cooldowns:
 - `pearl-cooldown-seconds` — ender pearl reuse timer
@@ -112,7 +114,10 @@ Chat appears as: `[faction] [tag] [rank] name » message`
 Each part is optional:
 - **[faction]** — faction name (omitted if factionless)
 - **[tag]** — equipped cosmetic tag (omitted if none)
-- **[rank]** — LuckPerms rank display name (omitted without LuckPerms)
+- **[rank]** — LuckPerms rank, either the group's display name or the
+  player's own prefix meta depending on whether `chat.rank-format` uses
+  `{rank}` or `{prefix}` (see **Configuration Guide** above); omitted
+  without LuckPerms
 - **name » message** — the actual chat message
 
 Players can enable **nickname-match** on tags to recolor their name to match the tag's color.

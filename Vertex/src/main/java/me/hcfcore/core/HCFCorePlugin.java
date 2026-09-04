@@ -218,7 +218,7 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new PearlStunnerListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new RabbitsFeedListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new TagMenuListener(this), this);
-        Bukkit.getPluginManager().registerEvents(new ChatFormatterListener(tagManager, getConfig()), this);
+        Bukkit.getPluginManager().registerEvents(new ChatFormatterListener(tagManager, this), this);
         Bukkit.getPluginManager().registerEvents(new FactionCommandListener(this, messages), this);
 
         KitCommand kitCommand = new KitCommand(this, kitManager, messages);
@@ -341,6 +341,7 @@ public final class HCFCorePlugin extends JavaPlugin {
             tagManager.load();
         }
         if (nametagManager != null) {
+            nametagManager.reload();
             nametagManager.cleanupStaleTeams();
         }
 
