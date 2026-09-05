@@ -185,7 +185,7 @@ Edit `kits.yml` to create kits. Each kit has:
 
 ## Abilities
 
-Twenty-one PvP ability items ship pre-configured in `abilities.yml`. Each has:
+Sixteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
 - **material** / **name** / **lore** — fully customizable appearance
 - **cooldown-seconds** — reuse timer (saved to database, persists across restarts)
 - **uses** — number of uses before breaking (optional)
@@ -209,15 +209,14 @@ Twenty-one PvP ability items ship pre-configured in `abilities.yml`. Each has:
   that hit to have landed within the last 15 seconds and both of you to
   currently be in combat. On arrival you get Regeneration II, Strength
   III, and Speed V, each for 3 seconds.
-- **Portable Bard** (right-click) — Gives you one of each buff item
-  (Speed, Strength, Resistance, Regeneration, Jump Boost); right-click a
-  buff item to share it with faction members within
-  `abilities.bard-share-radius-blocks` (default 30) blocks of you, same
-  world only — not the whole online faction regardless of distance. Tells
-  you how many nearby members actually received it. Doubled duration and
-  effect level when worn in the full gold bard set, halved otherwise (never
-  below Level I / 1 second). The master item also gets the short in-kit
-  cooldown, see below; each buff item has its own separate cooldown
+- **Portable Bard** (right-click) — Opens a GUI to pick a buff (Speed,
+  Strength, Resistance, Regeneration, Jump Boost) and share it with
+  faction members within `abilities.bard-share-radius-blocks` (default
+  30) blocks of you, same world only — not the whole online faction
+  regardless of distance. Tells you how many nearby members actually
+  received it. Doubled duration and effect level when worn in the full
+  gold bard set, halved otherwise (never below Level I / 1 second). Uses
+  the single Portable Bard item; the short in-kit cooldown is below
 - **Repair** (right-click) — Grant block-breaking permission (needs LuckPerms)
 - **Switcher Snowball** (throw) — Swap positions with enemy
 - **Time Warp Pearl** (right-click) — Teleport to last pearl throw location
@@ -623,8 +622,8 @@ the server. If they don't show up in-game:
   `display` string, since tags embed their color directly rather than
   storing it separately.
 - Class detection for gameplay rules that key off "what class is this
-  player" (Portable Bard's short cooldown, and doubling/halving its buff
-  items' effect) goes through `ArmorClass`, which matches armor
+  player" (Portable Bard's short cooldown, and doubling/halving its buffs'
+  effect) goes through `ArmorClass`, which matches armor
   **material** only — worn durability,
   donator enchantments, and repairs must not drop a player out of their
   class mid-fight. That's deliberately looser than the exact-set match
@@ -639,11 +638,10 @@ the server. If they don't show up in-game:
   anything, so a mark from a factionless archer grants no melee bonus
   rather than arming every factionless player.
 - Short-lived cooldowns that would be pointless to persist —
-  `VanillaCooldownManager`'s pearl/gapple timers — live in memory, keyed
-  by UUID. Their quit handlers only drop entries that have already
-  expired; clearing live ones would turn a relog into a cooldown reset.
-  Portable Bard's buff items don't need this: each is its own ability
-  with its own normal, persisted cooldown, not a special in-memory map.
+  `VanillaCooldownManager`'s pearl/gapple timers, Portable Bard's per-buff
+  timers in `AbilityManager` — live in memory, keyed by UUID. Their quit
+  handlers only drop entries that have already expired; clearing live ones
+  would turn a relog into a cooldown reset.
 - `CombatManager.SERVER_UUID` (`new UUID(0, 0)`) is a reserved sentinel
   opponent id used only by `/combattag ... server` — never a real player's
   UUID, so it can't collide.

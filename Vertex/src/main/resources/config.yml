@@ -69,7 +69,7 @@ chat:
   # rank-format also supports {rank}, {prefix}, or a PlaceholderAPI
   # %placeholder% token like %luckperms_prefix% (needs PlaceholderAPI).
   faction-format: '&8[<gray>{faction}</gray>&8] '
-  rank-format: '%luckperms_prefix% '
+  rank-format: '%luckperms_prefix%'
   name-format: '{name} '
 
 # ============================================

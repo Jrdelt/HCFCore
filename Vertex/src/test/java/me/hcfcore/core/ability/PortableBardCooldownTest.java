@@ -5,7 +5,6 @@ import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.potion.PotionEffectType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,7 +13,6 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.plugin.PluginMock;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -134,18 +132,30 @@ class PortableBardCooldownTest {
     }
 
     @Test
-    void eachBuffItemIsItsOwnAbilityWithASevenSecondCooldown() {
-        // Each buff is now a standalone physical item/ability (its own
-        // cooldown, material, effect config) rather than a GUI-only
-        // construct sharing the parent ability's cooldown bucket.
-        for (String buffId : List.of("bard-buff-speed", "bard-buff-strength", "bard-buff-resistance",
-                "bard-buff-regeneration", "bard-buff-jump-boost")) {
-            Ability buff = abilityManager.get(buffId);
-            assertNotNull(buff, "abilities.yml should define " + buffId);
-            assertEquals(7, buff.getCooldownSeconds(), buffId + " should have its own 7s cooldown");
-            assertNotNull(PotionEffectType.getByName(buff.getString("effect-type", "")),
-                    buffId + " should have a valid effect-type");
-        }
+    void eachBuffGetsItsOwnSevenSecondCooldown() {
+        PlayerMock player = server.addPlayer("Bard4");
+        Ability bard = portableBard();
+
+        abilityManager.startBuffCooldown(player.getUniqueId(), bard, "speed");
+
+        long remainingSeconds =
+                abilityManager.buffCooldownRemainingMillis(player.getUniqueId(), bard, "speed") / 1000;
+        assertTrue(remainingSeconds <= 7 && remainingSeconds >= 5,
+                "expected roughly 7s of buff cooldown, got " + remainingSeconds + "s");
+        assertEquals(0L, abilityManager.buffCooldownRemainingMillis(player.getUniqueId(), bard, "strength"),
+                "one buff's cooldown must not block the others");
+    }
+
+    @Test
+    void quittingDoesNotResetALiveBuffCooldown() {
+        // Otherwise a bard could relog to re-apply the same buff instantly.
+        PlayerMock player = server.addPlayer("Bard5");
+        Ability bard = portableBard();
+        abilityManager.startBuffCooldown(player.getUniqueId(), bard, "speed");
+
+        abilityManager.clearExpiredBuffCooldowns(player.getUniqueId());
+
+        assertTrue(abilityManager.buffCooldownRemainingMillis(player.getUniqueId(), bard, "speed") > 0L);
     }
 
     @Test
