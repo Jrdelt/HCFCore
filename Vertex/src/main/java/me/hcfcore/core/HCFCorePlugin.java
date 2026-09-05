@@ -61,7 +61,6 @@ import me.hcfcore.core.staff.FreezeListener;
 import me.hcfcore.core.staff.InvseeCommand;
 import me.hcfcore.core.staff.InvseeMenuListener;
 import me.hcfcore.core.staff.StaffBuildCommand;
-import me.hcfcore.core.factions.ZoneBlockProtectionListener;
 import me.hcfcore.core.staff.StaffBuildListener;
 import me.hcfcore.core.staff.StaffChatCommand;
 import me.hcfcore.core.staff.StaffChatListener;
@@ -176,7 +175,6 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new VanishListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new StaffChatListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new StaffBuildListener(staffManager), this);
-        Bukkit.getPluginManager().registerEvents(new ZoneBlockProtectionListener(this, staffManager), this);
         Bukkit.getPluginManager().registerEvents(new FreezeListener(staffManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new InvseeMenuListener(this), this);
         getCommand("staff").setExecutor(new StaffCommand(staffManager, messages));

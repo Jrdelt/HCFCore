@@ -146,16 +146,6 @@ factions:
     - f
     - factions
 
-  # Faction claim names where all block breaking (including pistons) is
-  # blocked outright, regardless of who's building. Matches by the
-  # claiming faction's tag/name, case-insensitive -- NOT the system
-  # WarZone/SafeZone API flags (/f warzone, /f safezone), since a claim
-  # can be named this way without ever having those flags set, which is
-  # why blocking was silently not applying for some setups.
-  no-build-claim-names:
-    - warzone
-    - safezone
-
 # ============================================
 # KITS
 # ============================================

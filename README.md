@@ -420,23 +420,8 @@ actually that armor piece (a diamond sword can't end up in the helmet
 slot). A change the target makes to their own gear while the menu is
 open won't show up until it's reopened.
 
-### WarZone / SafeZone protection
-
-Independent of the ability zone restriction above, block breaking is
-blocked outright in claims named in `config.yml` under
-`factions.no-build-claim-names` (default: `warzone`, `safezone`) — not
-just `BlockBreakEvent`, but `BlockDamageEvent` (the moment a player
-starts hitting a block) and piston push/pull, so there's no
-partial-break or piston-glitch way to grief protected terrain.
-`/staffbuild` bypasses this too.
-
-Matches by the claim's faction **name**, case-insensitive — not the
-system WarZone/SafeZone API flags (`/f warzone`, `/f safezone`) a
-faction can be formally marked with. A claim can be named "warzone"
-without ever having that flag set (e.g. a plain `/f create warzone`),
-which is why name matching is what's actually checked: it's the one
-thing guaranteed to reflect what the claim is actually called, matching
-the same approach the ability zone restriction above already uses.
+Block breaking in WarZone/SafeZone claims is left entirely to
+FactionsUUID's own native protection — this plugin doesn't duplicate it.
 
 ## Reboot scheduling
 
