@@ -125,7 +125,6 @@ archer:
 ability:
   on-global-cooldown: '&e&lABILITES&r &7> <red>You''re on ability cooldown for another {seconds}s.'
   on-cooldown: '&e&lABILITES&r &7> <red>You can use this again in {seconds}s.'
-  bard-cooldown-shortened: '&e&lABILITES&r &7> <green>Your portable bard cooldown dropped to {seconds}s for wearing the bard set.'
   region-blocked: '&e&lABILITES&r &7> <red>Abilities can''t be used here.'
   getitem-usage: '<red>Usage: /getitem <username> <ability> [amount]'
   getitem-not-found: '<red>No ability named ''{ability}''.'

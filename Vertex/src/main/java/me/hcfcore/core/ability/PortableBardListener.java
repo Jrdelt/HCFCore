@@ -1,10 +1,8 @@
 package me.hcfcore.core.ability;
 
-import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
 import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.kit.ArmorClass;
 import me.hcfcore.core.lang.Messages;
-import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -14,19 +12,31 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-import java.util.Locale;
-import java.util.UUID;
+import java.util.List;
 
+/**
+ * Right-clicking the master Portable Bard item opens a menu; picking a buff
+ * there hands the player that one buff item instead of applying it directly.
+ * The master item has no cooldown of its own -- it's free to reopen at any
+ * time -- since each buff item is its own standalone ability with its own
+ * cooldown, only spent once the player actually right-clicks it to use it.
+ */
 public final class PortableBardListener implements Listener {
 
     private static final String ABILITY_ID = "portable-bard";
+    private static final List<String> BUFF_IDS = List.of(
+            "bard-buff-speed",
+            "bard-buff-strength",
+            "bard-buff-resistance",
+            "bard-buff-regeneration",
+            "bard-buff-jump-boost");
 
     private final Plugin plugin;
     private final AbilityManager abilityManager;
@@ -49,18 +59,30 @@ public final class PortableBardListener implements Listener {
         if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK) {
             return;
         }
-        if (!AbilityGate.isAbility(plugin, event.getItem(), ABILITY_ID)) {
+        ItemStack item = event.getItem();
+        if (AbilityGate.isAbility(plugin, item, ABILITY_ID)) {
+            onMasterItem(event);
             return;
         }
+        for (String buffId : BUFF_IDS) {
+            if (AbilityGate.isAbility(plugin, item, buffId)) {
+                onBuffItem(event, buffId);
+                return;
+            }
+        }
+    }
 
-        Ability ability = abilityManager.get(ABILITY_ID);
-        if (ability == null) {
+    /**
+     * No cooldown, no zone check -- opening the menu and receiving a buff
+     * item doesn't do anything by itself; the buff item it hands out is its
+     * own ability with its own cooldown/zone-check, applied when used.
+     */
+    private void onMasterItem(PlayerInteractEvent event) {
+        if (abilityManager.get(ABILITY_ID) == null) {
             return;
         }
         event.setCancelled(true);
-        Player player = event.getPlayer();
-
-        PortableBardMenu.open(player, messages);
+        PortableBardMenu.open(event.getPlayer(), messages);
     }
 
     @EventHandler
@@ -92,37 +114,53 @@ public final class PortableBardListener implements Listener {
         if (clicked == null) {
             return;
         }
-
-        Buff buff = Buff.fromIcon(clicked.getType());
-        if (buff == null) {
+        String buffId = buffIdForIcon(clicked.getType());
+        if (buffId == null) {
+            return;
+        }
+        Ability buffAbility = abilityManager.get(buffId);
+        if (buffAbility == null) {
             return;
         }
 
-        Ability ability = abilityManager.get(ABILITY_ID);
-        if (ability == null || !AbilityGate.isAbility(plugin, player.getInventory().getItemInMainHand(), ABILITY_ID)) {
+        PlayerInventory inventory = player.getInventory();
+        for (ItemStack dropped : inventory.addItem(abilityManager.createItem(buffAbility)).values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), dropped);
+        }
+        player.closeInventory();
+    }
+
+    private static String buffIdForIcon(Material icon) {
+        return switch (icon) {
+            case SUGAR -> "bard-buff-speed";
+            case BLAZE_POWDER -> "bard-buff-strength";
+            case IRON_INGOT -> "bard-buff-resistance";
+            case GHAST_TEAR -> "bard-buff-regeneration";
+            case FEATHER -> "bard-buff-jump-boost";
+            default -> null;
+        };
+    }
+
+    private void onBuffItem(PlayerInteractEvent event, String buffId) {
+        Ability ability = abilityManager.get(buffId);
+        if (ability == null) {
             return;
         }
-
-        // Checked before the shared gate, which consumes the item and starts
-        // the item cooldown: a buff that's still on its own cooldown must
-        // cost the player nothing.
-        long buffRemaining = abilityManager.buffCooldownRemainingMillis(player.getUniqueId(), ability, buff.id());
-        if (buffRemaining > 0L) {
-            player.sendMessage(messages.get(player, "ability.on-cooldown",
-                    "seconds", String.valueOf((buffRemaining + 999L) / 1000L)));
-            return;
-        }
-
+        event.setCancelled(true);
+        Player player = event.getPlayer();
         if (!AbilityGate.checkAndStart(plugin, abilityManager, userManager, messages, player, ability)) {
             return;
         }
-        abilityManager.startBuffCooldown(player.getUniqueId(), ability, buff.id());
 
+        PotionEffectType type = PotionEffectType.getByName(ability.getString("effect-type", ""));
+        if (type == null) {
+            return;
+        }
         int seconds = Math.max(1, ability.getInt("buff-seconds", 6));
-        int amplifier = buff.amplifier();
+        int amplifier = Math.max(0, ability.getInt("effect-amplifier", 0));
         // A bard actually wearing the full gold set doubles both the buff
         // duration and its effect level (Level I -> II, II -> IV, ...);
-        // choosing a buff outside the bard kit instead halves both back
+        // using a buff item outside the bard kit instead halves both back
         // down, never below Level I / 1 second.
         if (ArmorClass.isBard(player)) {
             seconds *= 2;
@@ -131,7 +169,7 @@ public final class PortableBardListener implements Listener {
             seconds = Math.max(1, seconds / 2);
             amplifier = Math.max(0, (amplifier + 1) / 2 - 1);
         }
-        PotionEffect effect = new PotionEffect(buff.effectType(), seconds * 20, amplifier);
+        PotionEffect effect = new PotionEffect(type, seconds * 20, amplifier);
 
         double radius = Math.max(0, plugin.getConfig().getDouble("abilities.bard-share-radius-blocks", 30));
         double radiusSquared = radius * radius;
@@ -145,84 +183,5 @@ public final class PortableBardListener implements Listener {
             recipients++;
         }
         player.sendMessage(messages.get(player, "ability.bard-shared", "count", String.valueOf(recipients)));
-        player.closeInventory();
-    }
-
-    /**
-     * Gearing into the gold set shortens an outstanding out-of-class
-     * Portable Bard cooldown -- see
-     * {@link AbilityManager#shortenBardCooldownForKitSwap}.
-     *
-     * <p>Checked a tick later because the armor slot this event reports on
-     * isn't necessarily settled in the inventory yet, and the check reads
-     * the whole set rather than the one changed piece.
-     */
-    @EventHandler
-    public void onArmorChange(PlayerArmorChangeEvent event) {
-        Player player = event.getPlayer();
-        UUID playerId = player.getUniqueId();
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
-            Player online = plugin.getServer().getPlayer(playerId);
-            if (online == null) {
-                return;
-            }
-            User user = userManager.get(playerId);
-            if (user == null) {
-                return;
-            }
-            long remaining = abilityManager.shortenBardCooldownForKitSwap(online, user);
-            if (remaining >= 0L) {
-                online.sendMessage(messages.get(online, "ability.bard-cooldown-shortened",
-                        "seconds", String.valueOf(remaining)));
-            }
-        });
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        abilityManager.clearExpiredBuffCooldowns(event.getPlayer().getUniqueId());
-    }
-
-    /**
-     * The buffs offered by {@link PortableBardMenu}, keyed by the icon they
-     * are shown as so the click handler and the menu can't drift apart.
-     */
-    private enum Buff {
-        SPEED(Material.SUGAR, PotionEffectType.SPEED, 1),
-        STRENGTH(Material.BLAZE_POWDER, PotionEffectType.STRENGTH, 0),
-        RESISTANCE(Material.IRON_INGOT, PotionEffectType.RESISTANCE, 0),
-        REGENERATION(Material.GHAST_TEAR, PotionEffectType.REGENERATION, 0),
-        JUMP_BOOST(Material.FEATHER, PotionEffectType.JUMP_BOOST, 1);
-
-        private final Material icon;
-        private final PotionEffectType effectType;
-        private final int amplifier;
-
-        Buff(Material icon, PotionEffectType effectType, int amplifier) {
-            this.icon = icon;
-            this.effectType = effectType;
-            this.amplifier = amplifier;
-        }
-
-        static Buff fromIcon(Material icon) {
-            for (Buff buff : values()) {
-                if (buff.icon == icon) {
-                    return buff;
-                }
-            }
-            return null;
-        }
-
-        PotionEffectType effectType() {
-            return effectType;
-        }
-
-        int amplifier() {
-            return amplifier;
-        }
-
-        String id() {
-            return name().toLowerCase(Locale.ROOT).replace('_', '-');
-        }
     }
 }
