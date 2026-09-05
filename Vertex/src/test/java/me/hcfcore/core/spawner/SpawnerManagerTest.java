@@ -10,6 +10,9 @@ import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.plugin.PluginMock;
 
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -105,5 +108,22 @@ class SpawnerManagerTest {
             assertTrue(manager.stackableTypes().contains(type), type + " should be stackable per spawners.yml");
         }
         assertFalse(manager.stackableTypes().contains(EntityType.CREEPER));
+    }
+
+    @Test
+    void loadFallsBackToBundledDefaultsWhenOnDiskFileIsMissingNewerKeys() throws Exception {
+        // Simulates a spawners.yml saved to disk before mob-stacking existed
+        // -- getStringList/getBoolean/etc. on a section that's just plain
+        // absent from the file would otherwise silently read as
+        // empty/disabled forever, since nothing ever re-adds it.
+        File file = new File(plugin.getDataFolder(), "spawners.yml");
+        Files.writeString(file.toPath(), "max-stack-size: 32\n", StandardCharsets.UTF_8);
+
+        SpawnerManager fallbackManager = new SpawnerManager(plugin, null);
+        fallbackManager.load();
+
+        assertEquals(32, fallbackManager.maxStackSize(), "the on-disk override should still win");
+        assertTrue(fallbackManager.isMobStackingEnabled(), "missing section should fall back to the bundled default");
+        assertFalse(fallbackManager.stackableTypes().isEmpty(), "missing stackable-types should fall back to the bundled list");
     }
 }

@@ -243,3 +243,4 @@ spawner:
   purchased: '<green>Purchased a spawner for {amount}.'
   unclaim-blocked: '<red>✖ <gray>You can''t unclaim this chunk while it has active spawners.'
   unclaimall-warning: '<yellow>⚠ <gray>{amount}x spawner(s) in your unclaimed land were dropped on the ground.'
+  disband-warning: '<yellow>⚠ <gray>{amount}x spawner(s) in your faction''s claimed land were dropped on the ground.'

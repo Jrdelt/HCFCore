@@ -1,6 +1,5 @@
 package me.hcfcore.core.spawner;
 
-import com.destroystokyo.paper.entity.ai.GoalType;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
@@ -19,11 +18,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Strips targeting AI from anything a tracked spawner produces (so a stack
- * is a safe grinder, not a threat) and swaps its death drops for the
- * configured table. A spawned mob is tagged with which spawner made it via
- * PDC so onDeath can look the drop table back up without re-searching for
- * a nearby spawner a second time.
+ * Strips all AI (movement, targeting, everything) from anything a tracked
+ * spawner produces -- a stack is a safe, stationary grinder, not a threat,
+ * only movable by being pushed (lava, water currents, a player) -- and
+ * swaps its death drops for the configured table. A spawned mob is tagged
+ * with which spawner made it via PDC so onDeath can look the drop table
+ * back up without re-searching for a nearby spawner a second time.
  */
 public final class SpawnerMobListener implements Listener {
 
@@ -56,7 +56,11 @@ public final class SpawnerMobListener implements Listener {
             return;
         }
         mob.getPersistentDataContainer().set(mobTypeKey, PersistentDataType.STRING, mob.getType().name());
-        Bukkit.getMobGoals().removeAllGoals(mob, GoalType.TARGET);
+        // Strips every AI goal (movement/look/jump/targeting), not just
+        // targeting -- these are meant to stand still as grinder fodder,
+        // only moving when actually pushed by lava, water currents, or a
+        // player, none of which are goal-driven so none of this affects them.
+        Bukkit.getMobGoals().removeAllGoals(mob);
     }
 
     @EventHandler(ignoreCancelled = true)

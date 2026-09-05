@@ -74,6 +74,21 @@ public final class SpawnerManager {
             plugin.saveResource("spawners.yml", false);
         }
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+        // A spawners.yml saved to disk before a config section existed (e.g.
+        // mob-stacking, added after this file was first generated on an
+        // existing server) would otherwise silently read as empty/disabled
+        // for anyone who already has an on-disk copy -- falling back to the
+        // bundled resource's own values for anything the on-disk file is
+        // missing keeps it working without ever touching/reformatting the
+        // user's actual file.
+        try (java.io.InputStream defaultStream = plugin.getResource("spawners.yml")) {
+            if (defaultStream != null) {
+                config.setDefaults(YamlConfiguration.loadConfiguration(
+                        new java.io.InputStreamReader(defaultStream, java.nio.charset.StandardCharsets.UTF_8)));
+            }
+        } catch (java.io.IOException e) {
+            plugin.getLogger().log(Level.WARNING, "Failed to load bundled spawners.yml defaults.", e);
+        }
 
         maxStackSize = Math.max(1, config.getInt("max-stack-size", 64));
         silkTouchRequired = config.getBoolean("silk-touch-required", true);

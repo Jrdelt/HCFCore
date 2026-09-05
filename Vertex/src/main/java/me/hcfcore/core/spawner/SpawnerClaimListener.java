@@ -100,7 +100,14 @@ public final class SpawnerClaimListener implements Listener {
         if (event.isCancelled()) {
             return;
         }
-        dropAllInFactionClaims(event.getFaction());
+        int dropped = dropAllInFactionClaims(event.getFaction());
+        if (dropped <= 0) {
+            return;
+        }
+        Player player = event.getFPlayer().asPlayer();
+        if (player != null) {
+            player.sendMessage(messages.get(player, "spawner.disband-warning", "amount", String.valueOf(dropped)));
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

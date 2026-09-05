@@ -5,6 +5,7 @@ import me.hcfcore.core.lang.Messages;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -122,7 +123,8 @@ public final class SpawnerMenuListener implements Listener {
                 player.getWorld().dropItemNaturally(player.getLocation(), dropped);
             }
         }
-        spawnerManager.decreaseStack(location, amount);
+        int newSize = spawnerManager.decreaseStack(location, amount);
+        clearBlockIfEmpty(location, newSize);
         player.sendMessage(messages.get(player, "spawner.withdrew", "amount", String.valueOf(amount)));
     }
 
@@ -142,8 +144,23 @@ public final class SpawnerMenuListener implements Listener {
             }
             EconomyHook.getEconomy().depositPlayer(player, refund);
         }
-        spawnerManager.decreaseStack(location, amount);
+        int newSize = spawnerManager.decreaseStack(location, amount);
+        clearBlockIfEmpty(location, newSize);
         player.sendMessage(messages.get(player, "spawner.sold", "amount", String.valueOf(amount),
                 "refund", EconomyHook.format(refund)));
+    }
+
+    /**
+     * Withdrawing/selling the last spawner in a stack untracks it (see
+     * SpawnerManager#decreaseStack), but leaves the physical block behind
+     * unless this clears it too -- otherwise it lingers as an inert,
+     * un-interactable vanilla spawner block that can't be reopened, added
+     * to, or broken normally, and won't drop later on an overclaim/disband
+     * since it's no longer tracked.
+     */
+    private static void clearBlockIfEmpty(Location location, int newSize) {
+        if (newSize <= 0 && location.getBlock().getType() == Material.SPAWNER) {
+            location.getBlock().setType(Material.AIR);
+        }
     }
 }

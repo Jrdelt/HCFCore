@@ -462,11 +462,13 @@ members of the claim's own faction (or `/staffbuild`) — everyone else is
 blocked outright. `break-mode` controls whether breaking drops the whole
 stack (`drop-all`) or just one spawner at a time (`decrement`).
 
-**Mobs spawned from a tracked spawner** have every targeting goal stripped
-(`Bukkit.getMobGoals()`, `GoalType.TARGET`) so they can never attack a
-player — safe for AFK grinders — and their death drops are replaced
-entirely by the `drops` list configured for that mob type in
-`spawners.yml`, instead of vanilla drops.
+**Mobs spawned from a tracked spawner** have every AI goal stripped
+(`Bukkit.getMobGoals().removeAllGoals(mob)` — movement, look, jump, and
+targeting alike) so they just stand still and can never attack a player —
+safe for AFK grinders — only moving when actually pushed by lava, a water
+current, or a player. Their death drops are replaced entirely by the
+`drops` list configured for that mob type in `spawners.yml`, instead of
+vanilla drops.
 
 **Claim integration**: a chunk with active spawners can't be `/f unclaim`'d
 on its own — the plugin refuses and tells the player why. `/f unclaimall`
@@ -474,10 +476,11 @@ isn't blocked (there's no practical way to protect specific chunks from a
 whole-faction unclaim), but every spawner in the land being released is
 dropped as an item and the player is warned how many. A faction disbanding
 (voluntarily or automatically) drops every spawner in all of its claimed
-land the same way. Each spawner remembers which faction actually placed it,
-so a chunk genuinely overclaimed by a *different* faction drops whatever
-spawners the previous owner had there, while a faction simply re-running
-`/f claim` on land it already owns leaves its own spawners untouched.
+land the same way, warning whoever disbanded it how many were lost. Each
+spawner remembers which faction actually placed it, so a chunk genuinely
+overclaimed by a *different* faction drops whatever spawners the previous
+owner had there, while a faction simply re-running `/f claim` on land it
+already owns leaves its own spawners untouched.
 
 ### Mob Stacking (`spawners.yml` → `mob-stacking`)
 
