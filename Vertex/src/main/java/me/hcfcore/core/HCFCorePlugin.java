@@ -222,7 +222,7 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(
                 new me.hcfcore.core.spawner.SpawnerClaimListener(spawnerManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
-                new me.hcfcore.core.spawner.SpawnerMenuListener(spawnerManager, messages), this);
+                new me.hcfcore.core.spawner.SpawnerMenuListener(spawnerManager, staffManager, messages), this);
         getCommand("spawners").setExecutor(new me.hcfcore.core.spawner.SpawnerCommand(spawnerManager, messages));
         Bukkit.getScheduler().runTaskTimer(this, spawnerManager::manualSpawnTick, 100L, 100L);
         mobStackListener = new me.hcfcore.core.spawner.MobStackListener(this, spawnerManager);

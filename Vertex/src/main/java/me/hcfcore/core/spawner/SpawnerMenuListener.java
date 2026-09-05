@@ -1,7 +1,9 @@
 package me.hcfcore.core.spawner;
 
 import me.hcfcore.core.economy.EconomyHook;
+import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.Messages;
+import me.hcfcore.core.staff.StaffManager;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Location;
@@ -19,10 +21,12 @@ import org.bukkit.inventory.PlayerInventory;
 public final class SpawnerMenuListener implements Listener {
 
     private final SpawnerManager spawnerManager;
+    private final StaffManager staffManager;
     private final Messages messages;
 
-    public SpawnerMenuListener(SpawnerManager spawnerManager, Messages messages) {
+    public SpawnerMenuListener(SpawnerManager spawnerManager, StaffManager staffManager, Messages messages) {
         this.spawnerManager = spawnerManager;
+        this.staffManager = staffManager;
         this.messages = messages;
     }
 
@@ -91,6 +95,19 @@ public final class SpawnerMenuListener implements Listener {
         if (data == null) {
             player.closeInventory();
             return;
+        }
+        // Defense-in-depth: re-checked here too (not just before the menu
+        // opens in SpawnerListener.onInteract), in case the land changed
+        // hands or the player left the faction while the menu was already
+        // open -- withdraw/sell must never work against someone else's claim.
+        if (!staffManager.isStaffBuild(player.getUniqueId())) {
+            String claimTag = FactionsHook.getClaimFactionTag(location);
+            String playerTag = FactionsHook.getFactionTag(player);
+            if (claimTag == null || !claimTag.equalsIgnoreCase(playerTag)) {
+                player.sendMessage(messages.get(player, "spawner.not-your-claim"));
+                player.closeInventory();
+                return;
+            }
         }
         int slot = event.getSlot();
         if (slot == SpawnerManagementMenu.WITHDRAW_ONE_SLOT) {

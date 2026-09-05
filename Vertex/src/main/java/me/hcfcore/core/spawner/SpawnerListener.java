@@ -77,6 +77,15 @@ public final class SpawnerListener implements Listener {
         event.setCancelled(true);
         Player player = event.getPlayer();
 
+        if (!staffManager.isStaffBuild(player.getUniqueId())) {
+            String claimTag = FactionsHook.getClaimFactionTag(location);
+            String playerTag = FactionsHook.getFactionTag(player);
+            if (claimTag == null || !claimTag.equalsIgnoreCase(playerTag)) {
+                player.sendMessage(messages.get(player, "spawner.not-your-claim"));
+                return;
+            }
+        }
+
         ItemStack handItem = event.getItem();
         EntityType handType = SpawnerManager.readSpawnedType(handItem);
         if (handType == null || handType != data.mobType()) {
