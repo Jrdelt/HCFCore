@@ -153,7 +153,7 @@ ability:
   timewarp-none: '<red>You haven''t ender pearled recently.'
   timewarp-warped: '<green>Warped back to your last pearl.'
   timewarp-blocked: '<red>✖</red> <gray>Você não pode voltar para uma zona protegida.'
-  rogue-backstab: '<gold>Backstab landed for 3 hearts.'
+  rogue-backstab: '<gold>Backstab landed for {hearts} hearts.'
   rogue-backstabbed: '<red>You were backstabbed!'
   mage-spell-cast: '<light_purple>Mage spell cast.'
   pearl-stunned: '<red>You cannot use pearls for another {seconds}s.'

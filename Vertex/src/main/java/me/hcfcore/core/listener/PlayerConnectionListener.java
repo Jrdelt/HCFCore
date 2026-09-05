@@ -14,6 +14,8 @@ import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.util.UUID;
+
 public final class PlayerConnectionListener implements Listener {
 
     private final UserManager userManager;
@@ -70,14 +72,26 @@ public final class PlayerConnectionListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
 
-        if (combatManager != null && combatManager.logoutPenaltyEnabled() && combatManager.isTagged(player.getUniqueId())) {
+        if (combatManager != null && combatManager.logoutPenaltyEnabled() && combatManager.isTagged(uuid)) {
+            UUID opponentId = combatManager.getOpponentId(uuid);
+            // setHealth(0) triggers a synchronous PlayerDeathEvent, which
+            // CombatListener.onDeath handles by applying the killer's
+            // post-kill cooldown and then clearing *only* this player's own
+            // tag via clearOwnTag() (deliberately non-cascading, so it
+            // doesn't stomp that cooldown it just set). That means the
+            // combatManager.clear(uuid) below will find this player's entry
+            // already gone and never reach its cascade -- so the mutual
+            // opponent is released/notified here explicitly instead, using
+            // the pairing as it stood right before the death.
             player.setHealth(0.0);
+            combatManager.releaseOpponent(opponentId);
         }
 
         if (combatManager != null) {
-            combatManager.clear(player.getUniqueId());
-            combatManager.forgetPlayer(player.getUniqueId());
+            combatManager.clear(uuid);
+            combatManager.forgetPlayer(uuid);
         }
         if (scoreboardManager != null) {
             scoreboardManager.remove(player.getUniqueId());

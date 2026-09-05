@@ -7,6 +7,7 @@ import me.hcfcore.core.essentials.EssentialsHook;
 import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.luckperms.LuckPermsHook;
 import me.hcfcore.core.placeholderapi.PlaceholderApiHook;
+import me.hcfcore.core.staff.StaffManager;
 import me.hcfcore.core.user.UserManager;
 import io.papermc.paper.scoreboard.numbers.NumberFormat;
 import net.kyori.adventure.text.Component;
@@ -46,6 +47,7 @@ public final class ScoreboardManager {
     private final Map<UUID, PlayerBoard> boards = new ConcurrentHashMap<>();
     private final Map<UUID, Map<String, String>> customPlaceholders = new ConcurrentHashMap<>();
     private volatile String lastRenderedTitle;
+    private volatile StaffManager staffManager;
     private BukkitTask task;
 
     public ScoreboardManager(Plugin plugin, FileConfiguration config, UserManager userManager,
@@ -56,6 +58,16 @@ public final class ScoreboardManager {
         List<String> configuredLines = new ArrayList<>(config.getStringList("scoreboard.lines"));
         this.lineTemplates = List.copyOf(configuredLines);
         this.intervalTicks = Math.max(1, config.getLong("scoreboard.update-interval-ticks", 20));
+    }
+
+    /**
+     * Wired in after construction (StaffManager isn't constructed yet at
+     * the point ScoreboardManager first is, in onEnable) -- same "set it
+     * once it exists" pattern PlayerConnectionListener.setScoreboardManager
+     * already uses for the reverse ordering problem.
+     */
+    public void setStaffManager(StaffManager staffManager) {
+        this.staffManager = staffManager;
     }
 
     public void start() {
@@ -164,6 +176,26 @@ public final class ScoreboardManager {
         }
     }
 
+    /**
+     * Bukkit.getOnlinePlayers() includes vanished players (vanish is
+     * client-visibility-only) -- without filtering these out, a regular
+     * player's sidebar shows an online count one higher than what tab/world
+     * shows them, a passive but real "someone's watching" leak.
+     */
+    private int onlineCountExcludingVanished() {
+        StaffManager currentStaffManager = staffManager;
+        if (currentStaffManager == null) {
+            return Bukkit.getOnlinePlayers().size();
+        }
+        int count = 0;
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (!currentStaffManager.isVanished(online.getUniqueId())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     private String resolvePlaceholders(Player player, String template) {
         Map<String, String> custom = customPlaceholders.getOrDefault(player.getUniqueId(), Map.of());
         String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
@@ -171,7 +203,7 @@ public final class ScoreboardManager {
         String prefix = LuckPermsHook.getPrefix(player);
         String resolved = template
                 .replace("{date}", LocalDate.now().format(dateFormatter))
-                .replace("{online}", String.valueOf(Bukkit.getOnlinePlayers().size()))
+                .replace("{online}", String.valueOf(onlineCountExcludingVanished()))
                 .replace("{name}", EssentialsHook.resolveName(player))
                 .replace("{rank_prefix}", rankPrefix)
                 .replace("{rank}", rank == null ? "" : rank)

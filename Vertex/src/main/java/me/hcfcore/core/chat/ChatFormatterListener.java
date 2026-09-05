@@ -9,7 +9,6 @@ import me.hcfcore.core.luckperms.LuckPermsHook;
 import me.hcfcore.core.placeholderapi.PlaceholderApiHook;
 import me.hcfcore.core.tag.TagManager;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -92,7 +91,7 @@ public final class ChatFormatterListener implements Listener {
     private Component rankComponent(Player player, String rank, String prefix) {
         String template = plugin.getConfig().getString("chat.rank-format", "<light_purple>[{rank}]</light_purple> ");
         template = template.replace("{prefix}", prefix == null ? "" : prefix);
-        template = template.replace("{rank}", MiniMessage.miniMessage().escapeTags(rank == null ? "" : rank));
+        template = template.replace("{rank}", MessageFormatter.escapeForSubstitution(rank == null ? "" : rank));
         return MessageFormatter.deserialize(PlaceholderApiHook.apply(player, template));
     }
 
@@ -137,7 +136,7 @@ public final class ChatFormatterListener implements Listener {
     private Component deserializeTemplate(Player player, String path, String fallback, String... values) {
         String template = plugin.getConfig().getString(path, fallback);
         for (int i = 0; i + 1 < values.length; i += 2) {
-            template = template.replace("{" + values[i] + "}", MiniMessage.miniMessage().escapeTags(values[i + 1]));
+            template = template.replace("{" + values[i] + "}", MessageFormatter.escapeForSubstitution(values[i + 1]));
         }
         return MessageFormatter.deserialize(PlaceholderApiHook.apply(player, template));
     }

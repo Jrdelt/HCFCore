@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 
 /**
@@ -41,6 +43,7 @@ public final class SpawnerManager {
     private final File file;
     private final Random random = new Random();
     private final Map<String, SpawnerData> spawners = new ConcurrentHashMap<>();
+    private final java.util.Set<CompletableFuture<Void>> pendingWrites = ConcurrentHashMap.newKeySet();
 
     private volatile int maxStackSize;
     private volatile boolean silkTouchRequired;
@@ -151,10 +154,25 @@ public final class SpawnerManager {
     private Map<EntityType, MobConfig> readMobConfigs(YamlConfiguration config) {
         Map<EntityType, MobConfig> result = new LinkedHashMap<>();
         ConfigurationSection mobsSection = config.getConfigurationSection("mobs");
-        if (mobsSection == null) {
-            return result;
+        org.bukkit.configuration.Configuration defaults = config.getDefaults();
+        ConfigurationSection defaultMobsSection = defaults != null ? defaults.getConfigurationSection("mobs") : null;
+
+        java.util.Set<String> keys = new java.util.LinkedHashSet<>();
+        if (mobsSection != null) {
+            keys.addAll(mobsSection.getKeys(false));
         }
-        for (String key : mobsSection.getKeys(false)) {
+        if (defaultMobsSection != null) {
+            // getKeys() only ever enumerates a section's own on-disk
+            // children, never the separate defaults tree set up in load()
+            // -- so a mob type added to the bundled catalog after this
+            // server's spawners.yml already had a "mobs:" section (which
+            // has existed since day one) would otherwise silently never
+            // appear here, no matter how new spawners.yml's own
+            // setDefaults() fallback is elsewhere.
+            keys.addAll(defaultMobsSection.getKeys(false));
+        }
+
+        for (String key : keys) {
             EntityType type;
             try {
                 type = EntityType.valueOf(key.toUpperCase(Locale.ROOT));
@@ -162,7 +180,10 @@ public final class SpawnerManager {
                 plugin.getLogger().warning("Unknown entity type '" + key + "' in spawners.yml");
                 continue;
             }
-            ConfigurationSection section = mobsSection.getConfigurationSection(key);
+            ConfigurationSection section = mobsSection != null ? mobsSection.getConfigurationSection(key) : null;
+            if (section == null && defaultMobsSection != null) {
+                section = defaultMobsSection.getConfigurationSection(key);
+            }
             if (section == null) {
                 continue;
             }
@@ -335,23 +356,49 @@ public final class SpawnerManager {
         if (spawners.remove(key(location)) == null) {
             return;
         }
-        CompletableFuture.runAsync(() -> {
+        track(CompletableFuture.runAsync(() -> {
             try {
                 storage.delete(location);
             } catch (Exception e) {
                 plugin.getLogger().log(Level.WARNING, "Failed to delete spawner from the database.", e);
             }
-        });
+        }));
     }
 
     private void persist(Location location, SpawnerData data) {
-        CompletableFuture.runAsync(() -> {
+        track(CompletableFuture.runAsync(() -> {
             try {
                 storage.save(location, data);
             } catch (Exception e) {
                 plugin.getLogger().log(Level.WARNING, "Failed to save spawner to the database.", e);
             }
-        });
+        }));
+    }
+
+    private void track(CompletableFuture<Void> write) {
+        pendingWrites.add(write);
+        write.whenComplete((ignored, error) -> pendingWrites.remove(write));
+    }
+
+    /**
+     * Blocks briefly for any in-flight DB write to finish -- without this,
+     * a place/upgrade/break right before a restart or reload could have its
+     * write still in flight (or not yet even submitted) when the shared
+     * connection pool is torn down moments later, silently losing that
+     * spawner's last state change even though the in-memory map (and any
+     * physical block change) already reflected it.
+     */
+    public void awaitWrites() {
+        try {
+            CompletableFuture.allOf(pendingWrites.toArray(new CompletableFuture[0]))
+                    .get(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (TimeoutException e) {
+            plugin.getLogger().warning("Timed out waiting for spawner writes during shutdown.");
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Failed while waiting for spawner writes.", e);
+        }
     }
 
     /**

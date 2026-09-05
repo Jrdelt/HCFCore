@@ -39,6 +39,15 @@ public final class AbilityMenuListener implements Listener {
         }
         event.setCancelled(true);
 
+        // getInventory() above is the view's *top* inventory, so it matches
+        // for clicks in the player's own inventory too -- without this, an
+        // ability item already sitting in the player's own inventory (which
+        // still carries the same PDC tag this reads) would hand out a free
+        // extra copy every time it's clicked.
+        if (event.getClickedInventory() == null
+                || !(event.getClickedInventory().getHolder() instanceof AbilitiesMenu.Holder)) {
+            return;
+        }
         if (!(event.getWhoClicked() instanceof Player player) || !player.hasPermission("hcfcore.ability.give")) {
             return;
         }

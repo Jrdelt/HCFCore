@@ -185,14 +185,17 @@ public final class PortableBardListener implements Listener {
         }
         event.setCancelled(true);
         Player player = event.getPlayer();
-        if (!AbilityGate.checkAndStart(plugin, abilityManager, userManager, messages, player, ability)) {
-            return;
-        }
 
+        // Validated before checkAndStart (which consumes the cooldown/item)
+        // so a misconfigured effect-type can't waste either for nothing.
         PotionEffectType type = PotionEffectType.getByName(ability.getString("effect-type", ""));
         if (type == null) {
             return;
         }
+        if (!AbilityGate.checkAndStart(plugin, abilityManager, userManager, messages, player, ability)) {
+            return;
+        }
+
         int seconds = Math.max(1, ability.getInt("buff-seconds", 6));
         int amplifier = Math.max(0, ability.getInt("effect-amplifier", 0));
         // A bard actually wearing the full gold set doubles both the buff

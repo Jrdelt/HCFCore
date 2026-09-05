@@ -30,6 +30,24 @@ public final class MessageFormatter {
         return PlainTextComponentSerializer.plainText().serialize(deserialize(message));
     }
 
+    /**
+     * Neutralizes untrusted text (a player's faction tag, LuckPerms group
+     * name, etc.) before it's substituted into a template that will later
+     * go through {@link #deserialize}. MiniMessage's own {@code
+     * escapeTags()} only escapes {@code <tag>} syntax -- but
+     * {@link #normalize} separately rewrites literal legacy {@code &x}
+     * codes into live MiniMessage tags, so a value containing e.g.
+     * {@code &c&l} would sail through {@code escapeTags()} untouched and
+     * still turn into real color/formatting once the fully-composed string
+     * is normalized. Breaking every {@code &} away from the character
+     * immediately after it (with an invisible zero-width space) defeats
+     * normalize()'s literal two-character match without changing what the
+     * player actually reads.
+     */
+    public static String escapeForSubstitution(String value) {
+        return MINI_MESSAGE.escapeTags(value).replace("&", "&​");
+    }
+
     private static String normalize(String message) {
         message = LEGACY_HEX.matcher(message).replaceAll("<#$1>");
         return message

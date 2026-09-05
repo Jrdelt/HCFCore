@@ -81,7 +81,17 @@ public final class LanguageCommand implements CommandExecutor, TabCompleter {
         });
         writeChains.put(uuid, write);
         pendingWrites.add(write);
-        write.whenComplete((ignored, error) -> pendingWrites.remove(write));
+        write.whenComplete((ignored, error) -> {
+            pendingWrites.remove(write);
+            // Conditional remove: only drop this UUID's chain entry if it's
+            // still THIS write -- a newer /language call for the same
+            // player could have already chained a fresh write after it.
+            // Unlike pendingWrites (which self-empties), nothing was ever
+            // removing a completed chain otherwise, leaking one entry per
+            // unique player who ever ran /language for the life of the
+            // server process.
+            writeChains.remove(uuid, write);
+        });
 
         player.sendMessage(messages.getChat(player, "language.changed", "locale", code));
         return true;

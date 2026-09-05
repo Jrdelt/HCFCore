@@ -50,6 +50,7 @@ public final class ChunkCollectorManager {
 
     /** Location-key (see {@link #key(Location)}) -> the location itself. */
     private final Map<String, Location> collectors = new ConcurrentHashMap<>();
+    private final java.util.Set<CompletableFuture<Void>> pendingWrites = ConcurrentHashMap.newKeySet();
 
     private volatile boolean enabled;
     private volatile boolean silkTouchRequired;
@@ -228,25 +229,51 @@ public final class ChunkCollectorManager {
         if (collectors.remove(key(location)) == null) {
             return;
         }
-        CompletableFuture.runAsync(() -> {
+        track(CompletableFuture.runAsync(() -> {
             try {
                 storage.delete(location);
             } catch (Exception e) {
                 plugin.getLogger().log(Level.WARNING, "Failed to delete chunk collector from the database.", e);
             }
-        });
+        }));
     }
 
     private void persist(Location location, ChunkCollectorData data) {
         String ownerFaction = data.ownerFactionTag();
         String ownerUuid = data.ownerUuid().toString();
-        CompletableFuture.runAsync(() -> {
+        track(CompletableFuture.runAsync(() -> {
             try {
                 storage.save(location, ownerFaction, ownerUuid);
             } catch (Exception e) {
                 plugin.getLogger().log(Level.WARNING, "Failed to save chunk collector to the database.", e);
             }
-        });
+        }));
+    }
+
+    private void track(CompletableFuture<Void> write) {
+        pendingWrites.add(write);
+        write.whenComplete((ignored, error) -> pendingWrites.remove(write));
+    }
+
+    /**
+     * Blocks briefly for any in-flight DB write to finish -- without this,
+     * a place/upgrade/break right before a restart or reload could have its
+     * write still in flight (or not yet even submitted) when the shared
+     * connection pool is torn down moments later, silently losing that
+     * collector's last state change even though the in-memory index (and
+     * any physical block change) already reflected it.
+     */
+    public void awaitWrites() {
+        try {
+            CompletableFuture.allOf(pendingWrites.toArray(new CompletableFuture[0]))
+                    .get(5, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (java.util.concurrent.TimeoutException e) {
+            plugin.getLogger().warning("Timed out waiting for chunk collector writes during shutdown.");
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Failed while waiting for chunk collector writes.", e);
+        }
     }
 
     /** Reads a tracked collector's live state off its block's PDC, or null if the block isn't actually a collector right now. */

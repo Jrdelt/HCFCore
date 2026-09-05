@@ -151,6 +151,7 @@ public final class HCFCorePlugin extends JavaPlugin {
         messages.load();
         abilityManager = new AbilityManager(this, storage);
         abilityManager.load();
+        Bukkit.getPluginManager().registerEvents(abilityManager, this);
         kitManager = new KitManager(this, storage, userManager, messages, abilityManager);
         kitManager.load();
         kitManager.start();
@@ -193,6 +194,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new NametagListener(nametagManager), this);
 
         staffManager = new StaffManager(this);
+        if (scoreboardManager != null) {
+            scoreboardManager.setStaffManager(staffManager);
+        }
         Bukkit.getPluginManager().registerEvents(new VanishListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new StaffChatListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new StaffBuildListener(staffManager), this);
@@ -383,6 +387,12 @@ public final class HCFCorePlugin extends JavaPlugin {
         if (tagManager != null) {
             tagManager.awaitWrites();
         }
+        if (spawnerManager != null) {
+            spawnerManager.awaitWrites();
+        }
+        if (chunkCollectorManager != null) {
+            chunkCollectorManager.awaitWrites();
+        }
         if (rallyManager != null) {
             rallyManager.shutdown();
         }
@@ -450,6 +460,7 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
         if (userManager != null && abilityManager != null) {
             scoreboardManager = new ScoreboardManager(this, getConfig(), userManager, abilityManager);
+            scoreboardManager.setStaffManager(staffManager);
             scoreboardManager.start();
         }
 

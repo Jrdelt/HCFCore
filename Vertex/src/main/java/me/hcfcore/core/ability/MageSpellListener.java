@@ -5,6 +5,7 @@ import me.hcfcore.core.kit.ArmorClass;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
+import me.hcfcore.core.worldguard.WorldGuardHook;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -66,6 +67,11 @@ public final class MageSpellListener implements Listener {
         if (abilityManager.isOnCooldown(user, ability)) {
             long remaining = (abilityManager.remainingCooldownMillis(user, ability) + 999) / 1000;
             attacker.sendMessage(messages.get(attacker, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
+            return;
+        }
+        Set<String> disabledRegions = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-regions"));
+        if (WorldGuardHook.isInDisabledRegion(attacker, disabledRegions)) {
+            attacker.sendMessage(messages.get(attacker, "ability.region-blocked"));
             return;
         }
         Set<String> disabledClaims = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-claim-names"));

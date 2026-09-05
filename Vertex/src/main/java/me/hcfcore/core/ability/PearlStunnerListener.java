@@ -4,6 +4,7 @@ import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
+import me.hcfcore.core.worldguard.WorldGuardHook;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.EnderPearl;
@@ -13,6 +14,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
@@ -67,6 +69,10 @@ public final class PearlStunnerListener implements Listener {
             attacker.sendMessage(messages.get(attacker, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
             return;
         }
+        Set<String> disabledRegions = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-regions"));
+        if (WorldGuardHook.isInDisabledRegion(attacker, disabledRegions)) {
+            return;
+        }
         Set<String> disabledClaims = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-claim-names"));
         if (FactionsHook.isDisabledClaim(attacker.getLocation(), disabledClaims)) {
             return;
@@ -114,6 +120,12 @@ public final class PearlStunnerListener implements Listener {
         event.setCancelled(true);
         long remaining = (stunnedUntil.get(player.getUniqueId()) - System.currentTimeMillis() + 999L) / 1000L;
         player.sendMessage(messages.get(player, "ability.pearl-stunned", "seconds", String.valueOf(Math.max(1L, remaining))));
+    }
+
+    /** Unlike every other per-UUID map in this package, stunnedUntil had no quit cleanup -- an unbounded leak. */
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        stunnedUntil.remove(event.getPlayer().getUniqueId());
     }
 
     private boolean isStunned(UUID uuid) {

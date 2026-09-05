@@ -56,6 +56,9 @@ public final class CombatManager {
     }
 
     public void start() {
+        if (task != null) {
+            task.cancel();
+        }
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, updateIntervalTicks, updateIntervalTicks);
     }
 
@@ -102,10 +105,21 @@ public final class CombatManager {
         taggedUntil.put(b.getUniqueId(), until);
     }
 
+    /**
+     * Only unpairs the stale opponent from `playerId` -- deliberately does
+     * NOT touch their own taggedUntil. A third attacker landing a hit on a
+     * shared target (a completely ordinary 2-on-1) used to wipe the
+     * original attacker's own combat tag outright the instant the target
+     * re-paired with the newcomer, letting them log out penalty-free / use
+     * blocked commands seconds after landing a hit, despite still very
+     * much being in a fight. They're still tagged now, just no longer
+     * paired with anyone specific for action-bar purposes -- the next
+     * tick() naturally renders them against actionbarVsUnknown instead of
+     * a stale "vs" line for someone who moved on.
+     */
     private void clearStaleOpponent(UUID playerId, UUID oldOpponentId, UUID newOpponentId) {
         if (oldOpponentId != null && !oldOpponentId.equals(newOpponentId)) {
             opponents.remove(oldOpponentId, playerId);
-            taggedUntil.remove(oldOpponentId);
         }
     }
 
@@ -159,6 +173,26 @@ public final class CombatManager {
     public void clearOwnTag(UUID uuid) {
         opponents.remove(uuid);
         taggedUntil.remove(uuid);
+    }
+
+    /**
+     * The notify half of clear()'s cascade, usable standalone when the
+     * *other* side of a mutual pair has already had its own state cleared
+     * through some other path (e.g. clearOwnTag(), on a combat-logout kill)
+     * and calling clear() on them again would just no-op on an
+     * already-empty entry before ever reaching this. Safe to call even if
+     * `opponentId` turns out to already be clear.
+     */
+    public void releaseOpponent(UUID opponentId) {
+        if (opponentId == null || SERVER_UUID.equals(opponentId)) {
+            return;
+        }
+        opponents.remove(opponentId);
+        taggedUntil.remove(opponentId);
+        Player opponent = Bukkit.getPlayer(opponentId);
+        if (opponent != null) {
+            opponent.sendActionBar(messages.get(opponent, "combat.no-longer-in-combat"));
+        }
     }
 
     /**

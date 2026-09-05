@@ -89,7 +89,13 @@ class CombatManagerTest {
     }
 
     @Test
-    void retaggingPlayerClearsTheirPreviousOpponent() {
+    void retaggingPlayerUnpairsButDoesNotUntagTheirPreviousOpponent() {
+        // A third attacker (here, Alice re-targeting Carol) landing on a
+        // shared target used to wipe the original attacker's (Bob's) own
+        // combat tag outright -- an ordinary 2-on-1 could instantly let Bob
+        // log out penalty-free / use blocked commands. Bob must stay
+        // tagged (still very much in a fight), just no longer paired with
+        // Alice specifically.
         PlayerMock alice = server.addPlayer("Alice");
         PlayerMock bob = server.addPlayer("Bob");
         PlayerMock carol = server.addPlayer("Carol");
@@ -97,7 +103,7 @@ class CombatManagerTest {
         combatManager.tag(alice, bob);
         combatManager.tag(alice, carol);
 
-        assertFalse(combatManager.isTagged(bob.getUniqueId()));
+        assertTrue(combatManager.isTagged(bob.getUniqueId()), "the stale opponent should still be in combat");
         assertNull(combatManager.getOpponentId(bob.getUniqueId()));
         assertEquals(carol.getUniqueId(), combatManager.getOpponentId(alice.getUniqueId()));
     }

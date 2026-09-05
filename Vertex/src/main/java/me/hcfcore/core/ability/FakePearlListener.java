@@ -8,6 +8,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
@@ -21,11 +22,16 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Launches a real EnderPearl (so the arc/sound look identical to a real
  * throw) but cancels the teleport it would normally trigger on landing.
- * Correlated per-player rather than per-projectile: a fake pearl is
- * "pending" for a player from the moment it's thrown until the next
- * ENDER_PEARL teleport fires for them, which is simple and reliable given
- * the ability's own cooldown rules out realistic overlap with a second,
- * real pearl throw in the same flight window.
+ * Correlated per-*projectile*, not just per-player: {@code trackedEntities}
+ * marks specifically which EnderPearl entity is fake, and only once THAT
+ * exact entity's own {@link ProjectileHitEvent} fires do we arm
+ * {@code pendingTeleportCancel} for its shooter -- consumed by the very
+ * next ENDER_PEARL teleport, which (same-tick, single-threaded NMS
+ * processing) is guaranteed to be caused by that same hit. A cheaper
+ * per-player-only correlation was tried first and thrown out: it could
+ * cancel a genuine real pearl's teleport if one happened to land while an
+ * earlier fake pearl's correlation window (armed at throw time, open for
+ * seconds) was still open.
  */
 public final class FakePearlListener implements Listener {
 
@@ -35,7 +41,8 @@ public final class FakePearlListener implements Listener {
     private final AbilityManager abilityManager;
     private final UserManager userManager;
     private final Messages messages;
-    private final Set<UUID> pendingFakePearl = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> trackedEntities = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> pendingTeleportCancel = ConcurrentHashMap.newKeySet();
     private static final Set<UUID> THROWING_FAKE_PEARL = ConcurrentHashMap.newKeySet();
 
     public FakePearlListener(Plugin plugin, AbilityManager abilityManager, UserManager userManager, Messages messages) {
@@ -70,12 +77,25 @@ public final class FakePearlListener implements Listener {
 
         UUID playerId = player.getUniqueId();
         THROWING_FAKE_PEARL.add(playerId);
-        player.launchProjectile(EnderPearl.class);
-        pendingFakePearl.add(playerId);
+        EnderPearl pearl = player.launchProjectile(EnderPearl.class);
+        trackedEntities.add(pearl.getUniqueId());
         plugin.getServer().getScheduler().runTaskLater(plugin,
             () -> THROWING_FAKE_PEARL.remove(playerId), 5L);
+        // Safety-net only: the entity should always hit (and get untracked
+        // via onPearlHit) well before this -- covers it being removed some
+        // other way first (e.g. an unloaded chunk) without ever hitting.
         plugin.getServer().getScheduler().runTaskLater(plugin,
-            () -> pendingFakePearl.remove(playerId), 200L);
+            () -> trackedEntities.remove(pearl.getUniqueId()), 200L);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPearlHit(ProjectileHitEvent event) {
+        if (!(event.getEntity() instanceof EnderPearl pearl) || !trackedEntities.remove(pearl.getUniqueId())) {
+            return;
+        }
+        if (pearl.getShooter() instanceof Player player) {
+            pendingTeleportCancel.add(player.getUniqueId());
+        }
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
@@ -83,7 +103,7 @@ public final class FakePearlListener implements Listener {
         if (event.getCause() != PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
             return;
         }
-        if (pendingFakePearl.remove(event.getPlayer().getUniqueId())) {
+        if (pendingTeleportCancel.remove(event.getPlayer().getUniqueId())) {
             event.setCancelled(true);
         }
     }
@@ -91,7 +111,7 @@ public final class FakePearlListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
-        pendingFakePearl.remove(playerId);
+        pendingTeleportCancel.remove(playerId);
         THROWING_FAKE_PEARL.remove(playerId);
     }
 

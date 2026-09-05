@@ -21,10 +21,16 @@ import java.util.UUID;
  * bottom row doesn't look broken.
  *
  * <p>Not a live shared reference like the old approach -- it's a snapshot
- * synced back to the target after every click ({@link InvseeMenuListener}),
- * so a change the target makes to their own gear while the menu is open
- * won't appear until it's reopened. Trading that for safety: syncing
- * continuously in both directions is how these menus lose items.
+ * synced back to the target after every click ({@link InvseeMenuListener}).
+ * Unlike the naive version of this (blindly push all 41 tracked slots to
+ * the target on every sync), {@link #writeBack} only pushes the specific
+ * slots that actually changed *in the menu* since the last sync -- any
+ * slot the staff member didn't touch is left alone, re-read fresh from the
+ * target's own current live value instead of overwritten with a stale
+ * snapshot. Without this, any independent change to the target's gear
+ * (they pick something up, are given an item, etc.) made while the menu is
+ * open gets silently destroyed by the next click's writeback, even one
+ * that only touched the staff member's own inventory pane.
  */
 public final class InvseeMenu {
 
@@ -35,6 +41,8 @@ public final class InvseeMenu {
     static final int SLOT_BOOTS = 39;
     static final int SLOT_OFFHAND = 40;
     private static final int FILLER_START = 41;
+    /** Number of slots writeBack/populate actually track (storage + armor + offhand). */
+    private static final int TRACKED_SLOTS = SLOT_OFFHAND + 1;
 
     private InvseeMenu() {
     }
@@ -45,13 +53,14 @@ public final class InvseeMenu {
                 Component.text(target.getName() + "'s Inventory", NamedTextColor.DARK_GRAY));
         holder.inventory = inventory;
         populate(inventory, target);
+        holder.lastKnownSnapshot = snapshot(inventory);
         for (int slot = FILLER_START; slot < SIZE; slot++) {
             inventory.setItem(slot, filler());
         }
         viewer.openInventory(inventory);
     }
 
-    /** Copies the target's live gear into the menu -- called on open and after every synced edit. */
+    /** Copies the target's live gear into the menu -- called on open and to refresh untouched slots on sync. */
     static void populate(Inventory inventory, Player target) {
         ItemStack[] storage = target.getInventory().getStorageContents();
         for (int i = 0; i < storage.length; i++) {
@@ -65,18 +74,83 @@ public final class InvseeMenu {
         inventory.setItem(SLOT_OFFHAND, target.getInventory().getItemInOffHand());
     }
 
-    /** Writes the menu's current contents back onto the target's live gear. */
-    static void writeBack(Inventory inventory, Player target) {
-        ItemStack[] storage = new ItemStack[36];
-        for (int i = 0; i < storage.length; i++) {
-            storage[i] = inventory.getItem(i);
+    /** A copy of the menu's tracked slots (0-40), for diffing against on the next sync. */
+    static ItemStack[] snapshot(Inventory inventory) {
+        ItemStack[] snapshot = new ItemStack[TRACKED_SLOTS];
+        for (int slot = 0; slot < TRACKED_SLOTS; slot++) {
+            snapshot[slot] = inventory.getItem(slot);
         }
-        target.getInventory().setStorageContents(storage);
-        target.getInventory().setHelmet(inventory.getItem(SLOT_HELMET));
-        target.getInventory().setChestplate(inventory.getItem(SLOT_CHESTPLATE));
-        target.getInventory().setLeggings(inventory.getItem(SLOT_LEGGINGS));
-        target.getInventory().setBoots(inventory.getItem(SLOT_BOOTS));
-        target.getInventory().setItemInOffHand(inventory.getItem(SLOT_OFFHAND));
+        return snapshot;
+    }
+
+    /**
+     * Writes only the menu slots that actually changed since
+     * `holder.lastKnownSnapshot` onto the target's live gear -- any
+     * untouched slot is instead refreshed in the menu from the target's
+     * current live value, so a concurrent change on their end survives.
+     * Updates `holder.lastKnownSnapshot` to the result either way.
+     */
+    static void writeBack(Inventory inventory, Player target, Holder holder) {
+        ItemStack[] previous = holder.lastKnownSnapshot;
+        ItemStack[] current = snapshot(inventory);
+        boolean[] changed = new boolean[TRACKED_SLOTS];
+        for (int slot = 0; slot < TRACKED_SLOTS; slot++) {
+            changed[slot] = !itemsEqual(previous == null ? null : previous[slot], current[slot]);
+        }
+
+        for (int slot = 0; slot < TRACKED_SLOTS; slot++) {
+            if (!changed[slot]) {
+                // Not touched by this sync -- pull the target's current
+                // live value into the menu instead of pushing our stale copy.
+                inventory.setItem(slot, liveSlot(target, slot));
+            }
+        }
+        for (int slot = 0; slot < TRACKED_SLOTS; slot++) {
+            if (changed[slot]) {
+                setLiveSlot(target, slot, current[slot]);
+            }
+        }
+        holder.lastKnownSnapshot = snapshot(inventory);
+    }
+
+    private static ItemStack liveSlot(Player target, int slot) {
+        if (slot < 36) {
+            return target.getInventory().getStorageContents()[slot];
+        }
+        return switch (slot) {
+            case SLOT_HELMET -> target.getInventory().getHelmet();
+            case SLOT_CHESTPLATE -> target.getInventory().getChestplate();
+            case SLOT_LEGGINGS -> target.getInventory().getLeggings();
+            case SLOT_BOOTS -> target.getInventory().getBoots();
+            case SLOT_OFFHAND -> target.getInventory().getItemInOffHand();
+            default -> null;
+        };
+    }
+
+    private static void setLiveSlot(Player target, int slot, ItemStack value) {
+        if (slot < 36) {
+            ItemStack[] storage = target.getInventory().getStorageContents();
+            storage[slot] = value;
+            target.getInventory().setStorageContents(storage);
+            return;
+        }
+        switch (slot) {
+            case SLOT_HELMET -> target.getInventory().setHelmet(value);
+            case SLOT_CHESTPLATE -> target.getInventory().setChestplate(value);
+            case SLOT_LEGGINGS -> target.getInventory().setLeggings(value);
+            case SLOT_BOOTS -> target.getInventory().setBoots(value);
+            case SLOT_OFFHAND -> target.getInventory().setItemInOffHand(value);
+            default -> { }
+        }
+    }
+
+    private static boolean itemsEqual(ItemStack a, ItemStack b) {
+        boolean aEmpty = a == null || a.getType().isAir();
+        boolean bEmpty = b == null || b.getType().isAir();
+        if (aEmpty || bEmpty) {
+            return aEmpty == bEmpty;
+        }
+        return a.isSimilar(b) && a.getAmount() == b.getAmount();
     }
 
     static boolean isFillerSlot(int slot) {
@@ -111,6 +185,8 @@ public final class InvseeMenu {
     public static final class Holder implements InventoryHolder {
         private final UUID targetId;
         private Inventory inventory;
+        /** The tracked slots as of the last populate/writeBack, for diffing the next sync against. */
+        ItemStack[] lastKnownSnapshot;
 
         Holder(UUID targetId) {
             this.targetId = targetId;

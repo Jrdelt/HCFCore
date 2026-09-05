@@ -251,7 +251,7 @@ public final class LegacyCombatManager implements Listener {
             }
         }
         if (event.getEntity() instanceof LivingEntity victim) {
-            applyLegacyKnockback(attacker, victim);
+            applyLegacyKnockback(attacker, victim, event);
         }
     }
 
@@ -277,10 +277,10 @@ public final class LegacyCombatManager implements Listener {
         if (!applicable) {
             return;
         }
-        applyLegacyKnockback(shooter, victim);
+        applyLegacyKnockback(shooter, victim, event);
     }
 
-    private void applyLegacyKnockback(Player attacker, LivingEntity victim) {
+    private void applyLegacyKnockback(Player attacker, LivingEntity victim, org.bukkit.event.Cancellable event) {
         Vector direction = victim.getLocation().toVector().subtract(attacker.getLocation().toVector());
         direction.setY(0);
         if (direction.lengthSquared() < 1.0E-4) {
@@ -297,9 +297,14 @@ public final class LegacyCombatManager implements Listener {
         // Vanilla applies its own knockback within the same tick this event
         // fires in, so setting velocity here gets silently overwritten a
         // moment later; scheduling it one tick ahead is the reliable way to
-        // make a custom knockback value actually stick.
+        // make a custom knockback value actually stick. Re-checking
+        // event.isCancelled() here (not just at schedule time) matters: a
+        // later-priority handler (a safezone/PvP-toggle check, say) can
+        // still cancel this same hit after we've already scheduled the
+        // knockback, and without this the hit would deal zero damage but
+        // still shove the victim a tick later.
         Bukkit.getScheduler().runTask(plugin, () -> {
-            if (victim.isValid()) {
+            if (victim.isValid() && !event.isCancelled()) {
                 victim.setVelocity(velocity);
             }
         });

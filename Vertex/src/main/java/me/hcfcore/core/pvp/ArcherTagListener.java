@@ -52,10 +52,15 @@ public final class ArcherTagListener implements Listener {
     }
 
     /**
-     * HIGH so the multiplier lands on damage other plugins have already
-     * adjusted, and so a cancelled hit never applies a tag.
+     * HIGHEST (not just HIGH) so the multiplier deterministically lands on
+     * top of whatever LegacyCombatManager's own HIGH-priority weapon-damage
+     * override already set -- both mutate the same DamageModifier.BASE
+     * slot via getDamage()/setDamage(double), so at equal priority
+     * whichever happened to register second would silently discard the
+     * other's change depending on undocumented order. Also ensures a
+     * cancelled hit never applies a tag.
      */
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent event) {
         if (!(event.getEntity() instanceof Player victim)) {
             return;

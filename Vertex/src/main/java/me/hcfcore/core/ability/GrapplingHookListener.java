@@ -102,6 +102,12 @@ public final class GrapplingHookListener implements Listener {
     }
 
     private void consumeUse(Player player, int maximumUses) {
+        if (maximumUses <= 0) {
+            // Matches AbilityManager.createItem's treatment of the same
+            // config value: <= 0 means untracked/unlimited, not "exactly
+            // one use" (which is what flooring this to 1 used to produce).
+            return;
+        }
         ItemStack item = player.getInventory().getItemInMainHand();
         if (item == null || item.getType() == Material.AIR) {
             return;
@@ -112,7 +118,7 @@ public final class GrapplingHookListener implements Listener {
         }
         NamespacedKey usesKey = new NamespacedKey(plugin, AbilityManager.USES_KEY);
         int uses = meta.getPersistentDataContainer().getOrDefault(
-                usesKey, PersistentDataType.INTEGER, Math.max(1, maximumUses)) - 1;
+                usesKey, PersistentDataType.INTEGER, maximumUses) - 1;
         if (uses <= 0) {
             player.getInventory().setItemInMainHand(null);
             return;

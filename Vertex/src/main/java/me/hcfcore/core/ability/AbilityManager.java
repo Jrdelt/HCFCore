@@ -9,6 +9,9 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -30,7 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 
-public final class AbilityManager {
+public final class AbilityManager implements Listener {
 
     public static final String ABILITY_ID_KEY = "ability_id";
     public static final String USES_KEY = "ability_uses";
@@ -183,6 +186,17 @@ public final class AbilityManager {
 
     public void markGlobalCooldown(UUID uuid) {
         lastAbilityUse.put(uuid, System.currentTimeMillis());
+    }
+
+    /**
+     * Unlike every other per-UUID map in this package, lastAbilityUse had
+     * no cleanup and no self-pruning on read -- an unbounded, if slow, leak
+     * over the life of the server process. The global cooldown is short
+     * (a few seconds), so there's nothing useful to preserve across a quit.
+     */
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        lastAbilityUse.remove(event.getPlayer().getUniqueId());
     }
 
     private long globalCooldownMillis() {

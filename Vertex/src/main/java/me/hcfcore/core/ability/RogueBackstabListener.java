@@ -1,10 +1,10 @@
 package me.hcfcore.core.ability;
 
 import me.hcfcore.core.factions.FactionsHook;
-import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
+import me.hcfcore.core.worldguard.WorldGuardHook;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -63,6 +63,10 @@ public final class RogueBackstabListener implements Listener {
         if (!isBehind(attacker, victim)) {
             return;
         }
+        Set<String> disabledRegions = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-regions"));
+        if (WorldGuardHook.isInDisabledRegion(attacker, disabledRegions)) {
+            return;
+        }
         Set<String> disabledClaims = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-claim-names"));
         if (FactionsHook.isDisabledClaim(attacker.getLocation(), disabledClaims)) {
             return;
@@ -71,9 +75,16 @@ public final class RogueBackstabListener implements Listener {
         abilityManager.markGlobalCooldown(attacker.getUniqueId());
         abilityManager.startCooldown(attacker, user, ability);
         consume(attacker);
-        event.setDamage(Math.max(0.0, ability.getDouble("damage", 6.0)));
-        attacker.sendMessage(MessageFormatter.deserialize("&e&lABILITES&r &7> <gold>Backstab landed for 3 hearts."));
-        victim.sendMessage(MessageFormatter.deserialize("&e&lABILITES&r &7> <red>You were backstabbed!"));
+        double damage = Math.max(0.0, ability.getDouble("damage", 6.0));
+        event.setDamage(damage);
+        attacker.sendMessage(messages.get(attacker, "ability.rogue-backstab", "hearts", formatHearts(damage)));
+        victim.sendMessage(messages.get(victim, "ability.rogue-backstabbed"));
+    }
+
+    /** damage is in half-hearts (vanilla convention); shown as whole hearts unless it needs a decimal. */
+    private static String formatHearts(double damage) {
+        double hearts = damage / 2;
+        return hearts == Math.floor(hearts) ? String.valueOf((int) hearts) : String.format("%.1f", hearts);
     }
 
     private static boolean isBehind(Player attacker, Player victim) {

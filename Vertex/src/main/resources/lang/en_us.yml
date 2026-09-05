@@ -1,275 +1,275 @@
 general:
-  no-permission: '<red>✖ You do not have access to that command.'
-  data-unavailable: '<red>✖ <gray>Your player data is temporarily unavailable. Please try again shortly.'
-  player-not-found: '<red>✖ Player not found.'
-  players-only: '&c&lSTAFF&r &7> Only players can use this command.'
+  no-permission: "<red>✖ You do not have access to that command."
+  data-unavailable: "<red>✖ <gray>Your player data is temporarily unavailable. Please try again shortly."
+  player-not-found: "<red>✖ Player not found."
+  players-only: "&c&lSTAFF&r &7> Only players can use this command."
 
 admin:
-  usage: '&c&lSTAFF&r &7> <yellow>Usage: <gray>/<red>hcfcore reload<gray>|<red>clearmobstacks'
-  reloaded: '<green>✔ <green>HCFCore plugin reloaded.'
-  mobstacks-cleared: '<green>✔ <green>Cleared {amount} stacked mob(s).'
+  usage: "&c&lSTAFF&r &7> <yellow>Usage: <gray>/<red>hcfcore reload<gray>|<red>clearmobstacks"
+  reloaded: "<green>✔ <green>HCFCore plugin reloaded."
+  mobstacks-cleared: "<green>✔ <green>Cleared {amount} stacked mob(s)."
 
 tags:
-  title-your: 'ʏᴏᴜʀ ᴛᴀɢꜱ  ({count})'
-  title-unowned: 'ᴜɴᴏᴡɴᴇᴅ ᴛᴀɢꜱ ({count})'
-  title-all: 'ᴀʟʟ ᴛᴀɢꜱ ({count})'
-  locked: '<red><bold>ᴜɴᴏᴡɴᴇᴅ'
-  equipped: '<green><bold>ᴇǫᴜɪᴘᴘᴇᴅ'
-  unequipped: '<gray><red><bold>ᴜɴᴇǫᴜɪᴘᴘᴇᴅ'
-  click-select: '<green>ᴄʟɪᴄᴋ ᴛᴏ ᴇǫᴜɪᴘ ᴛʜɪꜱ ᴛᴀɢ.'
-  click-unselect: '<red>Click to un-equip this tag.'
-  selected: '&a&lᴛᴀɢꜱ&r &7> <green>ꜱᴇʟᴇᴄᴛᴇᴅ ᴛᴀɢ: &8[{tag}&8]'
-  info-created: '<gray>ᴄʀᴇᴀᴛᴇᴅ: <white>{date}'
-  info-owners: '<gray>ᴏᴡɴᴇʀꜱ: <white>{count}'
-  sort-heading: '<aqua>ꜱᴏʀᴛɪɴɢ ʙʏ: {sort}'
-  sort-alphabetical: 'ᴀʟᴘʜᴀʙᴇᴛɪᴄᴀʟ (ᴀ-ᴢ)'
-  sort-age: 'ᴀɢᴇ'
-  sort-rarity: 'ʀᴀʀɪᴛʏ'
-  sort-hint-cycle: '<green>→ <green><underlined>Click</underlined> <white>to cycle sorting filters.'
-  sort-hint-direction: '<green>→ <green><underlined>Shift Click</underlined> <white>to switch sorting direction.'
-  filter-heading: '<aqua>ꜰɪʟᴛᴇʀɪɴɢ ʙʏ: {filter}'
-  filter-label-your: 'ʏᴏᴜʀ ᴛᴀɢꜱ'
-  filter-label-unowned: 'ᴜɴᴏᴡɴᴇᴅ ᴛᴀɢꜱ'
-  filter-label-all: 'ᴀʟʟ ᴛᴀɢꜱ'
-  filter-hint: '<gray>ᴄʟɪᴄᴋ ᴛᴏ ᴛᴏɢɢʟᴇ.'
-  search-heading: '<gold>ᴛᴀɢ ꜱᴇᴀʀᴄʜ'
-  search-hint-left: '<gray>ʟᴇꜰᴛ ᴄʟɪᴄᴋ ᴛᴏ ꜱᴇᴀʀᴄʜ ꜰᴏʀ ᴀ ᴛᴀɢ.'
-  search-hint-right: '<gray>ʀɪɢʜᴛ ᴄʟɪᴄᴋ ᴛᴏ ᴄʟᴇᴀʀ ʏᴏᴜʀ ꜱᴇᴀʀᴄʜ.'
-  search-prompt: ''
+  title-your: "ʏᴏᴜʀ ᴛᴀɢꜱ  ({count})"
+  title-unowned: "ᴜɴᴏᴡɴᴇᴅ ᴛᴀɢꜱ ({count})"
+  title-all: "ᴀʟʟ ᴛᴀɢꜱ ({count})"
+  locked: "<red><bold>ᴜɴᴏᴡɴᴇᴅ"
+  equipped: "<green><bold>ᴇǫᴜɪᴘᴘᴇᴅ"
+  unequipped: "<gray><red><bold>ᴜɴᴇǫᴜɪᴘᴘᴇᴅ"
+  click-select: "<green>ᴄʟɪᴄᴋ ᴛᴏ ᴇǫᴜɪᴘ ᴛʜɪꜱ ᴛᴀɢ."
+  click-unselect: "<red>Click to un-equip this tag."
+  selected: "&a&lᴛᴀɢꜱ&r &7> <green>ꜱᴇʟᴇᴄᴛᴇᴅ ᴛᴀɢ: &8[{tag}&8]"
+  info-created: "<gray>ᴄʀᴇᴀᴛᴇᴅ: <white>{date}"
+  info-owners: "<gray>ᴏᴡɴᴇʀꜱ: <white>{count}"
+  sort-heading: "<aqua>ꜱᴏʀᴛɪɴɢ ʙʏ: {sort}"
+  sort-alphabetical: "ᴀʟᴘʜᴀʙᴇᴛɪᴄᴀʟ (ᴀ-ᴢ)"
+  sort-age: "ᴀɢᴇ"
+  sort-rarity: "ʀᴀʀɪᴛʏ"
+  sort-hint-cycle: "<green>→ <green><underlined>Click</underlined> <white>to cycle sorting filters."
+  sort-hint-direction: "<green>→ <green><underlined>Shift Click</underlined> <white>to switch sorting direction."
+  filter-heading: "<aqua>ꜰɪʟᴛᴇʀɪɴɢ ʙʏ: {filter}"
+  filter-label-your: "ʏᴏᴜʀ ᴛᴀɢꜱ"
+  filter-label-unowned: "ᴜɴᴏᴡɴᴇᴅ ᴛᴀɢꜱ"
+  filter-label-all: "ᴀʟʟ ᴛᴀɢꜱ"
+  filter-hint: "<gray>ᴄʟɪᴄᴋ ᴛᴏ ᴛᴏɢɢʟᴇ."
+  search-heading: "<gold>ᴛᴀɢ ꜱᴇᴀʀᴄʜ"
+  search-hint-left: "<gray>ʟᴇꜰᴛ ᴄʟɪᴄᴋ ᴛᴏ ꜱᴇᴀʀᴄʜ ꜰᴏʀ ᴀ ᴛᴀɢ."
+  search-hint-right: "<gray>ʀɪɢʜᴛ ᴄʟɪᴄᴋ ᴛᴏ ᴄʟᴇᴀʀ ʏᴏᴜʀ ꜱᴇᴀʀᴄʜ."
+  search-prompt: ""
   search-confirm: '<green>ꜱᴇᴀʀᴄʜ ꜰᴏʀ "{query}"'
-  search-confirm-hint: '<gray>ᴄʟɪᴄᴋ ᴛᴏ ꜰɪʟᴛᴇʀ ʏᴏᴜʀ ᴛᴀɢꜱ.'
-  search-confirm-empty: '<gray>ɴᴏ ꜱᴇᴀʀᴄʜ ᴛʏᴘᴇᴅ'
-  search-confirm-empty-hint: '<gray>ᴛʏᴘᴇ ᴀ ᴛᴀɢ ɴᴀᴍᴇ ᴀʙᴏᴠᴇ, ᴛʜᴇɴ ᴄʟɪᴄᴋ ʜᴇʀᴇ.'
-  nickname-heading: '<green>ᴍᴀᴛᴄʜ <yellow>ʏᴏᴜʀ ɴɪᴄᴋɴᴀᴍᴇ ᴛᴏ ʏᴏᴜʀ ᴛᴀɢ!'
-  nickname-status-on: '<green><bold>ᴇɴᴀʙʟᴇᴅ'
-  nickname-status-off: '<red><bold>ᴅɪꜱᴀʙʟᴇᴅ'
-  nickname-preview-heading: '<gray>ᴄʜᴀᴛ ᴘʀᴇᴠɪᴇᴡ:'
-  nickname-sample-message: 'Hey!'
-  nickname-reversed-suffix: '<gray> (ʀᴇᴠᴇʀꜱᴇᴅ)'
-  nickname-hint-toggle: '<gray>ᴄʟɪᴄᴋ ᴛᴏ ᴛᴏɢɢʟᴇ.'
-  nickname-hint-reverse: '<gray>ꜱʜɪꜰᴛ-ᴄʟɪᴄᴋ ᴛᴏ ʀᴇᴠᴇʀꜱᴇ ᴛʜᴇ ɢʀᴀᴅɪᴇɴᴛ.'
-  previous-page: '<yellow>ᴘʀᴇᴠɪᴏᴜꜱ ᴘᴀɢᴇ'
-  next-page: '<yellow>ɴᴇxᴛ ᴘᴀɢᴇ'
+  search-confirm-hint: "<gray>ᴄʟɪᴄᴋ ᴛᴏ ꜰɪʟᴛᴇʀ ʏᴏᴜʀ ᴛᴀɢꜱ."
+  search-confirm-empty: "<gray>ɴᴏ ꜱᴇᴀʀᴄʜ ᴛʏᴘᴇᴅ"
+  search-confirm-empty-hint: "<gray>ᴛʏᴘᴇ ᴀ ᴛᴀɢ ɴᴀᴍᴇ ᴀʙᴏᴠᴇ, ᴛʜᴇɴ ᴄʟɪᴄᴋ ʜᴇʀᴇ."
+  nickname-heading: "<green>ᴍᴀᴛᴄʜ <yellow>ʏᴏᴜʀ ɴɪᴄᴋɴᴀᴍᴇ ᴛᴏ ʏᴏᴜʀ ᴛᴀɢ!"
+  nickname-status-on: "<green><bold>ᴇɴᴀʙʟᴇᴅ"
+  nickname-status-off: "<red><bold>ᴅɪꜱᴀʙʟᴇᴅ"
+  nickname-preview-heading: "<gray>ᴄʜᴀᴛ ᴘʀᴇᴠɪᴇᴡ:"
+  nickname-sample-message: "Hey!"
+  nickname-reversed-suffix: "<gray> (ʀᴇᴠᴇʀꜱᴇᴅ)"
+  nickname-hint-toggle: "<gray>ᴄʟɪᴄᴋ ᴛᴏ ᴛᴏɢɢʟᴇ."
+  nickname-hint-reverse: "<gray>ꜱʜɪꜰᴛ-ᴄʟɪᴄᴋ ᴛᴏ ʀᴇᴠᴇʀꜱᴇ ᴛʜᴇ ɢʀᴀᴅɪᴇɴᴛ."
+  previous-page: "<yellow>ᴘʀᴇᴠɪᴏᴜꜱ ᴘᴀɢᴇ"
+  next-page: "<yellow>ɴᴇxᴛ ᴘᴀɢᴇ"
 
 cooldowns:
-  title: '<gray>-- <red>Active Cooldowns <gray>--'
-  none: '<gray>No active cooldowns.'
-  ender-pearl: 'Ender Pearl'
-  golden-apple: 'Golden Apple'
-  enchanted-golden-apple: 'Enchanted Golden Apple'
-  ender-pearl-colored: '<green>Ender Pearl'
-  golden-apple-colored: '<yellow>Golden Apple'
-  enchanted-golden-apple-colored: '<gold>Enchanted Golden Apple'
-  item-on-cooldown: '<red>✖ <gray>{item} <gray>is on cooldown for another <red>{seconds}s<gray>.'
+  title: "<gray>-- <red>Active Cooldowns <gray>--"
+  none: "<gray>No active cooldowns."
+  ender-pearl: "Ender Pearl"
+  golden-apple: "Golden Apple"
+  enchanted-golden-apple: "Enchanted Golden Apple"
+  ender-pearl-colored: "<green>Ender Pearl"
+  golden-apple-colored: "<yellow>Golden Apple"
+  enchanted-golden-apple-colored: "<gold>Enchanted Golden Apple"
+  item-on-cooldown: "<red>✖ <gray>{item} <gray>is on cooldown for another <red>{seconds}s<gray>."
 
 language:
-  usage: '<green>✔ <yellow>Usage<gray>: <red>/language <code>'
-  current: '<green>✔ <gray>Current language: <green>{locale}'
-  available: '<green>✔ <green>Available<gray>: <green>{locales}'
-  unknown: '<red>✖ Unknown language ''{code}''. Available: {locales}'
-  changed: '<green>✔ <green>Language set to {locale}.'
+  usage: "<green>✔ <yellow>Usage<gray>: <red>/language <code>"
+  current: "<green>✔ <gray>Current language: <green>{locale}"
+  available: "<green>✔ <green>Available<gray>: <green>{locales}"
+  unknown: "<red>✖ Unknown language '{code}'. Available: {locales}"
+  changed: "<green>✔ <green>Language set to {locale}."
 
 kit:
-  usage: '&c&lKITS&r &7> <yellow>Use /kits to see all server kits<gray>.'
-  usage-delete: '&c&lKITS&r &7> <red>Usage: /kit delete <name>'
-  usage-create: '&c&lKITS&r &7> <red>Usage: /kit create <name> [permission] [cooldownseconds] [cost] [costitem[:amount]]'
-  deleted: '&c&lKITS&r &7> <green>Deleted kit {kit}.'
-  not-found: '&c&lKITS&r &7> <red>No kit named ''{kit}''.'
-  saved: '&c&lKITS&r &7> <green>Saved kit {kit} from your current inventory.'
-  no-kit-permission: '<red>You don''t have permission to use that kit.'
-  cooldown: '&c&lKITS&r &7> <red>You can use this kit again in {seconds}s.'
-  applied: '&c&lKITS&r &7> <green>Applied kit {kit}.'
-  effects-warmup: '&c&lKITS&r &7> <yellow>Class effects activate in <white>{seconds}s<yellow>. Keep the kit armor equipped.'
-  effects-removed: '&c&lKITS&r &7> <gray>Class effects removed because the full kit armor is no longer equipped.'
-  cost-item-needed: '&c&lKITS&r &7> <red>You need {amount}x {item} to claim this kit.'
-  cost-no-economy: '&c&lKITS&r &7> <red>This kit costs money, but no economy plugin is installed. Contact staff.'
-  cost-money-needed: '&c&lKITS&r &7> <red>You need {amount} to claim this kit.'
-  cost-withdraw-failed: '&c&lKITS&r &7> <red>The payment failed, so the kit was not claimed.'
-  inventory-full: '&c&lKITS&r &7> <red>✖</red> <deny>Your inventory is too full to claim this kit.'
-  gui-title: '                 ᴋɪᴛꜱ'
-  gui-access: '<green><bold>ᴜɴʟᴏᴄᴋᴇᴅ'
-  gui-no-access: '<red><bold>ʟᴏᴄᴋᴇᴅ'
-  gui-cooldown: '<red>ᴄᴏᴏʟᴅᴏᴡɴ: <green>{seconds}s'
-  gui-ready: '<green>ʀᴇᴀᴅʏ ᴛᴏ ᴄʟᴀɪᴍ.'
-  gui-cost-money: '<red>ᴄᴏꜱᴛ: {amount}'
-  gui-cost-item: '<red>ᴄᴏꜱᴛ: {amount}x {item}'
-  gui-left-click: '<green><u>ʟᴇꜰᴛ-ᴄʟɪᴄᴋ</u> ᴛᴏ ᴄʟᴀɪᴍ<gray>.'
-  gui-right-click: '<green><u>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ</u> ᴛᴏ ᴠɪᴇᴡ ᴄᴏɴᴛᴇɴᴛꜱ<gray>.'
-  gui-previous-page: '<yellow>ᴘʀᴇᴠɪᴏᴜꜱ ᴘᴀɢᴇ'
-  gui-next-page: '<yellow>ɴᴇxᴛ ᴘᴀɢᴇ'
-  preview-title: 'ᴘʀᴇᴠɪᴇᴡ: {kit}'
+  usage: "&c&lKITS&r &7> <yellow>Use /kits to see all server kits<gray>."
+  usage-delete: "&c&lKITS&r &7> <red>Usage: /kit delete <name>"
+  usage-create: "&c&lKITS&r &7> <red>Usage: /kit create <name> [permission] [cooldownseconds] [cost] [costitem[:amount]]"
+  deleted: "&c&lKITS&r &7> <green>Deleted kit {kit}."
+  not-found: "&c&lKITS&r &7> <red>No kit named '{kit}'."
+  saved: "&c&lKITS&r &7> <green>Saved kit {kit} from your current inventory."
+  no-kit-permission: "<red>You don't have permission to use that kit."
+  cooldown: "&c&lKITS&r &7> <red>You can use this kit again in {seconds}s."
+  applied: "&c&lKITS&r &7> <green>Applied kit {kit}."
+  effects-warmup: "&c&lKITS&r &7> <yellow>Class effects activate in <white>{seconds}s<yellow>. Keep the kit armor equipped."
+  effects-removed: "&c&lKITS&r &7> <gray>Class effects removed because the full kit armor is no longer equipped."
+  cost-item-needed: "&c&lKITS&r &7> <red>You need {amount}x {item} to claim this kit."
+  cost-no-economy: "&c&lKITS&r &7> <red>This kit costs money, but no economy plugin is installed. Contact staff."
+  cost-money-needed: "&c&lKITS&r &7> <red>You need {amount} to claim this kit."
+  cost-withdraw-failed: "&c&lKITS&r &7> <red>The payment failed, so the kit was not claimed."
+  inventory-full: "&c&lKITS&r &7> <red>✖</red> <deny>Your inventory is too full to claim this kit."
+  gui-title: "                 ᴋɪᴛꜱ"
+  gui-access: "<green><bold>ᴜɴʟᴏᴄᴋᴇᴅ"
+  gui-no-access: "<red><bold>ʟᴏᴄᴋᴇᴅ"
+  gui-cooldown: "<red>ᴄᴏᴏʟᴅᴏᴡɴ: <green>{seconds}s"
+  gui-ready: "<green>ʀᴇᴀᴅʏ ᴛᴏ ᴄʟᴀɪᴍ."
+  gui-cost-money: "<red>ᴄᴏꜱᴛ: {amount}"
+  gui-cost-item: "<red>ᴄᴏꜱᴛ: {amount}x {item}"
+  gui-left-click: "<green><u>ʟᴇꜰᴛ-ᴄʟɪᴄᴋ</u> ᴛᴏ ᴄʟᴀɪᴍ<gray>."
+  gui-right-click: "<green><u>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ</u> ᴛᴏ ᴠɪᴇᴡ ᴄᴏɴᴛᴇɴᴛꜱ<gray>."
+  gui-previous-page: "<yellow>ᴘʀᴇᴠɪᴏᴜꜱ ᴘᴀɢᴇ"
+  gui-next-page: "<yellow>ɴᴇxᴛ ᴘᴀɢᴇ"
+  preview-title: "ᴘʀᴇᴠɪᴇᴡ: {kit}"
 
 combat:
-  no-longer-in-combat: '<green>ʏᴏᴜ ᴀʀᴇ ɴᴏ ʟᴏɴɢᴇʀ ɪɴ ᴄᴏᴍʙᴀᴛ.'
-  uncombat-not-tagged: '&c&lSTAFF&r &7> <yellow>{player} isn''t in combat.'
-  uncombat-cleared-sender: '&c&lSTAFF&r &7> <green>Cleared {player}''s combat tag.'
-  uncombat-cleared-target: '<green>✔ <green>Your combat tag was cleared.'
-  uncombat-usage: '&c&lSTAFF&r &7> <red>Usage: /uncombat <player>'
-  check-usage: '&c&lSTAFF&r &7> <red>Usage: /combatcheck <player>'
-  check-not-tagged: '&c&lSTAFF&r &7> <gray>{player} is not in combat.'
-  check-tagged-prefix: '&c&lSTAFF&r &7> <red>{player} <gray>is in combat '
-  check-time-left: '<green>({seconds}s <gray>left)'
-  check-with-server: '&c&lSTAFF&r &7> <yellow> with server'
-  check-with-opponent-prefix: '&c&lSTAFF&r &7> <yellow> with '
-  check-opponent-stats: '<gray> ({health} hp, {ping}ms)'
-  tag-usage: '&c&lSTAFF&r &7> <red>Usage<gray>: /<yellow>combattag <player> [opponent|server]'
-  tag-opponent-not-found: '&c&lSTAFF&r &7> Opponent not found.'
+  no-longer-in-combat: "<green>ʏᴏᴜ ᴀʀᴇ ɴᴏ ʟᴏɴɢᴇʀ ɪɴ ᴄᴏᴍʙᴀᴛ."
+  uncombat-not-tagged: "&c&lSTAFF&r &7> <yellow>{player} isn't in combat."
+  uncombat-cleared-sender: "&c&lSTAFF&r &7> <green>Cleared {player}'s combat tag."
+  uncombat-cleared-target: "<green>✔ <green>Your combat tag was cleared."
+  uncombat-usage: "&c&lSTAFF&r &7> <red>Usage: /uncombat <player>"
+  check-usage: "&c&lSTAFF&r &7> <red>Usage: /combatcheck <player>"
+  check-not-tagged: "&c&lSTAFF&r &7> <gray>{player} is not in combat."
+  check-tagged-prefix: "&c&lSTAFF&r &7> <red>{player} <gray>is in combat "
+  check-time-left: "<green>({seconds}s <gray>left)"
+  check-with-server: "&c&lSTAFF&r &7> <yellow> with server"
+  check-with-opponent-prefix: "&c&lSTAFF&r &7> <yellow> with "
+  check-opponent-stats: "<gray> ({health} hp, {ping}ms)"
+  tag-usage: "&c&lSTAFF&r &7> <red>Usage<gray>: /<yellow>combattag <player> [opponent|server]"
+  tag-opponent-not-found: "&c&lSTAFF&r &7> Opponent not found."
   tag-self: '&c&lSTAFF&r &7> <red>A player can''t be tagged against themselves, tag against "server" instead.'
   tag-server-success: '&c&lSTAFF&r &7> <green>Tagged {player} into combat against "server".'
-  tag-success: '<green>Tagged {player} and {opponent} into combat.'
-  no-pearl-spawn: '<red>✖ <gray>You can''t pearl into a protected zone.'
-  command-blocked: '<red>✖ <gray>You can''t use that command while in combat.'
+  tag-success: "<green>Tagged {player} and {opponent} into combat."
+  no-pearl-spawn: "<red>✖ <gray>You can't pearl into a protected zone."
+  command-blocked: "<red>✖ <gray>You can't use that command while in combat."
 
 ability:
-  on-global-cooldown: '&e&lABILITES&r &7> <red>You''re on ability cooldown for another {seconds}s.'
-  on-cooldown: '&e&lABILITES&r &7> <red>You can use this again in {seconds}s.'
-  region-blocked: '&e&lABILITES&r &7> <red>Abilities can''t be used here.'
-  getitem-usage: '&c&lSTAFF&r &7> <red>Usage<gray>: <yellow>/getitem <username> <ability> <gray>[<green>amount<gray>]'
-  getitem-not-found: '&c&lSTAFF&r &7> v<red>No ability named ''{ability}''.'
-  getitem-given-sender: '&c&lSTAFF&r &7> <green>Gave {player} {amount}x '
-  getitem-given-target: '&c&lSTAFF&r &7> <green>You received {amount}x '
-  gui-title: '              ᴀʙɪʟɪᴛɪᴇꜱ'
-  gui-click-to-receive: ''
-  gui-cooldown: '<gray>ᴄᴏᴏʟᴅᴏᴡɴ: {seconds}s'
-  gui-received: '&c&lSTAFF&r &7> <green>Gave you '
-  bone-attacker: '&e&lABILITES&r &7> <yellow>{player} can''t place blocks for {seconds}s.'
-  bone-victim: '&e&lABILITES&r &7> <red>You can''t place blocks for {seconds}s.'
-  bone-place-denied: '&e&lABILITES&r &7> <red>You can''t place blocks right now.'
-  bard-shared: '&e&lABILITES&r &7> <green>Shared a buff with {count} nearby faction member(s).'
-  bard-gui-title: '     ᴘᴏʀᴛᴀʙʟᴇ ʙᴀʀᴅ'
-  bard-strength-name: '<gold>ꜱᴛʀᴇɴɢᴛʜ ɪ'
-  bard-strength-lore: '<gray>ɢʀᴀɴᴛꜱ ꜱᴛʀᴇɴɢᴛʜ ɪ ᴛᴏ ʏᴏᴜʀ ꜰᴀᴄᴛɪᴏɴ.'
-  bard-speed-name: '<gold>ꜱᴘᴇᴇᴅ ɪɪ'
-  bard-speed-lore: '<gray>ɢʀᴀɴᴛꜱ ꜱᴘᴇᴇᴅ ɪɪ ᴛᴏ ʏᴏᴜʀ ꜰᴀᴄᴛɪᴏɴ.'
-  bard-regen-name: '<gold>ʀᴇɢᴇɴᴇʀᴀᴛɪᴏɴ ɪ'
-  bard-regen-lore: '<gray>ɢʀᴀɴᴛꜱ ʀᴇɢᴇɴᴇʀᴀᴛɪᴏɴ ɪ ᴛᴏ ʏᴏᴜʀ ꜰᴀᴄᴛɪᴏɴ.'
-  bard-resistance-name: '<gold>ʀᴇꜱɪꜱᴛᴀɴᴄᴇ ɪ'
-  bard-resistance-lore: '<gray>ɢʀᴀɴᴛꜱ ʀᴇꜱɪꜱᴛᴀɴᴄᴇ ɪ ᴛᴏ ʏᴏᴜʀ ꜰᴀᴄᴛɪᴏɴ.'
-  bard-jumpboost-name: '<gold>ᴊᴜᴍᴘ ʙᴏᴏꜱᴛ ɪɪ'
-  bard-jumpboost-lore: '<gray>ɢʀᴀɴᴛꜱ ᴊᴜᴍᴘ ʙᴏᴏꜱᴛ ɪɪ ᴛᴏ ʏᴏᴜʀ ꜰᴀᴄᴛɪᴏɴ.'
-  repair-no-luckperms: '&e&lABILITES&r &7> <red>Repair requires LuckPerms to be installed. Contact staff.'
-  repair-granted: '&e&lABILITES&r &7> <green>You can repair your gear for {seconds}s.'
-  repair-countdown: '&e&lABILITES&r &7> <gray>Repairing: {seconds}s'
-  timewarp-none: '&e&lABILITES&r &7> <red>You haven''t ender pearled recently.'
-  timewarp-warped: '&e&lABILITES&r &7> <green>Warped back to your last pearl.'
-  timewarp-blocked: '&e&lABILITES&r &7> <red>You can''t warp back into a protected zone.'
-  rogue-backstab: '&e&lABILITES&r &7> <gold>Backstab landed for 3 hearts.'
-  rogue-backstabbed: '&e&lABILITES&r &7> <red>You were backstabbed!'
-  mage-spell-cast: '&e&lABILITES&r &7> <light_purple>Mage spell cast.'
-  pearl-stunned: '&e&lABILITES&r &7> <red>You cannot use pearls for another {seconds}s.'
-  pearl-stunner-hit: '&e&lABILITES&r &7> <green>Pearl stunner hit.'
-  rabbits-feed-used: '&e&lABILITES&r &7> <green>Rabbit''s feed gave you speed v for {seconds}s.'
-  ninja-star-no-target: '&e&lABILITES&r &7> <red>You haven''t been hit by a player recently.'
-  ninja-star-not-in-combat: '&e&lABILITES&r &7> <red>Both you and your target must be in combat.'
-  ninja-star-activated: '&e&lABILITES&r &7> <light_purple>Teleporting to {player} in {seconds}s.'
-  ninja-star-warning: '&e&lABILITES&r &7> <red>{player} activated a Ninja Star on you and will teleport to you in {seconds}s.'
-  ninja-star-fizzled: '&e&lABILITES&r &7> <red>The other player disconnected, so the Ninja Star teleport fizzled.'
+  on-global-cooldown: "&e&lABILITES&r &7> <red>You're on ability cooldown for another {seconds}s."
+  on-cooldown: "&e&lABILITES&r &7> <red>You can use this again in {seconds}s."
+  region-blocked: "&e&lABILITES&r &7> <red>Abilities can't be used here."
+  getitem-usage: "&c&lSTAFF&r &7> <red>Usage<gray>: <yellow>/getitem <username> <ability> <gray>[<green>amount<gray>]"
+  getitem-not-found: "&c&lSTAFF&r &7> v<red>No ability named '{ability}'."
+  getitem-given-sender: "&c&lSTAFF&r &7> <green>Gave {player} {amount}x "
+  getitem-given-target: "&c&lSTAFF&r &7> <green>You received {amount}x "
+  gui-title: "              ᴀʙɪʟɪᴛɪᴇꜱ"
+  gui-click-to-receive: ""
+  gui-cooldown: "<gray>ᴄᴏᴏʟᴅᴏᴡɴ: {seconds}s"
+  gui-received: "&c&lSTAFF&r &7> <green>Gave you "
+  bone-attacker: "&e&lABILITES&r &7> <yellow>{player} can't place blocks for {seconds}s."
+  bone-victim: "&e&lABILITES&r &7> <red>You can't place blocks for {seconds}s."
+  bone-place-denied: "&e&lABILITES&r &7> <red>You can't place blocks right now."
+  bard-shared: "&e&lABILITES&r &7> <green>Shared a buff with {count} nearby faction member(s)."
+  bard-gui-title: "     ᴘᴏʀᴛᴀʙʟᴇ ʙᴀʀᴅ"
+  bard-strength-name: "<gold>ꜱᴛʀᴇɴɢᴛʜ ɪ"
+  bard-strength-lore: "<gray>ɢʀᴀɴᴛꜱ ꜱᴛʀᴇɴɢᴛʜ ɪ ᴛᴏ ʏᴏᴜʀ ꜰᴀᴄᴛɪᴏɴ."
+  bard-speed-name: "<gold>ꜱᴘᴇᴇᴅ ɪɪ"
+  bard-speed-lore: "<gray>ɢʀᴀɴᴛꜱ ꜱᴘᴇᴇᴅ ɪɪ ᴛᴏ ʏᴏᴜʀ ꜰᴀᴄᴛɪᴏɴ."
+  bard-regen-name: "<gold>ʀᴇɢᴇɴᴇʀᴀᴛɪᴏɴ ɪ"
+  bard-regen-lore: "<gray>ɢʀᴀɴᴛꜱ ʀᴇɢᴇɴᴇʀᴀᴛɪᴏɴ ɪ ᴛᴏ ʏᴏᴜʀ ꜰᴀᴄᴛɪᴏɴ."
+  bard-resistance-name: "<gold>ʀᴇꜱɪꜱᴛᴀɴᴄᴇ ɪ"
+  bard-resistance-lore: "<gray>ɢʀᴀɴᴛꜱ ʀᴇꜱɪꜱᴛᴀɴᴄᴇ ɪ ᴛᴏ ʏᴏᴜʀ ꜰᴀᴄᴛɪᴏɴ."
+  bard-jumpboost-name: "<gold>ᴊᴜᴍᴘ ʙᴏᴏꜱᴛ ɪɪ"
+  bard-jumpboost-lore: "<gray>ɢʀᴀɴᴛꜱ ᴊᴜᴍᴘ ʙᴏᴏꜱᴛ ɪɪ ᴛᴏ ʏᴏᴜʀ ꜰᴀᴄᴛɪᴏɴ."
+  repair-no-luckperms: "&e&lABILITES&r &7> <red>Repair requires LuckPerms to be installed. Contact staff."
+  repair-granted: "&e&lABILITES&r &7> <green>You can repair your gear for {seconds}s."
+  repair-countdown: "&e&lABILITES&r &7> <gray>Repairing: {seconds}s"
+  timewarp-none: "&e&lABILITES&r &7> <red>You haven't ender pearled recently."
+  timewarp-warped: "&e&lABILITES&r &7> <green>Warped back to your last pearl."
+  timewarp-blocked: "&e&lABILITES&r &7> <red>You can't warp back into a protected zone."
+  rogue-backstab: "&e&lABILITES&r &7> <gold>Backstab landed for {hearts} hearts."
+  rogue-backstabbed: "&e&lABILITES&r &7> <red>You were backstabbed!"
+  mage-spell-cast: "&e&lABILITES&r &7> <light_purple>Mage spell cast."
+  pearl-stunned: "&e&lABILITES&r &7> <red>You cannot use pearls for another {seconds}s."
+  pearl-stunner-hit: "&e&lABILITES&r &7> <green>Pearl stunner hit."
+  rabbits-feed-used: "&e&lABILITES&r &7> <green>Rabbit's feed gave you speed v for {seconds}s."
+  ninja-star-no-target: "&e&lABILITES&r &7> <red>You haven't been hit by a player recently."
+  ninja-star-not-in-combat: "&e&lABILITES&r &7> <red>Both you and your target must be in combat."
+  ninja-star-activated: "&e&lABILITES&r &7> <light_purple>Teleporting to {player} in {seconds}s."
+  ninja-star-warning: "&e&lABILITES&r &7> <red>{player} activated a Ninja Star on you and will teleport to you in {seconds}s."
+  ninja-star-fizzled: "&e&lABILITES&r &7> <red>The other player disconnected, so the Ninja Star teleport fizzled."
 
 reboot:
-  usage: '&c&lSTAFF&r &7> <gray>Usage: <yellow>/reboot [cancel]'
-  none: '&4&SERVER&r &7> <yellow>No reboot is currently scheduled.'
-  next: '&4&SERVER&r &7> <yellow>The server will reboot in <green>{minutes}m {seconds}s<gray>.'
-  started: '&4&SERVER&r &7> <yellow>A server reboot has been scheduled in <white>{minutes} minute(s)<yellow>.'
-  reminder: '&4&SERVER&r &7> <yellow>Server reboot in <green>{minutes}m {seconds}s<yellow>.'
-  final-countdown: '&4&SERVER&r &7> <yellow>Server reboot in <green>{seconds}s<red>.'
-  now: '&4&SERVER&r &7> <yellow>The server is rebooting now.'
-  cancelled: '&4&SERVER&r &7> <green>The scheduled reboot was cancelled.'
-  already-scheduled: '&c&lSTAFF&r &7> <red>A reboot is already scheduled.'
-  not-scheduled: '&4&SERVER&r &7> <yellow>No reboot is currently scheduled.'
+  usage: "&c&lSTAFF&r &7> <gray>Usage: <yellow>/reboot [cancel]"
+  none: "&c&lSERVER&r &7> <yellow>No reboot is currently scheduled."
+  next: "&c&SERVER&r &7> <yellow>The server will reboot in <green>{minutes}m {seconds}s<gray>."
+  started: "&c&SERVER&r &7> <yellow>A server reboot has been scheduled in <white>{minutes} minute(s)<yellow>."
+  reminder: "&c&SERVER&r &7> <yellow>Server reboot in <green>{minutes}m {seconds}s<yellow>."
+  final-countdown: "&c&SERVER&r &7> <yellow>Server reboot in <green>{seconds}s<red>."
+  now: "&c&SERVER&r &7> <yellow>The server is rebooting now."
+  cancelled: "&c&SERVER&r &7> <green>The scheduled reboot was cancelled."
+  already-scheduled: "&c&lSTAFF&r &7> <red>A reboot is already scheduled."
+  not-scheduled: "&c&SERVER&r &7> <yellow>No reboot is currently scheduled."
 
 factions:
-  leader-cannot-leave: '<red>✖ <yellow>You cannot leave your faction as leader. Use /f disband to disband it.'
-  must-be-in-faction: '<red>✖ <yellow>You must be in a faction to set a rally.'
-  rally-usage: '<green>✔ <yellow>Usage: /f rally [set|clear]'
-  rally-set: '<green>✔ <yellow>Rally set at your location! It will last 4 minutes.'
-  rally-cleared: '<green>✔ Faction rally has been cleared!'
-  rally-bossbar-title: '<green><bold>Faction Rally'
-  rally-bossbar-distance: '<white>blocks away'
+  leader-cannot-leave: "<red>✖ <yellow>You cannot leave your faction as leader. Use /f disband to disband it."
+  must-be-in-faction: "<red>✖ <yellow>You must be in a faction to set a rally."
+  rally-usage: "<green>✔ <yellow>Usage: /f rally [set|clear]"
+  rally-set: "<green>✔ <yellow>Rally set at your location! It will last 4 minutes."
+  rally-cleared: "<green>✔ Faction rally has been cleared!"
+  rally-bossbar-title: "<green><bold>Faction Rally"
+  rally-bossbar-distance: "<white>blocks away"
 
 staff:
-  players-only: '&c&lSTAFF&r &7> <gray>Only players can use this command.'
-  rollback-usage: '&8[&cStaff&8]&r <gray>Usage: <yellow>/rollback <player>'
-  rollback-opened: '&8[&cStaff&8]&r <yellow>Opening death history for {player}'
-  no-deaths-found: '&8[&cStaff&8]&r <red>No deaths found for this player.'
-  death-lookup-failed: '&8[&cStaff&8]&r <red>Failed to look up that player''s death history -- check console.'
-  deaths-title: 'ᴅᴇᴀᴛʜꜱ - {uuid}'
-  death-contents-title: 'ᴅᴇᴀᴛʜ ᴄᴏɴᴛᴇɴᴛꜱ'
-  menu-back: '<red>ʙᴀᴄᴋ'
-  death-cause: '<gray>ᴄᴀᴜꜱᴇ: {cause}'
-  death-killer: '<gray>ᴋɪʟʟᴇʀ: {killer}'
-  death-lore-left: '<u><green>ʟᴇꜰᴛ-ᴄʟɪᴄᴋ</u><gray>: <yellow>ʀᴇꜱᴛᴏʀᴇ ᴛᴏ ʏᴏᴜʀ ɪɴᴠᴇɴᴛᴏʀʏ'
-  death-lore-right: '<u><green>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ</u><gray>: ᴠɪᴇᴡ ᴄᴏɴᴛᴇɴᴛꜱ'
-  restore-success: '&c&lSTAFF&r &7> <green>Restored {added} items to your inventory'
-  restore-overflow: '&c&lSTAFF&r &7> <yellow>{dropped} items were dropped (inventory full)'
-  vanish-enabled: '&c&lSTAFF&r &7> <green>Vanish enabled.'
-  vanish-disabled: '&c&lSTAFF&r &7> <red>Vanish disabled.'
-  staffchat-enabled: '&c&lSTAFF&r &7> <green>Staff chat enabled.'
-  staffchat-disabled: '&c&lSTAFF&r &7> <red>Staff chat disabled.'
-  staffbuild-enabled: '&c&lSTAFF&r &7> <green>Staff-build enabled.'
-  staffbuild-disabled: '&c&lSTAFF&r &7> <red>Staff-build disabled.'
-  mode-enabled: '&c&lSTAFF&r &7> <green>Staff mode enabled (vanish + staff-build).'
-  mode-disabled: '&c&lSTAFF&r &7> <red>Staff mode disabled.'
-  freeze-usage: '&c&lSTAFF&r &7> <gray>Usage: <yellow>/freeze <player>'
-  freeze-enabled-sender: '&c&lSTAFF&r &7> <green>Froze {player}.'
-  freeze-disabled-sender: '&c&lSTAFF&r &7> <red>Unfroze {player}.'
-  freeze-enabled-target: '&c&lFROZEN&r &7> <red>You have been frozen by staff. Do <bold>NOT</bold> log out or you will be temporarily banned!'
-  freeze-disabled-target: '&c&lFROZEN&r &7> <green>You have been unfrozen.'
-  freeze-blocked-command: '&c&lFROZEN&r &7> <red>You cannot use commands while frozen.'
-  freeze-ban-reason: '&c&lFROZEN&r &7> <red>You left the game while frozen by staff. Banned for 3 hours.'
-  freeze-quit-alert: '&c&lSTAFF&r &7> <red>{player} left while frozen and has been banned for 3 hours.'
-  invsee-usage: '&c&lSTAFF&r &7> <gray>Usage: /<yellow>invsee <player>'
-  invsee-opened: '&c&lSTAFF&r &7> <green>Viewing {player}''s inventory.'
-  endersee-usage: '&c&lSTAFF&r &7> <gray>Usage: /<yellow>endersee <player>'
-  endersee-opened: '&c&lSTAFF&r &7> <green>Viewing {player}''s ender chest.'
+  players-only: "&c&lSTAFF&r &7> <gray>Only players can use this command."
+  rollback-usage: "&c&lSTAFF&r &7> <gray>Usage: <yellow>/rollback <player>"
+  rollback-opened: "&c&lSTAFF&r &7> <yellow>Opening death history for {player}"
+  no-deaths-found: "&c&lSTAFF&r &7> <red>No deaths found for this player."
+  death-lookup-failed: "&c&lSTAFF&r &7> <red>Failed to look up that player's death history -- check console."
+  deaths-title: "ᴅᴇᴀᴛʜꜱ - {uuid}"
+  death-contents-title: "ᴅᴇᴀᴛʜ ᴄᴏɴᴛᴇɴᴛꜱ"
+  menu-back: "<red>ʙᴀᴄᴋ"
+  death-cause: "<gray>ᴄᴀᴜꜱᴇ: {cause}"
+  death-killer: "<gray>ᴋɪʟʟᴇʀ: {killer}"
+  death-lore-left: "<u><green>ʟᴇꜰᴛ-ᴄʟɪᴄᴋ</u><gray>: <yellow>ʀᴇꜱᴛᴏʀᴇ ᴛᴏ ʏᴏᴜʀ ɪɴᴠᴇɴᴛᴏʀʏ"
+  death-lore-right: "<u><green>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ</u><gray>: ᴠɪᴇᴡ ᴄᴏɴᴛᴇɴᴛꜱ"
+  restore-success: "&c&lSTAFF&r &7> <green>Restored {added} items to your inventory"
+  restore-overflow: "&c&lSTAFF&r &7> <yellow>{dropped} items were dropped (inventory full)"
+  vanish-enabled: "&c&lSTAFF&r &7> <green>Vanish enabled."
+  vanish-disabled: "&c&lSTAFF&r &7> <red>Vanish disabled."
+  staffchat-enabled: "&c&lSTAFF&r &7> <green>Staff chat enabled."
+  staffchat-disabled: "&c&lSTAFF&r &7> <red>Staff chat disabled."
+  staffbuild-enabled: "&c&lSTAFF&r &7> <green>Staff-build enabled."
+  staffbuild-disabled: "&c&lSTAFF&r &7> <red>Staff-build disabled."
+  mode-enabled: "&c&lSTAFF&r &7> <green>Staff mode enabled (vanish + staff-build)."
+  mode-disabled: "&c&lSTAFF&r &7> <red>Staff mode disabled."
+  freeze-usage: "&c&lSTAFF&r &7> <gray>Usage: <yellow>/freeze <player>"
+  freeze-enabled-sender: "&c&lSTAFF&r &7> <green>Froze {player}."
+  freeze-disabled-sender: "&c&lSTAFF&r &7> <red>Unfroze {player}."
+  freeze-enabled-target: "&c&lFROZEN&r &7> <red>You have been frozen by staff. Do <bold>NOT</bold> log out or you will be temporarily banned!"
+  freeze-disabled-target: "&c&lFROZEN&r &7> <green>You have been unfrozen."
+  freeze-blocked-command: "&c&lFROZEN&r &7> <red>You cannot use commands while frozen."
+  freeze-ban-reason: "&c&lFROZEN&r &7> <red>You left the game while frozen by staff. Banned for 3 hours."
+  freeze-quit-alert: "&c&lSTAFF&r &7> <red>{player} left while frozen and has been banned for 3 hours."
+  invsee-usage: "&c&lSTAFF&r &7> <gray>Usage: /<yellow>invsee <player>"
+  invsee-opened: "&c&lSTAFF&r &7> <green>Viewing {player}'s inventory."
+  endersee-usage: "&c&lSTAFF&r &7> <gray>Usage: /<yellow>endersee <player>"
+  endersee-opened: "&c&lSTAFF&r &7> <green>Viewing {player}'s ender chest."
 
 spawner:
-  claim-only: '<red>✖ <gray>Spawners can only be placed in your own faction''s claimed territory.'
-  not-your-claim: '<red>✖ <gray>You can''t break a spawner outside your own faction''s claim.'
-  silk-touch-required: '<red>✖ <gray>You need a Silk Touch pickaxe to break a spawner.'
-  stack-full: '<red>✖ <gray>That spawner stack is already full.'
-  stacked: '&3&lSPAWNERS&r &7> <green>Stacked {amount}x -- now {size} in this stack.'
-  management-title: '             ꜱᴘᴀᴡɴᴇʀ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ'
-  info-stack-size: '<gray>ꜱᴛᴀᴄᴋ ꜱɪᴢᴇ:  <white>{size}'
-  withdraw-one: '<green>ᴡɪᴛʜᴅʀᴀᴡ 𝟣'
-  withdraw-all: '<green>ꜱᴇʟʟ 𝟣'
-  sell-one: '<gold>ꜱᴇʟʟ 𝟣 <gray>(+{amount})'
-  sell-all: '<gold>ꜱᴇʟʟ ᴀʟʟ <gray>(+{amount})'
-  withdrew: '<green>Withdrew {amount}x spawner(s).'
-  sold: '<green>Sold {amount}x spawner(s) for {refund}.'
-  shop-title: 'ꜱᴘᴀᴡɴᴇʀ ꜱʜᴏᴘ'
-  shop-price: '<gray>ᴘʀɪᴄᴇ: <white>{amount}'
-  shop-hint: '<gray>ᴄʟɪᴄᴋ ᴛᴏ ʙᴜʏ..'
-  no-economy: '&3&lSPAWNERS&r &7> <gray>No economy plugin is installed. Contact staff.'
-  cannot-afford: '&3&lSPAWNERS&r &7> <gray>You need {amount} to buy this spawner.'
-  purchased: '&3&lSPAWNERS&r &7> <green>Purchased a spawner for {amount}.'
-  unclaim-blocked: '&3&lSPAWNERS&r &7> <gray>You can''t unclaim this chunk while it has active spawners.'
-  unclaimall-warning: '&3&lSPAWNERS&r &7> <yellow>⚠ <gray>{amount}x spawner(s) in your unclaimed land were dropped on the ground.'
-  disband-warning: '&3&lSPAWNERS&r &7> <yellow>⚠ <gray>{amount}x spawner(s) in your faction''s claimed land were dropped on the ground.'
+  claim-only: "&3&lSPAWNERS&r &7> <gray>Spawners can only be placed in your own faction's claimed territory."
+  not-your-claim: "&3&lSPAWNERS&r &7> <gray>You can't break a spawner outside your own faction's claim."
+  silk-touch-required: "&3&lSPAWNERS&r &7> <gray>You need a Silk Touch pickaxe to break a spawner."
+  stack-full: "&3&lSPAWNERS&r &7> <gray>That spawner stack is already full."
+  stacked: "&3&lSPAWNERS&r &7> <green>Stacked {amount}x -- now {size} in this stack."
+  management-title: "             ꜱᴘᴀᴡɴᴇʀ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ"
+  info-stack-size: "<gray>ꜱᴛᴀᴄᴋ ꜱɪᴢᴇ:  <white>{size}"
+  withdraw-one: "<green>ᴡɪᴛʜᴅʀᴀᴡ 𝟣"
+  withdraw-all: "<green>ꜱᴇʟʟ 𝟣"
+  sell-one: "<gold>ꜱᴇʟʟ 𝟣 <gray>(+{amount})"
+  sell-all: "<gold>ꜱᴇʟʟ ᴀʟʟ <gray>(+{amount})"
+  withdrew: "<green>Withdrew {amount}x spawner(s)."
+  sold: "&3&lSPAWNERS&r &7> <yellow>Sold <green>{amount}x <yellow>spawner(s) for {refund}."
+  shop-title: "ꜱᴘᴀᴡɴᴇʀ ꜱʜᴏᴘ"
+  shop-price: "<gray>ᴘʀɪᴄᴇ: <white>{amount}"
+  shop-hint: "<gray>ᴄʟɪᴄᴋ ᴛᴏ ʙᴜʏ.."
+  no-economy: "&3&lSPAWNERS&r &7> <gray>No economy plugin is installed. Contact staff."
+  cannot-afford: "&3&lSPAWNERS&r &7> <gray>You need {amount} to buy this spawner."
+  purchased: "&3&lSPAWNERS&r &7> <green>Purchased a spawner for {amount}."
+  unclaim-blocked: "&3&lSPAWNERS&r &7> <gray>You can't unclaim this chunk while it has active spawners."
+  unclaimall-warning: "&3&lSPAWNERS&r &7> <yellow>⚠ <gray>{amount}x spawner(s) in your unclaimed land were dropped on the ground."
+  disband-warning: "&3&lSPAWNERS&r &7> <yellow>⚠ <gray>{amount}x spawner(s) in your faction's claimed land were dropped on the ground."
 
 collector:
-  title: 'Chunk Collector'
-  stored-lore: '<gray>Stored: <yellow>{stored} <gray>/ <yellow>{capacity}'
-  upgrade-lore: '<gray>Click to upgrade to tier <yellow>{tier} <gray>for <yellow>{cost}'
-  upgrade-maxed: '<gray>Already at the maximum tier ({tier}).'
-  upgraded: '&3&lCOLLECTOR&r &7> <green>Upgraded to tier {tier} -- capacity is now {capacity} per item type.'
-  withdrew: '&3&lCOLLECTOR&r &7> <green>Withdrew {amount}x {item}.'
-  claim-only: '&3&lCOLLECTOR&r &7> <red>✖ <gray>Chunk Collectors can only be placed in your own faction''s claimed territory.'
-  chunk-limit: '&3&lCOLLECTOR&r &7> <red>✖ <gray>This chunk already has the maximum number of Chunk Collectors.'
-  player-limit: '&3&lCOLLECTOR&r &7> <red>✖ <gray>You already have the maximum number of Chunk Collectors placed.'
-  not-your-claim: '&3&lCOLLECTOR&r &7> <red>✖ <gray>You can''t break a Chunk Collector outside your own faction''s claim.'
-  silk-touch-required: '&3&lCOLLECTOR&r &7> <red>✖ <gray>You need a Silk Touch tool to break a Chunk Collector.'
-  hopper-blocked: '&3&lCOLLECTOR&r &7> <red>✖ <gray>Hoppers can''t be placed this close to a Chunk Collector.'
-  cannot-afford: '&3&lCOLLECTOR&r &7> <gray>You need {amount} to buy this upgrade.'
+  title: "ᴄʜᴜɴᴋ ᴄᴏʟʟᴇᴄᴛᴏʀ"
+  stored-lore: "<gray>ꜱᴛᴏʀᴇᴅ: <yellow>{stored} <gray>/ <yellow>{capacity}"
+  upgrade-lore: "<gray>ᴄʟɪᴄᴋ ᴛᴏ ᴜᴘɢʀᴀᴅᴇ ᴛᴏ ᴛɪᴇʀ <yellow>{tier} <gray>for <yellow>{cost}"
+  upgrade-maxed: "<gray>Already at the maximum tier ({tier})."
+  upgraded: "&a&lCOLLECTOR&r &7> <green>Upgraded to tier {tier} -- capacity is now {capacity} per item type."
+  withdrew: "&a&lCOLLECTOR&r &7> <green>Withdrew {amount}x {item}."
+  claim-only: "&a&lCOLLECTOR&r &7> <red>✖ <gray>Chunk Collectors can only be placed in your own faction's claimed territory."
+  chunk-limit: "&a&lCOLLECTOR&r &7> <red>✖ <gray>This chunk already has the maximum number of Chunk Collectors."
+  player-limit: "&a&lCOLLECTOR&r &7> <red>✖ <gray>You already have the maximum number of Chunk Collectors placed."
+  not-your-claim: "&a&lCOLLECTOR&r &7> <red>✖ <gray>You can't break a Chunk Collector outside your own faction's claim."
+  silk-touch-required: "&a&lCOLLECTOR&r &7> <red>✖ <gray>You need a Silk Touch tool to break a Chunk Collector."
+  hopper-blocked: "&a&lCOLLECTOR&r &7> <red>✖ <gray>Hoppers can't be placed this close to a Chunk Collector."
+  cannot-afford: "&a&lCOLLECTOR&r &7> <gray>You need {amount} to buy this upgrade."
 
 blueprint:
-  unknown-template: '&3&lBLUEPRINT&r &7> <red>✖ <gray>That blueprint template no longer exists.'
-  on-cooldown: '&3&lBLUEPRINT&r &7> <red>✖ <gray>You can place another blueprint in {seconds}s.'
-  no-faction: '&3&lBLUEPRINT&r &7> <red>✖ <gray>You must be in a faction to place a blueprint.'
-  load-failed: '&3&lBLUEPRINT&r &7> <red>✖ <gray>That blueprint failed to load -- contact staff.'
-  claim-invalid: '&3&lBLUEPRINT&r &7> <red>✖ <gray>The entire structure must fit within your own faction''s claimed land.'
-  started: '&3&lBLUEPRINT&r &7> <green>Started building {template}.'
-  cancelled: '&3&lBLUEPRINT&r &7> <yellow>Build cancelled. Blocks already placed are left as-is.'
-  menu-title: 'Blueprint Progress'
-  menu-progress: '<gray>Placed: <yellow>{done} <gray>/ <yellow>{total}'
-  menu-elapsed: '<gray>Elapsed: <yellow>{seconds}s'
-  menu-cancel-lore: '<gray>Stops the build. Blocks already placed stay; the beacon is not refunded.'
+  unknown-template: "&3&lBLUEPRINT&r &7> <red>✖ <gray>That blueprint template no longer exists."
+  on-cooldown: "&3&lBLUEPRINT&r &7> <red>✖ <gray>You can place another blueprint in {seconds}s."
+  no-faction: "&3&lBLUEPRINT&r &7> <red>✖ <gray>You must be in a faction to place a blueprint."
+  load-failed: "&3&lBLUEPRINT&r &7> <red>✖ <gray>That blueprint failed to load -- contact staff."
+  claim-invalid: "&3&lBLUEPRINT&r &7> <red>✖ <gray>The entire structure must fit within your own faction's claimed land."
+  started: "&3&lBLUEPRINT&r &7> <green>Started building {template}."
+  cancelled: "&3&lBLUEPRINT&r &7> <yellow>Build cancelled. Blocks already placed are left as-is."
+  menu-title: "Blueprint Progress"
+  menu-progress: "<gray>Placed: <yellow>{done} <gray>/ <yellow>{total}"
+  menu-elapsed: "<gray>Elapsed: <yellow>{seconds}s"
+  menu-cancel-lore: "<gray>Stops the build. Blocks already placed stay; the beacon is not refunded."

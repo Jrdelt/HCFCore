@@ -3,7 +3,6 @@ package me.hcfcore.core.lang;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -115,8 +114,9 @@ public final class Messages {
         for (int i = 0; i + 1 < placeholders.length; i += 2) {
             // Values (unlike the admin-authored template) may come from
             // untrusted sources such as a player's name, so any MiniMessage
-            // tags inside them must render as literal text, not formatting.
-            String safeValue = MiniMessage.miniMessage().escapeTags(placeholders[i + 1]);
+            // tags (or legacy &-codes -- escapeTags() alone doesn't stop
+            // those) inside them must render as literal text, not formatting.
+            String safeValue = MessageFormatter.escapeForSubstitution(placeholders[i + 1]);
             template = template.replace("{" + placeholders[i] + "}", safeValue);
         }
         return template;

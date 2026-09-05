@@ -145,7 +145,16 @@ public final class SpawnerClaimListener implements Listener {
         for (Map.Entry<Location, SpawnerData> entry : spawnerManager.getSpawnersInChunk(chunk)) {
             SpawnerData data = entry.getValue();
             String ownerTag = data.ownerFactionTag();
-            if (ownerTag != null && claimingFactionTag != null && ownerTag.equalsIgnoreCase(claimingFactionTag)) {
+            if (ownerTag == null) {
+                // Legacy spawner, placed before ownership tracking existed
+                // -- there's no reliable signal here to tell a genuine
+                // overclaim apart from the same faction simply reclaiming
+                // its own land, so (unlike a tracked spawner) this is left
+                // alone rather than risk dropping a faction's own
+                // long-standing spawner on an entirely ordinary reclaim.
+                continue;
+            }
+            if (claimingFactionTag != null && ownerTag.equalsIgnoreCase(claimingFactionTag)) {
                 continue;
             }
             totalDropped += dropSpawner(entry.getKey(), data);

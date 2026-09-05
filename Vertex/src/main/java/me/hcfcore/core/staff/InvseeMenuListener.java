@@ -83,7 +83,7 @@ public final class InvseeMenuListener implements Listener {
     private void sync(Inventory inventory, InvseeMenu.Holder holder) {
         Player target = Bukkit.getPlayer(holder.targetId());
         if (target != null) {
-            InvseeMenu.writeBack(inventory, target);
+            InvseeMenu.writeBack(inventory, target, holder);
         }
     }
 }
