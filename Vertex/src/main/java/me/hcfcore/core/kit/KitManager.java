@@ -3,10 +3,13 @@ package me.hcfcore.core.kit;
 import me.hcfcore.core.ability.Ability;
 import me.hcfcore.core.ability.AbilityManager;
 import me.hcfcore.core.economy.EconomyHook;
+import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.storage.Storage;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
@@ -131,14 +134,7 @@ public final class KitManager {
                     new Kit(name, permission, cooldown, armor, contents, cost, effects, icon, purpose));
         }
 
-        // Rebuild cache of kits with effects for armor checking optimization
-        List<Kit> effectKits = new ArrayList<>();
-        for (Kit kit : kits.values()) {
-            if (!kit.getEffects().isEmpty()) {
-                effectKits.add(kit);
-            }
-        }
-        kitsWithEffects = effectKits;
+        rebuildEffectsCache();
     }
 
     private Map<String, Object> loadRawConfig(File file) {
@@ -306,7 +302,37 @@ public final class KitManager {
         }
         applyEnchantments(item, map.get("enchantments"));
         applyPotionEffect(item, map);
+        applyDisplay(item, map);
         return item;
+    }
+
+    /**
+     * Restores a custom display name/lore round-tripped by serializeItems --
+     * an ability item already gets its name/lore from the ability's own
+     * definition above, but a plain item's custom name/lore has nowhere
+     * else to come from.
+     */
+    private static void applyDisplay(ItemStack item, Map<?, ?> map) {
+        Object nameValue = map.get("name");
+        Object loreValue = map.get("lore");
+        if (nameValue == null && loreValue == null) {
+            return;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        if (nameValue != null) {
+            meta.displayName(MessageFormatter.deserialize(String.valueOf(nameValue)));
+        }
+        if (loreValue instanceof List<?> loreList) {
+            List<Component> lore = new ArrayList<>();
+            for (Object line : loreList) {
+                lore.add(MessageFormatter.deserialize(String.valueOf(line)));
+            }
+            meta.lore(lore);
+        }
+        item.setItemMeta(meta);
     }
 
     private void applyPotionEffect(ItemStack item, Map<?, ?> map) {
@@ -339,8 +365,9 @@ public final class KitManager {
         }
     }
 
-    private static List<Map<String, Object>> serializeItems(ItemStack[] items) {
+    private List<Map<String, Object>> serializeItems(ItemStack[] items) {
         List<Map<String, Object>> serialized = new ArrayList<>();
+        NamespacedKey abilityKey = new NamespacedKey(plugin, AbilityManager.ABILITY_ID_KEY);
         for (ItemStack item : items) {
             if (item == null || item.getType() == Material.AIR) {
                 serialized.add(null);
@@ -355,6 +382,35 @@ public final class KitManager {
                     enchantments.put(enchant.getKey().getKey().getKey().toUpperCase(Locale.ROOT), enchant.getValue());
                 }
                 entry.put("enchantments", enchantments);
+            }
+
+            ItemMeta meta = item.getItemMeta();
+            if (meta != null) {
+                String abilityId = meta.getPersistentDataContainer()
+                        .get(abilityKey, org.bukkit.persistence.PersistentDataType.STRING);
+                if (abilityId != null) {
+                    // parseItem() rebuilds this entirely from the ability's own
+                    // definition when "ability" is set -- name/lore/PDC tag all
+                    // come from abilities.yml, so there's nothing else to persist.
+                    entry.put("ability", abilityId);
+                } else {
+                    if (meta.hasDisplayName()) {
+                        entry.put("name", MiniMessage.miniMessage().serialize(meta.displayName()));
+                    }
+                    if (meta.hasLore()) {
+                        List<String> lore = new ArrayList<>();
+                        for (Component line : meta.lore()) {
+                            lore.add(MiniMessage.miniMessage().serialize(line));
+                        }
+                        entry.put("lore", lore);
+                    }
+                }
+                if (meta instanceof PotionMeta potionMeta && potionMeta.hasCustomEffects()) {
+                    PotionEffect effect = potionMeta.getCustomEffects().get(0);
+                    entry.put("potion-effect", effect.getType().getKey().getKey().toUpperCase(Locale.ROOT));
+                    entry.put("potion-duration-ticks", effect.getDuration());
+                    entry.put("potion-amplifier", effect.getAmplifier());
+                }
             }
             serialized.add(entry);
         }
@@ -647,11 +703,32 @@ public final class KitManager {
 
     public void save(String name, Player player, String permission, int cooldownSeconds, Kit.Cost cost) {
         PlayerInventory inventory = player.getInventory();
+        // Re-saving an existing kit (e.g. just to bump its cooldown/cost)
+        // must not silently discard effects/icon/purpose -- there's no
+        // in-game command to set those, only hand-editing kits.yml, so
+        // losing them here would be unrecoverable without restoring a backup.
+        Kit existing = kits.get(name.toLowerCase(Locale.ROOT));
+        List<Kit.Effect> effects = existing != null ? existing.getEffects() : List.of();
+        String icon = existing != null ? existing.getIcon() : null;
+        String purpose = existing != null ? existing.getPurpose() : null;
         Kit kit = new Kit(name, permission, cooldownSeconds,
-            fromBukkitArmorOrder(inventory.getArmorContents()), inventory.getStorageContents(), cost);
+            fromBukkitArmorOrder(inventory.getArmorContents()), inventory.getStorageContents(), cost,
+            effects, icon, purpose);
         kits.put(name.toLowerCase(Locale.ROOT), kit);
+        rebuildEffectsCache();
         persistAsync();
         waitForPendingPersist();
+    }
+
+    /** Keeps kitsWithEffects in sync with kits -- must run after every mutation, not just load(). */
+    private void rebuildEffectsCache() {
+        List<Kit> effectKits = new ArrayList<>();
+        for (Kit kit : kits.values()) {
+            if (!kit.getEffects().isEmpty()) {
+                effectKits.add(kit);
+            }
+        }
+        kitsWithEffects = effectKits;
     }
 
     private static ItemStack[] toBukkitArmorOrder(ItemStack[] armor) {
@@ -706,6 +783,10 @@ public final class KitManager {
         if (removed == null) {
             return false;
         }
+        // Without this, a deleted class kit's effects kept being granted to
+        // anyone already wearing (or who later re-crafted/found) that exact
+        // armor set, since checkArmorEffects() reads kitsWithEffects, not kits.
+        rebuildEffectsCache();
         persistAsync();
         waitForPendingPersist();
         return true;

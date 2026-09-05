@@ -37,34 +37,42 @@ public final class InvRestoreMenu {
     }
 
     public static void openByUUID(Player staffPlayer, java.util.UUID targetUUID, Plugin plugin, DeathManager deathManager, Messages messages) {
-        deathManager.loadDeaths(targetUUID, 20, deaths -> {
-            if (deaths.isEmpty()) {
-                staffPlayer.sendMessage(messages.getChat(staffPlayer, "staff.no-deaths-found"));
-                return;
+        deathManager.loadDeaths(targetUUID, 20, new DeathManager.DeathLoadCallback() {
+            @Override
+            public void onDeathsLoadFailed() {
+                staffPlayer.sendMessage(messages.getChat(staffPlayer, "staff.death-lookup-failed"));
             }
 
-            Holder holder = new Holder(deaths, targetUUID);
-            Inventory inventory = Bukkit.createInventory(holder, GRID_SIZE,
-                    Component.text("ᴅᴇᴀᴛʜs")
-                            .color(NamedTextColor.LIGHT_PURPLE));
-            holder.inventory = inventory;
-
-            NamespacedKey deathIndexKey = new NamespacedKey(plugin, DEATH_INDEX_KEY);
-            NamespacedKey deathActionKey = new NamespacedKey(plugin, DEATH_ACTION_KEY);
-
-            for (int i = 0; i < deaths.size() && i < 45; i++) {
-                Death death = deaths.get(i);
-                ItemStack icon = createDeathIcon(death, i, targetUUID, staffPlayer, messages);
-                ItemMeta meta = icon.getItemMeta();
-                if (meta != null) {
-                    meta.getPersistentDataContainer().set(deathIndexKey, PersistentDataType.INTEGER, i);
-                    meta.getPersistentDataContainer().set(deathActionKey, PersistentDataType.STRING, "restore");
-                    icon.setItemMeta(meta);
+            @Override
+            public void onDeathsLoaded(List<Death> deaths) {
+                if (deaths.isEmpty()) {
+                    staffPlayer.sendMessage(messages.getChat(staffPlayer, "staff.no-deaths-found"));
+                    return;
                 }
-                inventory.setItem(i, icon);
-            }
 
-            staffPlayer.openInventory(inventory);
+                Holder holder = new Holder(deaths, targetUUID);
+                Inventory inventory = Bukkit.createInventory(holder, GRID_SIZE,
+                        Component.text("ᴅᴇᴀᴛʜs")
+                                .color(NamedTextColor.LIGHT_PURPLE));
+                holder.inventory = inventory;
+
+                NamespacedKey deathIndexKey = new NamespacedKey(plugin, DEATH_INDEX_KEY);
+                NamespacedKey deathActionKey = new NamespacedKey(plugin, DEATH_ACTION_KEY);
+
+                for (int i = 0; i < deaths.size() && i < 45; i++) {
+                    Death death = deaths.get(i);
+                    ItemStack icon = createDeathIcon(death, i, targetUUID, staffPlayer, messages);
+                    ItemMeta meta = icon.getItemMeta();
+                    if (meta != null) {
+                        meta.getPersistentDataContainer().set(deathIndexKey, PersistentDataType.INTEGER, i);
+                        meta.getPersistentDataContainer().set(deathActionKey, PersistentDataType.STRING, "restore");
+                        icon.setItemMeta(meta);
+                    }
+                    inventory.setItem(i, icon);
+                }
+
+                staffPlayer.openInventory(inventory);
+            }
         });
     }
 

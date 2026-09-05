@@ -50,6 +50,8 @@ public final class NametagManager {
     private boolean enabled;
     private int updateIntervalTicks;
     private NamedTextColor sameFactionColor;
+    private NamedTextColor allyColor;
+    private NamedTextColor enemyColor;
     private NamedTextColor neutralColor;
     private BukkitTask task;
 
@@ -95,7 +97,9 @@ public final class NametagManager {
         updateIntervalTicks = config.getInt("nametags.update-interval-ticks", 20);
 
         sameFactionColor = parseColor(config.getString("nametags.colors.same-faction", "green"));
-        neutralColor = parseColor(config.getString("nametags.colors.neutral", "gray"));
+        allyColor = parseColor(config.getString("nametags.colors.ally", "light_purple"));
+        enemyColor = parseColor(config.getString("nametags.colors.enemy", "red"));
+        neutralColor = parseColor(config.getString("nametags.colors.neutral", "red"));
     }
 
     private NamedTextColor parseColor(String colorName) {
@@ -120,26 +124,21 @@ public final class NametagManager {
 
     /**
      * Pushes `subject`'s current faction/nametag data to every online
-     * viewer's own scoreboard -- skipped entirely if nothing changed since
-     * last time, so the periodic tick isn't O(playerCount^2) every second
-     * for players whose faction never changes.
+     * viewer's own scoreboard. Unlike before, this can't skip on "subject's
+     * own faction is unchanged" -- the color is relative to each *viewer*
+     * (own faction green, ally light purple, everyone else red), so a
+     * viewer's own faction changing, or a relation between two factions
+     * changing, needs the same re-apply even when the subject's faction
+     * itself didn't move.
      */
     public void updatePlayerNametag(Player subject) {
         String subjectId = subject.getUniqueId().toString();
         int factionId = FactionsHook.getFactionId(subject);
         String factionName = FactionsHook.getFactionName(factionId);
-
-        PlayerNametagState currentState = playerStates.get(subjectId);
-        if (currentState != null && currentState.factionId == factionId && currentState.factionName.equals(factionName)) {
-            return; // No change, skip update
-        }
-
-        PrefixAndColor prefixAndColor = buildPrefixAndColor(factionId, factionName);
         String teamName = teamName(subject.getUniqueId());
         for (Player viewer : Bukkit.getOnlinePlayers()) {
-            applyToViewer(viewer, subject, teamName, prefixAndColor);
+            applyToViewer(viewer, subject, teamName, factionId, factionName);
         }
-
         playerStates.put(subjectId, new PlayerNametagState(factionId, factionName));
     }
 
@@ -164,11 +163,11 @@ public final class NametagManager {
                 factionId = FactionsHook.getFactionId(subject);
                 factionName = FactionsHook.getFactionName(factionId);
             }
-            applyToViewer(viewer, subject, teamName(subject.getUniqueId()), buildPrefixAndColor(factionId, factionName));
+            applyToViewer(viewer, subject, teamName(subject.getUniqueId()), factionId, factionName);
         }
     }
 
-    private void applyToViewer(Player viewer, Player subject, String teamName, PrefixAndColor prefixAndColor) {
+    private void applyToViewer(Player viewer, Player subject, String teamName, int subjectFactionId, String subjectFactionName) {
         Scoreboard board = viewer.getScoreboard();
         Team team = board.getTeam(teamName);
         if (team == null) {
@@ -177,27 +176,35 @@ public final class NametagManager {
             team.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.ALWAYS);
             team.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
         }
-        team.prefix(prefixAndColor.prefix());
-        team.color(prefixAndColor.color());
+        team.prefix(buildPrefix(viewer, subjectFactionId, subjectFactionName));
+        team.color(NamedTextColor.WHITE);
     }
 
     /**
-     * Build nametag: &8[&a<ftop>&8] &8[<factioncolor>name&8] &e<player>
-     * Note: a scoreboard team's prefix is the same for every viewer of
-     * that team -- Minecraft's scoreboard API has no way to color it
-     * differently per viewer (e.g. red to enemies, purple to allies of
-     * whoever's looking). It uses one fixed color: green for players in a
-     * faction, gray for factionless, matching
-     * nametags.colors.same-faction/neutral in config.yml.
+     * Build nametag: &8[&a<ftop>&8] &8[<relationcolor>name&8] &e<player>
+     * The relation color is from `viewer`'s own perspective -- own faction,
+     * allied faction, enemy faction, or neutral (a truce/no-relation
+     * faction, or a factionless subject) -- matching
+     * nametags.colors.same-faction/ally/enemy/neutral in config.yml. This
+     * genuinely differs per viewer (unlike a shared main-scoreboard team
+     * could) because each team lives on the *viewer's own* scoreboard
+     * object -- see this class's top-level doc.
      */
-    private PrefixAndColor buildPrefixAndColor(int factionId, String factionName) {
-        String ftop = factionId == FactionsHook.NO_FACTION ? "-" : String.valueOf(FactionsHook.getFactionRank(factionId));
-        NamedTextColor factionColor = factionId == FactionsHook.NO_FACTION ? neutralColor : sameFactionColor;
-        String prefix = "&8[&a" + ftop + "&8] &8[" + toLegacyCode(factionColor) + factionName + "&8] &e";
-        return new PrefixAndColor(MessageFormatter.deserialize(prefix), NamedTextColor.WHITE);
-    }
-
-    private record PrefixAndColor(Component prefix, NamedTextColor color) {
+    private Component buildPrefix(Player viewer, int subjectFactionId, String subjectFactionName) {
+        String ftop = subjectFactionId == FactionsHook.NO_FACTION ? "-" : String.valueOf(FactionsHook.getFactionRank(subjectFactionId));
+        int viewerFactionId = FactionsHook.getFactionId(viewer);
+        NamedTextColor relationColor;
+        if (viewerFactionId != FactionsHook.NO_FACTION && viewerFactionId == subjectFactionId) {
+            relationColor = sameFactionColor;
+        } else if (FactionsHook.isAllyFaction(viewerFactionId, subjectFactionId)) {
+            relationColor = allyColor;
+        } else if (FactionsHook.isEnemyFaction(viewerFactionId, subjectFactionId)) {
+            relationColor = enemyColor;
+        } else {
+            relationColor = neutralColor;
+        }
+        String prefix = "&8[&a" + ftop + "&8] &8[" + toLegacyCode(relationColor) + subjectFactionName + "&8] &e";
+        return MessageFormatter.deserialize(prefix);
     }
 
     private String toLegacyCode(NamedTextColor color) {

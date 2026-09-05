@@ -84,10 +84,10 @@ public final class MySQLStorage implements Storage {
             SELECT timestamp, cause, killer_name, items, helmet, chestplate, leggings, boots, offhand
             FROM player_deaths WHERE uuid = ? ORDER BY timestamp DESC LIMIT ?""";
 
-    private static final String CLEANUP_DEATHS = """
-            DELETE FROM player_deaths WHERE uuid = ? AND id NOT IN (
-                SELECT id FROM (SELECT id FROM player_deaths WHERE uuid = ? ORDER BY timestamp DESC LIMIT 20) t
-            )""";
+    /** How long death-inventory history is retained before being pruned. */
+    private static final long DEATH_RETENTION_MILLIS = java.util.concurrent.TimeUnit.DAYS.toMillis(14);
+
+    private static final String CLEANUP_DEATHS = "DELETE FROM player_deaths WHERE uuid = ? AND timestamp < ?";
 
     private final Database database;
 
@@ -241,7 +241,7 @@ public final class MySQLStorage implements Storage {
     private void cleanupOldDeaths(UUID uuid, Connection connection) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(CLEANUP_DEATHS)) {
             statement.setString(1, uuid.toString());
-            statement.setString(2, uuid.toString());
+            statement.setLong(2, System.currentTimeMillis() - DEATH_RETENTION_MILLIS);
             statement.executeUpdate();
         }
     }

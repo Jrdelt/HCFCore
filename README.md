@@ -375,13 +375,19 @@ affiliation, visible to everyone (not just the wearer):
 
 - `[ftop]` — the faction's power-ranking position (`-` if factionless)
 - `[FactionName]` — `Neutral` if factionless
-- Color is one fixed color for everyone (green for faction members, gray
-  for factionless by default) — a Minecraft scoreboard team's prefix
-  can't show a different color to different viewers (e.g. red to
-  enemies, green to allies), so this isn't ally/enemy-relative.
+- Color is relative to each **viewer**, not fixed: your own faction is
+  green, an allied faction is light purple, and everyone else (enemies,
+  truce/no-relation factions, and factionless players alike) is red by
+  default. The same subject genuinely renders differently to different
+  viewers at once, since each nametag is its own team registered on that
+  specific viewer's own scoreboard (see below) — ally/enemy status comes
+  from FactionsUUID's real `/f ally`/`/f enemy` relation (the more hostile
+  of the two factions' one-directional relation wishes wins, so a
+  one-sided ally wish alone doesn't count, but a one-sided enemy wish
+  does).
 - Configurable in `config.yml` under `nametags:` — `enabled`,
-  `update-interval-ticks`, and `colors.same-faction`/`colors.neutral`
-  (any Adventure `NamedTextColor` name).
+  `update-interval-ticks`, and `colors.same-faction`/`colors.ally`/
+  `colors.enemy`/`colors.neutral` (any Adventure `NamedTextColor` name).
 - Teams live on each **viewer's own scoreboard**, one team per
   (viewer, subject) pair — not a single shared team on the main
   scoreboard. Every player has their own `Scoreboard` object (assigned
@@ -527,6 +533,41 @@ Run `/hcfcore clearmobstacks` (`hcfcore.admin`) to manually remove every
 currently-tracked stacked mob across all loaded chunks — the "manual
 entity-clear" a lagclear/entity-clear task would trigger; there's no
 automatic scheduled version of this built in.
+
+## Chunk Collector (`collectors.yml`)
+
+A placeable Green Shulker Box that vacuums up mob-kill drops so a
+grinder/farm doesn't carpet the ground in loot. Every item a **non-player**
+entity drops on death is PDC-tagged the instant it dies — player deaths,
+manually-dropped items, and block-break drops are never tagged (they never
+go through that code path in the first place), and EXP orbs are never
+touched at all. A tagged item that spawns strictly **above** a same-chunk
+collector's Y level is absorbed immediately; a periodic sweep (every
+`scan-interval-ticks`) catches anything that fell through some other path
+(e.g. it existed before the collector was placed).
+
+**Storage** is virtual and per-item-type — right-click a collector to open
+a 27-slot GUI with one slot per unique item type currently stored, showing
+`Stored: {amount} / {capacity}` in its lore. Left-click withdraws one stack
+(64), shift-click withdraws everything stored for that type. A
+`base-capacity-per-type` cap applies to *every* item type independently
+(50,000 rotten flesh **and**, separately, 50,000 bone, not a combined
+total) and can be raised via the Nether Star upgrade button, up to
+`max-upgrade-tier`, at an increasing money cost
+(`upgrade-cost-base * upgrade-cost-multiplier^tier`).
+
+**Placement/breaking** is gated on faction claim ownership exactly like
+spawners (`/staffbuild` bypasses it), capped at `max-per-chunk` and
+`max-per-player`, and requires Silk Touch to break if
+`silk-touch-required` is set. Breaking one drops it as an item with every
+stored count and its upgrade tier intact (round-tripped through the same
+PDC schema the placed block uses), so moving a collector never loses
+anything. Hoppers can't be placed within `hopper-block-radius` blocks of a
+collector, and one already touching the collector block can't push into
+or pull out of it.
+
+There's no in-game shop for these — `/chunkcollector give <player>`
+(`hcfcore.collector.give`) hands one out directly.
 
 ## Staff Tools
 
@@ -760,6 +801,7 @@ Each player's death history persists to MySQL and stores the last 20 deaths auto
 |---|---|---|
 | `/hcfcore reload` | `hcfcore.admin` | Reloads config, messages, kits, abilities, tags, and rebuilds the scoreboard for every online player. |
 | `/hcfcore clearmobstacks` | `hcfcore.admin` | Manually removes every currently-tracked stacked mob (see **Mob Stacking**) across all loaded chunks. |
+| `/chunkcollector give <player>` | `hcfcore.collector.give` | Gives a player a Chunk Collector (see **Chunk Collector**) -- there's no in-game shop for these. |
 
 ## Tab-completion
 

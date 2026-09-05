@@ -43,6 +43,9 @@ commands:
   spawners:
     description: Browse the spawner shop in a GUI.
     usage: /<command>
+  chunkcollector:
+    description: Give a player a Chunk Collector (Green Shulker Box).
+    usage: /<command> give <player>
   language:
     description: View or change your language.
     usage: /<command> [code]
@@ -91,6 +94,9 @@ commands:
 permissions:
   hcfcore.admin:
     description: Reload HCFCore's config, or manually clear stacked mobs.
+    default: op
+  hcfcore.collector.give:
+    description: Give a player a Chunk Collector.
     default: op
   hcfcore.kit.create:
     description: Create a kit from the currently held inventory.

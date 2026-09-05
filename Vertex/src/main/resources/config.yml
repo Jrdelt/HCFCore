@@ -329,15 +329,16 @@ nametags:
   update-interval-ticks: 15
 
   # Nametag format is fixed: &8[&a<ftop>&8] &8[<color>faction&8] &e<player>
-  # Note: nametags use a shared scoreboard team, so the faction-name color
-  # below is the SAME for every viewer -- Minecraft's scoreboard API has no
-  # per-viewer color, so true "red to enemies, purple to allies" coloring
-  # would require a packet library (e.g. ProtocolLib) and isn't implemented.
+  # The faction-name color below is relative to each *viewer*, not fixed --
+  # every player has their own scoreboard, and each nametag is its own team
+  # registered per-viewer, so the same subject can render green to their
+  # own faction, light purple to an allied faction, and red to everyone
+  # else, all at once.
   colors:
-    same-faction: 'green'      # Players in a faction
+    same-faction: 'green'      # Your own faction
+    ally: 'light_purple'
     enemy: 'red'
-    ally: 'purple'
-    neutral: 'gray'            # Factionless players
+    neutral: 'red'             # Factionless subjects, and factions with no ally/enemy relation
 
 # ============================================
 # REBOOT SYSTEM

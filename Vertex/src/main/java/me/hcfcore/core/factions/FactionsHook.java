@@ -6,6 +6,7 @@ import dev.kitteh.factions.FPlayer;
 import dev.kitteh.factions.FPlayers;
 import dev.kitteh.factions.Faction;
 import dev.kitteh.factions.Factions;
+import dev.kitteh.factions.permissible.Relation;
 import dev.kitteh.factions.permissible.Role;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -135,16 +136,61 @@ public final class FactionsHook {
     }
 
     /**
-     * Check if two factions are the same (for alliance/teamwork purposes).
-     * Note: FactionsUUID doesn't expose formal alliance API, so this just checks same faction.
+     * Whether two different factions have a genuine, mutual /f ally
+     * relation -- FactionsUUID does expose this via {@code relationWish},
+     * contrary to {@link #isAlly}'s claim otherwise. A relation is only as
+     * friendly as its *more hostile* side wishes it to be (a one-sided ally
+     * wish doesn't make a real alliance, but a one-sided enemy wish does
+     * make real hostility), so this takes the higher-ordinal (more hostile)
+     * of the two one-directional wishes. Same faction, or either side
+     * factionless, is never "ally" -- callers should check same-faction
+     * (see {@link #isSameFaction}) separately first.
      */
-    public static boolean isAlly(int factionId1, int factionId2) {
-        // Not in a faction = not allies
-        if (factionId1 == NO_FACTION || factionId2 == NO_FACTION) {
+    public static boolean isAllyFaction(int factionIdA, int factionIdB) {
+        if (factionIdA == NO_FACTION || factionIdB == NO_FACTION || factionIdA == factionIdB) {
             return false;
         }
-        // Same faction id = allies
-        return factionId1 == factionId2;
+        Faction factionA = factionById(factionIdA);
+        Faction factionB = factionById(factionIdB);
+        if (factionA == null || factionB == null) {
+            return false;
+        }
+        return effectiveRelation(factionA, factionB).isAlly();
+    }
+
+    /**
+     * Whether two different factions have a genuine, mutual /f enemy
+     * relation -- see {@link #isAllyFaction} for how "mutual" is resolved.
+     */
+    public static boolean isEnemyFaction(int factionIdA, int factionIdB) {
+        if (factionIdA == NO_FACTION || factionIdB == NO_FACTION || factionIdA == factionIdB) {
+            return false;
+        }
+        Faction factionA = factionById(factionIdA);
+        Faction factionB = factionById(factionIdB);
+        if (factionA == null || factionB == null) {
+            return false;
+        }
+        return effectiveRelation(factionA, factionB).isEnemy();
+    }
+
+    /** The more hostile (higher-ordinal) of the two factions' one-directional relationWish() calls. */
+    private static Relation effectiveRelation(Faction factionA, Faction factionB) {
+        Relation wishFromA = factionA.relationWish(factionB);
+        Relation wishFromB = factionB.relationWish(factionA);
+        return wishFromA.ordinal() >= wishFromB.ordinal() ? wishFromA : wishFromB;
+    }
+
+    private static Faction factionById(int factionId) {
+        if (factionId == NO_FACTION) {
+            return null;
+        }
+        for (Faction faction : Factions.factions().all()) {
+            if (faction != null && faction.id() == factionId) {
+                return faction;
+            }
+        }
+        return null;
     }
 
     public static int getFactionRank(int factionId) {

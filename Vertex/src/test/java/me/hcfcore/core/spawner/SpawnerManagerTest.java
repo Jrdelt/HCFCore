@@ -51,8 +51,8 @@ class SpawnerManagerTest {
             assertTrue(config.price() > 0, type + " should have a positive price");
             assertFalse(config.drops().isEmpty(), type + " should have a configured drop table");
         }
-        assertEquals(64, manager.maxStackSize());
-        assertTrue(manager.isSilkTouchRequired());
+        assertEquals(50, manager.maxStackSize());
+        assertFalse(manager.isSilkTouchRequired());
     }
 
     @Test

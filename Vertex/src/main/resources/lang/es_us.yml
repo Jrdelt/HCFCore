@@ -188,9 +188,10 @@ factions:
 
 staff:
   players-only: '<red>Solo los jugadores pueden usar este comando.'
-  rollback-usage: '<red>Uso: /rollback <jugador>'
-  rollback-opened: '<green>Abriendo historial de muertes de {player}'
-  no-deaths-found: '<red>No se encontraron muertes para este jugador.'
+  rollback-usage: '&8[&cStaff&8]&r <red>Uso: /rollback <jugador>'
+  rollback-opened: '&8[&cStaff&8]&r <green>Abriendo historial de muertes de {player}'
+  no-deaths-found: '&8[&cStaff&8]&r <red>No se encontraron muertes para este jugador.'
+  death-lookup-failed: '&8[&cStaff&8]&r <red>No se pudo cargar el historial de muertes -- revisa la consola.'
   deaths-title: 'Muertes - {uuid}'
   death-contents-title: 'Contenido de la Muerte'
   menu-back: '<red>Atras'
@@ -244,3 +245,18 @@ spawner:
   unclaim-blocked: '<red>✖ <gray>You can''t unclaim this chunk while it has active spawners.'
   unclaimall-warning: '<yellow>⚠ <gray>{amount}x spawner(s) in your unclaimed land were dropped on the ground.'
   disband-warning: '<yellow>⚠ <gray>{amount}x spawner(s) in your faction''s claimed land were dropped on the ground.'
+
+collector:
+  title: 'Chunk Collector'
+  stored-lore: '<gray>Stored: <yellow>{stored} <gray>/ <yellow>{capacity}'
+  upgrade-lore: '<gray>Click to upgrade to tier <yellow>{tier} <gray>for <yellow>{cost}'
+  upgrade-maxed: '<gray>Already at the maximum tier ({tier}).'
+  upgraded: '<green>Upgraded to tier {tier} -- capacity is now {capacity} per item type.'
+  withdrew: '<green>Withdrew {amount}x {item}.'
+  claim-only: '<red>Chunk Collectors can only be placed in your own faction''s claimed territory.'
+  chunk-limit: '<red>This chunk already has the maximum number of Chunk Collectors.'
+  player-limit: '<red>You already have the maximum number of Chunk Collectors placed.'
+  not-your-claim: '<red>You can''t break a Chunk Collector outside your own faction''s claim.'
+  silk-touch-required: '<red>You need a Silk Touch tool to break a Chunk Collector.'
+  hopper-blocked: '<red>Hoppers can''t be placed this close to a Chunk Collector.'
+  cannot-afford: '<gray>You need {amount} to buy this upgrade.'

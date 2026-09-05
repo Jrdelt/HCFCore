@@ -98,6 +98,9 @@ public final class HCFCorePlugin extends JavaPlugin {
     private me.hcfcore.core.spawner.SpawnerStorage spawnerStorage;
     private me.hcfcore.core.spawner.SpawnerManager spawnerManager;
     private me.hcfcore.core.spawner.MobStackListener mobStackListener;
+    private me.hcfcore.core.collector.ChunkCollectorStorage chunkCollectorStorage;
+    private me.hcfcore.core.collector.ChunkCollectorManager chunkCollectorManager;
+    private me.hcfcore.core.collector.ChunkCollectorListener chunkCollectorListener;
     private RebootManager rebootManager;
     private PlayerConnectionListener playerConnectionListener;
     private RepairListener repairListener;
@@ -130,6 +133,8 @@ public final class HCFCorePlugin extends JavaPlugin {
             storage.init();
             spawnerStorage = new me.hcfcore.core.spawner.SpawnerStorage(database);
             spawnerStorage.init();
+            chunkCollectorStorage = new me.hcfcore.core.collector.ChunkCollectorStorage(database);
+            chunkCollectorStorage.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize the database, disabling.", e);
             Bukkit.getPluginManager().disablePlugin(this);
@@ -218,6 +223,21 @@ public final class HCFCorePlugin extends JavaPlugin {
         mobStackListener = new me.hcfcore.core.spawner.MobStackListener(this, spawnerManager);
         Bukkit.getPluginManager().registerEvents(mobStackListener, this);
         Bukkit.getScheduler().runTaskTimer(this, mobStackListener::consolidateStacks, 40L, 40L);
+
+        chunkCollectorManager = new me.hcfcore.core.collector.ChunkCollectorManager(this, chunkCollectorStorage);
+        chunkCollectorManager.load();
+        chunkCollectorManager.loadIndexFromDatabase();
+        chunkCollectorListener = new me.hcfcore.core.collector.ChunkCollectorListener(
+                this, chunkCollectorManager, staffManager, messages);
+        Bukkit.getPluginManager().registerEvents(chunkCollectorListener, this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.hcfcore.core.collector.ChunkCollectorMenuListener(chunkCollectorManager, messages), this);
+        Bukkit.getScheduler().runTaskTimer(this, chunkCollectorListener::scanForMissedItems,
+                chunkCollectorManager.scanIntervalTicks(), chunkCollectorManager.scanIntervalTicks());
+        me.hcfcore.core.collector.ChunkCollectorCommand chunkCollectorCommand =
+                new me.hcfcore.core.collector.ChunkCollectorCommand(chunkCollectorManager, messages);
+        getCommand("chunkcollector").setExecutor(chunkCollectorCommand);
+        getCommand("chunkcollector").setTabCompleter(chunkCollectorCommand);
 
         combatListener = new CombatListener(this, combatManager, messages);
         Bukkit.getPluginManager().registerEvents(combatListener, this);
@@ -378,6 +398,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
         if (spawnerManager != null) {
             spawnerManager.load();
+        }
+        if (chunkCollectorManager != null) {
+            chunkCollectorManager.load();
         }
         if (kitManager != null) {
             kitManager.load();

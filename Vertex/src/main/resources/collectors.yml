@@ -1,0 +1,44 @@
+# ============================================
+# CHUNK COLLECTOR (Green Shulker Box)
+# ============================================
+# Automatically vacuums up mob-kill drops (never player deaths, manually
+# dropped items, or block-break drops, and never EXP orbs) into a single
+# per-item-type virtual storage, so a grinder/farm doesn't carpet the
+# ground in loot. Only items dropped strictly ABOVE the collector's own
+# Y level are eligible -- a collector at the bottom of a mob-fall shaft
+# catches everything that falls down to it.
+enabled: true
+
+# Whether breaking a Chunk Collector requires a Silk Touch tool.
+silk-touch-required: true
+
+# How many Chunk Collectors a single chunk may contain at once.
+max-per-chunk: 1
+
+# How many Chunk Collectors a single player may have placed, server-wide.
+max-per-player: 3
+
+# Per-item-type storage cap before any upgrades (e.g. up to this many
+# rotten flesh AND, independently, up to this many bones -- not a combined
+# total across every item type).
+base-capacity-per-type: 50000
+
+# Extra per-item-type capacity granted by each upgrade tier.
+capacity-per-upgrade: 25000
+
+# Highest upgrade tier a single collector can reach.
+max-upgrade-tier: 5
+
+# Cost (in money) to buy the next upgrade tier: base * multiplier^(tier-1),
+# where tier is the 1-based tier being purchased.
+upgrade-cost-base: 100000.0
+upgrade-cost-multiplier: 1.75
+
+# Hoppers can't be placed within this many blocks (horizontally or
+# vertically) of a Chunk Collector, and a hopper already touching the
+# collector block itself can't push into or pull out of it.
+hopper-block-radius: 2
+
+# How often (in ticks) the fallback chunk-wide sweep runs, catching any
+# tagged item on the ground that the real-time collection missed.
+scan-interval-ticks: 100

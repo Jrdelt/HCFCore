@@ -61,5 +61,15 @@ public final class LeapListener implements Listener {
         Vector boost = direction.multiply(forwardMultiplier).setY(direction.getY() * forwardMultiplier + yMultiplier);
         player.setVelocity(boost);
         FallDamageImmunity.grant(player.getUniqueId(), 8);
+
+        // effect-type/effect-amplifier/effect-duration-seconds were
+        // configured but never applied -- Leap is meant to grant a landing
+        // buff (SPEED by default) alongside the jump itself.
+        PotionEffectType type = PotionEffectType.getByName(ability.getString("effect-type", ""));
+        if (type != null) {
+            int durationSeconds = Math.max(1, ability.getInt("effect-duration-seconds", 5));
+            int amplifier = Math.max(0, ability.getInt("effect-amplifier", 0));
+            player.addPotionEffect(new PotionEffect(type, durationSeconds * 20, amplifier));
+        }
     }
 }
