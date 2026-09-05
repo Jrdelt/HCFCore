@@ -116,6 +116,7 @@ combat:
   tag-self: '<red>Ein Spieler kann nicht gegen sich selbst markiert werden. Lasse den Gegner weg, um gegen "Server" zu markieren.'
   tag-server-success: '<green>{player} wurde in den Kampf gegen "Server" versetzt.'
   tag-success: '<green>{player} und {opponent} wurden in den Kampf versetzt.'
+  no-pearl-spawn: '<red>✖ <gray>Du kannst nicht in eine geschützte Zone perlen.'
 
 archer:
   tag-applied: '<gold>{player} ist bogenschuetzen-markiert ({seconds}s) <gray>- <red>+{percent}% Pfeilschaden <gray>/ <red>+{melee}% Nahkampf deiner Fraktion<gray>.'
@@ -154,6 +155,7 @@ ability:
   repair-countdown: '<gray>Repairing: {seconds}s'
   timewarp-none: '<red>You haven''t ender pearled recently.'
   timewarp-warped: '<green>Warped back to your last pearl.'
+  timewarp-blocked: '<red>✖</red> <gray>Du kannst nicht in eine geschützte Zone zurückwarpen.'
   rogue-backstab: '<gold>Backstab landed for 3 hearts.'
   rogue-backstabbed: '<red>You were backstabbed!'
   mage-spell-cast: '<light_purple>Mage spell cast.'

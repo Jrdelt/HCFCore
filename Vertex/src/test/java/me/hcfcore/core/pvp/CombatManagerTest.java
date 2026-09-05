@@ -73,6 +73,22 @@ class CombatManagerTest {
     }
 
     @Test
+    void clearOwnTagRemovesOnlyThatPlayersTagWithoutTouchingTheirOpponent() {
+        // Regression coverage: clearOwnTag exists specifically so a
+        // victim's death doesn't wipe out the killer's own (possibly
+        // freshly-shortened post-kill) tag the way clear()'s mutual-clear
+        // cascade would.
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerMock bob = server.addPlayer("Bob");
+        combatManager.tag(alice, bob);
+
+        combatManager.clearOwnTag(alice.getUniqueId());
+
+        assertFalse(combatManager.isTagged(alice.getUniqueId()));
+        assertTrue(combatManager.isTagged(bob.getUniqueId()), "Bob's own tag must survive Alice's death");
+    }
+
+    @Test
     void retaggingPlayerClearsTheirPreviousOpponent() {
         PlayerMock alice = server.addPlayer("Alice");
         PlayerMock bob = server.addPlayer("Bob");

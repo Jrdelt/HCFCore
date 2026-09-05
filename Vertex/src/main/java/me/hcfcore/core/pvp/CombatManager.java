@@ -151,6 +151,17 @@ public final class CombatManager {
     }
 
     /**
+     * Removes only this player's own combat tag -- unlike clear(), this
+     * does NOT cascade to clear their opponent's tag too. Used on death: a
+     * killer's own tag (already shortened to the post-kill cooldown) must
+     * be left alone, not wiped out just because their target died.
+     */
+    public void clearOwnTag(UUID uuid) {
+        opponents.remove(uuid);
+        taggedUntil.remove(uuid);
+    }
+
+    /**
      * Records a left-click arm swing for CPS tracking. Tracked for every
      * online player unconditionally (not just tagged ones) so the action
      * bar has real recent history the instant a tag starts, not a cold 0.

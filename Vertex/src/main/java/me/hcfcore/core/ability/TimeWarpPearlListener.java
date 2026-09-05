@@ -74,6 +74,14 @@ public final class TimeWarpPearlListener implements Listener {
             player.sendMessage(messages.getChat(player, "ability.timewarp-none"));
             return;
         }
+        // A recorded origin can itself sit inside a protected zone from a
+        // much earlier, perfectly ordinary pearl thrown out of it (e.g.
+        // before a fight even started) -- without this, that origin becomes
+        // an anytime recall-to-safety button during a later, unrelated fight.
+        if (NoPearlSpawnListener.isProtected(plugin, origin)) {
+            player.sendMessage(messages.getChat(player, "ability.timewarp-blocked"));
+            return;
+        }
 
         if (!AbilityGate.checkAndStart(plugin, abilityManager, userManager, messages, player, ability)) {
             return;

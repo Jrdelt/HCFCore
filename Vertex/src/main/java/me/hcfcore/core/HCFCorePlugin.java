@@ -6,6 +6,7 @@ import me.hcfcore.core.ability.AbilityMenuListener;
 import me.hcfcore.core.ability.CooldownsCommand;
 import me.hcfcore.core.ability.AntiBlockupBoneListener;
 import me.hcfcore.core.ability.FakePearlListener;
+import me.hcfcore.core.ability.NoPearlSpawnListener;
 import me.hcfcore.core.ability.GetItemCommand;
 import me.hcfcore.core.ability.GrapplingHookListener;
 import me.hcfcore.core.ability.LeapListener;
@@ -214,6 +215,7 @@ public final class HCFCorePlugin extends JavaPlugin {
                 new SwitcherSnowballListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new TimeWarpPearlListener(this, abilityManager, userManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new NoPearlSpawnListener(this, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new NinjaStarListener(this, abilityManager, userManager, combatManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new FallDamageImmunityListener(), this);

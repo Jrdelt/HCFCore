@@ -489,7 +489,17 @@ Landing a kill shortens the killer's own combat tag down to
 `pvp.post-kill-combat-seconds` (default 5), instead of leaving them
 stuck waiting out the full `pvp.combat-tag-seconds` duration — enough
 time to loot the body and retreat. It only shortens an existing tag;
-a kill can't start one that wasn't already there.
+a kill can't start one that wasn't already there. Dying clears the
+victim's own tag entirely (they're out of combat) without touching
+the killer's — so a kill's shortened cooldown always survives the
+death that caused it.
+
+A thrown ender pearl landing inside a WorldGuard region or claim named
+in `pvp.no-pearl-regions` / `pvp.no-pearl-claim-names` (default:
+`spawn`, `safezone`) is cancelled outright — stops using a pearl to
+escape combat into spawn. Time Warp Pearl checks its recorded origin
+against the same zones, so a pearl thrown out of spawn long before a
+fight can't become an anytime recall-to-safety button either.
 
 ### Rally
 

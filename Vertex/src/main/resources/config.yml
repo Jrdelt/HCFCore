@@ -89,6 +89,16 @@ pvp:
   golden-apple-cooldown-seconds: 8
   enchanted-golden-apple-cooldown-seconds: 120
 
+  # A thrown ender pearl landing in one of these WorldGuard regions, or a
+  # claim named this (case-insensitive), is cancelled outright -- stops
+  # pearling into spawn/safezone to escape combat. Time Warp Pearl checks
+  # its recorded origin against this too, so a pearl thrown out of spawn
+  # long before a fight can't become an anytime recall-to-safety button.
+  no-pearl-regions:
+    - spawn
+  no-pearl-claim-names:
+    - safezone
+
   # Logout penalty: if true, disconnecting while tagged counts as combat logout
   logout-penalty: true
 

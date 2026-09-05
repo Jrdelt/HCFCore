@@ -116,6 +116,7 @@ combat:
   tag-self: '<red>A player can''t be tagged against themselves. Omit the opponent to tag against "server" instead.'
   tag-server-success: '<green>Tagged {player} into combat against "server".'
   tag-success: '<green>Tagged {player} and {opponent} into combat.'
+  no-pearl-spawn: '<red>✖ <gray>You can''t pearl into a protected zone.'
 
 archer:
   tag-applied: '<gold>{player} is Archer tagged ({seconds}s) <gray>- <red>+{percent}% arrow <gray>/ <red>+{melee}% faction melee<gray>.'
@@ -154,6 +155,7 @@ ability:
   repair-countdown: '&e&lABILITES&r &7> <gray>Repairing: {seconds}s'
   timewarp-none: '&e&lABILITES&r &7> <red>You haven''t ender pearled recently.'
   timewarp-warped: '&e&lABILITES&r &7> <green>Warped back to your last pearl.'
+  timewarp-blocked: '&e&lABILITES&r &7> <red>✖</red> <gray>You can''t warp back into a protected zone.'
   rogue-backstab: '&e&lABILITES&r &7> <gold>Backstab landed for 3 hearts.'
   rogue-backstabbed: '&e&lABILITES&r &7> <red>You were backstabbed!'
   mage-spell-cast: '&e&lABILITES&r &7> <light_purple>Mage spell cast.'

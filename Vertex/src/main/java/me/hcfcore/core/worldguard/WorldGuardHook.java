@@ -5,6 +5,7 @@ import com.sk89q.worldguard.WorldGuard;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import com.sk89q.worldguard.protection.regions.RegionQuery;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
 import java.util.Set;
@@ -21,15 +22,19 @@ public final class WorldGuardHook {
     }
 
     public static boolean isInDisabledRegion(Player player, Set<String> disabledRegionIds) {
+        return isInDisabledRegion(player.getLocation(), disabledRegionIds);
+    }
+
+    public static boolean isInDisabledRegion(Location location, Set<String> disabledRegionIds) {
         if (disabledRegionIds.isEmpty() || !Bukkit.getPluginManager().isPluginEnabled("WorldGuard")) {
             return false;
         }
-        return isInAnyRegion(player, disabledRegionIds);
+        return isInAnyRegion(location, disabledRegionIds);
     }
 
-    private static boolean isInAnyRegion(Player player, Set<String> regionIds) {
+    private static boolean isInAnyRegion(Location location, Set<String> regionIds) {
         RegionQuery query = WorldGuard.getInstance().getPlatform().getRegionContainer().createQuery();
-        Iterable<ProtectedRegion> regions = query.getApplicableRegions(BukkitAdapter.adapt(player.getLocation()));
+        Iterable<ProtectedRegion> regions = query.getApplicableRegions(BukkitAdapter.adapt(location));
         if (regions == null) {
             return false;
         }

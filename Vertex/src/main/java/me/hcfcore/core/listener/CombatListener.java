@@ -45,6 +45,10 @@ public final class CombatListener implements Listener {
         if (event.getEntity().getKiller() instanceof Player killer) {
             combatManager.applyPostKillCooldown(killer.getUniqueId());
         }
+        // clearOwnTag, not clear() -- clear() would cascade and wipe out
+        // the killer's post-kill cooldown just set above, since the killer
+        // was the victim's mutual opponent.
+        combatManager.clearOwnTag(event.getEntity().getUniqueId());
     }
 
     private Player resolveAttacker(Entity damager) {
