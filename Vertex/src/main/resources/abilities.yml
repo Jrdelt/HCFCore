@@ -9,7 +9,7 @@ abilities:
     stun-seconds: 8
 
   rabbits-feed:
-    material: FEATHER
+    material: RABBIT_FOOT
     name: '<green>Rabbit''s Feed'
     lore:
       - '<gray>Right-click for Speed V.'
