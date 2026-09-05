@@ -24,21 +24,20 @@ kits:
         amount: 1
         enchantments:
           FLAME: 1
+          INFINITY: 1
       - material: ARROW
-        amount: 32
-      - material: BREAD
-        amount: 8
-      - material: GOLDEN_CARROT
         amount: 1
+      - material: GOLDEN_CARROT
+        amount: 16
         ability: rabbits-feed
       - material: CHORUS_FRUIT
-        amount: 1
+        amount: 16
         ability: jump-boost-feather
     effects:
       - type: SPEED
         amplifier: 2
       - type: JUMP_BOOST
-        amplifier: 1
+        amplifier: 2
 
   archer-donator:
     permission: hcfcore.kit.archer.donator
@@ -69,22 +68,20 @@ kits:
         amount: 1
         enchantments:
           FLAME: 1
-          UNBREAKING: 3
+          INFINITY: 1
       - material: ARROW
-        amount: 64
-      - material: BREAD
-        amount: 8
-      - material: GOLDEN_CARROT
         amount: 1
+      - material: GOLDEN_CARROT
+        amount: 64
         ability: rabbits-feed
       - material: CHORUS_FRUIT
-        amount: 1
+        amount: 64
         ability: jump-boost-feather
     effects:
       - type: SPEED
         amplifier: 2
       - type: JUMP_BOOST
-        amplifier: 1
+        amplifier: 2
 
   miner:
     permission: ''
@@ -111,17 +108,15 @@ kits:
         amount: 1
       - material: TORCH
         amount: 32
-      - material: BREAD
-        amount: 8
     effects:
       - type: HASTE
-        amplifier: 1
+        amplifier: 2
       - type: NIGHT_VISION
         amplifier: 0
 
   miner-donator:
     permission: hcfcore.kit.miner.donator
-    cooldown-seconds: 300
+    cooldown-seconds: 600
     armor:
       - material: IRON_HELMET
         amount: 1
@@ -151,11 +146,9 @@ kits:
           EFFICIENCY: 1
       - material: TORCH
         amount: 64
-      - material: BREAD
-        amount: 8
     effects:
       - type: HASTE
-        amplifier: 1
+        amplifier: 2
       - type: NIGHT_VISION
         amplifier: 0
 
@@ -180,12 +173,10 @@ kits:
         enchantments:
           PROTECTION: 2
     contents:
-      - material: BREAD
-        amount: 8
       - material: GOLDEN_APPLE
         amount: 2
       - material: NOTE_BLOCK
-        amount: 1
+        amount: 16
         ability: portable-bard
     effects:
       - type: SPEED
@@ -197,7 +188,7 @@ kits:
 
   bard-donator:
     permission: hcfcore.kit.bard.donator
-    cooldown-seconds: 300
+    cooldown-seconds: 600
     armor:
       - material: GOLDEN_HELMET
         amount: 1
@@ -220,12 +211,10 @@ kits:
           PROTECTION: 2
           UNBREAKING: 3
     contents:
-      - material: BREAD
-        amount: 8
       - material: GOLDEN_APPLE
-        amount: 4
-      - material: NOTE_BLOCK
         amount: 2
+      - material: NOTE_BLOCK
+        amount: 64
         ability: portable-bard
     effects:
       - type: SPEED
@@ -263,12 +252,12 @@ kits:
     effects:
       - type: SPEED
         amplifier: 0
-      - type: ABSORPTION
+      - type: INVISIBILITY
         amplifier: 0
 
   diamond-donator:
     permission: hcfcore.kit.diamond.donator
-    cooldown-seconds: 300
+    cooldown-seconds: 600
     armor:
       - material: DIAMOND_HELMET
         amount: 1
@@ -285,15 +274,13 @@ kits:
     contents:
       - material: DIAMOND_SWORD
         amount: 1
-        enchantments: {UNBREAKING: 3}
-      - material: SPLASH_POTION
-        amount: 3
+        enchantments: {UNBREAKING: 3, SHARPNESS: 1}
       - material: GOLDEN_APPLE
         amount: 3
     effects:
       - type: SPEED
         amplifier: 0
-      - type: ABSORPTION
+      - type: INVISIBILITY
         amplifier: 0
 
   rogue:
@@ -314,22 +301,20 @@ kits:
         enchantments: {PROTECTION: 2}
     contents:
       - material: GOLDEN_SWORD
-        amount: 2
+        amount: 8
         ability: rogue-backstab
       - material: COMPASS
-        amount: 1
+        amount: 16
         ability: ninja-star
-      - material: BREAD
-        amount: 8
     effects:
       - type: SPEED
         amplifier: 2
       - type: JUMP_BOOST
-        amplifier: 1
+        amplifier: 0
 
   rogue-donator:
     permission: hcfcore.kit.rogue.donator
-    cooldown-seconds: 300
+    cooldown-seconds: 600
     armor:
       - material: CHAINMAIL_HELMET
         amount: 1
@@ -345,19 +330,16 @@ kits:
         enchantments: {PROTECTION: 2, UNBREAKING: 3}
     contents:
       - material: GOLDEN_SWORD
-        amount: 3
-        ability: rogue-backstab
-        enchantments: {UNBREAKING: 3}
-      - material: COMPASS
-        amount: 1
-        ability: ninja-star
-      - material: BREAD
         amount: 8
+        ability: rogue-backstab
+      - material: COMPASS
+        amount: 64
+        ability: ninja-star
     effects:
       - type: SPEED
         amplifier: 2
       - type: JUMP_BOOST
-        amplifier: 1
+        amplifier: 0
 
   mage:
     permission: ''
@@ -378,13 +360,13 @@ kits:
         enchantments: {PROTECTION: 2}
     contents:
       - material: WITHER_SKELETON_SKULL
-        amount: 1
+        amount: 16
         ability: mage-wither
       - material: COBWEB
-        amount: 1
+        amount: 16
         ability: mage-slowness
       - material: SPIDER_EYE
-        amount: 1
+        amount: 16
         ability: mage-poison
     effects:
       - type: SPEED
@@ -413,13 +395,13 @@ kits:
         enchantments: {PROTECTION: 2, UNBREAKING: 3}
     contents:
       - material: WITHER_SKELETON_SKULL
-        amount: 2
+        amount: 64
         ability: mage-wither
       - material: COBWEB
-        amount: 2
+        amount: 64
         ability: mage-slowness
       - material: SPIDER_EYE
-        amount: 2
+        amount: 64
         ability: mage-poison
     effects:
       - type: SPEED

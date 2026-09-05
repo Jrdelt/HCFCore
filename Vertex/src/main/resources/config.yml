@@ -34,7 +34,7 @@ mysql:
 # ============================================
 scoreboard:
   # How often to update the scoreboard (in ticks; 20 ticks = 1 second)
-  update-interval-ticks: 20
+  update-interval-ticks: 15
 
   # Scoreboard title with placeholders
   title: '<blue><bold>ꜰᴀᴄᴛɪᴏɴꜱ<reset>   <gray>{date}'
@@ -46,7 +46,7 @@ scoreboard:
   # Supports: {name}, {rank_prefix}, {rank}, {prefix}, {exp}, {balance}, {faction}, {power}, {fplayers_online}, {ftop}
   # Also supports PlaceholderAPI %placeholder% tokens (e.g. %luckperms_prefix%) if PlaceholderAPI is installed.
   lines:
-    - '     <gray>ꜱᴇᴀꜱᴏɴ 𝟣'
+    - '     <gray>ꜱᴇᴀꜱᴏɴ I'
     - '%luckperms_prefix%<gray>{name}'
     - '<gray>• <red>Balance: <white>{balance}'
     - '<gray>• <red>Experience: <white>{exp}'
@@ -60,14 +60,13 @@ scoreboard:
 
 # ============================================
 # CHAT FORMATTING
+# Chat format components (use MiniMessage or legacy & color codes).
+# rank-format also supports {rank}, {prefix}, or a PlaceholderAPI
+# %placeholder% token like %luckperms_prefix% (needs PlaceholderAPI).
+# Separator between message components
 # ============================================
 chat:
-  # Separator between message components
-  separator: ' <gray>» </gray>'
-
-  # Chat format components (use MiniMessage or legacy & color codes).
-  # rank-format also supports {rank}, {prefix}, or a PlaceholderAPI
-  # %placeholder% token like %luckperms_prefix% (needs PlaceholderAPI).
+  separator: ' <gray>»</gray>'
   faction-format: '&8[<gray>{faction}</gray>&8] '
   rank-format: '%luckperms_prefix%'
   name-format: '{name} '
@@ -109,10 +108,54 @@ pvp:
   # alias you use separately (e.g. both "f home" and "factions home") --
   # this only matches what the player actually typed.
   blocked-commands-in-combat:
-    - kit
-    - kits
-    - abilities
-    - f home
+      # Inventory & Kits
+      - kit
+      - kits
+      - abilities
+      - pv
+      - playervault
+      - playervaults
+      - vault
+      - ec
+      - enderchest
+      - craft
+      - workbench
+      - anvil
+      # Teleportation & Escapes
+      - f home
+      - factions home
+      - spawn
+      - warp
+      - warps
+      - tpa
+      - tpaccept
+      - tpahere
+      - back
+      - wild
+      - rtp
+      # Economy & Trading
+      - ah
+      - auctionhouse
+      - shop
+      - buy
+      - sell
+      - trade
+      - pay
+      # Cheats, Perks & Utility
+      - fly
+      - god
+      - heal
+      - feed
+      - repair
+      - fix
+      - suicide
+      # Faction Exploit Prevention
+      - f leave
+      - factions leave
+      - f disband
+      - factions disband
+      - f kick
+      - factions kick
 
   # How often to update the combat action bar (ticks)
   actionbar-update-interval-ticks: 2
@@ -133,24 +176,6 @@ pvp:
     vs-player: '<red>⚔ <gray>Combat<gray>: <red>{opponent} <gray>(<green>{health}<gray>) <gray>Ends: <green>{seconds} <gray>CPS: <green>You: <gray>(<green>{your_cps}<gray>) <red>Them <gray>(<red>{their_cps}<gray>) <red>⚔'    # Tagged, but the opponent is offline or otherwise unresolvable
     vs-unknown: '<red><bold>Combat</bold><gray>: {seconds} <green>you <white>({your_cps}cps)'
 
-  # ---- ARCHER CLASS ----
-  # Archers mark victims with arrows. Each stack increases arrow damage and gives
-  # the archer's faction a melee bonus against the marked player.
-  archer-tag:
-    # How long a mark lasts (refreshed by each new arrow)
-    duration-seconds: 10
-    # Maximum number of stacks from multiple archers
-    max-stacks: 4
-    # Arrow damage multiplier per stack (0.10 = +10% per stack)
-    arrow-damage-bonus-per-stack: 0.10
-    # Melee damage bonus for the archer's faction only
-    faction-melee-bonus-per-stack: 0.05
-    # Chat messages when a mark is applied (MiniMessage). Placeholders:
-    # {player}, {percent} (arrow bonus), {melee} (faction melee bonus),
-    # {seconds} (mark duration).
-    message-attacker: '&c&lKITS&r &7> <gold>Tagged {player} <gray>(+{percent}%, {seconds}s)'
-    message-victim: '&c&lKITS&r &7> <red>Tagged by {player} <gray>(+{percent}%, {seconds}s)'
-
   # ---- LEGACY COMBAT (1.8 PvP style) ----
   legacy-combat:
     enabled: true
@@ -160,6 +185,79 @@ pvp:
     attack-speed: 1024.0
     # Remove sweeping damage from axes
     disable-sweeping-attacks: true
+
+    # --- WEAPONS & ARMOR ---
+    # Overrides a weapon's base attack damage with the value below instead
+    # of the modern attribute-based amount. A material left out of the
+    # table keeps its normal damage. Enchantments/potion effects/armor
+    # still apply normally on top of this.
+    legacy-weapon-damage: true
+    weapon-damage:
+      WOODEN_SWORD: 4.0
+      GOLDEN_SWORD: 4.0
+      STONE_SWORD: 5.0
+      IRON_SWORD: 6.0
+      DIAMOND_SWORD: 8.0
+      NETHERITE_SWORD: 8.0
+      WOODEN_AXE: 5.0
+      GOLDEN_AXE: 5.0
+      STONE_AXE: 6.0
+      IRON_AXE: 6.0
+      DIAMOND_AXE: 6.0
+      NETHERITE_AXE: 6.0
+    # Cancels out the armor toughness modern armor pieces carry (the
+    # mechanic that gives diminishing returns against big hits), so armor
+    # reduction goes back to being a flat, predictable percentage.
+    legacy-armor-calculations: true
+    # Blocks swapping any item into the offhand slot (F key) -- no
+    # dual-wielding, no shields.
+    disable-offhand: true
+
+    # --- KNOCKBACK & PROJECTILES ---
+    # Restores the pre-1.9 behavior of snowball/egg/fishing-rod hits
+    # pushing the target even though they deal no damage.
+    projectile-knockback:
+      fishing-rod: true
+      snowball: true
+      egg: true
+    # Knockback applied on every melee hit and every enabled projectile hit
+    # above, overriding vanilla's own knockback entirely.
+    knockback:
+      horizontal: 0.4
+      vertical: 0.4
+      # Extra horizontal knockback when the attacker is sprinting.
+      sprint-bonus: 0.1
+
+    # --- HEALTH & REGEN ---
+    # Replaces vanilla's fast, food-saturation-boosted regen with a flat
+    # 1 heart every 4 seconds (still gated on food level >= 18, same as
+    # vanilla's own natural-regen requirement).
+    legacy-health-regen: true
+    # Replaces vanilla's golden apple/enchanted golden apple effects
+    # entirely with these lists (each entry: type, amplifier, duration in
+    # seconds). Leave a list empty to fall back to doing nothing special
+    # for that apple (vanilla's own effects still apply in that case).
+    legacy-golden-apples: true
+    golden-apple-effects:
+      - type: REGENERATION
+        amplifier: 1
+        duration-seconds: 5
+      - type: ABSORPTION
+        amplifier: 0
+        duration-seconds: 120
+    enchanted-golden-apple-effects:
+      - type: REGENERATION
+        amplifier: 1
+        duration-seconds: 20
+      - type: ABSORPTION
+        amplifier: 3
+        duration-seconds: 120
+      - type: FIRE_RESISTANCE
+        amplifier: 0
+        duration-seconds: 300
+      - type: RESISTANCE
+        amplifier: 0
+        duration-seconds: 300
 
 # ============================================
 # FACTIONS
@@ -172,6 +270,7 @@ factions:
   command-aliases:
     - f
     - factions
+    - t
 
 # ============================================
 # KITS
@@ -179,16 +278,12 @@ factions:
 kits:
   # Default kit cooldown in seconds
   default-cooldown-seconds: 30
-
   # Delay before class effects apply after putting on full armor
   effect-warmup-seconds: 5
-
   # Maximum cooldown allowed (about 1 day)
   max-cooldown-seconds: 86400
-
   # Maximum money cost for a kit
   max-money-cost: 1000000000.0
-
   # Maximum item cost amount
   max-cost-item-amount: 64
 
@@ -198,19 +293,15 @@ kits:
 abilities:
   # Cooldown shared across all ability items
   global-cooldown-seconds: 4
-
   # Maximum number of items /getitem can give
   max-getitem-amount: 64
-
   # Portable Bard's buff items only reach faction members within this many
   # blocks of the caster (same world), not the whole online faction.
   bard-share-radius-blocks: 30
-
   # Regions where abilities are disabled (e.g., spawn, safezone)
   # Per-ability settings (cooldowns, durations) go in abilities.yml
   disabled-regions:
     - spawn
-
   # Faction claim names abilities are disabled in -- abilities work
   # everywhere else (wilderness and any other faction's claimed land),
   # this is only a blocklist. Matches the faction's tag/name
@@ -227,7 +318,7 @@ nametags:
   enabled: true
 
   # How often to update nametags (in ticks; 20 ticks = 1 second)
-  update-interval-ticks: 20
+  update-interval-ticks: 15
 
   # Nametag format is fixed: &8[&a<ftop>&8] &8[<color>faction&8] &e<player>
   # Note: nametags use a shared scoreboard team, so the faction-name color
@@ -236,6 +327,8 @@ nametags:
   # would require a packet library (e.g. ProtocolLib) and isn't implemented.
   colors:
     same-faction: 'green'      # Players in a faction
+    enemy: 'red'
+    ally: 'purple'
     neutral: 'gray'            # Factionless players
 
 # ============================================
@@ -250,3 +343,21 @@ reboot:
     - 10
     - 5
     - 1
+
+  # ---- ARCHER CLASS ----
+  # Archers mark victims with arrows. Each stack increases arrow damage and gives
+  # the archer's faction a melee bonus against the marked player.
+  archer-tag:
+    # How long a mark lasts (refreshed by each new arrow)
+    duration-seconds: 8
+    # Maximum number of stacks from multiple archers
+    max-stacks: 3
+    # Arrow damage multiplier per stack (0.10 = +10% per stack)
+    arrow-damage-bonus-per-stack: 0.02175
+    # Melee damage bonus for the archer's faction only
+    faction-melee-bonus-per-stack: 0.025
+    # Chat messages when a mark is applied (MiniMessage). Placeholders:
+    # {player}, {percent} (arrow bonus), {melee} (faction melee bonus),
+    # {seconds} (mark duration).
+    message-attacker: '&c&lKITS&r &7> <gold>Tagged {player} <gray>(+{percent}%, {seconds}s)'
+    message-victim: '&c&lKITS&r &7> <red>Tagged by {player} <gray>(+{percent}%, {seconds}s)'

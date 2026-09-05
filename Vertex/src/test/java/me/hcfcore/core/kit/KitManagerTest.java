@@ -237,7 +237,7 @@ class KitManagerTest {
         assertTrue(player.hasPotionEffect(PotionEffectType.SPEED));
         assertEquals(2, player.getPotionEffect(PotionEffectType.SPEED).getAmplifier());
         assertTrue(player.hasPotionEffect(PotionEffectType.JUMP_BOOST));
-        assertEquals(1, player.getPotionEffect(PotionEffectType.JUMP_BOOST).getAmplifier());
+        assertEquals(2, player.getPotionEffect(PotionEffectType.JUMP_BOOST).getAmplifier());
 
         player.nextComponentMessage();
         player.nextComponentMessage();
@@ -403,7 +403,7 @@ class KitManagerTest {
         Kit archer = kitManager.get("archer");
         assertEquals(2, archer.getEffects().size());
         assertTrue(archer.getEffects().contains(new Kit.Effect(PotionEffectType.SPEED, 2)));
-        assertTrue(archer.getEffects().contains(new Kit.Effect(PotionEffectType.JUMP_BOOST, 1)));
+        assertTrue(archer.getEffects().contains(new Kit.Effect(PotionEffectType.JUMP_BOOST, 2)));
         ItemStack[] archerArmor = archer.getArmor();
         assertEquals(2, archerArmor[0].getEnchantmentLevel(Enchantment.PROTECTION));
         assertEquals(1, archerArmor[1].getEnchantmentLevel(Enchantment.PROTECTION));

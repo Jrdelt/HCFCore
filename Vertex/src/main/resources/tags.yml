@@ -1,72 +1,44 @@
 tags:
   berserker:
-    display: "&8[<gradient:#ff512f:#f09819>Berserker</gradient>&8]"
-    permission: hcfcore.tag.berserker
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Driven by pure rage.'
+      display: "&8[<gradient:#ff512f:#f09819><b>Berserker</b></gradient>&8]&r"
+      permission: hcfcore.tag.berserker
+      created-at: 1725235200000
+      owners: 0
+      lore:
+        - '<gray>ᴅʀɪᴠᴇɴ ʙʏ ᴘᴜʀᴇ ʀᴀɢᴇ.'
   venom:
-    display: "&8[<gradient:#00b09b:#96c93d>Venom</gradient>&8]"
-    permission: hcfcore.tag.venom
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Toxic strike.'
+      display: "&8[<gradient:#00b09b:#96c93d><b>Venom</b></gradient>&8]&r"
+      permission: hcfcore.tag.venom
+      created-at: 1725235200000
+      owners: 0
+      lore:
+        - '<gray>ᴛᴏxɪᴄ sᴛʀɪᴋᴇ.'
   ruin:
-    display: "&8[<gradient:#f12711:#f5af19>Ruin</gradient>&8]"
-    permission: hcfcore.tag.ruin
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Bring total collapse.'
-  apocalypse:
-    display: "&8[<gradient:#232526:#414345>Apocalypse</gradient>&8]"
-    permission: hcfcore.tag.apocalypse
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>The end of days.'
-  slaughter:
-    display: "&8[<gradient:#870000:#190a05>Slaughter</gradient>&8]"
-    permission: hcfcore.tag.slaughter
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>No mercy given.'
+      display: "&8[<gradient:#f12711:#f5af19><b>Ruin</b></gradient>&8]&r"
+      permission: hcfcore.tag.ruin
+      created-at: 1725235200000
+      owners: 0
+      lore:
+        - '<gray>ʙʀɪɴɢ ᴛᴏᴛᴀʟ ᴄᴏʟʟᴀᴘsᴇ.'
   frostbite:
-    display: "&8[<gradient:#2980b9:#6dd5fa>Frostbite</gradient>&8]"
-    permission: hcfcore.tag.frostbite
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Frozen in combat.'
-  typhoon:
-    display: "&8[<gradient:#1f4037:#99f2c8>Typhoon</gradient>&8]"
-    permission: hcfcore.tag.typhoon
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Sweeps away the enemy.'
+      display: "&8[<gradient:#2980b9:#6dd5fa><b>Frostbite</b></gradient>&8]&r"
+      permission: hcfcore.tag.frostbite
+      created-at: 1725235200000
+      owners: 0
+      lore:
+        - '<gray>ғʀᴏᴢᴇɴ ɪɴ ᴄᴏᴍʙᴀᴛ.'
   eclipse:
-    display: "&8[<gradient:#0f2027:#203a43:#2c5364>Eclipse</gradient>&8]"
-    permission: hcfcore.tag.eclipse
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Shadows conceal the kill.'
-  butcher:
-    display: "&8[<gradient:#cb356b:#bd3f32>Butcher</gradient>&8]"
-    permission: hcfcore.tag.butcher
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Swift execution.'
+      display: "&8[<gradient:#0f2027:#203a43:#2c5364><b>Eclipse</b></gradient>&8]&r"
+      permission: hcfcore.tag.eclipse
+      created-at: 1725235200000
+      owners: 0
+      lore:
+        - '<gray>sʜᴀᴅᴏᴡs ᴄᴏɴᴄᴇᴀʟ ᴛʜᴇ ᴋɪʟʟ.'
   vortex:
-    display: "&8[<gradient:#3a1c71:#d76d77:#ffaf7b>Vortex</gradient>&8]"
-    permission: hcfcore.tag.vortex
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>Caught in the spin.'
+      display: "&8[<gradient:#3a1c71:#d76d77:#ffaf7b><b>Vortex</b></gradient>&8]&r"
+      permission: hcfcore.tag.vortex
+      created-at: 1725235200000
+      owners: 0
+      lore:
+        - '<gray>ᴄᴀᴜɢʜᴛ ɪɴ ᴛʜᴇ sᴘɪɴ.'
 players: {}

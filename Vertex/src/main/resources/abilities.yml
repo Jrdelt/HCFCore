@@ -1,173 +1,173 @@
 abilities:
   pearl-stunner:
     material: END_ROD
-    name: '<light_purple>Pearl Stunner'
+    name: '<light_purple>ᴘᴇᴀʀʟ sᴛᴜɴɴᴇʀ'
     lore:
-      - '<gray>Hit a player to stop them from'
-      - '<gray>using pearls for a short time.'
-    cooldown-seconds: 30
+      - '<gray>ʜɪᴛ ᴀ ᴘʟᴀʏᴇʀ ᴛᴏ sᴛᴏᴘ ᴛʜᴇᴍ ғʀᴏᴍ'
+      - '<gray>ᴜsɪɴɢ ᴘᴇᴀʀʟs ғᴏʀ ᴀ sʜᴏʀᴛ ᴛɪᴍᴇ.'
+    cooldown-seconds: 45
     stun-seconds: 8
 
   rabbits-feed:
     material: GOLDEN_CARROT
-    name: '<green>Rabbit''s Feed'
+    name: '<green>ʀᴀʙʙɪᴛ''s ғᴇᴇᴅ'
     lore:
-      - '<gray>Right-click for Speed V.'
-    cooldown-seconds: 30
-    speed-duration-seconds: 8
+      - '<gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ғᴏʀ sᴘᴇᴇᴅ ᴠ.'
+    cooldown-seconds: 60
+    speed-duration-seconds: 5
 
   jump-boost-feather:
     material: CHORUS_FRUIT
-    name: '<green>Jump Boost Fruit'
+    name: '<green>ᴊᴜᴍᴘ ʙᴏᴏsᴛ ғʀᴜɪᴛ'
     lore:
-      - '<gray>Right-click for Jump Boost V.'
-    cooldown-seconds: 30
-    jump-duration-seconds: 8
+      - '<gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ғᴏʀ ᴊᴜᴍᴘ ʙᴏᴏsᴛ ᴠ.'
+    cooldown-seconds: 45
+    jump-duration-seconds: 6
 
   anti-blockup-bone:
     material: BONE
-    name: '<white>Anti-Blockup Bone'
+    name: '<white>ᴀɴᴛɪ-ʙʟᴏᴄᴋᴜᴘ ʙᴏɴᴇ'
     lore:
-      - '<gray>Hit an enemy with this to stop'
-      - '<gray>them from placing blocks for'
-      - '<gray>a short time.'
-    cooldown-seconds: 60
-    hits-required: 3
-    deny-seconds: 15
+      - '<gray>ʜɪᴛ ᴀɴ ᴇɴᴇᴍʏ ᴛᴡᴏ ᴛɪᴍᴇs ᴛᴏ sᴛᴏᴘ'
+      - '<gray>ᴛʜᴇᴍ ғʀᴏᴍ ᴘʟᴀᴄɪɴɢ ʙʟᴏᴄᴋs ғᴏʀ'
+      - '<gray>ᴀ sʜᴏʀᴛ ᴛɪᴍᴇ.'
+    cooldown-seconds: 90
+    hits-required: 2
+    deny-seconds: 8
 
   fake-pearl:
     material: ENDER_PEARL
-    name: '<light_purple>Fake Pearl'
+    name: '<light_purple>ғᴀᴋᴇ ᴘᴇᴀʀʟ'
     lore:
-      - '<gray>Throws a pearl that looks real'
-      - '<gray>but never actually teleports'
-      - '<gray>you -- bait your enemy.'
-    cooldown-seconds: 30
+      - '<gray>ᴛʜʀᴏᴡs ᴀ ᴘᴇᴀʀʟ ᴛʜᴀᴛ ʟᴏᴏᴋs ʀᴇᴀʟ'
+      - '<gray>ʙᴜᴛ ɴᴇᴠᴇʀ ᴀᴄᴛᴜᴀʟʟʏ ᴛᴇʟᴇᴘᴏʀᴛs'
+      - '<gray>ʏᴏᴜ -- ʙᴀɪᴛ ʏᴏᴜʀ ᴇɴᴇᴍʏ.'
+    cooldown-seconds: 45
 
   grappling-hook:
     material: FISHING_ROD
-    name: '<blue>Grappling Hook'
+    name: '<blue>ɢʀᴀᴘᴘʟɪɴɢ ʜᴏᴏᴋ'
     lore:
-      - '<gray>Hook a block or player and'
-      - '<gray>reel yourself toward it.'
+      - '<gray>ʜᴏᴏᴋ ᴀ ʙʟᴏᴄᴋ ᴏʀ ᴘʟᴀʏᴇʀ ᴀɴᴅ'
+      - '<gray>ʀᴇᴇʟ ʏᴏᴜʀsᴇʟғ ᴛᴏᴡᴀʀᴅ ɪᴛ.'
     cooldown-seconds: 20
-    uses: 8
-    forward-multiplier: 1.6
-    y-multiplier: 0.8
+    uses: 4
+    forward-multiplier: 1.9
+    y-multiplier: 0.6
 
   leap:
     material: FIREWORK_ROCKET
-    name: '<red>Leap'
+    name: '<red>ʟᴇᴀᴘ'
     lore:
-      - '<gray>Launches you forward and'
-      - '<gray>slightly upward.'
+      - '<gray>ʟᴀᴜɴᴄʜᴇs ʏᴏᴜ ғᴏʀᴡᴀʀᴅ ᴀɴᴅ'
+      - '<gray>sʟɪɢʜᴛʟʏ ᴜᴘᴡᴀʀᴅ.'
     cooldown-seconds: 45
-    forward-multiplier: 1.4
-    y-multiplier: 0.6
+    forward-multiplier: 2.2
+    y-multiplier: 0.9
     effect-type: SPEED
     effect-amplifier: 4
     effect-duration-seconds: 5
 
   rogue-backstab:
     material: GOLDEN_SWORD
-    name: '<yellow>Gold Dagger'
+    name: '<yellow>ɢᴏʟᴅ ᴅᴀɢɢᴇʀ'
     lore:
-      - '<gray>Hit an enemy from behind for 3 hearts.'
-      - '<gray>Consumed on use.'
-    cooldown-seconds: 20
+      - '<gray>ʜɪᴛ ᴀɴ ᴇɴᴇᴍʏ ғʀᴏᴍ ʙᴇʜɪɴᴅ ғᴏʀ 3 ʜᴇᴀʀᴛs.'
+      - '<gray>ᴄᴏɴsᴜᴍᴇᴅ ᴏɴ sᴜᴄᴄᴇssғᴜʟ ᴜsᴇ.'
+    cooldown-seconds: 90
     damage: 6.0
 
   mage-wither:
     material: WITHER_SKELETON_SKULL
-    name: '<light_purple>Wither Spell'
+    name: '<light_purple>ᴡɪᴛʜᴇʀ sᴘᴇʟʟ'
     lore:
-      - '<gray>Hit an enemy to apply Wither.'
-    cooldown-seconds: 25
+      - '<gray>ʜɪᴛ ᴀɴ ᴇɴᴇᴍʏ ᴛᴏ ᴀᴘᴘʟʏ ᴡɪᴛʜᴇʀ.'
+    cooldown-seconds: 8
     effect-type: WITHER
     effect-amplifier: 0
-    effect-duration-seconds: 5
+    effect-duration-seconds: 3
 
   mage-slowness:
     material: COBWEB
-    name: '<#8B4513>Slowness Spell'
+    name: '<#8B4513>sʟᴏᴡɴᴇss sᴘᴇʟʟ'
     lore:
-      - '<gray>Hit an enemy to apply Slowness.'
-    cooldown-seconds: 20
+      - '<gray>ʜɪᴛ ᴀɴ ᴇɴᴇᴍʏ ᴛᴏ ᴀᴘᴘʟʏ sʟᴏᴡɴᴇss.'
+    cooldown-seconds: 8
     effect-type: SLOWNESS
     effect-amplifier: 1
-    effect-duration-seconds: 5
+    effect-duration-seconds: 3
 
   mage-poison:
     material: SPIDER_EYE
-    name: '<green>Poison Spell'
+    name: '<green>ᴘᴏɪsᴏɴ sᴘᴇʟʟ'
     lore:
-      - '<gray>Hit an enemy to apply Poison.'
-    cooldown-seconds: 25
+      - '<gray>ʜɪᴛ ᴀɴ ᴇɴᴇᴍʏ ᴛᴏ ᴀᴘᴘʟʏ ᴘᴏɪsᴏɴ.'
+    cooldown-seconds: 8
     effect-type: POISON
-    effect-amplifier: 0
-    effect-duration-seconds: 5
+    effect-amplifier: 1
+    effect-duration-seconds: 3
 
   portable-bard:
     material: NOTE_BLOCK
-    name: '<light_purple>Portable Bard'
+    name: '<light_purple>ᴘᴏʀᴛᴀʙʟᴇ ʙᴀʀᴅ'
     lore:
-      - '<gray>Right-click to open a menu and'
-      - '<gray>receive a buff item (Speed, Strength,'
-      - '<gray>Resistance, Regen, or Jump Boost).'
+      - '<gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴛᴏ ᴏᴘᴇɴ ᴀ ᴍᴇɴᴜ ᴀɴᴅ'
+      - '<gray>ʀᴇᴄᴇɪᴠᴇ ᴀ ʙᴜғғ ɪᴛᴇᴍ (sᴘᴇᴇᴅ, sᴛʀᴇɴɢᴛʜ,'
+      - '<gray>ʀᴇsɪsᴛᴀɴᴄᴇ, ʀᴇɢᴇɴ, ᴏʀ ᴊᴜᴍᴘ ʙᴏᴏsᴛ).'
     # No cooldown -- opening the menu and receiving a buff item is free;
     # the actual buff items below carry their own cooldown once used.
     cooldown-seconds: 0
 
   bard-buff-speed:
     material: SUGAR
-    name: '<gold>Speed II'
+    name: '<gold>sᴘᴇᴇᴅ ɪɪ'
     lore:
-      - '<gray>Right-click to grant Speed to your faction.'
-      - '<gray>Doubled if worn in the bard kit, halved otherwise.'
+      - '<gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴛᴏ ɢʀᴀɴᴛ sᴘᴇᴇᴅ ᴛᴏ ʏᴏᴜʀ ғᴀᴄᴛɪᴏɴ.'
+      - '<gray>ᴅᴏᴜʙʟᴇᴅ ɪғ ᴡᴏʀɴ ɪɴ ᴛʜᴇ ʙᴀʀᴅ ᴋɪᴛ, ʜᴀʟᴠᴇᴅ ᴏᴛʜᴇʀᴡɪsᴇ.'
     cooldown-seconds: 7
     effect-type: SPEED
     effect-amplifier: 1
-    buff-seconds: 6
+    buff-seconds: 5
 
   bard-buff-strength:
     material: BLAZE_POWDER
-    name: '<gold>Strength I'
+    name: '<gold>sᴛʀᴇɴɢᴛʜ ɪ'
     lore:
-      - '<gray>Right-click to grant Strength to your faction.'
-      - '<gray>Doubled if worn in the bard kit, halved otherwise.'
+      - '<gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴛᴏ ɢʀᴀɴᴛ sᴛʀᴇɴɢᴛʜ ᴛᴏ ʏᴏᴜʀ ғᴀᴄᴛɪᴏɴ.'
+      - '<gray>ᴅᴏᴜʙʟᴇᴅ ɪғ ᴡᴏʀɴ ɪɴ ᴛʜᴇ ʙᴀʀᴅ ᴋɪᴛ, ʜᴀʟᴠᴇᴅ ᴏᴛʜᴇʀᴡɪsᴇ.'
     cooldown-seconds: 7
     effect-type: STRENGTH
-    effect-amplifier: 0
-    buff-seconds: 6
+    effect-amplifier: 1
+    buff-seconds: 3
 
   bard-buff-resistance:
     material: IRON_INGOT
-    name: '<gold>Resistance I'
+    name: '<gold>ʀᴇsɪsᴛᴀɴᴄᴇ ɪ'
     lore:
-      - '<gray>Right-click to grant Resistance to your faction.'
-      - '<gray>Doubled if worn in the bard kit, halved otherwise.'
+      - '<gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴛᴏ ɢʀᴀɴᴛ ʀᴇsɪsᴛᴀɴᴄᴇ ᴛᴏ ʏᴏᴜʀ ғᴀᴄᴛɪᴏɴ.'
+      - '<gray>ᴅᴏᴜʙʟᴇᴅ ɪғ ᴡᴏʀɴ ɪɴ ᴛʜᴇ ʙᴀʀᴅ ᴋɪᴛ, ʜᴀʟᴠᴇᴅ ᴏᴛʜᴇʀᴡɪsᴇ.'
     cooldown-seconds: 7
     effect-type: RESISTANCE
-    effect-amplifier: 0
+    effect-amplifier: 1
     buff-seconds: 6
 
   bard-buff-regeneration:
     material: GHAST_TEAR
-    name: '<gold>Regeneration I'
+    name: '<gold>ʀᴇɢᴇɴᴇʀᴀᴛɪᴏɴ ɪ'
     lore:
-      - '<gray>Right-click to grant Regeneration to your faction.'
-      - '<gray>Doubled if worn in the bard kit, halved otherwise.'
+      - '<gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴛᴏ ɢʀᴀɴᴛ ʀᴇɢᴇɴᴇʀᴀᴛɪᴏɴ ᴛᴏ ʏᴏᴜʀ ғᴀᴄᴛɪᴏɴ.'
+      - '<gray>ᴅᴏᴜʙʟᴇᴅ ɪғ ᴡᴏʀɴ ɪɴ ᴛʜᴇ ʙᴀᴅ ᴋɪᴛ, ʜᴀʟᴠᴇᴅ ᴏᴛʜᴇʀᴡɪsᴇ.'
     cooldown-seconds: 7
     effect-type: REGENERATION
-    effect-amplifier: 0
-    buff-seconds: 6
+    effect-amplifier: 1
+    buff-seconds: 5
 
   bard-buff-jump-boost:
     material: FEATHER
-    name: '<gold>Jump Boost II'
+    name: '<gold>ᴊᴜᴍᴘ ʙᴏᴏsᴛ ɪɪ'
     lore:
-      - '<gray>Right-click to grant Jump Boost to your faction.'
-      - '<gray>Doubled if worn in the bard kit, halved otherwise.'
+      - '<gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴛᴏ ɢʀᴀɴᴛ ᴊᴜᴍᴘ ʙᴏᴏsᴛ ᴛᴏ ʏᴏᴜʀ ғᴀᴄᴛɪᴏɴ.'
+      - '<gray>ᴅᴏᴜʙʟᴇᴅ ɪғ ᴡᴏʀɴ ɪɴ ᴛʜᴇ ʙᴀʀᴅ ᴋɪᴛ, ʜᴀʟᴠᴇᴅ ᴏᴛʜᴇʀᴡɪsᴇ.'
     cooldown-seconds: 7
     effect-type: JUMP_BOOST
     effect-amplifier: 1
@@ -175,38 +175,38 @@ abilities:
 
   repair:
     material: ANVIL
-    name: '<light_purple>Repair'
+    name: '<light_purple>ʀᴇᴘᴀɪʀ'
     lore:
-      - '<gray>Grants temporary access to'
-      - '<gray>repair your gear, with a'
-      - '<gray>countdown on your scoreboard.'
-    cooldown-seconds: 600
-    duration-seconds: 60
+      - '<gray>ɢʀᴀɴᴛs ᴛᴇᴍᴘᴏʀᴀʀʏ ᴀᴄᴄᴇss ᴛᴏ'
+      - '<gray>ʀᴇᴘᴀɪʀ ʏᴏᴜʀ ɢᴇᴀʀ, ᴡɪᴛʜ ᴀ'
+      - '<gray>ᴄᴏᴜɴᴛᴅᴏᴡɴ ᴏɴ ʏᴏᴜʀ sᴄᴏʀᴇʙᴏᴀʀᴅ.'
+    cooldown-seconds: 1200
+    duration-seconds: 30
     permission-node: essentials.fix
 
   switcher-snowball:
     material: SNOWBALL
-    name: '<white>Switcher Snowball'
+    name: '<white>sᴡɪᴛᴄʜᴇʀ sɴᴏᴡʙᴀʟʟ'
     lore:
-      - '<gray>Throw at an enemy to swap'
-      - '<gray>places with them.'
-    cooldown-seconds: 30
+      - '<gray>ᴛʜʀᴏᴡ ᴀᴛ ᴀɴ ᴇɴᴇᴍʏ ᴛᴏ sᴡᴀᴘ'
+      - '<gray>ᴘʟᴀᴄᴇs ᴡɪᴛʜ ᴛʜᴇᴍ.'
+    cooldown-seconds: 45
 
   time-warp-pearl:
     material: ENDER_EYE
-    name: '<light_purple>Time Warp Pearl'
+    name: '<light_purple>ᴛɪᴍᴇ ᴡᴀʀᴘ ᴘᴇᴀʀʟ'
     lore:
-      - '<gray>Teleports you back to the last'
-      - '<gray>place you actually ender'
-      - '<gray>pearled from.'
-    cooldown-seconds: 30
+      - '<gray>ᴛᴇʟᴇᴘᴏʀᴛs ʏᴏᴜ ʙᴀᴄᴋ ᴛᴏ ᴛʜᴇ ʟᴀsᴛ'
+      - '<gray>ᴘʟᴀᴄᴇ ʏᴏᴜ ᴀᴄᴛᴜᴀʟʟʏ ᴇɴᴅᴇʀ'
+      - '<gray>ᴘᴇᴀʀʟᴇᴅ ғʀᴏᴍ.'
+    cooldown-seconds: 45
 
   ninja-star:
     material: COMPASS
-    name: '<light_purple>Ninja Star'
+    name: '<light_purple>ɴɪɴᴊᴀ sᴛᴀʀ'
     lore:
-      - '<gray>Teleport to whoever hit you'
-      - '<gray>last, after a 5s warning to'
-      - '<gray>them. Needs a hit within the'
-      - '<gray>last 15s and both of you in combat.'
-    cooldown-seconds: 60
+      - '<gray>ᴛᴇʟᴇᴘᴏʀᴛ ᴛᴏ ᴡʜᴏᴇᴠᴇʀ ʜɪᴛ ʏᴏᴜ'
+      - '<gray>ʟᴀsᴛ, ᴀғᴛᴇʀ ᴀ 5s ᴡᴀʀɴɪɴɢ ᴛᴏ'
+      - '<gray>ᴛʜᴇᴍ. ɴᴇᴇᴅs ᴀ ʜɪᴛ ᴡɪᴛʜɪɴ ᴛʜᴇ'
+      - '<gray>ʟᴀsᴛ 15s ᴀɴᴅ ʙᴏᴛʜ ᴏғ ʏᴏᴜ ɪɴ ᴄᴏᴍʙᴀᴛ.'
+    cooldown-seconds: 120

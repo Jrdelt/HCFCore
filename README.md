@@ -105,7 +105,41 @@ one-word entry like `kit` blocks that whole command tree; a multi-word
 entry like `f home` blocks only that exact subcommand, leaving the rest
 of `/f` untouched.
 
-**Legacy Combat** — Enable 1.8-style PvP with instant attacks. Leave `worlds: []` to apply everywhere, or list specific world names to limit it.
+**Legacy Combat** (`pvp.legacy-combat` in `config.yml`) — Restores a set of
+pre-1.9 PvP mechanics. Leave `worlds: []` to apply everywhere, or list
+specific world names to limit it. Every sub-feature below has its own
+on/off switch and only applies in those worlds:
+- **Attack speed** / **disable-sweeping-attacks** — instant attacks, no
+  cooldown bar, no axe sweep damage.
+- **legacy-weapon-damage** — overrides a weapon's base damage from the
+  `weapon-damage` material table (e.g. diamond sword 8.0 > diamond axe
+  6.0) instead of the modern attribute-based amount. Enchantments,
+  potion effects, and armor still apply normally on top.
+- **legacy-armor-calculations** — cancels out the armor toughness modern
+  armor pieces carry (the mechanic that gives diminishing returns
+  against big hits), so armor reduction goes back to a flat, predictable
+  percentage.
+- **disable-offhand** — blocks putting anything in the offhand slot (F
+  key): no dual-wielding, no shields.
+- **projectile-knockback** (`fishing-rod`/`snowball`/`egg`) — restores
+  those hits pushing the target even though they deal no damage, which
+  modern Minecraft dropped.
+- **knockback** (`horizontal`/`vertical`/`sprint-bonus`) — overrides
+  vanilla's own knockback on every melee hit and every enabled
+  projectile hit above.
+- **legacy-health-regen** — replaces vanilla's fast, food-saturation-
+  boosted regen with a flat 1 heart every 4 seconds (still requires food
+  level 18+, same as vanilla's own gate).
+- **legacy-golden-apples** — replaces vanilla's golden apple / enchanted
+  golden apple effects with the `golden-apple-effects` /
+  `enchanted-golden-apple-effects` lists (each entry: `type`,
+  `amplifier`, `duration-seconds`). An empty list leaves that apple's
+  vanilla effects alone.
+
+Sword blocking (1.8's right-click-to-block with a sword) isn't
+included — it was removed from Minecraft entirely in 1.9 in favor of
+shields, and there's no reliable vanilla event to hang an approximation
+on; ask if you want a best-effort version added.
 
 **Kits** — `effect-warmup-seconds` (default: 5) is the delay before class effects activate after equipping a full armor set. This gives players time to react to the visual change.
 
