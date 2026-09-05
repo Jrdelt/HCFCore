@@ -116,13 +116,22 @@ public final class ChatFormatterListener implements Listener {
      * syntax (Minecraft restricts the character set), so no escaping is
      * needed here either.
      */
+    /**
+     * Unlike deserializeTemplate's other callers, {@code displayName} isn't
+     * plain untrusted text to escape -- EssentialsHook.resolveName already
+     * hands back a MiniMessage-safe string that may legitimately carry its
+     * own color tags (from an Essentials nickname), so it's substituted raw
+     * here, the same treatment rankComponent gives {prefix}.
+     */
     private Component nameComponent(Player player) {
         String displayName = EssentialsHook.resolveName(player);
         String nicknameColor = tagManager.getNicknameColor(player);
         if (nicknameColor != null) {
             return MessageFormatter.deserialize(nicknameColor + displayName);
         }
-        return deserializeTemplate(player, "chat.name-format", "<white>{name}</white>", "name", displayName);
+        String template = plugin.getConfig().getString("chat.name-format", "<white>{name}</white>")
+                .replace("{name}", displayName);
+        return MessageFormatter.deserialize(PlaceholderApiHook.apply(player, template));
     }
 
     private Component deserializeTemplate(Player player, String path, String fallback, String... values) {

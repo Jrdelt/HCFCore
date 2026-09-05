@@ -1,5 +1,8 @@
 package me.hcfcore.core.essentials;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -55,10 +58,29 @@ public final class EssentialsHook {
 
     /**
      * The name every display spot should actually render: the Essentials
-     * nickname when one is set, falling back to the real username otherwise.
+     * nickname when one is set, falling back to the real username
+     * otherwise -- as a MiniMessage-safe string ready to embed directly
+     * into this plugin's own templates.
      */
     public static String resolveName(Player player) {
         String nickname = getNickname(player);
-        return nickname != null ? nickname : player.getName();
+        return legacyToMiniMessage(nickname != null ? nickname : player.getName());
+    }
+
+    /**
+     * Essentials nicknames can carry legacy "&" or real "§" color codes
+     * (including the "§x§r§r§g§g§b§b" per-character format used for hex/RGB
+     * colors), none of which MessageFormatter's MiniMessage parser
+     * understands on its own -- left unconverted, they showed up as literal
+     * junk characters instead of a color, and on the scoreboard ate into
+     * the line's tight character budget, pushing the visible name out
+     * entirely. Adventure's legacy serializer turns them into a proper
+     * Component, which is then re-serialized to MiniMessage tags.
+     */
+    static String legacyToMiniMessage(String legacyText) {
+        Component component = legacyText.indexOf('§') >= 0
+                ? LegacyComponentSerializer.legacySection().deserialize(legacyText)
+                : LegacyComponentSerializer.legacyAmpersand().deserialize(legacyText);
+        return MiniMessage.miniMessage().serialize(component);
     }
 }

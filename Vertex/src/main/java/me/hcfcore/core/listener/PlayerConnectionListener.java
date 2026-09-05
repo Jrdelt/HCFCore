@@ -1,11 +1,11 @@
 package me.hcfcore.core.listener;
 
 import me.hcfcore.core.essentials.EssentialsHook;
+import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.luckperms.LuckPermsHook;
 import me.hcfcore.core.pvp.CombatManager;
 import me.hcfcore.core.scoreboard.ScoreboardManager;
 import me.hcfcore.core.user.UserManager;
-import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -45,10 +45,14 @@ public final class PlayerConnectionListener implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
-        // Set player display name with rank (and Essentials nickname, if any)
+        // Set player display name with rank (and Essentials nickname, if any).
+        // MessageFormatter.deserialize, not Component.text -- resolveName's
+        // output may carry MiniMessage color tags (from an Essentials
+        // nickname), and Component.text renders those as literal characters
+        // instead of parsing them.
         String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
         String displayName = EssentialsHook.resolveName(player);
-        player.displayName(Component.text(rank != null && !rank.isBlank()
+        player.displayName(MessageFormatter.deserialize(rank != null && !rank.isBlank()
                 ? "[" + rank + "] " + displayName
                 : displayName));
 
