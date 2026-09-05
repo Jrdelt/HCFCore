@@ -50,12 +50,25 @@ public final class PearlStunnerListener implements Listener {
             return;
         }
         Ability ability = abilityManager.get(ABILITY_ID);
+        if (ability == null) {
+            return;
+        }
+        if (abilityManager.isOnGlobalCooldown(attacker.getUniqueId())) {
+            long remaining = (abilityManager.globalCooldownRemainingMillis(attacker.getUniqueId()) + 999) / 1000;
+            attacker.sendMessage(messages.get(attacker, "ability.on-global-cooldown", "seconds", String.valueOf(remaining)));
+            return;
+        }
         User user = userManager.get(attacker.getUniqueId());
+        if (user == null) {
+            return;
+        }
+        if (abilityManager.isOnCooldown(user, ability)) {
+            long remaining = (abilityManager.remainingCooldownMillis(user, ability) + 999) / 1000;
+            attacker.sendMessage(messages.get(attacker, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
+            return;
+        }
         Set<String> disabledClaims = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-claim-names"));
-        if (ability == null || user == null
-                || abilityManager.isOnGlobalCooldown(attacker.getUniqueId())
-                || abilityManager.isOnCooldown(user, ability)
-                || FactionsHook.isDisabledClaim(attacker.getLocation(), disabledClaims)) {
+        if (FactionsHook.isDisabledClaim(attacker.getLocation(), disabledClaims)) {
             return;
         }
         long durationSeconds = Math.max(1, ability.getInt("stun-seconds", 8));

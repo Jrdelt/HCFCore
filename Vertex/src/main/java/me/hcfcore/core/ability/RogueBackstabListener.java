@@ -2,6 +2,7 @@ package me.hcfcore.core.ability;
 
 import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.lang.MessageFormatter;
+import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
 import org.bukkit.entity.Player;
@@ -20,11 +21,14 @@ public final class RogueBackstabListener implements Listener {
     private final Plugin plugin;
     private final AbilityManager abilityManager;
     private final UserManager userManager;
+    private final Messages messages;
 
-    public RogueBackstabListener(Plugin plugin, AbilityManager abilityManager, UserManager userManager) {
+    public RogueBackstabListener(Plugin plugin, AbilityManager abilityManager, UserManager userManager,
+                                  Messages messages) {
         this.plugin = plugin;
         this.abilityManager = abilityManager;
         this.userManager = userManager;
+        this.messages = messages;
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -39,13 +43,28 @@ public final class RogueBackstabListener implements Listener {
             return;
         }
         Ability ability = abilityManager.get(ABILITY_ID);
+        if (ability == null) {
+            return;
+        }
+        if (abilityManager.isOnGlobalCooldown(attacker.getUniqueId())) {
+            long remaining = (abilityManager.globalCooldownRemainingMillis(attacker.getUniqueId()) + 999) / 1000;
+            attacker.sendMessage(messages.get(attacker, "ability.on-global-cooldown", "seconds", String.valueOf(remaining)));
+            return;
+        }
         User user = userManager.get(attacker.getUniqueId());
+        if (user == null) {
+            return;
+        }
+        if (abilityManager.isOnCooldown(user, ability)) {
+            long remaining = (abilityManager.remainingCooldownMillis(user, ability) + 999) / 1000;
+            attacker.sendMessage(messages.get(attacker, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
+            return;
+        }
+        if (!isBehind(attacker, victim)) {
+            return;
+        }
         Set<String> disabledClaims = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-claim-names"));
-        if (ability == null || user == null
-                || abilityManager.isOnGlobalCooldown(attacker.getUniqueId())
-                || abilityManager.isOnCooldown(user, ability)
-                || !isBehind(attacker, victim)
-                || FactionsHook.isDisabledClaim(attacker.getLocation(), disabledClaims)) {
+        if (FactionsHook.isDisabledClaim(attacker.getLocation(), disabledClaims)) {
             return;
         }
 

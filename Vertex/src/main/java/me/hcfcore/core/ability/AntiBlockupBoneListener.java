@@ -62,6 +62,8 @@ public final class AntiBlockupBoneListener implements Listener {
         }
 
         if (abilityManager.isOnGlobalCooldown(attacker.getUniqueId())) {
+            long remaining = (abilityManager.globalCooldownRemainingMillis(attacker.getUniqueId()) + 999) / 1000;
+            attacker.sendMessage(messages.get(attacker, "ability.on-global-cooldown", "seconds", String.valueOf(remaining)));
             return;
         }
         User user = userManager.get(attacker.getUniqueId());
@@ -69,6 +71,8 @@ public final class AntiBlockupBoneListener implements Listener {
             return;
         }
         if (user != null && abilityManager.isOnCooldown(user, ability)) {
+            long remaining = (abilityManager.remainingCooldownMillis(user, ability) + 999) / 1000;
+            attacker.sendMessage(messages.get(attacker, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
             return;
         }
         Set<String> disabledRegions = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-regions"));

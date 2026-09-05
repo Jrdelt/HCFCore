@@ -201,7 +201,7 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(
             new MageSpellListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
-            new RogueBackstabListener(this, abilityManager, userManager), this);
+            new RogueBackstabListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new FakePearlListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
