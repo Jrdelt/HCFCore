@@ -242,27 +242,29 @@ public final class TagMenu {
         List<Component> lore = new ArrayList<>();
         lore.add(messages.get(player, "tags.nickname-heading"));
         lore.add(Component.empty());
-        boolean enabled = manager.isNicknameMatchEnabled(player.getUniqueId());
-        lore.add(messages.get(player, enabled ? "tags.nickname-status-on" : "tags.nickname-status-off"));
-        lore.add(Component.empty());
 
+        // Shown regardless of whether nickname-match is currently on/off,
+        // or of the equipped tag having a color at all (falls back to
+        // white), so players can see the chat preview before turning it on.
         String tagId = manager.getPlayerTag(player.getUniqueId());
         TagManager.Tag equippedTag = tagId == null ? null : manager.get(tagId);
         String color = equippedTag == null ? null : GradientColor.extractLeadingColor(equippedTag.display());
-        if (color != null) {
-            Component chatPrefix = chatPreviewPrefix(player, manager, equippedTag);
-            String sample = messages.getRaw(player, "tags.nickname-sample-message");
-            String displayName = EssentialsHook.resolveName(player);
-            lore.add(messages.get(player, "tags.nickname-preview-heading"));
-            lore.add(chatPrefix.append(MessageFormatter.deserialize(color + displayName
-                    + "<gray>: " + sample)));
-            if (color.contains("gradient")) {
-                lore.add(chatPrefix.append(MessageFormatter.deserialize(GradientColor.reverse(color) + displayName
-                        + "<gray>: " + sample))
-                        .append(messages.get(player, "tags.nickname-reversed-suffix")));
-            }
-            lore.add(Component.empty());
+        String previewColor = color != null ? color : "<white>";
+        Component chatPrefix = chatPreviewPrefix(player, manager, equippedTag);
+        String sample = messages.getRaw(player, "tags.nickname-sample-message");
+        String displayName = EssentialsHook.resolveName(player);
+        lore.add(messages.get(player, "tags.nickname-preview-heading"));
+        lore.add(chatPrefix.append(MessageFormatter.deserialize(previewColor + displayName
+                + "<gray>: " + sample)));
+        if (color != null && color.contains("gradient")) {
+            lore.add(chatPrefix.append(MessageFormatter.deserialize(GradientColor.reverse(color) + displayName
+                    + "<gray>: " + sample))
+                    .append(messages.get(player, "tags.nickname-reversed-suffix")));
         }
+        lore.add(Component.empty());
+
+        boolean enabled = manager.isNicknameMatchEnabled(player.getUniqueId());
+        lore.add(messages.get(player, enabled ? "tags.nickname-status-on" : "tags.nickname-status-off"));
         lore.add(messages.get(player, "tags.nickname-hint-toggle"));
         if (color != null && color.contains("gradient")) {
             lore.add(messages.get(player, "tags.nickname-hint-reverse"));
@@ -280,7 +282,7 @@ public final class TagMenu {
         Configuration config = manager.plugin().getConfig();
         Component result = Component.empty();
 
-        String faction = FactionsHook.getFactionTag(player);
+        String faction = safeFactionTag(player);
         if (!"None".equalsIgnoreCase(faction)) {
             String template = config.getString("chat.faction-format", "<gold>[{faction}]</gold> ")
                     .replace("{faction}", MiniMessage.miniMessage().escapeTags(faction));
@@ -304,6 +306,22 @@ public final class TagMenu {
         result = result.append(MessageFormatter.deserialize(PlaceholderApiHook.apply(player, template)));
 
         return result;
+    }
+
+    /**
+     * This preview now renders unconditionally (see nicknameButton), so it
+     * runs for every player who opens the tag menu instead of only those
+     * with a colored tag equipped -- FactionsUUID's own static state isn't
+     * guaranteed initialized in every environment this runs in, so a lookup
+     * failure here degrades to "no faction" for this cosmetic preview
+     * rather than breaking the whole menu.
+     */
+    private static String safeFactionTag(Player player) {
+        try {
+            return FactionsHook.getFactionTag(player);
+        } catch (RuntimeException | LinkageError e) {
+            return "None";
+        }
     }
 
     private static ItemStack skullButton(Player owner, Component name, List<Component> lore) {
