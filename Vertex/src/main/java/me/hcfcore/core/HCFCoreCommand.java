@@ -8,6 +8,8 @@ import org.bukkit.command.TabCompleter;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class HCFCoreCommand implements CommandExecutor, TabCompleter {
 
@@ -32,6 +34,12 @@ public final class HCFCoreCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if (args.length == 1 && args[0].equalsIgnoreCase("clearmobstacks")) {
+            int removed = plugin.clearMobStacks();
+            sender.sendMessage(messages.getChat(sender, "admin.mobstacks-cleared", "amount", String.valueOf(removed)));
+            return true;
+        }
+
         sender.sendMessage(messages.getChat(sender, "admin.usage"));
         return true;
     }
@@ -42,6 +50,8 @@ public final class HCFCoreCommand implements CommandExecutor, TabCompleter {
             return List.of();
         }
         String partial = args[0].toLowerCase(Locale.ROOT);
-        return "reload".startsWith(partial) ? List.of("reload") : List.of();
+        return Stream.of("reload", "clearmobstacks")
+                .filter(sub -> sub.startsWith(partial))
+                .collect(Collectors.toList());
     }
 }

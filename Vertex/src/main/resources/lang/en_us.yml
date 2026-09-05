@@ -5,8 +5,9 @@ general:
   players-only: '&c&lSTAFF&r &7> Only players can use this command.'
 
 admin:
-  usage: '&c&lSTAFF&r &7> <yellow>Usage: <gray>/<red>hcfcore reload'
+  usage: '&c&lSTAFF&r &7> <yellow>Usage: <gray>/<red>hcfcore reload<gray>|<red>clearmobstacks'
   reloaded: '<green>✔ <green>HCFCore plugin reloaded.'
+  mobstacks-cleared: '<green>✔ <green>Cleared {amount} stacked mob(s).'
 
 tags:
   title-your: 'ʏᴏᴜʀ ᴛᴀɢꜱ  ({count})'

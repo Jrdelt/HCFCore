@@ -24,7 +24,7 @@ commands:
     usage: /<command>
   hcfcore:
     description: HCFCore admin/reload command.
-    usage: /<command> reload
+    usage: /<command> reload|clearmobstacks
   uncombat:
     description: Clear a player's combat tag.
     usage: /<command> <player>
@@ -90,7 +90,7 @@ commands:
 
 permissions:
   hcfcore.admin:
-    description: Reload HCFCore's config.
+    description: Reload HCFCore's config, or manually clear stacked mobs.
     default: op
   hcfcore.kit.create:
     description: Create a kit from the currently held inventory.

@@ -92,4 +92,18 @@ class SpawnerManagerTest {
     void rollDropsIsEmptyForAMobWithNoDropTable() {
         assertTrue(manager.rollDrops(EntityType.CREEPER).isEmpty());
     }
+
+    @Test
+    void loadParsesTheBundledMobStackingSection() {
+        assertTrue(manager.isMobStackingEnabled());
+        assertEquals(8.0, manager.mergeRadiusBlocks());
+        assertEquals(100, manager.maxStackLimit());
+        assertEquals(64, manager.dropBatchSize());
+        assertEquals("<gray>[x{count}] <white>{name}", manager.stackDisplayFormat());
+        for (EntityType type : List.of(EntityType.ZOMBIE, EntityType.SKELETON, EntityType.BLAZE,
+                EntityType.IRON_GOLEM, EntityType.EVOKER)) {
+            assertTrue(manager.stackableTypes().contains(type), type + " should be stackable per spawners.yml");
+        }
+        assertFalse(manager.stackableTypes().contains(EntityType.CREEPER));
+    }
 }

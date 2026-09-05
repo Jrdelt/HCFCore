@@ -97,6 +97,7 @@ public final class HCFCorePlugin extends JavaPlugin {
     private LegacyCombatManager legacyCombatManager;
     private me.hcfcore.core.spawner.SpawnerStorage spawnerStorage;
     private me.hcfcore.core.spawner.SpawnerManager spawnerManager;
+    private me.hcfcore.core.spawner.MobStackListener mobStackListener;
     private RebootManager rebootManager;
     private PlayerConnectionListener playerConnectionListener;
     private RepairListener repairListener;
@@ -213,6 +214,8 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(
                 new me.hcfcore.core.spawner.SpawnerMenuListener(spawnerManager, messages), this);
         getCommand("spawners").setExecutor(new me.hcfcore.core.spawner.SpawnerCommand(spawnerManager, messages));
+        mobStackListener = new me.hcfcore.core.spawner.MobStackListener(this, spawnerManager);
+        Bukkit.getPluginManager().registerEvents(mobStackListener, this);
 
         combatListener = new CombatListener(this, combatManager, messages);
         Bukkit.getPluginManager().registerEvents(combatListener, this);
@@ -436,5 +439,10 @@ public final class HCFCorePlugin extends JavaPlugin {
         if (rebootManager != null) {
             rebootManager.reconfigure();
         }
+    }
+
+    /** Manual entity-clear for stacked mobs; see MobStackListener#clearAll. */
+    public int clearMobStacks() {
+        return mobStackListener != null ? mobStackListener.clearAll() : 0;
     }
 }

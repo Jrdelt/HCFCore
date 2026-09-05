@@ -27,7 +27,9 @@ import java.util.Map;
  */
 public final class SpawnerMobListener implements Listener {
 
-    private static final double SEARCH_RADIUS = 8.0;
+    /** Margin added on top of the configured spawn-range so a slightly
+     * off-center spawn still matches its own spawner. */
+    private static final double SEARCH_MARGIN = 2.0;
 
     private final Plugin plugin;
     private final SpawnerManager spawnerManager;
@@ -45,7 +47,8 @@ public final class SpawnerMobListener implements Listener {
             return;
         }
         Location location = event.getLocation();
-        Map.Entry<Location, ?> nearby = spawnerManager.findNearby(location, SEARCH_RADIUS);
+        Map.Entry<Location, ?> nearby = spawnerManager.findNearby(location,
+                spawnerManager.spawnRangeBlocks() + SEARCH_MARGIN);
         if (nearby == null) {
             return;
         }

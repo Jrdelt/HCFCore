@@ -57,7 +57,7 @@ public final class SpawnerListener implements Listener {
             player.sendMessage(messages.get(player, "spawner.claim-only"));
             return;
         }
-        spawnerManager.place(location, mobType);
+        spawnerManager.place(location, mobType, claimTag != null ? claimTag : playerTag);
     }
 
     @EventHandler(ignoreCancelled = true)

@@ -38,9 +38,13 @@ public final class SpawnerClaimListener implements Listener {
     }
 
     /**
-     * A chunk being claimed (including an overclaim of someone else's
-     * land) drops whatever spawners were already tracked there -- the land
-     * is changing hands, so whoever placed them no longer controls it.
+     * A chunk being overclaimed out from under its actual owner drops
+     * whatever spawners were tracked there -- the land is changing hands,
+     * so whoever placed them no longer controls it. A faction re-claiming
+     * land that was already theirs (re-running /f claim, claim-filling,
+     * etc.) must NOT trigger this -- there's no ownership change to react
+     * to, so this only drops a spawner whose recorded owner tag actually
+     * differs from the faction claiming right now.
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onClaim(LandClaimEvent event) {
@@ -48,7 +52,8 @@ public final class SpawnerClaimListener implements Listener {
             return;
         }
         Chunk chunk = event.getLocation().asChunk();
-        dropAllIn(chunk);
+        String claimingTag = event.getFaction() == null ? null : event.getFaction().tag();
+        dropOverclaimedIn(chunk, claimingTag);
     }
 
     /** Blocks unclaiming a single chunk outright while it has active spawners. */
@@ -118,21 +123,41 @@ public final class SpawnerClaimListener implements Listener {
     private int dropAllIn(Chunk chunk) {
         int totalDropped = 0;
         for (Map.Entry<Location, SpawnerData> entry : spawnerManager.getSpawnersInChunk(chunk)) {
-            Location location = entry.getKey();
-            SpawnerData data = entry.getValue();
-            SpawnerManager.MobConfig config = spawnerManager.getMobConfig(data.mobType());
-            Component displayName = config != null ? MessageFormatter.deserialize(config.displayName())
-                    : Component.text(data.mobType().name());
-            for (int i = 0; i < data.stackSize(); i++) {
-                location.getWorld().dropItemNaturally(location.clone().add(0.5, 0.5, 0.5),
-                        SpawnerManager.createSpawnerItem(data.mobType(), displayName));
-            }
-            totalDropped += data.stackSize();
-            spawnerManager.remove(location);
-            if (location.getBlock().getType() == org.bukkit.Material.SPAWNER) {
-                location.getBlock().setType(org.bukkit.Material.AIR);
-            }
+            totalDropped += dropSpawner(entry.getKey(), entry.getValue());
         }
         return totalDropped;
+    }
+
+    /**
+     * Like dropAllIn, but only for spawners whose recorded owner tag
+     * doesn't match the faction now claiming the chunk -- see onClaim's
+     * javadoc for why this distinction matters.
+     */
+    private int dropOverclaimedIn(Chunk chunk, String claimingFactionTag) {
+        int totalDropped = 0;
+        for (Map.Entry<Location, SpawnerData> entry : spawnerManager.getSpawnersInChunk(chunk)) {
+            SpawnerData data = entry.getValue();
+            String ownerTag = data.ownerFactionTag();
+            if (ownerTag != null && claimingFactionTag != null && ownerTag.equalsIgnoreCase(claimingFactionTag)) {
+                continue;
+            }
+            totalDropped += dropSpawner(entry.getKey(), data);
+        }
+        return totalDropped;
+    }
+
+    private int dropSpawner(Location location, SpawnerData data) {
+        SpawnerManager.MobConfig config = spawnerManager.getMobConfig(data.mobType());
+        Component displayName = config != null ? MessageFormatter.deserialize(config.displayName())
+                : Component.text(data.mobType().name());
+        for (int i = 0; i < data.stackSize(); i++) {
+            location.getWorld().dropItemNaturally(location.clone().add(0.5, 0.5, 0.5),
+                    SpawnerManager.createSpawnerItem(data.mobType(), displayName));
+        }
+        spawnerManager.remove(location);
+        if (location.getBlock().getType() == org.bukkit.Material.SPAWNER) {
+            location.getBlock().setType(org.bukkit.Material.AIR);
+        }
+        return data.stackSize();
     }
 }

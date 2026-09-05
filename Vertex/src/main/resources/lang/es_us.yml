@@ -5,8 +5,9 @@ general:
   players-only: '<red>Solo los jugadores pueden usar este comando.'
 
 admin:
-  usage: '<red>Uso: /hcfcore reload'
+  usage: '<red>Uso: /hcfcore reload|clearmobstacks'
   reloaded: '<green>HCFCore recargado.'
+  mobstacks-cleared: '<green>{amount} mob(s) apilado(s) eliminado(s).'
 
 tags:
   title-your: 'Tus Tags ({count})'

@@ -90,3 +90,31 @@ mobs:
         min: 0
         max: 1
         chance: 0.05
+
+# ============================================
+# MOB STACKING
+# ============================================
+# Merges nearby mobs of the same type into a single entity instead of
+# letting entity count balloon out of control -- essential once a stacked
+# spawner is producing dozens of mobs per cycle.
+mob-stacking:
+  enabled: true
+  # A newly-spawned stackable mob within this many blocks of an existing
+  # stack of the same type merges into it instead of becoming its own
+  # entity.
+  merge-radius-blocks: 8
+  # A stack already at this size lets a new spawn become its own separate
+  # stack instead of being lost.
+  max-stack-limit: 100
+  stackable-types:
+    - ZOMBIE
+    - SKELETON
+    - BLAZE
+    - IRON_GOLEM
+    - EVOKER
+  # Nametag shown above a stacked mob. {count} and {name} placeholders.
+  display-format: '<gray>[x{count}] <white>{name}'
+  # A whole-stack kill (see below) batches its drops into stacks of at
+  # most this size, capped further by each material's own max stack size,
+  # to avoid spawning one item entity per mob in a big stack.
+  drop-batch-size: 64

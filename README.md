@@ -474,8 +474,38 @@ isn't blocked (there's no practical way to protect specific chunks from a
 whole-faction unclaim), but every spawner in the land being released is
 dropped as an item and the player is warned how many. A faction disbanding
 (voluntarily or automatically) drops every spawner in all of its claimed
-land the same way, and a chunk being overclaimed by another faction drops
-whatever spawners the previous owner had there.
+land the same way. Each spawner remembers which faction actually placed it,
+so a chunk genuinely overclaimed by a *different* faction drops whatever
+spawners the previous owner had there, while a faction simply re-running
+`/f claim` on land it already owns leaves its own spawners untouched.
+
+### Mob Stacking (`spawners.yml` → `mob-stacking`)
+
+Nearby mobs of the same type merge into a single tracked entity instead of
+letting entity count balloon once a stacked spawner is running dozens of
+spawns per cycle. A newly-spawned mob of a `stackable-types` entry within
+`merge-radius-blocks` of an existing stack (of the same type, under
+`max-stack-limit`) is folded into it instead of becoming its own entity —
+this applies regardless of *how* it spawned, bypassing vanilla's own
+nearby-entity spawn limits in the process. The merged entity shows a
+nametag (`display-format`, with `{count}`/`{name}` placeholders) once its
+count is 2 or higher, and is exempted from despawning when players leave
+the area (`setRemoveWhenFarAway(false)`) — it only goes away on a server
+restart or a manual clear.
+
+**Killing a stack**: a direct player hit peels exactly **one** mob off the
+stack — that one mob's own loot and EXP drop, the stack shrinks by one, and
+the rest of the stack is untouched (no damage carries over). Any other
+lethal cause (fire, lava, ...) instead kills the **entire stack** at once:
+every mob's worth of drops come out, batched into full item stacks
+(capped by `drop-batch-size` and each material's own max stack size) to
+avoid flooding the ground with one item entity per mob, but **no EXP**
+drops — only a direct player kill grants EXP.
+
+Run `/hcfcore clearmobstacks` (`hcfcore.admin`) to manually remove every
+currently-tracked stacked mob across all loaded chunks — the "manual
+entity-clear" a lagclear/entity-clear task would trigger; there's no
+automatic scheduled version of this built in.
 
 ## Staff Tools
 
@@ -708,6 +738,7 @@ Each player's death history persists to MySQL and stores the last 20 deaths auto
 | Command | Permission | Notes |
 |---|---|---|
 | `/hcfcore reload` | `hcfcore.admin` | Reloads config, messages, kits, abilities, tags, and rebuilds the scoreboard for every online player. |
+| `/hcfcore clearmobstacks` | `hcfcore.admin` | Manually removes every currently-tracked stacked mob (see **Mob Stacking**) across all loaded chunks. |
 
 ## Tab-completion
 

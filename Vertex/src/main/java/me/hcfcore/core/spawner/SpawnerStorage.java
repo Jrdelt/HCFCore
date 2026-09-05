@@ -28,13 +28,16 @@ public final class SpawnerStorage {
                 z INT NOT NULL,
                 mob_type VARCHAR(64) NOT NULL,
                 stack_size INT NOT NULL,
+                owner_faction VARCHAR(64) NULL,
                 PRIMARY KEY (world, x, y, z)
             )""";
 
-    private static final String SELECT_ALL = "SELECT world, x, y, z, mob_type, stack_size FROM spawners";
+    private static final String SELECT_ALL =
+            "SELECT world, x, y, z, mob_type, stack_size, owner_faction FROM spawners";
     private static final String UPSERT = """
-            INSERT INTO spawners (world, x, y, z, mob_type, stack_size) VALUES (?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE mob_type = VALUES(mob_type), stack_size = VALUES(stack_size)""";
+            INSERT INTO spawners (world, x, y, z, mob_type, stack_size, owner_faction) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE mob_type = VALUES(mob_type), stack_size = VALUES(stack_size),
+                owner_faction = VALUES(owner_faction)""";
     private static final String DELETE = "DELETE FROM spawners WHERE world = ? AND x = ? AND y = ? AND z = ?";
 
     private final Database database;
@@ -69,7 +72,8 @@ public final class SpawnerStorage {
                         results.getInt("y"),
                         results.getInt("z"),
                         mobType,
-                        results.getInt("stack_size")));
+                        results.getInt("stack_size"),
+                        results.getString("owner_faction")));
             }
         }
         return spawners;
@@ -84,6 +88,7 @@ public final class SpawnerStorage {
             statement.setInt(4, location.getBlockZ());
             statement.setString(5, data.mobType().name());
             statement.setInt(6, data.stackSize());
+            statement.setString(7, data.ownerFactionTag());
             statement.executeUpdate();
         }
     }
@@ -99,6 +104,7 @@ public final class SpawnerStorage {
         }
     }
 
-    public record StoredSpawner(String world, int x, int y, int z, EntityType mobType, int stackSize) {
+    public record StoredSpawner(String world, int x, int y, int z, EntityType mobType, int stackSize,
+                                 String ownerFactionTag) {
     }
 }

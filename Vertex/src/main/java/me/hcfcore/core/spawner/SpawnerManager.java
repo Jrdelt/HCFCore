@@ -56,6 +56,13 @@ public final class SpawnerManager {
     private volatile int spawnRangeBlocks;
     private volatile Map<EntityType, MobConfig> mobConfigs = Map.of();
 
+    private volatile boolean mobStackingEnabled;
+    private volatile double mergeRadiusBlocks;
+    private volatile int maxStackLimit;
+    private volatile java.util.Set<EntityType> stackableTypes = java.util.Set.of();
+    private volatile String stackDisplayFormat;
+    private volatile int dropBatchSize;
+
     public SpawnerManager(Plugin plugin, SpawnerStorage storage) {
         this.plugin = plugin;
         this.storage = storage;
@@ -84,6 +91,46 @@ public final class SpawnerManager {
         spawnRangeBlocks = Math.max(1, config.getInt("spawn-range-blocks", 4));
 
         mobConfigs = readMobConfigs(config);
+
+        mobStackingEnabled = config.getBoolean("mob-stacking.enabled", true);
+        mergeRadiusBlocks = Math.max(0, config.getDouble("mob-stacking.merge-radius-blocks", 8));
+        maxStackLimit = Math.max(1, config.getInt("mob-stacking.max-stack-limit", 100));
+        stackDisplayFormat = config.getString("mob-stacking.display-format", "<gray>[x{count}] <white>{name}");
+        dropBatchSize = Math.max(1, config.getInt("mob-stacking.drop-batch-size", 64));
+        java.util.Set<EntityType> types = new java.util.HashSet<>();
+        for (String typeName : config.getStringList("mob-stacking.stackable-types")) {
+            try {
+                types.add(EntityType.valueOf(typeName.toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException e) {
+                plugin.getLogger().warning("Unknown entity type '" + typeName + "' in spawners.yml mob-stacking.stackable-types");
+            }
+        }
+        stackableTypes = types;
+
+        // A no-op on first boot (nothing loaded into `spawners` yet -- that
+        // happens after this call, see loadSpawnersFromDatabase); on a
+        // later /hcfcore reload, this is what actually makes changed
+        // tuning values (spawn-count-per-stack etc.) apply to spawners
+        // that already exist instead of only ones stacked/unstacked after.
+        retuneAll();
+    }
+
+    /** Re-applies the current tuning to every tracked spawner whose chunk is loaded right now. */
+    public void retuneAll() {
+        for (Map.Entry<String, SpawnerData> entry : spawners.entrySet()) {
+            String[] parts = entry.getKey().split(":", 4);
+            World world = plugin.getServer().getWorld(parts[0]);
+            if (world == null) {
+                continue;
+            }
+            int blockX = Integer.parseInt(parts[1]);
+            int blockZ = Integer.parseInt(parts[3]);
+            if (!world.isChunkLoaded(blockX >> 4, blockZ >> 4)) {
+                continue;
+            }
+            Location location = new Location(world, blockX, Integer.parseInt(parts[2]), blockZ);
+            applyTuning(location, entry.getValue());
+        }
     }
 
     private Map<EntityType, MobConfig> readMobConfigs(YamlConfiguration config) {
@@ -147,7 +194,7 @@ public final class SpawnerManager {
                     continue;
                 }
                 spawners.put(key(stored.world(), stored.x(), stored.y(), stored.z()),
-                        new SpawnerData(stored.mobType(), stored.stackSize()));
+                        new SpawnerData(stored.mobType(), stored.stackSize(), stored.ownerFactionTag()));
             }
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to load spawners from the database.", e);
@@ -186,13 +233,46 @@ public final class SpawnerManager {
         return sellRefundPercent;
     }
 
+    /** How far (in blocks) from a spawner block vanilla will actually spawn a mob. */
+    public int spawnRangeBlocks() {
+        return spawnRangeBlocks;
+    }
+
+    public boolean isMobStackingEnabled() {
+        return mobStackingEnabled;
+    }
+
+    public double mergeRadiusBlocks() {
+        return mergeRadiusBlocks;
+    }
+
+    public int maxStackLimit() {
+        return maxStackLimit;
+    }
+
+    public java.util.Set<EntityType> stackableTypes() {
+        return stackableTypes;
+    }
+
+    public String stackDisplayFormat() {
+        return stackDisplayFormat;
+    }
+
+    public int dropBatchSize() {
+        return dropBatchSize;
+    }
+
     /**
      * Registers a brand-new single-count spawner at the given location and
      * tunes its vanilla block state to match. The caller is responsible for
      * actually placing/confirming the block itself first.
+     *
+     * @param ownerFactionTag the placing player's faction tag, recorded so
+     *                        an overclaim can tell "this land changed hands"
+     *                        apart from "the same faction re-claimed it"
      */
-    public void place(Location location, EntityType mobType) {
-        SpawnerData data = new SpawnerData(mobType, 1);
+    public void place(Location location, EntityType mobType, String ownerFactionTag) {
+        SpawnerData data = new SpawnerData(mobType, 1, ownerFactionTag);
         spawners.put(key(location), data);
         applyTuning(location, data);
         persist(location, data);
