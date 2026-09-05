@@ -104,7 +104,7 @@ pvp:
   pearl-velocity-multiplier: 1.35
 
   # Worlds where hunger never changes at all (players don't need to eat).
-  disable-hunger-worlds: []
+  disable-hunger-worlds: [world]
 
   # Logout penalty: if true, disconnecting while tagged counts as combat logout
   logout-penalty: true

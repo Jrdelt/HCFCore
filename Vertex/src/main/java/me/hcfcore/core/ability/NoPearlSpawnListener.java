@@ -40,6 +40,11 @@ public final class NoPearlSpawnListener implements Listener {
      * protected zone -- covers both "pearling out of a safezone" and,
      * combined with onPearl below checking the landing spot, "pearling
      * across the safezone/warzone boundary" in either direction.
+     *
+     * <p>No refund here, deliberately: cancelling ProjectileLaunchEvent for
+     * an ender pearl happens before vanilla consumes the item, so the pearl
+     * is still in the player's hand untouched -- handing back an extra one
+     * on top of that duplicates it.
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onLaunch(ProjectileLaunchEvent event) {
@@ -51,11 +56,17 @@ public final class NoPearlSpawnListener implements Listener {
         }
         if (isProtected(plugin, player.getLocation())) {
             event.setCancelled(true);
-            refund(player);
             player.sendMessage(messages.get(player, "combat.no-pearl-spawn"));
         }
     }
 
+    /**
+     * Unlike onLaunch above, the pearl here has already flown and is about
+     * to land -- vanilla consumed it back at throw time, a separate,
+     * already-completed step cancelling this teleport can't undo -- so
+     * blocking the landing does need to hand one back, or it's gone for
+     * nothing.
+     */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPearl(PlayerTeleportEvent event) {
         if (event.getCause() != PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
@@ -68,12 +79,6 @@ public final class NoPearlSpawnListener implements Listener {
         }
     }
 
-    /**
-     * The pearl is already gone from the player's hand by the time either
-     * handler above cancels it -- vanilla consumes it as part of throwing,
-     * not as part of landing -- so blocking the throw/landing has to hand
-     * one back explicitly or the player loses a pearl for nothing.
-     */
     private static void refund(Player player) {
         ItemStack refund = new ItemStack(Material.ENDER_PEARL, 1);
         for (ItemStack dropped : player.getInventory().addItem(refund).values()) {
