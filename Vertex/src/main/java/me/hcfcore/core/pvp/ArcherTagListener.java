@@ -2,7 +2,8 @@ package me.hcfcore.core.pvp;
 
 import me.hcfcore.core.factions.FactionsHook;
 import me.hcfcore.core.kit.ArmorClass;
-import me.hcfcore.core.lang.Messages;
+import me.hcfcore.core.lang.MessageFormatter;
+import net.kyori.adventure.text.Component;
 import org.bukkit.entity.AbstractArrow;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -24,26 +25,30 @@ public final class ArcherTagListener implements Listener {
 
     private final Plugin plugin;
     private final ArcherTagManager archerTagManager;
-    private final Messages messages;
 
     // Cached config values to avoid repeated reads on hot path
     private volatile int cachedDurationSeconds;
     private volatile int cachedMaxStacks;
     private volatile double cachedArrowBonusPerStack;
     private volatile double cachedMeleeBonusPerStack;
+    private volatile String cachedMessageAttacker;
+    private volatile String cachedMessageVictim;
 
-    public ArcherTagListener(Plugin plugin, ArcherTagManager archerTagManager, Messages messages) {
+    public ArcherTagListener(Plugin plugin, ArcherTagManager archerTagManager) {
         this.plugin = plugin;
         this.archerTagManager = archerTagManager;
-        this.messages = messages;
         reloadConfig();
     }
 
     public void reloadConfig() {
         cachedDurationSeconds = plugin.getConfig().getInt("pvp.archer-tag.duration-seconds", 10);
         cachedMaxStacks = plugin.getConfig().getInt("pvp.archer-tag.max-stacks", 4);
-        cachedArrowBonusPerStack = Math.max(0, plugin.getConfig().getDouble("pvp.archer-tag.arrow-damage-bonus-per-stack", 0.15));
+        cachedArrowBonusPerStack = Math.max(0, plugin.getConfig().getDouble("pvp.archer-tag.arrow-damage-bonus-per-stack", 0.10));
         cachedMeleeBonusPerStack = Math.max(0, plugin.getConfig().getDouble("pvp.archer-tag.faction-melee-bonus-per-stack", 0.05));
+        cachedMessageAttacker = plugin.getConfig().getString("pvp.archer-tag.message-attacker",
+                "&c&lKITS&r &7> <gold>Tagged {player} <gray>(+{percent}%, {seconds}s)");
+        cachedMessageVictim = plugin.getConfig().getString("pvp.archer-tag.message-victim",
+                "&c&lKITS&r &7> <red>Tagged by {player} <gray>(+{percent}%, {seconds}s)");
     }
 
     /**
@@ -98,16 +103,25 @@ public final class ArcherTagListener implements Listener {
         String arrowPercent = percent(stacks * arrowBonusPerStack());
         String meleePercent = percent(stacks * meleeBonusPerStack());
 
-        shooter.sendMessage(messages.getChat(shooter, "archer.tag-applied",
-                "player", victim.getName(),
-                "percent", arrowPercent,
-                "melee", meleePercent,
-                "seconds", String.valueOf(seconds)));
-        victim.sendMessage(messages.getChat(victim, "archer.tag-received",
-                "player", shooter.getName(),
-                "percent", arrowPercent,
-                "melee", meleePercent,
-                "seconds", String.valueOf(seconds)));
+        shooter.sendMessage(renderTagMessage(cachedMessageAttacker, victim.getName(), arrowPercent, meleePercent, seconds));
+        victim.sendMessage(renderTagMessage(cachedMessageVictim, shooter.getName(), arrowPercent, meleePercent, seconds));
+    }
+
+    /**
+     * Built from a config.yml template, not a lang key -- like the combat
+     * action bar templates, this is a single admin-authored string rather
+     * than a per-locale message, since {player}'s name can't contain
+     * MiniMessage syntax (Minecraft restricts the character set) and so
+     * needs no escaping either.
+     */
+    private static Component renderTagMessage(String template, String player, String arrowPercent,
+                                               String meleePercent, long seconds) {
+        String resolved = template
+                .replace("{player}", player)
+                .replace("{percent}", arrowPercent)
+                .replace("{melee}", meleePercent)
+                .replace("{seconds}", String.valueOf(seconds));
+        return MessageFormatter.deserialize(resolved);
     }
 
     @EventHandler

@@ -117,10 +117,7 @@ combat:
   tag-server-success: '<green>{player} foi marcado em combate contra "Server".'
   tag-success: '<green>{player} e {opponent} foram marcados em combate.'
   no-pearl-spawn: '<red>✖ <gray>Você não pode usar a pérola para entrar em uma zona protegida.'
-
-archer:
-  tag-applied: '<gold>{player} esta marcado pelo arqueiro ({seconds}s) <gray>- <red>+{percent}% de flecha <gray>/ <red>+{melee}% corpo a corpo da sua faccao<gray>.'
-  tag-received: '<red>Voce esta marcado pelo arqueiro {player} ({seconds}s) e vai receber +{percent}% de dano de flecha e +{melee}% corpo a corpo da faccao dele.'
+  command-blocked: '<red>✖ <gray>Você não pode usar esse comando em combate.'
 
 ability:
   on-global-cooldown: '<red>You''re on ability cooldown for another {seconds}s.'

@@ -117,10 +117,7 @@ combat:
   tag-server-success: '<green>Tagged {player} into combat against "server".'
   tag-success: '<green>Tagged {player} and {opponent} into combat.'
   no-pearl-spawn: '<red>✖ <gray>You can''t pearl into a protected zone.'
-
-archer:
-  tag-applied: '<gold>{player} is Archer tagged ({seconds}s) <gray>- <red>+{percent}% arrow <gray>/ <red>+{melee}% faction melee<gray>.'
-  tag-received: '<red>You are Archer tagged by {player} ({seconds}s) and will take +{percent}% arrow and +{melee}% melee damage from their faction.'
+  command-blocked: '<red>✖ <gray>You can''t use that command while in combat.'
 
 ability:
   on-global-cooldown: '&e&lABILITES&r &7> <red>You''re on ability cooldown for another {seconds}s.'

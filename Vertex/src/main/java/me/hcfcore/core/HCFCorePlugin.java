@@ -102,6 +102,7 @@ public final class HCFCorePlugin extends JavaPlugin {
     private DeathManager deathManager;
     private RallyManager rallyManager;
     private ArcherTagListener archerTagListener;
+    private CombatListener combatListener;
     private NametagManager nametagManager;
     private StaffManager staffManager;
 
@@ -193,7 +194,8 @@ public final class HCFCorePlugin extends JavaPlugin {
         getCommand("endersee").setExecutor(endseeCommand);
         getCommand("endersee").setTabCompleter(endseeCommand);
 
-        Bukkit.getPluginManager().registerEvents(new CombatListener(combatManager), this);
+        combatListener = new CombatListener(this, combatManager, messages);
+        Bukkit.getPluginManager().registerEvents(combatListener, this);
         playerConnectionListener = new PlayerConnectionListener(userManager, scoreboardManager, combatManager);
         Bukkit.getPluginManager().registerEvents(playerConnectionListener, this);
         Bukkit.getPluginManager().registerEvents(new AbilityMenuListener(this, abilityManager, messages), this);
@@ -222,7 +224,7 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new FallDamageImmunityListener(), this);
         Bukkit.getPluginManager().registerEvents(new FullHealSplashListener(), this);
         Bukkit.getPluginManager().registerEvents(new VanillaCooldownListener(this, messages, vanillaCooldownManager), this);
-        archerTagListener = new ArcherTagListener(this, archerTagManager, messages);
+        archerTagListener = new ArcherTagListener(this, archerTagManager);
         Bukkit.getPluginManager().registerEvents(archerTagListener, this);
         // Periodic cleanup of expired archer tag entries to prevent unbounded map growth
         Bukkit.getScheduler().runTaskTimer(this, archerTagManager::cleanupExpired, 300L, 300L);
@@ -395,6 +397,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
         if (archerTagListener != null) {
             archerTagListener.reloadConfig();
+        }
+        if (combatListener != null) {
+            combatListener.reloadConfig();
         }
         if (legacyCombatManager != null) {
             legacyCombatManager.reconfigure();

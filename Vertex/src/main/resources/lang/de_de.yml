@@ -117,10 +117,7 @@ combat:
   tag-server-success: '<green>{player} wurde in den Kampf gegen "Server" versetzt.'
   tag-success: '<green>{player} und {opponent} wurden in den Kampf versetzt.'
   no-pearl-spawn: '<red>✖ <gray>Du kannst nicht in eine geschützte Zone perlen.'
-
-archer:
-  tag-applied: '<gold>{player} ist bogenschuetzen-markiert ({seconds}s) <gray>- <red>+{percent}% Pfeilschaden <gray>/ <red>+{melee}% Nahkampf deiner Fraktion<gray>.'
-  tag-received: '<red>Du bist von {player} bogenschuetzen-markiert ({seconds}s) und erleidest +{percent}% Pfeilschaden und +{melee}% Nahkampfschaden von seiner Fraktion.'
+  command-blocked: '<red>✖ <gray>Du kannst diesen Befehl im Kampf nicht benutzen.'
 
 ability:
   on-global-cooldown: '<red>You''re on ability cooldown for another {seconds}s.'

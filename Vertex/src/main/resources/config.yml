@@ -102,6 +102,18 @@ pvp:
   # Logout penalty: if true, disconnecting while tagged counts as combat logout
   logout-penalty: true
 
+  # Commands blocked while tagged into combat (case-insensitive, without
+  # the leading "/"). An entry with more than one word only blocks that
+  # exact subcommand -- "f home" blocks "/f home" but not the rest of "/f";
+  # a single word like "kit" blocks that whole command tree. List every
+  # alias you use separately (e.g. both "f home" and "factions home") --
+  # this only matches what the player actually typed.
+  blocked-commands-in-combat:
+    - kit
+    - kits
+    - abilities
+    - f home
+
   # How often to update the combat action bar (ticks)
   actionbar-update-interval-ticks: 2
 
@@ -129,10 +141,15 @@ pvp:
     duration-seconds: 10
     # Maximum number of stacks from multiple archers
     max-stacks: 4
-    # Arrow damage multiplier per stack (0.15 = +15% per stack)
-    arrow-damage-bonus-per-stack: 0.15
+    # Arrow damage multiplier per stack (0.10 = +10% per stack)
+    arrow-damage-bonus-per-stack: 0.10
     # Melee damage bonus for the archer's faction only
     faction-melee-bonus-per-stack: 0.05
+    # Chat messages when a mark is applied (MiniMessage). Placeholders:
+    # {player}, {percent} (arrow bonus), {melee} (faction melee bonus),
+    # {seconds} (mark duration).
+    message-attacker: '&c&lKITS&r &7> <gold>Tagged {player} <gray>(+{percent}%, {seconds}s)'
+    message-victim: '&c&lKITS&r &7> <red>Tagged by {player} <gray>(+{percent}%, {seconds}s)'
 
   # ---- LEGACY COMBAT (1.8 PvP style) ----
   legacy-combat:

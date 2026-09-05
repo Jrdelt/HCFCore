@@ -92,9 +92,18 @@ literal text.
 Importantly: **cooldowns survive logout** — players can't escape them by relogging.
 
 **Archer Tag** — The archer class mechanic where arrows mark victims:
-- `arrow-damage-bonus-per-stack` — extra damage per mark (0.15 = +15% per stack)
+- `arrow-damage-bonus-per-stack` — extra damage per mark (0.10 = +10% per stack)
 - `faction-melee-bonus-per-stack` — bonus for the archer's faction only
 - `duration-seconds` — how long a mark lasts
+- `message-attacker` / `message-victim` — MiniMessage chat templates sent
+  on every hit, with `{player}`, `{percent}` (arrow bonus), `{melee}`
+  (faction melee bonus), and `{seconds}` (mark duration) placeholders
+
+**Combat command blocking** — `pvp.blocked-commands-in-combat` lists
+commands (no leading `/`, case-insensitive) a tagged player can't use. A
+one-word entry like `kit` blocks that whole command tree; a multi-word
+entry like `f home` blocks only that exact subcommand, leaving the rest
+of `/f` untouched.
 
 **Legacy Combat** — Enable 1.8-style PvP with instant attacks. Leave `worlds: []` to apply everywhere, or list specific world names to limit it.
 
@@ -385,8 +394,11 @@ bard uses) marks whoever their arrows hit:
   melee bonus (including themselves) — there's no faction to grant it to.
 - Both the archer and the target get a chat message on every hit, naming
   the other player, the stack's current arrow and melee percentages, and
-  the seconds left (`archer.tag-applied` / `archer.tag-received` in
-  `lang/*.yml`).
+  the seconds left. Unlike most player-facing text, these come from
+  `pvp.archer-tag.message-attacker` / `message-victim` in `config.yml`
+  (not `lang/*.yml`) — a single admin-authored MiniMessage template rather
+  than a per-locale message, the same treatment the combat action bar
+  templates get.
 - Archers can't mark their own faction members, and the mark clears on
   death. It deliberately survives a disconnect, so relogging isn't a way
   to shed it mid-fight.
