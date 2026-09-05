@@ -26,7 +26,7 @@ max-nearby-entities-per-stack: 2
 max-nearby-entities-cap: 32
 min-spawn-delay-ticks: 200
 max-spawn-delay-ticks: 400
-required-player-range-blocks: 16
+required-player-range-blocks: 32
 spawn-range-blocks: 4
 
 # --- SHOP CATALOG & DROP TABLES ---

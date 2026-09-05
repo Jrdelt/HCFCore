@@ -102,7 +102,7 @@ public final class SpawnerManager {
         maxNearbyEntitiesCap = Math.max(1, config.getInt("max-nearby-entities-cap", 32));
         minSpawnDelayTicks = Math.max(1, config.getInt("min-spawn-delay-ticks", 200));
         maxSpawnDelayTicks = Math.max(minSpawnDelayTicks, config.getInt("max-spawn-delay-ticks", 400));
-        requiredPlayerRangeBlocks = Math.max(1, config.getInt("required-player-range-blocks", 16));
+        requiredPlayerRangeBlocks = Math.max(1, config.getInt("required-player-range-blocks", 32));
         spawnRangeBlocks = Math.max(1, config.getInt("spawn-range-blocks", 4));
 
         mobConfigs = readMobConfigs(config);
