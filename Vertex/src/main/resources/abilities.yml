@@ -103,16 +103,67 @@ abilities:
     material: NOTE_BLOCK
     name: '<light_purple>Portable Bard'
     lore:
-      - '<gray>Right-click to choose a buff'
-      - '<gray>(Strength, Speed, or Regen) and'
-      - '<gray>share it with your whole faction.'
+      - '<gray>Right-click to receive a set of'
+      - '<gray>faction-buff items (Speed, Strength,'
+      - '<gray>Resistance, Regen, Jump Boost).'
     # The long cooldown is for anyone using the item outside the class it
     # belongs to; a player in the full gold bard set uses the short one.
     cooldown-seconds: 300
     bard-cooldown-seconds: 6
-    # Each buff in the GUI also gets its own cooldown, so a bard can rotate
-    # between buffs but can't re-apply the same one back to back.
-    buff-cooldown-seconds: 7
+
+  bard-buff-speed:
+    material: SUGAR
+    name: '<gold>Speed II'
+    lore:
+      - '<gray>Right-click to grant Speed to your faction.'
+      - '<gray>Doubled if worn in the bard kit, halved otherwise.'
+    cooldown-seconds: 7
+    effect-type: SPEED
+    effect-amplifier: 1
+    buff-seconds: 6
+
+  bard-buff-strength:
+    material: BLAZE_POWDER
+    name: '<gold>Strength I'
+    lore:
+      - '<gray>Right-click to grant Strength to your faction.'
+      - '<gray>Doubled if worn in the bard kit, halved otherwise.'
+    cooldown-seconds: 7
+    effect-type: STRENGTH
+    effect-amplifier: 0
+    buff-seconds: 6
+
+  bard-buff-resistance:
+    material: IRON_INGOT
+    name: '<gold>Resistance I'
+    lore:
+      - '<gray>Right-click to grant Resistance to your faction.'
+      - '<gray>Doubled if worn in the bard kit, halved otherwise.'
+    cooldown-seconds: 7
+    effect-type: RESISTANCE
+    effect-amplifier: 0
+    buff-seconds: 6
+
+  bard-buff-regeneration:
+    material: GHAST_TEAR
+    name: '<gold>Regeneration I'
+    lore:
+      - '<gray>Right-click to grant Regeneration to your faction.'
+      - '<gray>Doubled if worn in the bard kit, halved otherwise.'
+    cooldown-seconds: 7
+    effect-type: REGENERATION
+    effect-amplifier: 0
+    buff-seconds: 6
+
+  bard-buff-jump-boost:
+    material: FEATHER
+    name: '<gold>Jump Boost II'
+    lore:
+      - '<gray>Right-click to grant Jump Boost to your faction.'
+      - '<gray>Doubled if worn in the bard kit, halved otherwise.'
+    cooldown-seconds: 7
+    effect-type: JUMP_BOOST
+    effect-amplifier: 1
     buff-seconds: 6
 
   repair:

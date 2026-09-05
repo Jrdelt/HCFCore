@@ -218,63 +218,6 @@ public final class AbilityManager {
         }
     }
 
-    /**
-     * Per-buff cooldowns for the abilities offered inside an ability's own
-     * GUI (currently only Portable Bard's buff picker). Kept in memory
-     * rather than in the User cooldown map because they are short enough
-     * that surviving a relog would never matter, and because they are not
-     * abilities in their own right -- /cooldowns lists one entry for the
-     * parent ability, not five.
-     */
-    private final Map<UUID, Map<String, Long>> buffCooldowns = new ConcurrentHashMap<>();
-
-    public long buffCooldownRemainingMillis(UUID playerId, Ability ability, String buffId) {
-        Map<String, Long> playerBuffs = buffCooldowns.get(playerId);
-        if (playerBuffs == null) {
-            return 0L;
-        }
-        String key = buffKey(ability, buffId);
-        long remaining = playerBuffs.getOrDefault(key, 0L) - System.currentTimeMillis();
-        if (remaining <= 0L) {
-            playerBuffs.remove(key);
-            if (playerBuffs.isEmpty()) {
-                buffCooldowns.remove(playerId, playerBuffs);
-            }
-            return 0L;
-        }
-        return remaining;
-    }
-
-    public void startBuffCooldown(UUID playerId, Ability ability, String buffId) {
-        int seconds = ability.getInt("buff-cooldown-seconds", 0);
-        if (seconds <= 0) {
-            return;
-        }
-        buffCooldowns.computeIfAbsent(playerId, ignored -> new ConcurrentHashMap<>())
-                .put(buffKey(ability, buffId), System.currentTimeMillis() + seconds * 1000L);
-    }
-
-    /**
-     * Housekeeping for a leaving player. Only drops what has already
-     * expired: wiping live buff cooldowns on quit would let a bard relog
-     * to re-apply the same buff immediately.
-     */
-    public void clearExpiredBuffCooldowns(UUID playerId) {
-        Map<String, Long> playerBuffs = buffCooldowns.get(playerId);
-        if (playerBuffs == null) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        playerBuffs.values().removeIf(expiry -> expiry <= now);
-        if (playerBuffs.isEmpty()) {
-            buffCooldowns.remove(playerId, playerBuffs);
-        }
-    }
-
-    private static String buffKey(Ability ability, String buffId) {
-        return ability.getId().toLowerCase(Locale.ROOT) + ":" + buffId;
-    }
-
     public boolean isOnGlobalCooldown(UUID uuid) {
         return globalCooldownRemainingMillis(uuid) > 0;
     }

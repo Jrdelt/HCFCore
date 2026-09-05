@@ -204,9 +204,12 @@ Sixteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
   that hit to have landed within the last 15 seconds and both of you to
   currently be in combat. On arrival you get Regeneration II, Strength
   III, and Speed V, each for 3 seconds.
-- **Portable Bard** (right-click) — Pick a buff for your faction; doubled
-  duration and effect level when worn in the full gold bard set (also
-  gets the short in-kit cooldown, see below)
+- **Portable Bard** (right-click) — Gives you one of each buff item
+  (Speed, Strength, Resistance, Regeneration, Jump Boost); right-click a
+  buff item to share it with your faction. Doubled duration and effect
+  level when worn in the full gold bard set, halved otherwise (never
+  below Level I / 1 second). The master item also gets the short in-kit
+  cooldown, see below; each buff item has its own separate cooldown
 - **Repair** (right-click) — Grant block-breaking permission (needs LuckPerms)
 - **Switcher Snowball** (throw) — Swap positions with enemy
 - **Time Warp Pearl** (right-click) — Teleport to last pearl throw location
@@ -612,8 +615,9 @@ the server. If they don't show up in-game:
   `display` string, since tags embed their color directly rather than
   storing it separately.
 - Class detection for gameplay rules that key off "what class is this
-  player" (currently Portable Bard's short cooldown) goes through
-  `ArmorClass`, which matches armor **material** only — worn durability,
+  player" (Portable Bard's short cooldown, and doubling/halving its buff
+  items' effect) goes through `ArmorClass`, which matches armor
+  **material** only — worn durability,
   donator enchantments, and repairs must not drop a player out of their
   class mid-fight. That's deliberately looser than the exact-set match
   `KitManager` uses to decide whether a kit's passive `effects` apply, and
@@ -627,10 +631,11 @@ the server. If they don't show up in-game:
   anything, so a mark from a factionless archer grants no melee bonus
   rather than arming every factionless player.
 - Short-lived cooldowns that would be pointless to persist —
-  `VanillaCooldownManager`'s pearl/gapple timers, Portable Bard's per-buff
-  timers in `AbilityManager` — live in memory, keyed by UUID. Their quit
-  handlers only drop entries that have already expired; clearing live ones
-  would turn a relog into a cooldown reset.
+  `VanillaCooldownManager`'s pearl/gapple timers — live in memory, keyed
+  by UUID. Their quit handlers only drop entries that have already
+  expired; clearing live ones would turn a relog into a cooldown reset.
+  Portable Bard's buff items don't need this: each is its own ability
+  with its own normal, persisted cooldown, not a special in-memory map.
 - `CombatManager.SERVER_UUID` (`new UUID(0, 0)`) is a reserved sentinel
   opponent id used only by `/combattag ... server` — never a real player's
   UUID, so it can't collide.
