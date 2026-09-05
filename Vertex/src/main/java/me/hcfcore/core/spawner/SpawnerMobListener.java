@@ -1,0 +1,76 @@
+package me.hcfcore.core.spawner;
+
+import com.destroystokyo.paper.entity.ai.GoalType;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.plugin.Plugin;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Strips targeting AI from anything a tracked spawner produces (so a stack
+ * is a safe grinder, not a threat) and swaps its death drops for the
+ * configured table. A spawned mob is tagged with which spawner made it via
+ * PDC so onDeath can look the drop table back up without re-searching for
+ * a nearby spawner a second time.
+ */
+public final class SpawnerMobListener implements Listener {
+
+    private static final double SEARCH_RADIUS = 8.0;
+
+    private final Plugin plugin;
+    private final SpawnerManager spawnerManager;
+    private final NamespacedKey mobTypeKey;
+
+    public SpawnerMobListener(Plugin plugin, SpawnerManager spawnerManager) {
+        this.plugin = plugin;
+        this.spawnerManager = spawnerManager;
+        this.mobTypeKey = new NamespacedKey(plugin, "spawner_mob_type");
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onSpawn(CreatureSpawnEvent event) {
+        if (event.getSpawnReason() != CreatureSpawnEvent.SpawnReason.SPAWNER) {
+            return;
+        }
+        Location location = event.getLocation();
+        Map.Entry<Location, ?> nearby = spawnerManager.findNearby(location, SEARCH_RADIUS);
+        if (nearby == null) {
+            return;
+        }
+        if (!(event.getEntity() instanceof Mob mob)) {
+            return;
+        }
+        mob.getPersistentDataContainer().set(mobTypeKey, PersistentDataType.STRING, mob.getType().name());
+        Bukkit.getMobGoals().removeAllGoals(mob, GoalType.TARGET);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onDeath(EntityDeathEvent event) {
+        if (!(event.getEntity() instanceof LivingEntity entity)) {
+            return;
+        }
+        String taggedType = entity.getPersistentDataContainer().get(mobTypeKey, PersistentDataType.STRING);
+        if (taggedType == null) {
+            return;
+        }
+        SpawnerManager.MobConfig config = spawnerManager.getMobConfig(entity.getType());
+        if (config == null || config.drops().isEmpty()) {
+            return;
+        }
+        List<ItemStack> drops = spawnerManager.rollDrops(entity.getType());
+        event.getDrops().clear();
+        event.getDrops().addAll(drops);
+    }
+}

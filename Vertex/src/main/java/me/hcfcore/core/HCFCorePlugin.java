@@ -95,6 +95,8 @@ public final class HCFCorePlugin extends JavaPlugin {
     private ScoreboardManager scoreboardManager;
     private CombatManager combatManager;
     private LegacyCombatManager legacyCombatManager;
+    private me.hcfcore.core.spawner.SpawnerStorage spawnerStorage;
+    private me.hcfcore.core.spawner.SpawnerManager spawnerManager;
     private RebootManager rebootManager;
     private PlayerConnectionListener playerConnectionListener;
     private RepairListener repairListener;
@@ -125,6 +127,8 @@ public final class HCFCorePlugin extends JavaPlugin {
             // made during gameplay are the ones that must stay off the main
             // thread, and they do (see UserManager/KitManager).
             storage.init();
+            spawnerStorage = new me.hcfcore.core.spawner.SpawnerStorage(database);
+            spawnerStorage.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize the database, disabling.", e);
             Bukkit.getPluginManager().disablePlugin(this);
@@ -196,6 +200,19 @@ public final class HCFCorePlugin extends JavaPlugin {
         EndseeCommand endseeCommand = new EndseeCommand(messages);
         getCommand("endersee").setExecutor(endseeCommand);
         getCommand("endersee").setTabCompleter(endseeCommand);
+
+        spawnerManager = new me.hcfcore.core.spawner.SpawnerManager(this, spawnerStorage);
+        spawnerManager.load();
+        spawnerManager.loadSpawnersFromDatabase();
+        Bukkit.getPluginManager().registerEvents(
+                new me.hcfcore.core.spawner.SpawnerListener(spawnerManager, staffManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.hcfcore.core.spawner.SpawnerMobListener(this, spawnerManager), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.hcfcore.core.spawner.SpawnerClaimListener(spawnerManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.hcfcore.core.spawner.SpawnerMenuListener(spawnerManager, messages), this);
+        getCommand("spawners").setExecutor(new me.hcfcore.core.spawner.SpawnerCommand(spawnerManager, messages));
 
         combatListener = new CombatListener(this, combatManager, messages);
         Bukkit.getPluginManager().registerEvents(combatListener, this);
@@ -353,6 +370,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
         if (abilityManager != null) {
             abilityManager.load();
+        }
+        if (spawnerManager != null) {
+            spawnerManager.load();
         }
         if (kitManager != null) {
             kitManager.load();

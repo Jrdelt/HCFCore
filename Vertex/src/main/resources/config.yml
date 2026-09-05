@@ -231,8 +231,8 @@ pvp:
     # Knockback applied on every melee hit and every enabled projectile hit
     # above, overriding vanilla's own knockback entirely.
     knockback:
-      horizontal: 0.4
-      vertical: 0.4
+      horizontal: 0.275
+      vertical: 0.15
       # Extra horizontal knockback when the attacker is sprinting.
       sprint-bonus: 0.1
 

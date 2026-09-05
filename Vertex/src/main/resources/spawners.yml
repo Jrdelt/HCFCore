@@ -1,0 +1,92 @@
+# ============================================
+# SPAWNER STACKING
+# ============================================
+# Maximum number of spawners a single stack can hold.
+max-stack-size: 64
+
+# Whether breaking a spawner requires a Silk Touch pickaxe.
+silk-touch-required: true
+
+# What breaking a stacked spawner does:
+#   drop-all   - drops every spawner in the stack as items, removes the block
+#   decrement  - drops just 1 spawner, the block stays if any are left
+break-mode: drop-all
+
+# Percentage of the shop price refunded when withdrawing spawners from a
+# stack via the management GUI (right-click a spawner with an empty hand).
+sell-refund-percent: 50
+
+# --- VANILLA SPAWNER TUNING ---
+# These scale a stack's own CreatureSpawner block-entity fields by its
+# stack size, so a bigger stack actually produces more mobs per cycle
+# instead of just being a number tracked in a database somewhere.
+spawn-count-per-stack: 1
+max-spawn-count: 8
+max-nearby-entities-per-stack: 2
+max-nearby-entities-cap: 32
+min-spawn-delay-ticks: 200
+max-spawn-delay-ticks: 400
+required-player-range-blocks: 16
+spawn-range-blocks: 4
+
+# --- SHOP CATALOG & DROP TABLES ---
+# Each entry here is buyable from /spawners and placeable in claimed land.
+# "drops" replace the mob's vanilla death drops entirely -- leave it empty
+# to keep vanilla drops instead.
+mobs:
+  ZOMBIE:
+    display-name: '<green>Zombie Spawner'
+    price: 50000.0
+    drops:
+      - material: ROTTEN_FLESH
+        min: 0
+        max: 2
+        chance: 1.0
+      - material: IRON_INGOT
+        min: 0
+        max: 1
+        chance: 0.05
+
+  SKELETON:
+    display-name: '<green>Skeleton Spawner'
+    price: 50000.0
+    drops:
+      - material: BONE
+        min: 0
+        max: 2
+        chance: 1.0
+      - material: ARROW
+        min: 0
+        max: 2
+        chance: 1.0
+
+  BLAZE:
+    display-name: '<green>Blaze Spawner'
+    price: 150000.0
+    drops:
+      - material: BLAZE_ROD
+        min: 0
+        max: 1
+        chance: 0.5
+
+  IRON_GOLEM:
+    display-name: '<green>Iron Golem Spawner'
+    price: 200000.0
+    drops:
+      - material: IRON_INGOT
+        min: 2
+        max: 4
+        chance: 1.0
+
+  EVOKER:
+    display-name: '<green>Evoker Spawner'
+    price: 300000.0
+    drops:
+      - material: EMERALD
+        min: 0
+        max: 1
+        chance: 0.5
+      - material: TOTEM_OF_UNDYING
+        min: 0
+        max: 1
+        chance: 0.05

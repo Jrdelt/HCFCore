@@ -440,6 +440,43 @@ bard uses) marks whoever their arrows hit:
   death. It deliberately survives a disconnect, so relogging isn't a way
   to shed it mid-fight.
 
+## Spawners (`spawners.yml`)
+
+A stackable mob-spawner economy, tied into faction claims. Buy a spawner
+from `/spawners` (a shop GUI listing every mob type configured in
+`spawners.yml`), place it inside your own faction's claimed land, and
+right-click it with a matching spawner item to stack it (shift-right-click
+deposits every matching spawner in your inventory at once). Right-clicking
+it with an empty or non-matching hand opens a management GUI to withdraw
+or sell spawners from the stack for a configurable percentage of the shop
+price (`sell-refund-percent`).
+
+**Stacking** scales the block's own vanilla spawn-count/nearby-entity-cap
+by stack size (`spawn-count-per-stack`, `max-nearby-entities-per-stack`,
+each with a hard cap) rather than this plugin manually re-spawning mobs
+every cycle — a bigger stack really does spawn more mobs per cycle, using
+vanilla's own spawner logic.
+
+**Mining** requires Silk Touch (`silk-touch-required`) and only works for
+members of the claim's own faction (or `/staffbuild`) — everyone else is
+blocked outright. `break-mode` controls whether breaking drops the whole
+stack (`drop-all`) or just one spawner at a time (`decrement`).
+
+**Mobs spawned from a tracked spawner** have every targeting goal stripped
+(`Bukkit.getMobGoals()`, `GoalType.TARGET`) so they can never attack a
+player — safe for AFK grinders — and their death drops are replaced
+entirely by the `drops` list configured for that mob type in
+`spawners.yml`, instead of vanilla drops.
+
+**Claim integration**: a chunk with active spawners can't be `/f unclaim`'d
+on its own — the plugin refuses and tells the player why. `/f unclaimall`
+isn't blocked (there's no practical way to protect specific chunks from a
+whole-faction unclaim), but every spawner in the land being released is
+dropped as an item and the player is warned how many. A faction disbanding
+(voluntarily or automatically) drops every spawner in all of its claimed
+land the same way, and a chunk being overclaimed by another faction drops
+whatever spawners the previous owner had there.
+
 ## Staff Tools
 
 Session-scoped toggles (nothing persists across a rejoin — same as
@@ -543,6 +580,7 @@ shows any player the currently scheduled countdown, if one is running.
 | `/getitem <username> <ability> [amount]` | `hcfcore.ability.give` | Gives a player ability items directly, ignoring cooldowns. |
 | `/abilities` | *(none — open to all players)* | Opens a GUI listing every ability's name/lore. A viewer with `hcfcore.ability.give` who clicks one receives a copy; everyone else's click just closes/does nothing. |
 | `/cooldowns` | *(none — open to all players)* | Shows your own active cooldowns: kits, ability items, the shared global ability cooldown, and the vanilla pearl/golden-apple/enchanted-golden-apple timers. |
+| `/spawners` | *(none — open to all players)* | Opens the spawner shop GUI (see **Spawners** above). |
 
 ### Language
 
