@@ -73,7 +73,16 @@ public final class NinjaStarListener implements Listener {
         lastHits.put(victim.getUniqueId(), new LastHit(attacker.getUniqueId(), System.currentTimeMillis()));
     }
 
-    @EventHandler(ignoreCancelled = true)
+    // Not ignoreCancelled -- unlike this, every other right-click ability
+    // listener (Time Warp Pearl, Leap, Grappling Hook, Portable Bard,
+    // Repair) processes the event even if something else already cancelled
+    // it, since a bare right-click-air/block is routinely pre-cancelled by
+    // an unrelated plugin/listener for reasons that have nothing to do with
+    // this ability. With ignoreCancelled here, Ninja Star silently did
+    // nothing on exactly those clicks -- matching reports that it only
+    // worked after hitting a block or cycling hotbar slots first, both of
+    // which produce a fresh interact event that isn't already cancelled.
+    @EventHandler
     public void onInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
