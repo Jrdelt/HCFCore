@@ -195,13 +195,16 @@ Sixteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
 - **Grappling Hook** (right-click) — Fish hook pull mechanic (8 uses); no fall damage on landing
 - **Leap** (right-click) — Jump forward with velocity; no fall damage on landing
 - **Rogue Backstab** (melee from behind) — Extra damage
-- **Mage Debuffs** (melee) — Wither/Slowness/Poison
+- **Mage Debuffs** (melee) — Wither/Slowness/Poison; doubled duration and
+  effect level when worn in the mage kit's own mixed gold/chainmail set
 - **Ninja Star** (right-click, in the rogue kits) — Teleports you to whoever hit
   you last, after warning them with a 5-second countdown in chat. Requires
   that hit to have landed within the last 15 seconds and both of you to
   currently be in combat. On arrival you get Regeneration II, Strength
   III, and Speed V, each for 3 seconds.
-- **Portable Bard** (right-click) — Pick a buff for your faction (in gold armor set)
+- **Portable Bard** (right-click) — Pick a buff for your faction; doubled
+  duration and effect level when worn in the full gold bard set (also
+  gets the short in-kit cooldown, see below)
 - **Repair** (right-click) — Grant block-breaking permission (needs LuckPerms)
 - **Switcher Snowball** (throw) — Swap positions with enemy
 - **Time Warp Pearl** (right-click) — Teleport to last pearl throw location

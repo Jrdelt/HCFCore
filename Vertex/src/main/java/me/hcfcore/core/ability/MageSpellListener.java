@@ -1,6 +1,7 @@
 package me.hcfcore.core.ability;
 
 import me.hcfcore.core.factions.FactionsHook;
+import me.hcfcore.core.kit.ArmorClass;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
@@ -78,9 +79,17 @@ public final class MageSpellListener implements Listener {
         }
         abilityManager.markGlobalCooldown(attacker.getUniqueId());
         abilityManager.startCooldown(attacker, user, ability);
-        victim.addPotionEffect(new PotionEffect(type,
-                Math.max(1, ability.getInt("effect-duration-seconds", 5)) * 20,
-                Math.max(0, ability.getInt("effect-amplifier", 0)), false, true));
+        int durationSeconds = Math.max(1, ability.getInt("effect-duration-seconds", 5));
+        int amplifier = Math.max(0, ability.getInt("effect-amplifier", 0));
+        // A mage actually wearing the kit's own mixed gold/chainmail set
+        // gets double duration and double effect level (Level I -> II,
+        // II -> IV, ...) -- same "rewards playing in your own class"
+        // treatment Portable Bard already gets for its cooldown.
+        if (ArmorClass.isMage(attacker)) {
+            durationSeconds *= 2;
+            amplifier = amplifier * 2 + 1;
+        }
+        victim.addPotionEffect(new PotionEffect(type, durationSeconds * 20, amplifier, false, true));
         consume(attacker);
         attacker.sendMessage(messages.get(attacker, "ability.mage-spell-cast"));
     }

@@ -35,6 +35,18 @@ public final class ArmorClass {
             Material.LEATHER_HELMET,
     };
 
+    /**
+     * The mage kit's mixed set: gold helmet/boots over a chainmail
+     * chestplate/leggings -- the gold pieces alone are shared with the bard
+     * kit, so this checks all four materials, not just the gold ones.
+     */
+    private static final Material[] MAGE_SET = {
+            Material.GOLDEN_BOOTS,
+            Material.CHAINMAIL_LEGGINGS,
+            Material.CHAINMAIL_CHESTPLATE,
+            Material.GOLDEN_HELMET,
+    };
+
     private ArmorClass() {
     }
 
@@ -58,6 +70,15 @@ public final class ArmorClass {
      */
     public static boolean isBard(Player player) {
         return isWearing(player, BARD_SET);
+    }
+
+    /**
+     * Whether the player is wearing the mage kit's full mixed set (gold
+     * helmet/boots, chainmail chestplate/leggings) -- not just any one
+     * gold piece, since that overlaps with the bard kit.
+     */
+    public static boolean isMage(Player player) {
+        return isWearing(player, MAGE_SET);
     }
 
     private static boolean isWearing(Player player, Material[] expected) {

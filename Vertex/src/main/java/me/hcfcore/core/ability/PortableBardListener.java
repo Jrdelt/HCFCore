@@ -2,6 +2,7 @@ package me.hcfcore.core.ability;
 
 import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
 import me.hcfcore.core.factions.FactionsHook;
+import me.hcfcore.core.kit.ArmorClass;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.user.User;
 import me.hcfcore.core.user.UserManager;
@@ -118,7 +119,16 @@ public final class PortableBardListener implements Listener {
         abilityManager.startBuffCooldown(player.getUniqueId(), ability, buff.id());
 
         int buffSeconds = ability.getInt("buff-seconds", 6);
-        PotionEffect effect = new PotionEffect(buff.effectType(), buffSeconds * 20, buff.amplifier());
+        int amplifier = buff.amplifier();
+        // A bard actually wearing the full gold set doubles both the buff
+        // duration and its effect level (Level I -> II, II -> IV, ...) for
+        // the whole faction -- same "rewards playing in your own class"
+        // treatment this ability's cooldown already gets.
+        if (ArmorClass.isBard(player)) {
+            buffSeconds *= 2;
+            amplifier = amplifier * 2 + 1;
+        }
+        PotionEffect effect = new PotionEffect(buff.effectType(), buffSeconds * 20, amplifier);
 
         for (Player member : FactionsHook.getOnlineFactionMembers(player)) {
             member.addPotionEffect(effect);
