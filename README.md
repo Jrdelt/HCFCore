@@ -194,7 +194,7 @@ Sixteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
 **Ability List:**
 - **Pearl Stunner** (melee) — Blocks victim's pearl use
 - **Rabbits Feed** (right-click, in the archer kits) — Speed V buff
-- **Jump Boost Feather** (right-click, in the archer kits) — Jump Boost V buff
+- **Jump Boost Fruit** (right-click, in the archer kits) — Jump Boost V buff
 - **Anti-Blockup Bone** (melee) — Block placement denial after N hits
 - **Fake Pearl** (right-click) — Looks like ender pearl but no teleport
 - **Grappling Hook** (right-click) — Fish hook pull mechanic (8 uses); no fall damage on landing
@@ -220,6 +220,19 @@ Sixteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
 - **Repair** (right-click) — Grant block-breaking permission (needs LuckPerms)
 - **Switcher Snowball** (throw) — Swap positions with enemy
 - **Time Warp Pearl** (right-click) — Teleport to last pearl throw location
+
+**Choosing a material:** a right-click ability's `material` in `abilities.yml`
+must be something Minecraft's client recognizes as having its own right-click
+action (a bow, fishing rod, ender eye/pearl, firework rocket, anvil/any
+placeable block, or any edible item all qualify). A material with no
+vanilla right-click behavior at all (a plain feather, rabbit's foot, nether
+star, stick, etc.) only sends the interact packet when the player is
+looking at a block — right-clicking on open air silently does nothing,
+client-side, before HCFCore's own listener ever sees it. This bit Ninja
+Star (nether star), Rabbit's Feed (rabbit foot), and Jump Boost Feather
+(feather) until their materials were swapped to a compass, golden carrot,
+and chorus fruit respectively — none of which changes their cooldown,
+lore, or behavior, only what the item looks like in-hand.
 
 **Key behaviors:**
 - Items are only consumed after successful activation

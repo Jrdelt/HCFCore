@@ -9,7 +9,7 @@ abilities:
     stun-seconds: 8
 
   rabbits-feed:
-    material: RABBIT_FOOT
+    material: GOLDEN_CARROT
     name: '<green>Rabbit''s Feed'
     lore:
       - '<gray>Right-click for Speed V.'
@@ -17,8 +17,8 @@ abilities:
     speed-duration-seconds: 8
 
   jump-boost-feather:
-    material: FEATHER
-    name: '<green>Jump Boost Feather'
+    material: CHORUS_FRUIT
+    name: '<green>Jump Boost Fruit'
     lore:
       - '<gray>Right-click for Jump Boost V.'
     cooldown-seconds: 30
@@ -152,7 +152,7 @@ abilities:
     cooldown-seconds: 30
 
   ninja-star:
-    material: NETHER_STAR
+    material: COMPASS
     name: '<light_purple>Ninja Star'
     lore:
       - '<gray>Teleport to whoever hit you'

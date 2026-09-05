@@ -28,10 +28,10 @@ kits:
         amount: 32
       - material: BREAD
         amount: 8
-      - material: RABBIT_FOOT
+      - material: GOLDEN_CARROT
         amount: 1
         ability: rabbits-feed
-      - material: FEATHER
+      - material: CHORUS_FRUIT
         amount: 1
         ability: jump-boost-feather
     effects:
@@ -74,10 +74,10 @@ kits:
         amount: 64
       - material: BREAD
         amount: 8
-      - material: RABBIT_FOOT
+      - material: GOLDEN_CARROT
         amount: 1
         ability: rabbits-feed
-      - material: FEATHER
+      - material: CHORUS_FRUIT
         amount: 1
         ability: jump-boost-feather
     effects:
@@ -316,7 +316,7 @@ kits:
       - material: GOLDEN_SWORD
         amount: 2
         ability: rogue-backstab
-      - material: NETHER_STAR
+      - material: COMPASS
         amount: 1
         ability: ninja-star
       - material: BREAD
@@ -348,7 +348,7 @@ kits:
         amount: 3
         ability: rogue-backstab
         enchantments: {UNBREAKING: 3}
-      - material: NETHER_STAR
+      - material: COMPASS
         amount: 1
         ability: ninja-star
       - material: BREAD
