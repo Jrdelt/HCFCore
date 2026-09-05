@@ -159,7 +159,11 @@ Edit `kits.yml` to create kits. Each kit has:
 - **cooldown-seconds** — reuse timer (0 = no cooldown)
 - **cost** — optional money or item cost (or both)
 - **armor** — 4 armor pieces to give
-- **contents** — items for the inventory
+- **contents** — items for the inventory; a content entry with an
+  `ability: <id>` field is built from that ability's own
+  material/name/lore in `abilities.yml` (matching what `/getitem` would
+  hand out) rather than a bare, unlabeled vanilla item — `amount` and
+  `enchantments` on the content entry still apply on top of it
 - **effects** — passive potion effects while wearing full armor set
 - **icon** — GUI icon (Material name)
 - **purpose** — one-line description in GUI
@@ -181,7 +185,7 @@ Edit `kits.yml` to create kits. Each kit has:
 
 ## Abilities
 
-Sixteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
+Twenty-one PvP ability items ship pre-configured in `abilities.yml`. Each has:
 - **material** / **name** / **lore** — fully customizable appearance
 - **cooldown-seconds** — reuse timer (saved to database, persists across restarts)
 - **uses** — number of uses before breaking (optional)
@@ -189,7 +193,8 @@ Sixteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
 
 **Ability List:**
 - **Pearl Stunner** (melee) — Blocks victim's pearl use
-- **Rabbits Feed** (right-click) — Speed V buff
+- **Rabbits Feed** (right-click, in the archer kits) — Speed V buff
+- **Jump Boost Feather** (right-click, in the archer kits) — Jump Boost V buff
 - **Anti-Blockup Bone** (melee) — Block placement denial after N hits
 - **Fake Pearl** (right-click) — Looks like ender pearl but no teleport
 - **Grappling Hook** (right-click) — Fish hook pull mechanic (8 uses); no fall damage on landing
@@ -206,8 +211,11 @@ Sixteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
   III, and Speed V, each for 3 seconds.
 - **Portable Bard** (right-click) — Gives you one of each buff item
   (Speed, Strength, Resistance, Regeneration, Jump Boost); right-click a
-  buff item to share it with your faction. Doubled duration and effect
-  level when worn in the full gold bard set, halved otherwise (never
+  buff item to share it with faction members within
+  `abilities.bard-share-radius-blocks` (default 30) blocks of you, same
+  world only — not the whole online faction regardless of distance. Tells
+  you how many nearby members actually received it. Doubled duration and
+  effect level when worn in the full gold bard set, halved otherwise (never
   below Level I / 1 second). The master item also gets the short in-kit
   cooldown, see below; each buff item has its own separate cooldown
 - **Repair** (right-click) — Grant block-breaking permission (needs LuckPerms)

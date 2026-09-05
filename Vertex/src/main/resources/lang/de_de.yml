@@ -138,7 +138,7 @@ ability:
   bone-attacker: '<yellow>{player} can''t place blocks for {seconds}s.'
   bone-victim: '<red>You can''t place blocks for {seconds}s.'
   bone-place-denied: '<red>You can''t place blocks right now.'
-  bard-shared: '<green>Shared a buff with your faction.'
+  bard-shared: '<green>Shared a buff with {count} nearby faction member(s).'
   bard-buffs-given: '<green>Received a set of faction-buff items.'
   repair-no-luckperms: '<red>Repair requires LuckPerms to be installed. Contact staff.'
   repair-granted: '<green>You can repair your gear for {seconds}s.'

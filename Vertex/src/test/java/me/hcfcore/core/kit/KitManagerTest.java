@@ -1,5 +1,6 @@
 package me.hcfcore.core.kit;
 
+import me.hcfcore.core.ability.AbilityManager;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.storage.Storage;
 import me.hcfcore.core.user.UserManager;
@@ -41,6 +42,7 @@ class KitManagerTest {
     private PluginMock plugin;
     private UserManager userManager;
     private Messages messages;
+    private AbilityManager abilityManager;
     private KitManager kitManager;
 
     @BeforeEach
@@ -50,7 +52,9 @@ class KitManagerTest {
         userManager = new UserManager(plugin, new InMemoryStorage());
         messages = new Messages(plugin, userManager);
         messages.load();
-        kitManager = new KitManager(plugin, new InMemoryStorage(), userManager, messages);
+        abilityManager = new AbilityManager(plugin, new InMemoryStorage());
+        abilityManager.load();
+        kitManager = new KitManager(plugin, new InMemoryStorage(), userManager, messages, abilityManager);
     }
 
     @AfterEach
@@ -69,7 +73,7 @@ class KitManagerTest {
         kitManager.save("Starter", player, "hcfcore.kit.starter", 30, Kit.Cost.NONE);
         kitManager.shutdown();
 
-        KitManager reloaded = new KitManager(plugin, new InMemoryStorage(), userManager, messages);
+        KitManager reloaded = new KitManager(plugin, new InMemoryStorage(), userManager, messages, abilityManager);
         reloaded.load();
         Kit kit = reloaded.get("starter");
         assertEquals("Starter", kit.getName());
@@ -79,7 +83,7 @@ class KitManagerTest {
         reloaded.delete("Starter");
         reloaded.shutdown();
 
-        KitManager reloadedAgain = new KitManager(plugin, new InMemoryStorage(), userManager, messages);
+        KitManager reloadedAgain = new KitManager(plugin, new InMemoryStorage(), userManager, messages, abilityManager);
         reloadedAgain.load();
         assertNull(reloadedAgain.get("starter"));
     }
@@ -251,6 +255,30 @@ class KitManagerTest {
     }
 
     @Test
+    void abilityTaggedKitContentsUseTheAbilitysOwnNameAndLore() {
+        // Regression test: kit content items with an "ability:" tag used to
+        // be built as bare vanilla items (no name, no lore) with only a
+        // hidden PDC tag -- indistinguishable in the player's inventory
+        // from the plain material it's made of. They should look exactly
+        // like the same item granted via /getitem.
+        PlayerMock player = server.addPlayer("Merlin");
+        player.addAttachment(plugin, "hcfcore.kit.mage", true);
+        userManager.load(player.getUniqueId());
+        kitManager.load();
+        Kit kit = kitManager.get("mage");
+
+        kitManager.apply(player, kit);
+
+        ItemStack witherSkull = Arrays.stream(player.getInventory().getContents())
+                .filter(item -> item != null && item.getType() == Material.WITHER_SKELETON_SKULL)
+                .findFirst()
+                .orElse(null);
+        assertTrue(witherSkull != null && witherSkull.hasItemMeta() && witherSkull.getItemMeta().hasDisplayName(),
+                "the mage-wither item should carry the ability's own display name");
+        assertTrue(witherSkull.getItemMeta().hasLore(), "the mage-wither item should carry the ability's own lore");
+    }
+
+    @Test
     void externalPotionOverridingAKitEffectDoesNotRetriggerTheWarmupMessage() {
         // Regression test: an external potion (e.g. a PvP splash potion)
         // sharing an effect type with the kit used to be misread as the
@@ -419,7 +447,7 @@ class KitManagerTest {
         kitManager.load();
         assertEquals("CHAINMAIL_LEGGINGS", kitManager.get("scout").getIcon());
 
-        KitManager reloaded = new KitManager(plugin, new InMemoryStorage(), userManager, messages);
+        KitManager reloaded = new KitManager(plugin, new InMemoryStorage(), userManager, messages, abilityManager);
         reloaded.load();
         assertEquals("CHAINMAIL_LEGGINGS", reloaded.get("scout").getIcon());
     }

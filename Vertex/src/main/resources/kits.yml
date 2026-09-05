@@ -28,6 +28,12 @@ kits:
         amount: 32
       - material: BREAD
         amount: 8
+      - material: FEATHER
+        amount: 1
+        ability: rabbits-feed
+      - material: FEATHER
+        amount: 1
+        ability: jump-boost-feather
     effects:
       - type: SPEED
         amplifier: 2
@@ -68,6 +74,12 @@ kits:
         amount: 64
       - material: BREAD
         amount: 8
+      - material: FEATHER
+        amount: 1
+        ability: rabbits-feed
+      - material: FEATHER
+        amount: 1
+        ability: jump-boost-feather
     effects:
       - type: SPEED
         amplifier: 2

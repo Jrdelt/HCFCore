@@ -16,6 +16,14 @@ abilities:
     cooldown-seconds: 30
     speed-duration-seconds: 8
 
+  jump-boost-feather:
+    material: FEATHER
+    name: '<green>Jump Boost Feather'
+    lore:
+      - '<gray>Right-click for Jump Boost V.'
+    cooldown-seconds: 30
+    jump-duration-seconds: 8
+
   anti-blockup-bone:
     material: BONE
     name: '<white>Anti-Blockup Bone'

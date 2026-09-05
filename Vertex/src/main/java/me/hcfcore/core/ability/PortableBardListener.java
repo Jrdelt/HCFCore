@@ -125,10 +125,18 @@ public final class PortableBardListener implements Listener {
         }
 
         PotionEffect effect = new PotionEffect(type, seconds * 20, amplifier);
+        double radius = Math.max(0, plugin.getConfig().getDouble("abilities.bard-share-radius-blocks", 30));
+        double radiusSquared = radius * radius;
+        int recipients = 0;
         for (Player member : FactionsHook.getOnlineFactionMembers(player)) {
+            if (!member.getWorld().equals(player.getWorld())
+                    || member.getLocation().distanceSquared(player.getLocation()) > radiusSquared) {
+                continue;
+            }
             member.addPotionEffect(effect);
+            recipients++;
         }
-        player.sendMessage(messages.get(player, "ability.bard-shared"));
+        player.sendMessage(messages.get(player, "ability.bard-shared", "count", String.valueOf(recipients)));
     }
 
     /**

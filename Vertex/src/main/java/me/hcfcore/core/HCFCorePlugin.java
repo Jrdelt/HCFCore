@@ -22,6 +22,7 @@ import me.hcfcore.core.ability.VanillaCooldownListener;
 import me.hcfcore.core.ability.VanillaCooldownManager;
 import me.hcfcore.core.chat.ChatFormatterListener;
 import me.hcfcore.core.ability.PearlStunnerListener;
+import me.hcfcore.core.ability.JumpBoostFeatherListener;
 import me.hcfcore.core.ability.RabbitsFeedListener;
 import me.hcfcore.core.factions.FactionCommandListener;
 import me.hcfcore.core.kit.KitCommand;
@@ -129,11 +130,11 @@ public final class HCFCorePlugin extends JavaPlugin {
         userManager = new UserManager(this, storage);
         messages = new Messages(this, userManager);
         messages.load();
-        kitManager = new KitManager(this, storage, userManager, messages);
-        kitManager.load();
-        kitManager.start();
         abilityManager = new AbilityManager(this, storage);
         abilityManager.load();
+        kitManager = new KitManager(this, storage, userManager, messages, abilityManager);
+        kitManager.load();
+        kitManager.start();
         vanillaCooldownManager = new VanillaCooldownManager();
         archerTagManager = new ArcherTagManager();
         tagManager = new TagManager(this);
@@ -227,6 +228,7 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getScheduler().runTaskTimer(this, archerTagManager::cleanupExpired, 300L, 300L);
         Bukkit.getPluginManager().registerEvents(new PearlStunnerListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new RabbitsFeedListener(this, abilityManager, userManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new JumpBoostFeatherListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new TagMenuListener(this), this);
         Bukkit.getPluginManager().registerEvents(new ChatFormatterListener(tagManager, this), this);
         Bukkit.getPluginManager().registerEvents(new FactionCommandListener(this, messages), this);
@@ -341,11 +343,11 @@ public final class HCFCorePlugin extends JavaPlugin {
         if (messages != null) {
             messages.load();
         }
-        if (kitManager != null) {
-            kitManager.load();
-        }
         if (abilityManager != null) {
             abilityManager.load();
+        }
+        if (kitManager != null) {
+            kitManager.load();
         }
         if (tagManager != null) {
             tagManager.load();

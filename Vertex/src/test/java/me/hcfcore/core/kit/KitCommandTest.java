@@ -1,5 +1,6 @@
 package me.hcfcore.core.kit;
 
+import me.hcfcore.core.ability.AbilityManager;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.storage.Storage;
 import me.hcfcore.core.user.UserManager;
@@ -32,7 +33,9 @@ class KitCommandTest {
         UserManager userManager = new UserManager(plugin, new NoOpStorage());
         messages = new Messages(plugin, userManager);
         messages.load();
-        KitManager kitManager = new KitManager(plugin, new NoOpStorage(), userManager, messages);
+        AbilityManager abilityManager = new AbilityManager(plugin, new NoOpStorage());
+        abilityManager.load();
+        KitManager kitManager = new KitManager(plugin, new NoOpStorage(), userManager, messages, abilityManager);
         command = new KitCommand(plugin, kitManager, messages);
     }
 

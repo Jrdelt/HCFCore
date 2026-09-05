@@ -185,6 +185,10 @@ abilities:
   # Maximum number of items /getitem can give
   max-getitem-amount: 64
 
+  # Portable Bard's buff items only reach faction members within this many
+  # blocks of the caster (same world), not the whole online faction.
+  bard-share-radius-blocks: 30
+
   # Regions where abilities are disabled (e.g., spawn, safezone)
   # Per-ability settings (cooldowns, durations) go in abilities.yml
   disabled-regions:

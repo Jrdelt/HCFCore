@@ -34,7 +34,7 @@ class AbilityManagerTest {
             "mage-wither", "mage-slowness", "mage-poison",
             "switcher-snowball", "time-warp-pearl", "ninja-star",
             "bard-buff-speed", "bard-buff-strength", "bard-buff-resistance",
-            "bard-buff-regeneration", "bard-buff-jump-boost"
+            "bard-buff-regeneration", "bard-buff-jump-boost", "jump-boost-feather"
     };
 
     private ServerMock server;

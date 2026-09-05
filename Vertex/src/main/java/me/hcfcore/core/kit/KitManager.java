@@ -1,5 +1,7 @@
 package me.hcfcore.core.kit;
 
+import me.hcfcore.core.ability.Ability;
+import me.hcfcore.core.ability.AbilityManager;
 import me.hcfcore.core.economy.EconomyHook;
 import me.hcfcore.core.lang.Messages;
 import me.hcfcore.core.storage.Storage;
@@ -52,6 +54,7 @@ public final class KitManager {
     private final Storage storage;
     private final UserManager userManager;
     private final Messages messages;
+    private final AbilityManager abilityManager;
     private final AtomicLong saveGeneration = new AtomicLong();
     private volatile boolean shuttingDown;
     private volatile Future<?> pendingPersist;
@@ -71,11 +74,13 @@ public final class KitManager {
         return thread;
     });
 
-    public KitManager(Plugin plugin, Storage storage, UserManager userManager, Messages messages) {
+    public KitManager(Plugin plugin, Storage storage, UserManager userManager, Messages messages,
+                       AbilityManager abilityManager) {
         this.plugin = plugin;
         this.storage = storage;
         this.userManager = userManager;
         this.messages = messages;
+        this.abilityManager = abilityManager;
     }
 
     private File resolveFile() {
@@ -276,18 +281,31 @@ public final class KitManager {
             return null;
         }
         int amount = asInt(map.get("amount"), asInt(map.get("count"), 1));
-        ItemStack item = new ItemStack(material, Math.max(1, amount));
-        applyEnchantments(item, map.get("enchantments"));
-        applyPotionEffect(item, map);
         Object abilityId = map.get("ability");
-        if (abilityId != null) {
-            ItemMeta meta = item.getItemMeta();
-            if (meta != null) {
-                meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "ability_id"),
-                    org.bukkit.persistence.PersistentDataType.STRING, String.valueOf(abilityId));
-                item.setItemMeta(meta);
+        Ability ability = abilityId == null ? null : abilityManager.get(String.valueOf(abilityId));
+
+        ItemStack item;
+        if (ability != null) {
+            // Reuses the ability's own material/name/lore/PDC tag
+            // (abilities.yml is the single source of truth for what this
+            // item looks like and does) rather than handing out a bare
+            // vanilla item with no indication of what it is -- the kit
+            // content entry only overrides amount/enchantments/potion below.
+            item = abilityManager.createItem(ability);
+            item.setAmount(Math.max(1, amount));
+        } else {
+            item = new ItemStack(material, Math.max(1, amount));
+            if (abilityId != null) {
+                ItemMeta meta = item.getItemMeta();
+                if (meta != null) {
+                    meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "ability_id"),
+                        org.bukkit.persistence.PersistentDataType.STRING, String.valueOf(abilityId));
+                    item.setItemMeta(meta);
+                }
             }
         }
+        applyEnchantments(item, map.get("enchantments"));
+        applyPotionEffect(item, map);
         return item;
     }
 
