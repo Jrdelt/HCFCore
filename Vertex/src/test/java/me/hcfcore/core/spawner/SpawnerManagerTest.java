@@ -99,7 +99,7 @@ class SpawnerManagerTest {
     @Test
     void loadParsesTheBundledMobStackingSection() {
         assertTrue(manager.isMobStackingEnabled());
-        assertEquals(8.0, manager.mergeRadiusBlocks());
+        assertEquals(50.0, manager.mergeRadiusBlocks());
         assertEquals(100, manager.maxStackLimit());
         assertEquals(64, manager.dropBatchSize());
         assertEquals("<gray>[x{count}] <white>{name}", manager.stackDisplayFormat());

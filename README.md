@@ -486,15 +486,20 @@ already owns leaves its own spawners untouched.
 
 Nearby mobs of the same type merge into a single tracked entity instead of
 letting entity count balloon once a stacked spawner is running dozens of
-spawns per cycle. A newly-spawned mob of a `stackable-types` entry within
+spawns per cycle. A mob of a `stackable-types` entry within
 `merge-radius-blocks` of an existing stack (of the same type, under
-`max-stack-limit`) is folded into it instead of becoming its own entity —
+`max-stack-limit`) is folded into it instead of remaining its own entity —
 this applies regardless of *how* it spawned, bypassing vanilla's own
-nearby-entity spawn limits in the process. The merged entity shows a
-nametag (`display-format`, with `{count}`/`{name}` placeholders) once its
-count is 2 or higher, and is exempted from despawning when players leave
-the area (`setRemoveWhenFarAway(false)`) — it only goes away on a server
-restart or a manual clear.
+nearby-entity spawn limits in the process. Merging is checked both at spawn
+and on a periodic sweep afterward, so a mob that free-falls or rides a
+water stream down a multi-level spawner shaft still merges once it settles
+near the collection point below, not just mobs that happen to spawn within
+range of each other — set `merge-radius-blocks` generously enough to cover
+your tallest shaft. The merged entity shows a nametag (`display-format`,
+with `{count}`/`{name}` placeholders) once its count is 2 or higher, and is
+exempted from despawning when players leave the area
+(`setRemoveWhenFarAway(false)`) — it only goes away on a server restart or
+a manual clear.
 
 **Killing a stack**: a direct player hit peels exactly **one** mob off the
 stack — that one mob's own loot and EXP drop, the stack shrinks by one, and

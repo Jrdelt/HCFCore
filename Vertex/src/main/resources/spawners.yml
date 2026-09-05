@@ -99,10 +99,14 @@ mobs:
 # spawner is producing dozens of mobs per cycle.
 mob-stacking:
   enabled: true
-  # A newly-spawned stackable mob within this many blocks of an existing
-  # stack of the same type merges into it instead of becoming its own
-  # entity.
-  merge-radius-blocks: 8
+  # A stackable mob within this many blocks of an existing stack of the
+  # same type merges into it instead of becoming its own entity -- checked
+  # both at spawn and periodically afterward, so a mob that free-falls or
+  # gets carried by a water stream down a multi-level spawner shaft still
+  # merges once it settles near the collection point, not just mobs that
+  # happen to spawn within range of each other. Set this generously enough
+  # to cover your tallest shaft's height.
+  merge-radius-blocks: 50
   # A stack already at this size lets a new spawn become its own separate
   # stack instead of being lost.
   max-stack-limit: 100

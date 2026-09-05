@@ -108,6 +108,69 @@ public final class MobStackListener implements Listener {
         return closest;
     }
 
+    /**
+     * Merging only at spawn time misses the common case of a mob-farm
+     * shaft: a mob spawns at the top (often well outside merge range of the
+     * collection point) and is carried down to an existing stack purely by
+     * gravity/water current, neither of which re-fires CreatureSpawnEvent.
+     * Run periodically (see HCFCorePlugin's scheduling of this) to fold any
+     * such stragglers into whatever same-type stack they've ended up near,
+     * regardless of how they got there.
+     */
+    public void consolidateStacks() {
+        if (!spawnerManager.isMobStackingEnabled()) {
+            return;
+        }
+        double radius = spawnerManager.mergeRadiusBlocks();
+        if (radius <= 0) {
+            return;
+        }
+        double radiusSquared = radius * radius;
+        int limit = spawnerManager.maxStackLimit();
+
+        for (World world : plugin.getServer().getWorlds()) {
+            List<Mob> tracked = new ArrayList<>();
+            for (Entity entity : world.getEntities()) {
+                if (entity instanceof Mob mob && mob.getPersistentDataContainer().has(stackCountKey, PersistentDataType.INTEGER)) {
+                    tracked.add(mob);
+                }
+            }
+            for (int i = 0; i < tracked.size(); i++) {
+                Mob a = tracked.get(i);
+                if (!a.isValid()) {
+                    continue;
+                }
+                int countA = currentStackCount(a);
+                for (int j = i + 1; j < tracked.size(); j++) {
+                    Mob b = tracked.get(j);
+                    if (!b.isValid() || a.getType() != b.getType()) {
+                        continue;
+                    }
+                    int available = limit - countA;
+                    if (available <= 0) {
+                        break;
+                    }
+                    if (a.getLocation().distanceSquared(b.getLocation()) > radiusSquared) {
+                        continue;
+                    }
+                    int countB = currentStackCount(b);
+                    int transfer = Math.min(countB, available);
+                    countA += transfer;
+                    setStackCount(a, countA);
+                    updateDisplay(a, countA);
+
+                    int remaining = countB - transfer;
+                    if (remaining <= 0) {
+                        b.remove();
+                    } else {
+                        setStackCount(b, remaining);
+                        updateDisplay(b, remaining);
+                    }
+                }
+            }
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         if (!spawnerManager.isMobStackingEnabled() || !(event.getEntity() instanceof Mob mob)

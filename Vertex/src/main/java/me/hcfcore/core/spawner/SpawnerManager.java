@@ -108,7 +108,7 @@ public final class SpawnerManager {
         mobConfigs = readMobConfigs(config);
 
         mobStackingEnabled = config.getBoolean("mob-stacking.enabled", true);
-        mergeRadiusBlocks = Math.max(0, config.getDouble("mob-stacking.merge-radius-blocks", 8));
+        mergeRadiusBlocks = Math.max(0, config.getDouble("mob-stacking.merge-radius-blocks", 50));
         maxStackLimit = Math.max(1, config.getInt("mob-stacking.max-stack-limit", 100));
         stackDisplayFormat = config.getString("mob-stacking.display-format", "<gray>[x{count}] <white>{name}");
         dropBatchSize = Math.max(1, config.getInt("mob-stacking.drop-batch-size", 64));
