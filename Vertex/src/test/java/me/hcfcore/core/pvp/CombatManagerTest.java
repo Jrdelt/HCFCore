@@ -32,7 +32,7 @@ class CombatManagerTest {
         UserManager userManager = new UserManager(plugin, new NoOpStorage());
         Messages messages = new Messages(plugin, userManager);
         messages.load();
-        combatManager = new CombatManager(plugin, messages, 15, true, 4,
+        combatManager = new CombatManager(plugin, messages, 15, 5, true, 4,
                 "<red><bold>Combat</bold><gray>: <white>server <gray>{seconds} <green>you <white>({your_cps}cps)",
                 "<red><bold>Combat</bold><gray>: {health}   <white>{opponent} <gray>{seconds} <green>you "
                         + "<white>({your_cps}cps) <red>them <white>({their_cps}cps)",
@@ -169,11 +169,34 @@ class CombatManagerTest {
     }
 
     @Test
+    void applyPostKillCooldownShortensAnAlreadyTaggedPlayersRemainingTime() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerMock bob = server.addPlayer("Bob");
+        combatManager.tag(alice, bob);
+
+        combatManager.applyPostKillCooldown(alice.getUniqueId());
+
+        long remaining = combatManager.remainingMillis(alice.getUniqueId());
+        assertTrue(remaining <= 5_000L && remaining > 0L,
+                "expected the configured 5s post-kill duration, got " + remaining + "ms remaining");
+        assertTrue(combatManager.isTagged(alice.getUniqueId()));
+    }
+
+    @Test
+    void applyPostKillCooldownDoesNothingForAPlayerWhoIsNotTagged() {
+        UUID randomId = UUID.randomUUID();
+
+        combatManager.applyPostKillCooldown(randomId);
+
+        assertFalse(combatManager.isTagged(randomId));
+    }
+
+    @Test
     void reconfigureAppliesNewSettingsToFutureTagsWithoutNeedingARestart() {
         PlayerMock alice = server.addPlayer("Alice");
         PlayerMock bob = server.addPlayer("Bob");
 
-        combatManager.reconfigure(5, false, 4, "vs-server {seconds} {your_cps}",
+        combatManager.reconfigure(5, 2, false, 4, "vs-server {seconds} {your_cps}",
                 "vs-player {health} {opponent} {seconds} {your_cps} {their_cps}", "vs-unknown {seconds} {your_cps}");
         combatManager.tag(alice, bob);
 

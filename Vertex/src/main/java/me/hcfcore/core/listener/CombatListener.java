@@ -7,6 +7,7 @@ import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerAnimationType;
 
@@ -36,6 +37,13 @@ public final class CombatListener implements Listener {
     public void onSwing(PlayerAnimationEvent event) {
         if (event.getAnimationType() == PlayerAnimationType.ARM_SWING) {
             combatManager.recordClick(event.getPlayer().getUniqueId());
+        }
+    }
+
+    @EventHandler
+    public void onDeath(PlayerDeathEvent event) {
+        if (event.getEntity().getKiller() instanceof Player killer) {
+            combatManager.applyPostKillCooldown(killer.getUniqueId());
         }
     }
 

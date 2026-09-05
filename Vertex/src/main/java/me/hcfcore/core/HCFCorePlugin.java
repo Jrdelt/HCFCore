@@ -146,6 +146,7 @@ public final class HCFCorePlugin extends JavaPlugin {
                 this,
                 messages,
                 getConfig().getInt("pvp.combat-tag-seconds", 30),
+                getConfig().getInt("pvp.post-kill-combat-seconds", 5),
                 getConfig().getBoolean("pvp.logout-penalty", true),
                 getConfig().getInt("pvp.actionbar-update-interval-ticks", 4),
                 getConfig().getString("pvp.actionbar.vs-server", ""),
@@ -383,6 +384,7 @@ public final class HCFCorePlugin extends JavaPlugin {
         if (combatManager != null) {
             combatManager.reconfigure(
                     getConfig().getInt("pvp.combat-tag-seconds", 30),
+                    getConfig().getInt("pvp.post-kill-combat-seconds", 5),
                     getConfig().getBoolean("pvp.logout-penalty", true),
                     getConfig().getInt("pvp.actionbar-update-interval-ticks", 4),
                     getConfig().getString("pvp.actionbar.vs-server", ""),

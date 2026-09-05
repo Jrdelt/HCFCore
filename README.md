@@ -493,12 +493,18 @@ configurable MiniMessage template in `config.yml` under `pvp.actionbar`
 - `vs-server` — tagged via `/combattag <you> server`: `{seconds}`, `{your_cps}`
 - `vs-unknown` — tagged, but the opponent went offline: `{seconds}`, `{your_cps}`
 
-`{seconds}` and `{health}` arrive pre-colored (the countdown fades
-green→red as it runs out, health is always red) since those are computed
-live and can't be a fixed color in a static template — everything else
-in the wording, colors, and layout is yours to rearrange. CPS (clicks per
-second) is tracked from arm swings for every online player, not just
-tagged ones, so the count is already warm the instant a tag starts.
+`{seconds}` and `{health}` arrive pre-colored (the countdown is always
+green, health is always red) since those are computed live and can't be
+a fixed color in a static template — everything else in the wording,
+colors, and layout is yours to rearrange. CPS (clicks per second) is
+tracked from arm swings for every online player, not just tagged ones,
+so the count is already warm the instant a tag starts.
+
+Landing a kill shortens the killer's own combat tag down to
+`pvp.post-kill-combat-seconds` (default 5), instead of leaving them
+stuck waiting out the full `pvp.combat-tag-seconds` duration — enough
+time to loot the body and retreat. It only shortens an existing tag;
+a kill can't start one that wasn't already there.
 
 ### Rally
 

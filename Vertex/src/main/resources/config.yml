@@ -79,6 +79,11 @@ pvp:
   # Combat tag duration in seconds
   combat-tag-seconds: 30
 
+  # After landing a kill, the killer's own combat tag drops to this many
+  # seconds instead of running out the full combat-tag-seconds duration --
+  # lets them loot the body/retreat without being stuck in combat.
+  post-kill-combat-seconds: 5
+
   # Item cooldowns (in seconds)
   pearl-cooldown-seconds: 12
   golden-apple-cooldown-seconds: 8
@@ -91,7 +96,7 @@ pvp:
   actionbar-update-interval-ticks: 2
 
   # Combat action bar templates (MiniMessage). {seconds} and {health} are
-  # pre-colored (countdown fades red->green, health is always red) --
+  # pre-colored (countdown is always green, health is always red) --
   # everything else in the template is yours to style freely.
   # Placeholders:
   #   {seconds}    remaining combat time, e.g. "(12s)"

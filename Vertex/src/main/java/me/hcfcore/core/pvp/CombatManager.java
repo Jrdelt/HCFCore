@@ -3,7 +3,6 @@ package me.hcfcore.core.pvp;
 import me.hcfcore.core.lang.MessageFormatter;
 import me.hcfcore.core.lang.Messages;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -31,6 +30,7 @@ public final class CombatManager {
     private final Plugin plugin;
     private final Messages messages;
     private volatile long combatDurationMillis;
+    private volatile long postKillDurationMillis;
     private volatile boolean logoutPenalty;
     private volatile long updateIntervalTicks;
     private volatile String actionbarVsServer;
@@ -41,12 +41,13 @@ public final class CombatManager {
     private final Map<UUID, Deque<Long>> clickTimestamps = new ConcurrentHashMap<>();
     private BukkitTask task;
 
-    public CombatManager(Plugin plugin, Messages messages, int combatSeconds, boolean logoutPenalty,
-                          int updateIntervalTicks, String actionbarVsServer, String actionbarVsPlayer,
-                          String actionbarVsUnknown) {
+    public CombatManager(Plugin plugin, Messages messages, int combatSeconds, int postKillSeconds,
+                          boolean logoutPenalty, int updateIntervalTicks, String actionbarVsServer,
+                          String actionbarVsPlayer, String actionbarVsUnknown) {
         this.plugin = plugin;
         this.messages = messages;
         this.combatDurationMillis = combatSeconds * 1000L;
+        this.postKillDurationMillis = postKillSeconds * 1000L;
         this.logoutPenalty = logoutPenalty;
         this.updateIntervalTicks = Math.max(1, updateIntervalTicks);
         this.actionbarVsServer = actionbarVsServer;
@@ -64,9 +65,10 @@ public final class CombatManager {
      * stale on a config reload. Existing tags keep their already-computed
      * expiry; only new tags and the action-bar cadence pick up the change.
      */
-    public void reconfigure(int combatSeconds, boolean logoutPenalty, int updateIntervalTicks,
+    public void reconfigure(int combatSeconds, int postKillSeconds, boolean logoutPenalty, int updateIntervalTicks,
                              String actionbarVsServer, String actionbarVsPlayer, String actionbarVsUnknown) {
         this.combatDurationMillis = combatSeconds * 1000L;
+        this.postKillDurationMillis = postKillSeconds * 1000L;
         this.logoutPenalty = logoutPenalty;
         this.actionbarVsServer = actionbarVsServer;
         this.actionbarVsPlayer = actionbarVsPlayer;
@@ -188,6 +190,19 @@ public final class CombatManager {
         }
     }
 
+    /**
+     * Shortens a killer's own combat tag to the configured post-kill grace
+     * period, letting them loot the body/retreat without waiting out the
+     * full original combat duration. Only applies while they're already
+     * tagged -- a kill can't start a tag that wasn't there.
+     */
+    public void applyPostKillCooldown(UUID killerId) {
+        if (!isTagged(killerId)) {
+            return;
+        }
+        taggedUntil.put(killerId, System.currentTimeMillis() + postKillDurationMillis);
+    }
+
     public long remainingMillis(UUID uuid) {
         Long until = taggedUntil.get(uuid);
         if (until == null) {
@@ -226,14 +241,12 @@ public final class CombatManager {
     /**
      * Renders one of the three pvp.actionbar.* templates from config.yml,
      * substituting {@code {seconds}}/{@code {health}} as pre-colored
-     * MiniMessage fragments (the countdown fades red->green, health is
-     * always red -- neither is a fixed color a template string could
-     * express on its own) and the rest as plain text.
+     * MiniMessage fragments (health is always red) and the rest as plain
+     * text.
      */
     private Component render(Player player, long remainingMillis) {
         long remainingSeconds = (remainingMillis + 999) / 1000;
-        double timeFraction = combatDurationMillis <= 0 ? 0 : clamp01((double) remainingMillis / combatDurationMillis);
-        String secondsFragment = "<#" + toHex(gradient(1 - timeFraction)) + "><bold>(" + remainingSeconds + "s)</bold>";
+        String secondsFragment = "<green>(" + remainingSeconds + "s)</green>";
 
         UUID opponentId = opponents.get(player.getUniqueId());
         String template;
@@ -265,18 +278,4 @@ public final class CombatManager {
         return MessageFormatter.deserialize(template);
     }
 
-    private static String toHex(TextColor color) {
-        return String.format(Locale.ROOT, "%06X", color.value());
-    }
-
-    private static TextColor gradient(double greenFraction) {
-        double t = clamp01(greenFraction);
-        int red = (int) Math.round(255 * (1 - t));
-        int green = (int) Math.round(255 * t);
-        return TextColor.color(red, green, 0);
-    }
-
-    private static double clamp01(double value) {
-        return Math.max(0, Math.min(1, value));
-    }
 }
