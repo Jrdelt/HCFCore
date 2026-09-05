@@ -374,7 +374,13 @@ kits:
       - material: SPIDER_EYE
         amount: 1
         ability: mage-poison
-    effects: []
+    effects:
+      - type: SPEED
+        amplifier: 1
+      - type: INVISIBILITY
+        amplifier: 0
+      - type: JUMP_BOOST
+        amplifier: 1
 
   mage-donator:
     permission: hcfcore.kit.mage.donator
@@ -403,4 +409,10 @@ kits:
       - material: SPIDER_EYE
         amount: 2
         ability: mage-poison
-    effects: []
+    effects:
+      - type: SPEED
+        amplifier: 1
+      - type: INVISIBILITY
+        amplifier: 0
+      - type: JUMP_BOOST
+        amplifier: 1

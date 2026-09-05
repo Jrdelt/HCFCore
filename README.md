@@ -196,7 +196,9 @@ Sixteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
 - **Leap** (right-click) — Jump forward with velocity; no fall damage on landing
 - **Rogue Backstab** (melee from behind) — Extra damage
 - **Mage Debuffs** (melee) — Wither/Slowness/Poison; doubled duration and
-  effect level when worn in the mage kit's own mixed gold/chainmail set
+  effect level when worn in the mage kit's own mixed gold/chainmail set.
+  The mage kit's armor set also grants Speed II, Invisibility, and Jump
+  Boost II as passive class effects (see below)
 - **Ninja Star** (right-click, in the rogue kits) — Teleports you to whoever hit
   you last, after warning them with a 5-second countdown in chat. Requires
   that hit to have landed within the last 15 seconds and both of you to
