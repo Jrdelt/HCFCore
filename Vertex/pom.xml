@@ -36,13 +36,66 @@
             <id>placeholderapi</id>
             <url>https://repo.extendedclip.com/content/repositories/placeholderapi/</url>
         </repository>
+        <!-- Needed transitively by DecentHolograms (de.tr7zw:item-nbt-api). -->
+        <repository>
+            <id>codemc</id>
+            <url>https://repo.codemc.io/repository/maven-public/</url>
+        </repository>
     </repositories>
+
+    <!--
+        FAWE's own artifacts are version-managed by its BOM (bom-newest);
+        see https://intellectualsites.gitbook.io/fastasyncworldedit/api/api-usage
+        (verified 2026-09). Pin a newer BOM version here if FAWE releases one.
+    -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.intellectualsites.bom</groupId>
+                <artifactId>bom-newest</artifactId>
+                <version>1.56</version>
+                <scope>import</scope>
+                <type>pom</type>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
             <version>${paper.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            Blueprint Base Builder (see me.hcfcore.core.blueprint) needs
+            FAWE's clipboard API to load .schem templates, and
+            DecentHolograms to show build-progress holograms above the
+            beacon. Both are optional server-side plugins (see plugin.yml
+            softdepend); "provided" scope compiles against them without
+            shading them into our jar.
+        -->
+        <dependency>
+            <groupId>com.fastasyncworldedit</groupId>
+            <artifactId>FastAsyncWorldEdit-Core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fastasyncworldedit</groupId>
+            <artifactId>FastAsyncWorldEdit-Bukkit</artifactId>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>FastAsyncWorldEdit-Core</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.github.decentsoftware-eu</groupId>
+            <artifactId>decentholograms</artifactId>
+            <version>2.10.1</version>
             <scope>provided</scope>
         </dependency>
 

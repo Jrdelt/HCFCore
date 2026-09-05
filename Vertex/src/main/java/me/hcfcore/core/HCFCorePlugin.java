@@ -101,6 +101,9 @@ public final class HCFCorePlugin extends JavaPlugin {
     private me.hcfcore.core.collector.ChunkCollectorStorage chunkCollectorStorage;
     private me.hcfcore.core.collector.ChunkCollectorManager chunkCollectorManager;
     private me.hcfcore.core.collector.ChunkCollectorListener chunkCollectorListener;
+    private me.hcfcore.core.blueprint.BlueprintStorage blueprintStorage;
+    private me.hcfcore.core.blueprint.BlueprintManager blueprintManager;
+    private me.hcfcore.core.blueprint.BlueprintListener blueprintListener;
     private RebootManager rebootManager;
     private PlayerConnectionListener playerConnectionListener;
     private RepairListener repairListener;
@@ -135,6 +138,8 @@ public final class HCFCorePlugin extends JavaPlugin {
             spawnerStorage.init();
             chunkCollectorStorage = new me.hcfcore.core.collector.ChunkCollectorStorage(database);
             chunkCollectorStorage.init();
+            blueprintStorage = new me.hcfcore.core.blueprint.BlueprintStorage(database);
+            blueprintStorage.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize the database, disabling.", e);
             Bukkit.getPluginManager().disablePlugin(this);
@@ -238,6 +243,30 @@ public final class HCFCorePlugin extends JavaPlugin {
                 new me.hcfcore.core.collector.ChunkCollectorCommand(chunkCollectorManager, messages);
         getCommand("chunkcollector").setExecutor(chunkCollectorCommand);
         getCommand("chunkcollector").setTabCompleter(chunkCollectorCommand);
+
+        // The Blueprint Base Builder is meaningless without FAWE (it's the
+        // only way this plugin can load a .schem file) and DecentHolograms
+        // (the required progress display) -- rather than risk a
+        // NoClassDefFoundError the moment a player ever touches the
+        // feature, it's simply never wired up at all if either is absent.
+        if (Bukkit.getPluginManager().getPlugin("FastAsyncWorldEdit") != null
+                && Bukkit.getPluginManager().getPlugin("DecentHolograms") != null) {
+            blueprintManager = new me.hcfcore.core.blueprint.BlueprintManager(this, blueprintStorage);
+            blueprintManager.load();
+            blueprintListener = new me.hcfcore.core.blueprint.BlueprintListener(this, blueprintManager, messages);
+            Bukkit.getPluginManager().registerEvents(blueprintListener, this);
+            Bukkit.getPluginManager().registerEvents(
+                    new me.hcfcore.core.blueprint.BlueprintMenuListener(blueprintManager, messages), this);
+            blueprintListener.resumeAll();
+            Bukkit.getScheduler().runTaskTimer(this, blueprintListener::tickBuilds,
+                    blueprintManager.batchIntervalTicks(), blueprintManager.batchIntervalTicks());
+            me.hcfcore.core.blueprint.BlueprintCommand blueprintCommand =
+                    new me.hcfcore.core.blueprint.BlueprintCommand(this, blueprintManager, messages);
+            getCommand("blueprint").setExecutor(blueprintCommand);
+            getCommand("blueprint").setTabCompleter(blueprintCommand);
+        } else {
+            getLogger().info("Blueprint Base Builder disabled -- requires both FastAsyncWorldEdit and DecentHolograms.");
+        }
 
         combatListener = new CombatListener(this, combatManager, messages);
         Bukkit.getPluginManager().registerEvents(combatListener, this);
@@ -401,6 +430,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
         if (chunkCollectorManager != null) {
             chunkCollectorManager.load();
+        }
+        if (blueprintManager != null) {
+            blueprintManager.load();
         }
         if (kitManager != null) {
             kitManager.load();

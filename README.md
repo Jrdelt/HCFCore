@@ -569,6 +569,45 @@ or pull out of it.
 There's no in-game shop for these — `/chunkcollector give <player>`
 (`hcfcore.collector.give`) hands one out directly.
 
+## Blueprint Base Builder (`blueprints.yml`)
+
+**Requires both FastAsyncWorldEdit and DecentHolograms installed** — the
+feature is simply never wired up (logged once at startup, no errors) if
+either is missing, since it can't function without them (FAWE is the only
+way this plugin can load a `.schem` file; DecentHolograms is the required
+progress display).
+
+Placing a Blueprint item (a marked Beacon) starts a gradual build: the
+entire schematic's bounding box must fit 100% inside the placing player's
+own faction's claimed land (checked synchronously against every touched
+chunk), or it's refused outright. Once started, the beacon is completely
+unbreakable/unmovable (explosions, pistons included) until the build
+finishes or is cancelled, and a DecentHolograms display above it shows the
+structure name, progress, and owner. The structure is placed gradually
+over `build-time-seconds`, batched every `batch-interval-ticks` — never
+slower than that even for a huge schematic, since each batch's size is
+computed from the remaining block count divided by the remaining batches.
+
+Every `claim-recheck-interval-ticks`, the build's claimed-land status is
+re-checked; if the chunk or territory is no longer 100% the owning
+faction's land (overclaimed, voluntarily unclaimed, etc.), the build
+aborts immediately — blocks already placed are left as-is, and the beacon
+is **not** refunded, matching an explicit cancel via the beacon's own
+progress GUI (right-click it while a build is active).
+
+**Persistence across restarts**: an active build's world/location,
+template, owner, and current progress index are saved to the database on
+every batch. On restart, each one re-loads the same `.schem` file (whose
+deterministic iteration order reproduces the identical block list) and
+resumes from the saved index — after first re-validating claim ownership,
+since land can change hands while the server is down.
+
+Cooldown (`cooldown-seconds`) is per-player between placements. There's no
+in-game shop — `/blueprint give <player> <template>`
+(`hcfcore.blueprint.give`) hands one out directly; templates (and their
+`.schem` file, under `<plugin data folder>/schematics/`) are defined in
+`blueprints.yml`.
+
 ## Staff Tools
 
 Session-scoped toggles (nothing persists across a rejoin — same as
@@ -802,6 +841,7 @@ Each player's death history persists to MySQL and stores the last 20 deaths auto
 | `/hcfcore reload` | `hcfcore.admin` | Reloads config, messages, kits, abilities, tags, and rebuilds the scoreboard for every online player. |
 | `/hcfcore clearmobstacks` | `hcfcore.admin` | Manually removes every currently-tracked stacked mob (see **Mob Stacking**) across all loaded chunks. |
 | `/chunkcollector give <player>` | `hcfcore.collector.give` | Gives a player a Chunk Collector (see **Chunk Collector**) -- there's no in-game shop for these. |
+| `/blueprint give <player> <template>` | `hcfcore.blueprint.give` | Gives a player a Blueprint (see **Blueprint Base Builder**) -- there's no in-game shop for these. |
 
 ## Tab-completion
 

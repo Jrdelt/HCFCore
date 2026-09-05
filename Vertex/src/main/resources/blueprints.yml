@@ -1,0 +1,34 @@
+# ============================================
+# AUTOMATED BLUEPRINT BASE BUILDER
+# ============================================
+# Placing a Blueprint item drops a Beacon and gradually builds a .schem
+# structure around it over time using FastAsyncWorldEdit's clipboard API,
+# with a DecentHolograms progress display above the beacon. Requires both
+# FastAsyncWorldEdit and DecentHolograms to be installed -- this feature
+# quietly does nothing if either is missing.
+enabled: true
+
+# .schem files live in <plugin data folder>/schematics/<file>.
+schematics-folder: schematics
+
+# Cooldown (seconds) per player between placing a new blueprint.
+cooldown-seconds: 3600
+
+# How long a build should take to fully place, start to finish.
+build-time-seconds: 600
+
+# How the build is paced: every batch-interval-ticks, place enough blocks
+# to stay on schedule for build-time-seconds (never fewer than 1 block).
+batch-interval-ticks: 20
+
+# Every touched chunk's claim ownership is re-checked this often while a
+# build is in progress -- if it's no longer 100% the placing faction's
+# claimed land, the build aborts immediately (blocks placed so far are
+# left as-is, the beacon is not refunded).
+claim-recheck-interval-ticks: 100
+
+# Each entry here is a placeable Blueprint (see /blueprint give).
+templates:
+  outpost:
+    schematic: outpost.schem
+    display-name: '<gold>Outpost Blueprint'

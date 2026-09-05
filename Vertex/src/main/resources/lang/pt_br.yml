@@ -260,3 +260,16 @@ collector:
   silk-touch-required: '<red>You need a Silk Touch tool to break a Chunk Collector.'
   hopper-blocked: '<red>Hoppers can''t be placed this close to a Chunk Collector.'
   cannot-afford: '<gray>You need {amount} to buy this upgrade.'
+
+blueprint:
+  unknown-template: '<red>That blueprint template no longer exists.'
+  on-cooldown: '<red>You can place another blueprint in {seconds}s.'
+  no-faction: '<red>You must be in a faction to place a blueprint.'
+  load-failed: '<red>That blueprint failed to load -- contact staff.'
+  claim-invalid: '<red>The entire structure must fit within your own faction''s claimed land.'
+  started: '<green>Started building {template}.'
+  cancelled: '<yellow>Build cancelled. Blocks already placed are left as-is.'
+  menu-title: 'Blueprint Progress'
+  menu-progress: '<gray>Placed: <yellow>{done} <gray>/ <yellow>{total}'
+  menu-elapsed: '<gray>Elapsed: <yellow>{seconds}s'
+  menu-cancel-lore: '<gray>Stops the build. Blocks already placed stay; the beacon is not refunded.'

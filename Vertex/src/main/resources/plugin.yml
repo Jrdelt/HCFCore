@@ -14,6 +14,8 @@ softdepend:
   - LuckPerms
   - PlaceholderAPI
   - Essentials
+  - FastAsyncWorldEdit
+  - DecentHolograms
 
 commands:
   kit:
@@ -46,6 +48,9 @@ commands:
   chunkcollector:
     description: Give a player a Chunk Collector (Green Shulker Box).
     usage: /<command> give <player>
+  blueprint:
+    description: Give a player a Blueprint (Beacon) for the Automated Base Builder.
+    usage: /<command> give <player> <template>
   language:
     description: View or change your language.
     usage: /<command> [code]
@@ -97,6 +102,9 @@ permissions:
     default: op
   hcfcore.collector.give:
     description: Give a player a Chunk Collector.
+    default: op
+  hcfcore.blueprint.give:
+    description: Give a player a Blueprint.
     default: op
   hcfcore.kit.create:
     description: Create a kit from the currently held inventory.
