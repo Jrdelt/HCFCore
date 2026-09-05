@@ -380,6 +380,94 @@ public final class SpawnerManager {
     }
 
     /**
+     * Entity types vanilla's own CreatureSpawner tick refuses to produce no
+     * matter how its block state is tuned -- Iron Golems specifically have
+     * a built-in spawn-rule predicate that a monster-spawner block can
+     * never satisfy (a well-known vanilla limitation, not specific to this
+     * plugin). These get spawned directly by manualSpawnTick() instead,
+     * tagged with SpawnReason.SPAWNER so SpawnerMobListener/MobStackListener
+     * treat them exactly like any other tracked-spawner mob.
+     */
+    private static final java.util.Set<EntityType> MANUAL_SPAWN_TYPES = java.util.Set.of(EntityType.IRON_GOLEM);
+
+    /**
+     * Supplements the vanilla spawn cycle for {@link #MANUAL_SPAWN_TYPES}
+     * by spawning them directly, on a fixed schedule (see HCFCorePlugin),
+     * respecting the same player-range/nearby-entity-cap/spawn-count
+     * tuning as a real spawner would.
+     */
+    public void manualSpawnTick() {
+        if (spawners.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, SpawnerData> entry : spawners.entrySet()) {
+            SpawnerData data = entry.getValue();
+            if (!MANUAL_SPAWN_TYPES.contains(data.mobType())) {
+                continue;
+            }
+            String[] parts = entry.getKey().split(":", 4);
+            World world = plugin.getServer().getWorld(parts[0]);
+            if (world == null) {
+                continue;
+            }
+            int blockX = Integer.parseInt(parts[1]);
+            int blockY = Integer.parseInt(parts[2]);
+            int blockZ = Integer.parseInt(parts[3]);
+            if (!world.isChunkLoaded(blockX >> 4, blockZ >> 4)) {
+                continue;
+            }
+            Location spawnerLocation = new Location(world, blockX, blockY, blockZ);
+            if (spawnerLocation.getBlock().getType() != Material.SPAWNER) {
+                continue;
+            }
+            manualSpawnAt(world, spawnerLocation, data);
+        }
+    }
+
+    private void manualSpawnAt(World world, Location spawnerLocation, SpawnerData data) {
+        double rangeSquared = (double) requiredPlayerRangeBlocks * requiredPlayerRangeBlocks;
+        boolean playerNearby = world.getPlayers().stream()
+                .anyMatch(player -> player.getLocation().distanceSquared(spawnerLocation) <= rangeSquared);
+        if (!playerNearby) {
+            return;
+        }
+
+        int nearbyCount = 0;
+        for (org.bukkit.entity.Entity nearby : world.getNearbyEntities(spawnerLocation,
+                spawnRangeBlocks, spawnRangeBlocks, spawnRangeBlocks)) {
+            if (nearby.getType() == data.mobType()) {
+                nearbyCount++;
+            }
+        }
+        int nearbyCap = Math.min(maxNearbyEntitiesCap, maxNearbyEntitiesPerStack * data.stackSize());
+        int toSpawn = Math.min(nearbyCap - nearbyCount, Math.min(maxSpawnCount, spawnCountPerStack * data.stackSize()));
+        for (int i = 0; i < toSpawn; i++) {
+            Location spawnAt = randomSpawnLocation(spawnerLocation);
+            if (spawnAt == null) {
+                continue;
+            }
+            world.spawn(spawnAt, org.bukkit.entity.IronGolem.class,
+                    org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.SPAWNER, false, entity -> { });
+        }
+    }
+
+    /** A random offset within spawn-range-blocks that has solid ground and headroom, or null if none found nearby. */
+    private Location randomSpawnLocation(Location spawnerLocation) {
+        for (int attempt = 0; attempt < 4; attempt++) {
+            double dx = (random.nextDouble() * 2 - 1) * spawnRangeBlocks;
+            double dz = (random.nextDouble() * 2 - 1) * spawnRangeBlocks;
+            Location candidate = spawnerLocation.clone().add(dx + 0.5, 0, dz + 0.5);
+            Block ground = candidate.clone().add(0, -1, 0).getBlock();
+            Block feet = candidate.getBlock();
+            Block head = candidate.clone().add(0, 1, 0).getBlock();
+            if (ground.getType().isSolid() && !feet.getType().isSolid() && !head.getType().isSolid()) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
      * The closest tracked spawner within radius blocks of a location, or
      * null if none -- used to identify which spawner produced a freshly
      * spawned mob, since vanilla spawns it at a random offset within the

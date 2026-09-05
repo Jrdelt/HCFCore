@@ -466,9 +466,22 @@ stack (`drop-all`) or just one spawner at a time (`decrement`).
 (`Bukkit.getMobGoals().removeAllGoals(mob)` — movement, look, jump, and
 targeting alike) so they just stand still and can never attack a player —
 safe for AFK grinders — only moving when actually pushed by lava, a water
-current, or a player. Their death drops are replaced entirely by the
-`drops` list configured for that mob type in `spawners.yml`, instead of
-vanilla drops.
+current, or a player. Zombies and skeletons are also made immune to
+sunlight (`setShouldBurnInDay(false)`) — with no AI to walk themselves
+into shade, an above-ground farm would otherwise just burn its own stock
+for free (and for a stack, with no EXP, per the fire-kill rule below).
+Their death drops are replaced entirely by the `drops` list configured for
+that mob type in `spawners.yml`, instead of vanilla drops.
+
+**Iron Golems** can't actually be produced by a vanilla monster-spawner
+block no matter how it's tuned — golems have a built-in spawn-rule check
+that a spawner block can never satisfy, a well-known vanilla limitation,
+not something specific to this plugin. Tracked Iron Golem spawners are
+instead ticked manually (every 5s, respecting the same required-player-
+range/nearby-entity-cap/spawn-count tuning as every other mob type) and
+spawned directly, tagged so they're indistinguishable from a normal
+spawner-produced mob (AI-stripped, stacked, etc.) — every other configured
+mob type spawns through the normal vanilla mechanism.
 
 **Claim integration**: a chunk with active spawners can't be `/f unclaim`'d
 on its own — the plugin refuses and tells the player why. `/f unclaimall`

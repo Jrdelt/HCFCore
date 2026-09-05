@@ -3,8 +3,10 @@ package me.hcfcore.core.spawner;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
+import org.bukkit.entity.AbstractSkeleton;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
+import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -61,6 +63,17 @@ public final class SpawnerMobListener implements Listener {
         // only moving when actually pushed by lava, water currents, or a
         // player, none of which are goal-driven so none of this affects them.
         Bukkit.getMobGoals().removeAllGoals(mob);
+        // Undead mobs vanilla-burn in direct sunlight -- fine for a mob
+        // that wanders into the open on its own, but these can't move
+        // themselves out of the sun (all AI is stripped above) and a
+        // stacked one burning to death drops no EXP (see MobStackListener's
+        // fire/lava kill rule), so a farm built above ground would just
+        // quietly incinerate its own stock for free.
+        if (mob instanceof Zombie zombie) {
+            zombie.setShouldBurnInDay(false);
+        } else if (mob instanceof AbstractSkeleton skeleton) {
+            skeleton.setShouldBurnInDay(false);
+        }
     }
 
     @EventHandler(ignoreCancelled = true)
