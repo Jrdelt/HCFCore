@@ -7,12 +7,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
@@ -105,11 +107,25 @@ public final class VanillaCooldownListener implements Listener {
         if (remaining > 0L) {
             event.setCancelled(true);
             sendCooldownMessage(player, "ender-pearl", remaining);
+        }
+        // Cooldown starts on successful landing instead (see onPearlLand
+        // below) -- starting it here would charge a player a full cooldown
+        // for a throw that never actually lands, e.g. one Pearl Stunner or
+        // a protected zone blocks outright.
+    }
+
+    /**
+     * MONITOR + ignoreCancelled so this only fires for a pearl that
+     * actually landed -- one blocked by NoPearlSpawnListener (protected
+     * zone) or PearlStunnerListener (cancels the launch itself, so no
+     * teleport event exists at all in that case) never starts a cooldown.
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPearlLand(PlayerTeleportEvent event) {
+        if (event.getCause() != PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
             return;
         }
-
-        // Pearl was thrown - start cooldown for next pearl
-        cooldownManager.start(player.getUniqueId(), Material.ENDER_PEARL, pearlCooldownSeconds);
+        cooldownManager.start(event.getPlayer().getUniqueId(), Material.ENDER_PEARL, pearlCooldownSeconds);
     }
 
     @EventHandler

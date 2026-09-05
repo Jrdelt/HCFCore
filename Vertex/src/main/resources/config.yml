@@ -98,6 +98,14 @@ pvp:
   no-pearl-claim-names:
     - safezone
 
+  # Extra velocity on a thrown ender pearl, but only while actively falling
+  # or aiming downward -- a flat/upward throw is untouched, so this can't
+  # be used to snipe someone from across the map.
+  pearl-velocity-multiplier: 1.35
+
+  # Worlds where hunger never changes at all (players don't need to eat).
+  disable-hunger-worlds: []
+
   # Logout penalty: if true, disconnecting while tagged counts as combat logout
   logout-penalty: true
 

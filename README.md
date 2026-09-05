@@ -253,16 +253,19 @@ Sixteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
   currently be in combat. On arrival you get Regeneration II, Strength
   III, and Speed V, each for 3 seconds.
 - **Portable Bard** (right-click) — Opens a GUI to pick a buff (Speed,
-  Strength, Resistance, Regeneration, Jump Boost); picking one hands you
-  that buff item instead of applying it directly. Right-click the buff
-  item to share it with faction members within
-  `abilities.bard-share-radius-blocks` (default 30) blocks of you, same
-  world only — not the whole online faction regardless of distance. Tells
-  you how many nearby members actually received it. Doubled duration and
-  effect level when worn in the full gold bard set, halved otherwise
-  (never below Level I / 1 second). The master item has no cooldown of
-  its own — it's free to reopen any time — since each buff item is its
-  own ability with its own 7s cooldown, spent only once actually used
+  Strength, Resistance, Regeneration, Jump Boost); picking one consumes
+  one Portable Bard from your inventory and hands you that buff item
+  instead of applying it directly. The GUI only closes once you're out
+  of Portable Bards — holding several lets you pick a buff for each one
+  in a row without reopening the menu. Right-click the buff item to
+  share it with faction members within `abilities.bard-share-radius-blocks`
+  (default 30) blocks of you, same world only — not the whole online
+  faction regardless of distance. Tells you how many nearby members
+  actually received it. Doubled duration and effect level when worn in
+  the full gold bard set, halved otherwise (never below Level I / 1
+  second). The master item has no cooldown of its own — it's free to
+  reopen any time — since each buff item is its own ability with its
+  own 7s cooldown, spent only once actually used
 - **Repair** (right-click) — Grant block-breaking permission (needs LuckPerms)
 - **Switcher Snowball** (throw) — Swap positions with enemy
 - **Time Warp Pearl** (right-click) — Teleport to last pearl throw location
@@ -580,12 +583,33 @@ victim's own tag entirely (they're out of combat) without touching
 the killer's — so a kill's shortened cooldown always survives the
 death that caused it.
 
-A thrown ender pearl landing inside a WorldGuard region or claim named
-in `pvp.no-pearl-regions` / `pvp.no-pearl-claim-names` (default:
-`spawn`, `safezone`) is cancelled outright — stops using a pearl to
-escape combat into spawn. Time Warp Pearl checks its recorded origin
-against the same zones, so a pearl thrown out of spawn long before a
-fight can't become an anytime recall-to-safety button either.
+A thrown ender pearl is blocked at **both ends**: throwing one while
+standing inside a WorldGuard region or claim named in
+`pvp.no-pearl-regions` / `pvp.no-pearl-claim-names` (default: `spawn`,
+`safezone`) cancels the throw outright, and one landing inside those
+same zones cancels the teleport — between the two, a pearl can never
+cross into, out of, or through a protected zone in either direction.
+Either way the pearl itself is handed back (dropped at your feet if
+your inventory is full), since vanilla consumes it as part of throwing,
+not landing. Time Warp Pearl checks its recorded origin against the
+same zones too, so a pearl thrown out of spawn long before a fight
+can't become an anytime recall-to-safety button. Switcher Snowball
+won't swap either side if the thrower or the target is standing in one
+of these zones, for the same reason.
+
+The pearl cooldown itself only starts once a throw actually **lands**
+(`PlayerTeleportEvent`, not the initial throw) — a throw that gets
+blocked by a protected zone, or by Pearl Stunner, costs nothing and
+starts no cooldown, since a pearl that never landed shouldn't count
+against you either way. A pearl thrown while actively falling or
+looking downward also gets extra velocity
+(`pvp.pearl-velocity-multiplier`, default 1.35x) — a flat or upward
+throw is untouched, so this can't be used to snipe someone from across
+the map.
+
+`pvp.disable-hunger-worlds` (default: empty) lists worlds where hunger
+never changes at all — useful for a spawn/safezone world where players
+shouldn't need to eat.
 
 ### Rally
 

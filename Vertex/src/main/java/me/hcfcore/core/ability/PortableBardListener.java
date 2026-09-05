@@ -123,11 +123,48 @@ public final class PortableBardListener implements Listener {
             return;
         }
 
+        if (!consumeOnePortableBard(player)) {
+            player.closeInventory();
+            return;
+        }
+
         PlayerInventory inventory = player.getInventory();
         for (ItemStack dropped : inventory.addItem(abilityManager.createItem(buffAbility)).values()) {
             player.getWorld().dropItemNaturally(player.getLocation(), dropped);
         }
-        player.closeInventory();
+
+        // Only close once they're out of Portable Bards -- a player holding
+        // several should be able to pick a buff for each one in a row
+        // without having to reopen the menu every time.
+        if (!hasPortableBard(player)) {
+            player.closeInventory();
+        }
+    }
+
+    private boolean consumeOnePortableBard(Player player) {
+        PlayerInventory inventory = player.getInventory();
+        ItemStack[] contents = inventory.getStorageContents();
+        for (int slot = 0; slot < contents.length; slot++) {
+            ItemStack item = contents[slot];
+            if (AbilityGate.isAbility(plugin, item, ABILITY_ID)) {
+                if (item.getAmount() <= 1) {
+                    inventory.setItem(slot, null);
+                } else {
+                    item.setAmount(item.getAmount() - 1);
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasPortableBard(Player player) {
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (AbilityGate.isAbility(plugin, item, ABILITY_ID)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String buffIdForIcon(Material icon) {

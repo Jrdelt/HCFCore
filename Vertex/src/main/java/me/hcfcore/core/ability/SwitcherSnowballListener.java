@@ -83,6 +83,13 @@ public final class SwitcherSnowballListener implements Listener {
         if (thrower == null || thrower.equals(target) || FactionsHook.isSameFaction(thrower, target)) {
             return;
         }
+        // Neither side of the swap may already be standing in a protected
+        // zone -- otherwise this becomes a way to pull a player out of a
+        // safezone, or drag yourself into one to escape a fight.
+        if (NoPearlSpawnListener.isProtected(plugin, thrower.getLocation())
+                || NoPearlSpawnListener.isProtected(plugin, target.getLocation())) {
+            return;
+        }
 
         Location throwerLocation = thrower.getLocation();
         Location targetLocation = target.getLocation();

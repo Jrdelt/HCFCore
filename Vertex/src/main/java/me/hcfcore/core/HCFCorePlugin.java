@@ -7,6 +7,7 @@ import me.hcfcore.core.ability.CooldownsCommand;
 import me.hcfcore.core.ability.AntiBlockupBoneListener;
 import me.hcfcore.core.ability.FakePearlListener;
 import me.hcfcore.core.ability.NoPearlSpawnListener;
+import me.hcfcore.core.ability.PearlVelocityListener;
 import me.hcfcore.core.ability.GetItemCommand;
 import me.hcfcore.core.ability.GrapplingHookListener;
 import me.hcfcore.core.ability.LeapListener;
@@ -38,6 +39,7 @@ import me.hcfcore.core.pvp.ArcherTagListener;
 import me.hcfcore.core.pvp.ArcherTagManager;
 import me.hcfcore.core.pvp.CombatManager;
 import me.hcfcore.core.pvp.FullHealSplashListener;
+import me.hcfcore.core.pvp.HungerManagementListener;
 import me.hcfcore.core.pvp.CombatTagCommand;
 import me.hcfcore.core.pvp.UncombatCommand;
 import me.hcfcore.core.pvp.LegacyCombatManager;
@@ -103,6 +105,7 @@ public final class HCFCorePlugin extends JavaPlugin {
     private RallyManager rallyManager;
     private ArcherTagListener archerTagListener;
     private CombatListener combatListener;
+    private HungerManagementListener hungerManagementListener;
     private NametagManager nametagManager;
     private StaffManager staffManager;
 
@@ -219,6 +222,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(
                 new TimeWarpPearlListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new NoPearlSpawnListener(this, messages), this);
+        Bukkit.getPluginManager().registerEvents(new PearlVelocityListener(this), this);
+        hungerManagementListener = new HungerManagementListener(this);
+        Bukkit.getPluginManager().registerEvents(hungerManagementListener, this);
         Bukkit.getPluginManager().registerEvents(
                 new NinjaStarListener(this, abilityManager, userManager, combatManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new FallDamageImmunityListener(), this);
@@ -397,6 +403,9 @@ public final class HCFCorePlugin extends JavaPlugin {
         }
         if (archerTagListener != null) {
             archerTagListener.reloadConfig();
+        }
+        if (hungerManagementListener != null) {
+            hungerManagementListener.reloadConfig();
         }
         if (combatListener != null) {
             combatListener.reloadConfig();
