@@ -422,13 +422,22 @@ combat tags), all gated behind their own `hcfcore.staff.*` permission:
 place while staff investigate — a suspected cheater doesn't get a
 ban's tip-off. While frozen, a player can't move (they can still look
 around), break/place blocks, interact, deal or take any damage, drop
-items, click their own inventory, or run any command. They're warned in
-chat not to log out; **disconnecting while frozen bans them for 3
-hours** (`Player.ban(...)`, not a kick — `/freeze` itself never kicks or
-bans on its own, only leaving while frozen does), and every other online
-staff member with the permission is alerted. `/freeze` again unfreezes.
-Freeze state is session-scoped like the other toggles above — it doesn't
-survive a server restart.
+items, click their own inventory, run any command, launch a projectile
+(ender pearl, arrow, snowball, egg, fishing hook), eat or drink anything,
+use a bucket, pick up items, or swap their main/off hand — the only
+thing left is logging out. They're warned in chat not to log out;
+**disconnecting while frozen bans them for 3 hours** (`Player.ban(...)`,
+not a kick — `/freeze` itself never kicks or bans on its own, only
+leaving while frozen does), and every other online staff member with the
+permission is alerted. `/freeze` again unfreezes. Freeze state is
+session-scoped like the other toggles above — it doesn't survive a
+server restart.
+
+Projectiles get checked twice — once via cancelling the interact event
+that starts the throw, and again on the projectile itself
+(`ProjectileLaunchEvent`) — since cancelling the interact event alone
+doesn't reliably stop every launch path (the plugin's own pearl-cooldown
+and Pearl Stunner code already double up on pearls the same way).
 
 ### Invsee / Endersee
 

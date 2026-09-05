@@ -11,20 +11,34 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.PlayerBucketEmptyEvent;
+import org.bukkit.event.player.PlayerBucketFillEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 
 import java.time.Duration;
 
 /**
  * Locks a frozen player in place -- no movement, block break/place,
- * interaction, damage dealt or taken, item drops, inventory clicks, or
- * commands -- and auto-bans anyone who disconnects while frozen, since
- * that's the classic way to dodge a staff investigation.
+ * interaction, damage dealt or taken, item drops, inventory clicks,
+ * commands, projectile launches (pearls, arrows, snowballs, eggs, fishing
+ * hooks), eating/drinking, bucket use, item pickup, or hand-swapping --
+ * and auto-bans anyone who disconnects while frozen, since that's the
+ * classic way to dodge a staff investigation.
+ *
+ * <p>Projectiles get their own handler on top of {@code PlayerInteractEvent}
+ * cancellation: cancelling the interact event alone doesn't reliably stop
+ * every launch path (this codebase's own pearl-cooldown/pearl-stun code
+ * already double-covers pearls the same way), so anything that can leave
+ * the frozen player's hand is caught at the projectile itself too.
  */
 public final class FreezeListener implements Listener {
 
@@ -128,6 +142,56 @@ public final class FreezeListener implements Listener {
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onDamageByEntity(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Player player && frozen(player)) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * Catches every projectile a frozen player could launch -- ender
+     * pearls, arrows from a bow, snowballs, eggs, fishing hooks -- not
+     * just the ones a right-click starts. {@code PlayerInteractEvent}
+     * cancellation alone doesn't reliably block every one of these
+     * (see the class doc), so this is deliberately a second, independent
+     * check on the projectile itself.
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onProjectileLaunch(ProjectileLaunchEvent event) {
+        if (event.getEntity().getShooter() instanceof Player player && frozen(player)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onConsume(PlayerItemConsumeEvent event) {
+        if (frozen(event.getPlayer())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBucketFill(PlayerBucketFillEvent event) {
+        if (frozen(event.getPlayer())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBucketEmpty(PlayerBucketEmptyEvent event) {
+        if (frozen(event.getPlayer())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPickup(EntityPickupItemEvent event) {
+        if (event.getEntity() instanceof Player player && frozen(player)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onSwapHands(PlayerSwapHandItemsEvent event) {
+        if (frozen(event.getPlayer())) {
             event.setCancelled(true);
         }
     }
