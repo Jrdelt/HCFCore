@@ -196,12 +196,52 @@ factions:
   transferring leadership first.
 - **`command-aliases`** — every alias your server actually uses for
   FactionsUUID's command. This list is also what the `/f rally` command
-  and the faction permissions GUI (`/f permissions` / `/f perms`) listen
+  and the faction permissions GUI (`/f permissions` / `/f perms`) and
+  faction-upgrades GUI (`/f upgrades`) listen
   on to route themselves ahead of FactionsUUID's own command handling —
   add any custom alias here too or those won't be reachable from it.
 
 See [Factions Integration](factions-integration.md) for rallies, the
 permissions GUI, and nametag/scoreboard details.
+
+## Faction upgrades
+
+```yaml
+faction-upgrades:
+  enabled: true
+  leader-only: true
+  upgrades:
+    claim-damage: {enabled: true, max-level: 5, cost-base: 50000.0, cost-multiplier: 1.75, bonus-per-level: 5.0}
+    claim-protection: {enabled: true, max-level: 5, cost-base: 60000.0, cost-multiplier: 1.75, bonus-per-level: 4.0}
+    armor-wear: {enabled: true, max-level: 5, cost-base: 40000.0, cost-multiplier: 1.7, bonus-per-level: 10.0}
+    fall-protection: {enabled: true, max-level: 5, cost-base: 35000.0, cost-multiplier: 1.65, bonus-per-level: 10.0}
+    fly-boost: {enabled: true, max-level: 3, cost-base: 75000.0, cost-multiplier: 2.0, bonus-per-level: 20.0}
+    warps: {enabled: true, max-level: 3, cost-base: 100000.0, cost-multiplier: 2.0, bonus-per-level: 1.0}
+    spawner-rate: {enabled: true, max-level: 5, cost-base: 100000.0, cost-multiplier: 2.0, bonus-per-level: 10.0}
+    crop-growth: {enabled: true, max-level: 5, cost-base: 30000.0, cost-multiplier: 1.6, bonus-per-level: 15.0}
+    mob-xp: {enabled: true, max-level: 5, cost-base: 45000.0, cost-multiplier: 1.7, bonus-per-level: 10.0}
+```
+
+`enabled` is the global off switch. `leader-only` lets members browse the
+menu while preventing them from spending faction resources; set it to
+`false` if any member should be able to buy levels. Every individual entry
+has the same controls:
+
+- `enabled` hides its gameplay effect and prevents new purchases without
+  erasing its saved level.
+- `max-level` is capped at 100 to protect the economy and game balance.
+- `cost-base` is the first-level Vault cost; `cost-multiplier` is applied
+  once per already-owned level. A zero base makes the upgrade free and does
+  not require Vault.
+- `bonus-per-level` is a percentage for every item except `warps`. Crop
+  Growth is a per-growth-stage chance; Fly Boost applies only to players
+  already flying. Warps gives FactionsUUID its native warp upgrade level,
+  so configure the actual count/values in FactionsUUID's own upgrades
+  configuration.
+
+All non-warp effects apply only in the upgraded faction's claimed land.
+Their GUI labels, lore, and purchase/failure messages are configurable in
+`lang/en_us.yml` under `faction-upgrades` (and can be translated per locale).
 
 ## Kits & abilities (global settings)
 

@@ -41,6 +41,9 @@ required progress display above the build. See
   may take longer than `build-time-seconds` as a result, rather than
   causing a lag spike.
 - Progress and the hologram checkpoint every `batch-interval-ticks`.
+- The hologram exists only while the build is active. It is removed when
+  the build completes, is cancelled, or aborts, so mining the completed
+  beacon can never leave an orphaned display behind.
 - Every `claim-recheck-interval-ticks`, the build's claim status is
   re-verified. If the land is no longer 100% the owning faction's
   (overclaimed, voluntarily unclaimed, etc.), the build **aborts
@@ -87,3 +90,11 @@ Before enabling a new Blueprint template on production, test a normal
 build, a faction rename during a build, claim loss during a build,
 restart/resume, a missing or corrupt `.schem`, and a temporary database
 outage while the build row is being created.
+
+### Older schematics
+
+Vertex accepts legacy generic block ids for beds, signs, skulls, and
+banners so an old `.schem` still builds on current Paper. Their exact old
+color/wood variant cannot be recovered from those retired ids, so Vertex
+uses a valid default and logs a one-time warning. Re-save the schematic
+with your current FastAsyncWorldEdit installation for an exact conversion.

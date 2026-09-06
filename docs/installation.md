@@ -4,7 +4,7 @@
 
 | | Requirement | Notes |
 |---|---|---|
-| Required | **Paper 1.21.10+** | The plugin targets Paper's API directly (not just Spigot/Bukkit). |
+| Required | **Paper 1.21.10+** | The plugin targets Paper's API directly (not just Spigot/Bukkit) and is currently built against Paper 1.21.11's API. |
 | Required | **FactionsUUID** | Must be installed and enabled before Vertex starts, or Vertex refuses to enable. |
 | Optional | **MySQL 5.7+ or MariaDB** | Only if you set `storage.type: mysql`. By default Vertex uses a local SQLite file and needs no database server at all. See [Storage](#storage-local-or-mysql) below. |
 | Optional | Vault, WorldGuard, LuckPerms, PlaceholderAPI, EssentialsX, FastAsyncWorldEdit, DecentHolograms | Each unlocks specific features. See [Integrations](integrations.md) for exactly what each one does and what happens without it. |

@@ -16,7 +16,7 @@ All code lives under `me.vertex.core`, one package per feature area:
 | `collector` | Chunk Collector |
 | `economy` | Vault wrapper |
 | `essentials` | EssentialsX wrapper |
-| `faction` | Rally system |
+| `faction` | Rally system, faction permission matrix, and persistent faction upgrades |
 | `factions` | FactionsUUID wrapper and faction-command interception |
 | `kit` | Kit classes, GUI, armor-effect tracking |
 | `lang` | Message loading/formatting, `/language` |
@@ -52,16 +52,17 @@ lifecycle and wires listeners/commands together in `onEnable()`.
 - **Two backends, one implementation.** `Database` reads `storage.type`
   and connects to either a local SQLite file (the default) or a MySQL
   server, exposing which one it picked as a `Database.Dialect`.
-  `SqlStorage` and the three feature-specific stores
-  (`SpawnerStorage`, `ChunkCollectorStorage`, `BlueprintStorage`) then
+  `SqlStorage` and the four feature-specific stores
+  (`SpawnerStorage`, `ChunkCollectorStorage`, `BlueprintStorage`,
+  `FactionUpgradeStorage`) then
   select only the statements that genuinely differ between the two --
   the upserts (`ON DUPLICATE KEY UPDATE` vs `ON CONFLICT ... DO UPDATE`)
   and the auto-incrementing id columns. Everything else is shared
   verbatim, because SQLite accepts MySQL's column type names through its
   own type-affinity rules. Adding a query means writing dialect-specific
   SQL only if it uses one of those two constructs.
-- **GUIs** (`/kits`, `/tags`, `/abilities`, kit preview, spawner/collector
-  menus) use a static-nested `Holder implements InventoryHolder` per menu
+- **GUIs** (`/kits`, `/tags`, `/abilities`, kit preview, faction upgrades,
+  spawner/collector menus) use a static-nested `Holder implements InventoryHolder` per menu
   to identify their own inventories in click listeners, rather than
   comparing title strings. The tags GUI additionally rebuilds itself from
   an immutable `TagMenuState` (sort/filter/page/search) on every click
@@ -131,6 +132,9 @@ lifecycle and wires listeners/commands together in `onEnable()`.
   serialized on their dedicated I/O executor before reload or shutdown.
   Blueprint ownership uses a stable FactionsUUID id rather than a mutable
   faction tag.
+- Faction-upgrade writes are serialized per faction and flushed during
+  shutdown. A disband queues its delete behind every prior write, so a
+  delayed upgrade save cannot recreate rows for a disbanded faction.
 
 ## Testing
 

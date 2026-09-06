@@ -4,7 +4,7 @@ Vertex is a Paper plugin that adds a full HCF
 gameplay layer on top of **FactionsUUID**: armor-based kit classes, PvP
 ability items, 1.8-style legacy combat, a combat-tag system, a live
 sidebar scoreboard, faction-aware chat and nametags, faction rallies,
-cosmetic tags, stackable spawners, chunk collectors, an automated
+faction upgrades, cosmetic tags, stackable spawners, chunk collectors, an automated
 schematic base-builder, and a staff toolkit.
 
 This is the detailed, developer-facing reference. If you just want a
@@ -18,10 +18,10 @@ integration behavior.
 | Guide | Covers |
 |---|---|
 | [Installation](installation.md) | Requirements, building from source, first deploy, upgrading, database migrations |
-| [Configuration](configuration.md) | Full walkthrough of `config.yml`: database, scoreboard, chat, factions, nametags, reboot, and reload semantics |
+| [Configuration](configuration.md) | Full walkthrough of `config.yml`: database, scoreboard, chat, factions/upgrades, nametags, reboot, and reload semantics |
 | [PvP & Combat](pvp-and-combat.md) | Combat tag, action bar, item cooldowns, no-pearl zones, Legacy Combat (1.8 PvP), Archer Tag |
 | [Kits & Abilities](kits-and-abilities.md) | Kit classes, class effects, kit costs, the full ability item catalog and their mechanics |
-| [Factions Integration](factions-integration.md) | Chat/scoreboard placeholders, nametag coloring, rallies, the faction permissions GUI, leader-leave protection |
+| [Factions Integration](factions-integration.md) | Chat/scoreboard placeholders, nametag coloring, rallies, permission and upgrades GUIs, leader-leave protection |
 | [Spawners & Mob Stacking](spawners-and-collectors.md) | The spawner shop and economy, stack scaling, mob AI stripping, mob stacking, Chunk Collectors |
 | [Blueprint Base Builder](blueprints.md) | Automated `.schem` base building with FastAsyncWorldEdit + DecentHolograms |
 | [Tags & Cosmetics](tags-and-cosmetics.md) | The `/tags` system: unlocking, equipping, nickname-match, the GUI |

@@ -2,6 +2,7 @@ package me.vertex.core.storage;
 
 import me.vertex.core.blueprint.BlueprintStorage;
 import me.vertex.core.collector.ChunkCollectorStorage;
+import me.vertex.core.faction.FactionUpgradeStorage;
 import me.vertex.core.spawner.SpawnerStorage;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -220,6 +221,21 @@ class LocalStorageTest {
 
         storage.delete(first);
         storage.delete(second);
+        assertTrue(storage.loadAll().isEmpty());
+    }
+
+    @Test
+    void factionUpgradeLevelsRoundTripAndUpdateInPlace() throws SQLException {
+        FactionUpgradeStorage storage = new FactionUpgradeStorage(open(null));
+        storage.init();
+
+        storage.save(9, "mob-xp", 2);
+        storage.save(9, "mob-xp", 4);
+        storage.save(9, "spawner-rate", 1);
+
+        assertEquals(2, storage.loadAll().size(), "saving the same upgrade must update rather than duplicate it");
+        assertTrue(storage.loadAll().contains(new FactionUpgradeStorage.StoredLevel(9, "mob-xp", 4)));
+        storage.deleteFaction(9);
         assertTrue(storage.loadAll().isEmpty());
     }
 

@@ -295,6 +295,32 @@ factions:
     - factions
     - t
 
+# ============================================
+# FACTION UPGRADES
+# ============================================
+# Faction leaders open the persistent purchase GUI with /f upgrades (or
+# /f upgrade). Every bonus works only inside land claimed by that faction.
+# Costs are withdrawn from the clicking leader through Vault; set cost-base
+# to 0 for a free level. `bonus-per-level` is a percentage except for the
+# native FactionsUUID Warps entry, where it is display-only because that
+# plugin's own upgrades.yml controls the number of allowed warps.
+faction-upgrades:
+  enabled: true
+  # Members may view the GUI; only the faction leader can spend on upgrades.
+  leader-only: true
+  upgrades:
+    claim-damage: {enabled: true, max-level: 5, cost-base: 50000.0, cost-multiplier: 1.75, bonus-per-level: 5.0}
+    claim-protection: {enabled: true, max-level: 5, cost-base: 60000.0, cost-multiplier: 1.75, bonus-per-level: 4.0}
+    armor-wear: {enabled: true, max-level: 5, cost-base: 40000.0, cost-multiplier: 1.7, bonus-per-level: 10.0}
+    fall-protection: {enabled: true, max-level: 5, cost-base: 35000.0, cost-multiplier: 1.65, bonus-per-level: 10.0}
+    fly-boost: {enabled: true, max-level: 3, cost-base: 75000.0, cost-multiplier: 2.0, bonus-per-level: 20.0}
+    # This sets FactionsUUID's native Warps upgrade level. Configure its
+    # actual warp-count values in FactionsUUID's upgrades configuration.
+    warps: {enabled: true, max-level: 3, cost-base: 100000.0, cost-multiplier: 2.0, bonus-per-level: 1.0}
+    spawner-rate: {enabled: true, max-level: 5, cost-base: 100000.0, cost-multiplier: 2.0, bonus-per-level: 10.0}
+    crop-growth: {enabled: true, max-level: 5, cost-base: 30000.0, cost-multiplier: 1.6, bonus-per-level: 15.0}
+    mob-xp: {enabled: true, max-level: 5, cost-base: 45000.0, cost-multiplier: 1.7, bonus-per-level: 10.0}
+
 rally:
   # Faction leaders open the complete permission matrix with /f permissions
   # or /f perms. Left-click allows and right-click denies. FactionsUUID saves

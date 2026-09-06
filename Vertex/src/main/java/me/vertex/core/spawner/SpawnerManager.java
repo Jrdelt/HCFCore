@@ -1,5 +1,6 @@
 package me.vertex.core.spawner;
 
+import me.vertex.core.faction.FactionUpgradeManager;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -67,6 +68,8 @@ public final class SpawnerManager {
     private volatile java.util.Set<EntityType> stackableTypes = java.util.Set.of();
     private volatile String stackDisplayFormat;
     private volatile int dropBatchSize;
+    /** Optional because spawners are also usable when faction upgrades are disabled. */
+    private volatile FactionUpgradeManager factionUpgradeManager;
 
     public SpawnerManager(Plugin plugin, SpawnerStorage storage) {
         this.plugin = plugin;
@@ -138,6 +141,11 @@ public final class SpawnerManager {
         // tuning values (spawn-count-per-stack etc.) apply to spawners
         // that already exist instead of only ones stacked/unstacked after.
         retuneAll();
+    }
+
+    /** Lets faction-rate bonuses retune existing spawners immediately after a purchase. */
+    public void setFactionUpgradeManager(FactionUpgradeManager factionUpgradeManager) {
+        this.factionUpgradeManager = factionUpgradeManager;
     }
 
     /** Re-applies the current tuning to every tracked spawner whose chunk is loaded right now. */
@@ -438,8 +446,12 @@ public final class SpawnerManager {
             return;
         }
         spawner.setSpawnedType(data.mobType());
-        spawner.setSpawnCount(Math.min(maxSpawnCount, spawnCountPerStack * data.stackSize()));
-        spawner.setMaxNearbyEntities(Math.min(maxNearbyEntitiesCap, maxNearbyEntitiesPerStack * data.stackSize()));
+        double rateMultiplier = factionRateMultiplier(location);
+        int spawnCap = scaledLimit(maxSpawnCount, rateMultiplier);
+        int nearbyCap = scaledLimit(maxNearbyEntitiesCap, rateMultiplier);
+        spawner.setSpawnCount(Math.min(spawnCap, scaledCount(spawnCountPerStack * data.stackSize(), rateMultiplier)));
+        spawner.setMaxNearbyEntities(Math.min(nearbyCap,
+                scaledCount(maxNearbyEntitiesPerStack * data.stackSize(), rateMultiplier)));
         spawner.setMinSpawnDelay(minSpawnDelayTicks);
         spawner.setMaxSpawnDelay(maxSpawnDelayTicks);
         spawner.setRequiredPlayerRange(requiredPlayerRangeBlocks);
@@ -507,8 +519,11 @@ public final class SpawnerManager {
                 nearbyCount++;
             }
         }
-        int nearbyCap = Math.min(maxNearbyEntitiesCap, maxNearbyEntitiesPerStack * data.stackSize());
-        int toSpawn = Math.min(nearbyCap - nearbyCount, Math.min(maxSpawnCount, spawnCountPerStack * data.stackSize()));
+        double rateMultiplier = factionRateMultiplier(spawnerLocation);
+        int nearbyCap = Math.min(scaledLimit(maxNearbyEntitiesCap, rateMultiplier),
+                scaledCount(maxNearbyEntitiesPerStack * data.stackSize(), rateMultiplier));
+        int toSpawn = Math.min(nearbyCap - nearbyCount, Math.min(scaledLimit(maxSpawnCount, rateMultiplier),
+                scaledCount(spawnCountPerStack * data.stackSize(), rateMultiplier)));
         for (int i = 0; i < toSpawn; i++) {
             Location spawnAt = randomSpawnLocation(spawnerLocation);
             if (spawnAt == null) {
@@ -517,6 +532,20 @@ public final class SpawnerManager {
             world.spawn(spawnAt, org.bukkit.entity.IronGolem.class,
                     org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.SPAWNER, false, entity -> { });
         }
+    }
+
+    private double factionRateMultiplier(Location location) {
+        FactionUpgradeManager upgrades = factionUpgradeManager;
+        return upgrades == null ? 1D : Math.max(1D, upgrades.spawnerMultiplier(location));
+    }
+
+    /** Keeps the configured value as the baseline while allowing earned faction rate above it. */
+    private static int scaledLimit(int configuredLimit, double multiplier) {
+        return Math.max(1, (int) Math.min(Integer.MAX_VALUE, Math.ceil(configuredLimit * multiplier)));
+    }
+
+    private static int scaledCount(int baseline, double multiplier) {
+        return Math.max(1, (int) Math.min(Integer.MAX_VALUE, Math.ceil(baseline * multiplier)));
     }
 
     /** A random offset within spawn-range-blocks that has solid ground and headroom, or null if none found nearby. */

@@ -304,14 +304,14 @@ public final class BlueprintListener implements Listener {
         long nowTicks = plugin.getServer().getCurrentTick();
         for (ActiveBuild build : List.copyOf(manager.activeBuilds().values())) {
             if (build.isCancelled()) {
-                finish(build, false);
+                finish(build);
                 continue;
             }
             if (nowTicks % manager.claimRecheckIntervalTicks() == 0) {
                 try {
                     BlockVector3[] bounds = manager.relativeBounds(build.template());
                     if (!manager.isFullyClaimedBy(build.anchor(), bounds[0], bounds[1], build.ownerFactionId())) {
-                        finish(build, false);
+                        finish(build);
                         continue;
                     }
                 } catch (IOException e) {
@@ -320,7 +320,7 @@ public final class BlueprintListener implements Listener {
             }
             placeBatch(build, nowTicks);
             if (build.isComplete()) {
-                finish(build, true);
+                finish(build);
             }
         }
     }
@@ -348,16 +348,10 @@ public final class BlueprintListener implements Listener {
         }
     }
 
-    private void finish(ActiveBuild build, boolean completed) {
+    private void finish(ActiveBuild build) {
         manager.unregister(build);
         manager.persistRemoval(build.id());
-        if (hologramsAvailable) {
-            try {
-                DHAPI.setHologramLines(DHAPI.getHologram(build.hologramName()), finishedHologramLines(build, completed));
-            } catch (Exception ignored) {
-                // Hologram may already be gone (plugin reload, /dh command, etc.) -- nothing to clean up further.
-            }
-        }
+        removeHologram(build);
     }
 
     private void createOrUpdateHologram(ActiveBuild build, String progress) {
@@ -378,6 +372,18 @@ public final class BlueprintListener implements Listener {
         }
     }
 
+    /** Never leave a finished, cancelled, or claim-aborted Blueprint hologram behind. */
+    private void removeHologram(ActiveBuild build) {
+        if (!hologramsAvailable) {
+            return;
+        }
+        try {
+            DHAPI.removeHologram(build.hologramName());
+        } catch (Exception ignored) {
+            // It may already have been removed with /dh or by a plugin reload.
+        }
+    }
+
     /**
      * DecentHolograms parses legacy ampersand codes, not MiniMessage. Every
      * line therefore goes through MessageFormatter before being handed to its
@@ -388,13 +394,6 @@ public final class BlueprintListener implements Listener {
         return List.of(
                 MessageFormatter.legacyAmpersand(build.template().displayName()),
                 hologramMessage("blueprint.hologram-progress", "progress", progress),
-                hologramMessage("blueprint.hologram-owner", "faction", factionName(build), "owner", ownerName(build)));
-    }
-
-    private List<String> finishedHologramLines(ActiveBuild build, boolean completed) {
-        return List.of(
-                MessageFormatter.legacyAmpersand(build.template().displayName()),
-                hologramMessage(completed ? "blueprint.hologram-complete" : "blueprint.hologram-aborted"),
                 hologramMessage("blueprint.hologram-owner", "faction", factionName(build), "owner", ownerName(build)));
     }
 

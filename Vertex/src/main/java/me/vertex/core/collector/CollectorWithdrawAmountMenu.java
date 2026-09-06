@@ -7,6 +7,7 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.AnvilInventory;
@@ -14,6 +15,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.inventory.view.AnvilView;
 
 /** A small, free anvil prompt used to enter a collector withdrawal amount. */
@@ -21,6 +23,8 @@ public final class CollectorWithdrawAmountMenu {
 
     static final int SLOT_INPUT = 0;
     static final int SLOT_RESULT = 2;
+    /** Stores the exact parsed amount on the result item through vanilla's rename reset. */
+    private static final NamespacedKey CONFIRMED_AMOUNT_KEY = new NamespacedKey("vertex", "collector_withdraw_amount");
 
     private CollectorWithdrawAmountMenu() {
     }
@@ -48,8 +52,22 @@ public final class CollectorWithdrawAmountMenu {
         meta.displayName(noItalic(messages.get(player,
                 valid ? "collector.withdraw-confirm" : "collector.withdraw-confirm-empty",
                 "amount", valid ? String.format("%,d", amount) : "")));
+        if (valid) {
+            // Anvil rename text can be cleared before InventoryClickEvent is
+            // delivered for the result slot. The clicked result ItemStack is
+            // still the exact button that the player saw, so keep its parsed
+            // number here instead of trying to parse a reset text field.
+            meta.getPersistentDataContainer().set(CONFIRMED_AMOUNT_KEY, PersistentDataType.LONG, amount);
+        }
         button.setItemMeta(meta);
         return button;
+    }
+
+    static Long confirmedAmount(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return null;
+        }
+        return item.getItemMeta().getPersistentDataContainer().get(CONFIRMED_AMOUNT_KEY, PersistentDataType.LONG);
     }
 
     @SuppressWarnings("removal")

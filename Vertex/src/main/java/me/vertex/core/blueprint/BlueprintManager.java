@@ -8,6 +8,7 @@ import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.world.block.BaseBlock;
 import me.vertex.core.factions.FactionsHook;
+import org.bukkit.Material;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.data.BlockData;
@@ -24,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
@@ -48,6 +50,8 @@ public final class BlueprintManager {
     private final Map<String, CachedTemplate> parsedTemplates = new ConcurrentHashMap<>();
     private final Map<Integer, ActiveBuild> activeBuilds = new ConcurrentHashMap<>();
     private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
+    /** Avoid a console flood when an old schematic has thousands of one retired block type. */
+    private final Set<String> warnedLegacyBlockIds = ConcurrentHashMap.newKeySet();
     private final java.util.Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
     private final Map<Integer, CompletableFuture<Void>> writeChains = new ConcurrentHashMap<>();
 
@@ -222,7 +226,7 @@ public final class BlueprintManager {
             if (block.getBlockType().getMaterial().isAir()) {
                 continue;
             }
-            BlockData data = BukkitAdapter.adapt(block);
+            BlockData data = adaptBlockData(template, block);
             blocks.add(new ActiveBuild.PendingBlock(pos.subtract(origin), data));
         }
         // Build a visible, deterministic foundation first: each horizontal
@@ -238,6 +242,41 @@ public final class BlueprintManager {
                 clipboard.getRegion().getMaximumPoint().subtract(origin));
         CachedTemplate raced = parsedTemplates.putIfAbsent(template.name().toLowerCase(Locale.ROOT), parsed);
         return raced == null ? parsed : raced;
+    }
+
+    /**
+     * Older schematic exports used generic ids such as {@code minecraft:bed}
+     * and {@code minecraft:sign}. Those ids no longer exist in modern Paper,
+     * so directly adapting them makes Paper reject every affected block and
+     * can leave a Blueprint seemingly empty. Use a valid modern default so
+     * the structure can still build; re-exporting the schematic with current
+     * FAWE remains the way to retain the original color/wood variant.
+     */
+    private BlockData adaptBlockData(BlueprintTemplate template, BaseBlock block) {
+        String id = block.getBlockType().id();
+        Material fallback = legacyMaterial(id);
+        if (fallback == null) {
+            return BukkitAdapter.adapt(block);
+        }
+        if (warnedLegacyBlockIds.add(id)) {
+            plugin.getLogger().warning("Blueprint template '" + template.name() + "' uses retired block id '"
+                    + id + "'. Replacing it with " + fallback + "; re-export the .schem with current FAWE "
+                    + "to retain its exact block state.");
+        }
+        return fallback.createBlockData();
+    }
+
+    private static Material legacyMaterial(String id) {
+        return switch (id) {
+            case "minecraft:bed" -> Material.RED_BED;
+            case "minecraft:sign", "minecraft:standing_sign" -> Material.OAK_SIGN;
+            case "minecraft:wall_sign" -> Material.OAK_WALL_SIGN;
+            case "minecraft:skull" -> Material.PLAYER_HEAD;
+            case "minecraft:wall_skull" -> Material.PLAYER_WALL_HEAD;
+            case "minecraft:banner", "minecraft:standing_banner" -> Material.WHITE_BANNER;
+            case "minecraft:wall_banner" -> Material.WHITE_WALL_BANNER;
+            default -> null;
+        };
     }
 
     /**

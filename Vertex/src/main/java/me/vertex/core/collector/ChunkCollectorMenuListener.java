@@ -106,11 +106,14 @@ public final class ChunkCollectorMenuListener implements Listener {
 
     private void completeAmountWithdrawal(Player player, InventoryClickEvent event,
                                           CollectorWithdrawAmountMenu.Holder holder) {
-        // Prefer a fresh read, but fall back to the last amount the anvil's
-        // own PrepareAnvilEvent successfully parsed -- see the comment on
-        // Holder.lastPreparedAmount for why a fresh read can spuriously
-        // come back blank right as the result slot is clicked.
-        Long amount = CollectorWithdrawAmountMenu.readAmount(player, holder.messages(), event.getView(), event.getInventory());
+        // The result item has the parsed amount embedded in its PDC. This
+        // survives the vanilla anvil clearing its rename field while the
+        // result is clicked; only use text/cache fallbacks for API mocks or
+        // another plugin that replaced the result item.
+        Long amount = CollectorWithdrawAmountMenu.confirmedAmount(event.getCurrentItem());
+        if (amount == null) {
+            amount = CollectorWithdrawAmountMenu.readAmount(player, holder.messages(), event.getView(), event.getInventory());
+        }
         if (amount == null) {
             amount = holder.lastPreparedAmount();
         }

@@ -2,19 +2,28 @@ package me.vertex.core.faction;
 
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.Messages;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
+import org.bukkit.event.server.TabCompleteEvent;
+import org.bukkit.plugin.Plugin;
 
-public final class RallyCommand implements CommandExecutor {
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
+public final class RallyCommand implements CommandExecutor, Listener {
+
+    private final Plugin plugin;
     private final RallyManager rallyManager;
     private final Messages messages;
 
-    public RallyCommand(RallyManager rallyManager, Messages messages) {
+    public RallyCommand(Plugin plugin, RallyManager rallyManager, Messages messages) {
+        this.plugin = plugin;
         this.rallyManager = rallyManager;
         this.messages = messages;
     }
@@ -26,22 +35,54 @@ public final class RallyCommand implements CommandExecutor {
             return true;
         }
 
-        Player player = (Player) sender;
+        return execute((Player) sender, args);
+    }
+
+    /**
+     * FactionsUUID owns the `/f` root command. A YAML alias containing a
+     * space is not a real Bukkit subcommand, so route its `rally` branch
+     * before FactionsUUID handles it, just like permissions and upgrades.
+     */
+    @EventHandler
+    public void onFactionRallyCommand(PlayerCommandPreprocessEvent event) {
+        String[] parts = event.getMessage().substring(1).trim().split("\\s+");
+        if (parts.length < 2 || !isFactionCommand(parts[0]) || !parts[1].equalsIgnoreCase("rally")) {
+            return;
+        }
+        event.setCancelled(true);
+        String[] args = java.util.Arrays.copyOfRange(parts, 2, parts.length);
+        execute(event.getPlayer(), args);
+    }
+
+    @EventHandler
+    public void onFactionRallyTabComplete(TabCompleteEvent event) {
+        if (!(event.getSender() instanceof Player) || !event.getBuffer().startsWith("/")) {
+            return;
+        }
+        String[] parts = event.getBuffer().substring(1).split("\\s+", -1);
+        if (parts.length == 2 && isFactionCommand(parts[0])) {
+            addCompletions(event, parts[1], List.of("rally"));
+        } else if (parts.length == 3 && isFactionCommand(parts[0]) && parts[1].equalsIgnoreCase("rally")) {
+            addCompletions(event, parts[2], List.of("set", "clear"));
+        }
+    }
+
+    private boolean execute(Player player, String[] args) {
         int factionId = FactionsHook.getFactionId(player);
 
         if (factionId == FactionsHook.NO_FACTION) {
-            sender.sendMessage(messages.getChat(sender, "factions.must-be-in-faction"));
+            player.sendMessage(messages.getChat(player, "factions.must-be-in-faction"));
             return true;
         }
 
         if (args.length == 0) {
             if (!rallyManager.canUse(player, "rally-set")) {
-                sender.sendMessage(messages.getChat(sender, "factions.rally-no-permission"));
+                player.sendMessage(messages.getChat(player, "factions.rally-no-permission"));
                 return true;
             }
             // /rally with no args - set rally at current location
             rallyManager.setRally(factionId, player.getLocation());
-            sender.sendMessage(messages.getChat(sender, "factions.rally-set"));
+            player.sendMessage(messages.getChat(player, "factions.rally-set"));
             rallyManager.broadcastSet(player);
             return true;
         }
@@ -50,24 +91,46 @@ public final class RallyCommand implements CommandExecutor {
 
         if (action.equals("set")) {
             if (!rallyManager.canUse(player, "rally-set")) {
-                sender.sendMessage(messages.getChat(sender, "factions.rally-no-permission"));
+                player.sendMessage(messages.getChat(player, "factions.rally-no-permission"));
                 return true;
             }
             rallyManager.setRally(factionId, player.getLocation());
-            sender.sendMessage(messages.getChat(sender, "factions.rally-set"));
+            player.sendMessage(messages.getChat(player, "factions.rally-set"));
             rallyManager.broadcastSet(player);
             return true;
         } else if (action.equals("clear")) {
             if (!rallyManager.canUse(player, "rally-clear")) {
-                sender.sendMessage(messages.getChat(sender, "factions.rally-no-permission"));
+                player.sendMessage(messages.getChat(player, "factions.rally-no-permission"));
                 return true;
             }
             rallyManager.clearRally(factionId);
-            sender.sendMessage(messages.getChat(sender, "factions.rally-cleared"));
+            player.sendMessage(messages.getChat(player, "factions.rally-cleared"));
             return true;
         }
 
-        sender.sendMessage(messages.getChat(sender, "factions.rally-usage"));
+        player.sendMessage(messages.getChat(player, "factions.rally-usage"));
         return true;
+    }
+
+    private boolean isFactionCommand(String rawCommand) {
+        String command = rawCommand.startsWith("/") ? rawCommand.substring(1) : rawCommand;
+        int namespace = command.indexOf(':');
+        if (namespace >= 0) {
+            command = command.substring(namespace + 1);
+        }
+        String normalized = command.toLowerCase(Locale.ROOT);
+        return plugin.getConfig().getStringList("factions.command-aliases").stream()
+                .map(alias -> alias.toLowerCase(Locale.ROOT)).anyMatch(normalized::equals);
+    }
+
+    private static void addCompletions(TabCompleteEvent event, String rawPartial, List<String> values) {
+        String partial = rawPartial.toLowerCase(Locale.ROOT);
+        List<String> completions = new ArrayList<>(event.getCompletions());
+        for (String value : values) {
+            if (value.startsWith(partial) && completions.stream().noneMatch(value::equalsIgnoreCase)) {
+                completions.add(value);
+            }
+        }
+        event.setCompletions(completions);
     }
 }

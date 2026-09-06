@@ -26,6 +26,16 @@ and `max-nearby-entities-per-stack` (each with a hard cap:
 does spawn more mobs per cycle using vanilla's own spawner logic, not a
 manual re-spawn loop.
 
+### Faction Spawner Rate upgrade
+
+The **Spawner Rate** entry in `/f upgrades` scales both of those counts
+for Vertex spawners located in the purchasing faction's own claim. It
+also applies to the manual Iron Golem fallback. The normal spawner caps
+remain the baseline and scale by the same earned rate, so the bonus takes
+effect immediately without changing spawners in another faction's land.
+Configure its levels, cost, and percentage in
+`faction-upgrades.upgrades.spawner-rate`.
+
 **Mining** requires Silk Touch if `silk-touch-required` is set, and only
 works for members of the claim's owning faction (or staff-build) —
 everyone else is blocked outright. `break-mode: drop-all` drops the whole

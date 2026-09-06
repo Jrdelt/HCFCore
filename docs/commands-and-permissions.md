@@ -54,6 +54,7 @@ permission is checked — anyone can run it.
 |---|---|---|
 | `/f rally [set\|clear]` (alias `/frally`) | Open to all faction members | Sets/clears a 4-minute faction rally point. |
 | `/f permissions` / `/f perms` | Faction leader only (checked in-code, not a permission node) | Opens the faction permission matrix GUI. |
+| `/f upgrades` / `/f upgrade` | Any faction member may view; faction leader purchases by default | Opens the persistent faction-upgrades GUI. The behavior is configurable under `faction-upgrades`. |
 
 ## Reboot
 

@@ -2,6 +2,7 @@ package me.vertex.core.storage;
 
 import me.vertex.core.blueprint.BlueprintStorage;
 import me.vertex.core.collector.ChunkCollectorStorage;
+import me.vertex.core.faction.FactionUpgradeStorage;
 import me.vertex.core.spawner.SpawnerData;
 import me.vertex.core.spawner.SpawnerStorage;
 import org.bukkit.Location;
@@ -83,9 +84,13 @@ class StorageMigratorTest {
         sourceBlueprints.init();
         sourceBlueprints.insert(location, "outpost", player.toString(), "Raiders", 999L);
 
+        FactionUpgradeStorage sourceUpgrades = new FactionUpgradeStorage(source);
+        sourceUpgrades.init();
+        sourceUpgrades.save(42, "spawner-rate", 3);
+
         StorageMigrator.Result result = StorageMigrator.migrate(source, target);
 
-        assertEquals(6, result.total(), "one row per populated table should have been copied");
+        assertEquals(7, result.total(), "one row per populated table should have been copied");
 
         SqlStorage migrated = new SqlStorage(target);
         assertEquals(Map.of("archer", 1_234L), migrated.loadCooldowns(player));
@@ -107,6 +112,9 @@ class StorageMigratorTest {
         assertEquals("outpost", builds.get(0).template());
         assertEquals(999L, builds.get(0).startedAt());
         assertTrue(builds.get(0).id() > 0, "the target assigns its own generated id");
+
+        List<FactionUpgradeStorage.StoredLevel> upgrades = new FactionUpgradeStorage(target).loadAll();
+        assertEquals(List.of(new FactionUpgradeStorage.StoredLevel(42, "spawner-rate", 3)), upgrades);
     }
 
     @Test

@@ -27,7 +27,7 @@ and what each integration does, see the [full documentation](docs/README.md).
 
 | | |
 | --- | --- |
-| **Required** | Paper 1.21.10+, [FactionsUUID](https://www.spigotmc.org/resources/factionsuuid.1035/) |
+| **Required** | Paper 1.21.10+ (built against the 1.21.11 API), [FactionsUUID](https://www.spigotmc.org/resources/factionsuuid.1035/) |
 | **Optional** | MySQL 5.7+ / MariaDB (only if you'd rather not use the built-in local database), Vault, WorldGuard, LuckPerms, PlaceholderAPI, EssentialsX, FastAsyncWorldEdit + DecentHolograms |
 
 **No database setup needed.** Vertex saves everything to a local file
@@ -97,6 +97,9 @@ Full steps, upgrade notes, and database details are in
 - **A visual permission-matrix GUI** for faction leaders, extending
   FactionsUUID's own role permissions, with clear green/red state panes,
   small-caps labels, and `/f perms` / `/f permissions` completion.
+- **Faction upgrades GUI** (`/f upgrades`) with persistent, configurable
+  levels for claim damage/protection, armor and fall protection, flight
+  speed, faction warps, spawner rate, crop growth, and mob experience.
 
 → [Factions Integration](docs/factions-integration.md)
 

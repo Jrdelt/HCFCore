@@ -2,6 +2,7 @@ package me.vertex.core.storage;
 
 import me.vertex.core.blueprint.BlueprintStorage;
 import me.vertex.core.collector.ChunkCollectorStorage;
+import me.vertex.core.faction.FactionUpgradeStorage;
 import me.vertex.core.spawner.SpawnerStorage;
 
 import java.io.File;
@@ -47,6 +48,7 @@ public final class StorageMigrator {
         TABLES.put("chunk_collectors", List.of("world", "x", "y", "z", "owner_faction", "owner_uuid"));
         TABLES.put("blueprint_builds", List.of("world", "x", "y", "z", "template", "owner_uuid",
                 "owner_faction", "current_index", "started_at"));
+        TABLES.put("faction_upgrade_levels", List.of("faction_id", "upgrade_key", "level"));
     }
 
     private StorageMigrator() {
@@ -150,6 +152,7 @@ public final class StorageMigrator {
         new SpawnerStorage(database).init();
         new ChunkCollectorStorage(database).init();
         new BlueprintStorage(database).init();
+        new FactionUpgradeStorage(database).init();
     }
 
     /**

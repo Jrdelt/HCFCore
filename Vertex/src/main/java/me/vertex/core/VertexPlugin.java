@@ -49,6 +49,8 @@ import me.vertex.core.reboot.RebootManager;
 import me.vertex.core.scoreboard.ScoreboardManager;
 import me.vertex.core.faction.RallyCommand;
 import me.vertex.core.faction.RallyManager;
+import me.vertex.core.faction.FactionUpgradeManager;
+import me.vertex.core.faction.FactionUpgradeStorage;
 import me.vertex.core.staff.DeathListener;
 import me.vertex.core.staff.DeathManager;
 import me.vertex.core.staff.InvRestoreMenuListener;
@@ -115,6 +117,8 @@ public final class VertexPlugin extends JavaPlugin {
     private ArcherTagManager archerTagManager;
     private DeathManager deathManager;
     private RallyManager rallyManager;
+    private FactionUpgradeStorage factionUpgradeStorage;
+    private FactionUpgradeManager factionUpgradeManager;
     private ArcherTagListener archerTagListener;
     private CombatListener combatListener;
     private HungerManagementListener hungerManagementListener;
@@ -145,6 +149,8 @@ public final class VertexPlugin extends JavaPlugin {
             chunkCollectorStorage.init();
             blueprintStorage = new me.vertex.core.blueprint.BlueprintStorage(database);
             blueprintStorage.init();
+            factionUpgradeStorage = new FactionUpgradeStorage(database);
+            factionUpgradeStorage.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize the database, disabling.", e);
             Bukkit.getPluginManager().disablePlugin(this);
@@ -192,11 +198,19 @@ public final class VertexPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new InvRestoreMenuListener(this, deathManager, messages), this);
 
         rallyManager = new RallyManager(this, messages);
-        RallyCommand rallyCommand = new RallyCommand(rallyManager, messages);
+        RallyCommand rallyCommand = new RallyCommand(this, rallyManager, messages);
         getCommand("frally").setExecutor(rallyCommand);
+        Bukkit.getPluginManager().registerEvents(rallyCommand, this);
         me.vertex.core.faction.RallyPermissionMenu rallyPermissionMenu =
                 new me.vertex.core.faction.RallyPermissionMenu(this, rallyManager, messages);
         Bukkit.getPluginManager().registerEvents(rallyPermissionMenu, this);
+        factionUpgradeManager = new FactionUpgradeManager(this, factionUpgradeStorage);
+        factionUpgradeManager.load();
+        Bukkit.getPluginManager().registerEvents(factionUpgradeManager, this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.faction.FactionUpgradeMenu(this, factionUpgradeManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.faction.FactionUpgradeEffectsListener(this, factionUpgradeManager), this);
 
         nametagManager = new NametagManager(this);
         Bukkit.getPluginManager().registerEvents(new NametagListener(nametagManager), this);
@@ -225,8 +239,11 @@ public final class VertexPlugin extends JavaPlugin {
         getCommand("endersee").setTabCompleter(endseeCommand);
 
         spawnerManager = new me.vertex.core.spawner.SpawnerManager(this, spawnerStorage);
+        spawnerManager.setFactionUpgradeManager(factionUpgradeManager);
         spawnerManager.load();
         spawnerManager.loadSpawnersFromDatabase();
+        factionUpgradeManager.setSpawnerRetune(spawnerManager::retuneAll);
+        spawnerManager.retuneAll();
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.spawner.SpawnerListener(spawnerManager, staffManager, messages, rallyManager), this);
         Bukkit.getPluginManager().registerEvents(
@@ -408,6 +425,9 @@ public final class VertexPlugin extends JavaPlugin {
         if (rallyManager != null) {
             rallyManager.shutdown();
         }
+        if (factionUpgradeManager != null) {
+            factionUpgradeManager.awaitWrites();
+        }
         if (nametagManager != null) {
             nametagManager.shutdown();
         }
@@ -484,6 +504,12 @@ public final class VertexPlugin extends JavaPlugin {
         }
         if (spawnerManager != null) {
             spawnerManager.load();
+        }
+        if (factionUpgradeManager != null) {
+            factionUpgradeManager.reloadConfig();
+            if (spawnerManager != null) {
+                spawnerManager.retuneAll();
+            }
         }
         if (chunkCollectorManager != null) {
             chunkCollectorManager.load();

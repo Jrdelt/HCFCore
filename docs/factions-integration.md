@@ -84,6 +84,41 @@ live under `rally.permission-gui` in `config.yml` (see
 [Configuration](configuration.md#rally-permission-gui)). Per-faction rally
 permission choices are saved under `rally.faction-permissions`.
 
+## Faction upgrades
+
+`/f upgrades` (or `/f upgrade`, including every configured faction-command
+alias) opens a persistent per-faction upgrade GUI. Any faction member can
+inspect it; by default, only the faction leader can purchase levels. Every
+cost is withdrawn from the leader through Vault and every upgrade level is
+saved in Vertex's database, so it survives restarts and faction renames.
+
+All values are configurable in `faction-upgrades.upgrades` in `config.yml`:
+
+- **Damage in Claims** increases damage dealt by members standing in their
+  own claim.
+- **Claim Protection**, **Armor Wear**, and **Fall Protection** reduce the
+  corresponding damage/durability loss while a member is in their claim.
+- **Fly Boost** increases the speed of members who are already flying in
+  their claim. It deliberately does not grant flight itself, so it stays
+  compatible with the server's FactionsUUID flight rules and other flight
+  plugins.
+- **Faction Warps** sets the faction's native FactionsUUID `WARPS` upgrade
+  level, so its normal `/f warp` commands and the limit configured by
+  FactionsUUID continue to own warp creation and teleportation. Existing
+  native warp levels are adopted on first menu view and are never lowered.
+- **Spawner Rate** retunes Vertex spawners in the faction's claim at once,
+  including the manual Iron Golem fallback. The configured normal spawner
+  limits remain the baseline and scale with the earned rate.
+- **Crop Growth** gives each crop growth stage an additional configurable
+  chance to advance one more stage.
+- **Mob Experience** increases XP dropped when a faction member kills a
+  mob in that faction's claim.
+
+Set an individual `enabled: false` or set `faction-upgrades.enabled: false`
+to take it out of service without deleting saved levels. A faction disband
+cleans up its Vertex upgrade rows automatically. See
+[Configuration](configuration.md#faction-upgrades) for the complete setup.
+
 ## Leader-leave protection
 
 `factions.prevent-leader-leave` (default `true`) blocks a faction

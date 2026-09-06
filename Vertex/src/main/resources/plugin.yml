@@ -71,9 +71,7 @@ commands:
     usage: /<command> <player>
   frally:
     description: Set or clear faction rally point (4 minute duration).
-    usage: /f rally [set|clear]
-    aliases:
-      - f rally
+    usage: /<command> [set|clear]
   staff:
     description: Toggle full staff mode (vanish + staff-build).
     usage: /<command>

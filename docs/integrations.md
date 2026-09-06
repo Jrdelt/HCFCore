@@ -21,6 +21,7 @@ Enables money costs. Specifically:
 - A kit's `cost.money` requirement (see [Kits & Abilities](kits-and-abilities.md#cost)).
 - Buying spawners from `/spawners` and selling them back.
 - Buying Chunk Collector upgrade tiers.
+- Buying faction-upgrade levels through `/f upgrades`.
 - The `{balance}` scoreboard placeholder.
 
 Without Vault, only free or item-cost kits work, spawners/collectors that
@@ -89,7 +90,7 @@ partial/degraded mode, it's fully off until both are present.
 | Plugin | Required? | Powers |
 |---|---|---|
 | FactionsUUID | **Yes** | Everything faction-aware: claims, relations, chat/scoreboard/nametags, rallies |
-| Vault | No | Kit money costs, spawner/collector economy, `{balance}` |
+| Vault | No | Kit money costs, spawner/collector/faction-upgrade economy, `{balance}` |
 | WorldGuard | No | Region-based ability and no-pearl restrictions |
 | LuckPerms | No | Rank display, the Repair ability |
 | PlaceholderAPI | No | `%placeholder%` support in chat/scoreboard templates |
