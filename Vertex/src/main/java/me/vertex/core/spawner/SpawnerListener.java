@@ -16,6 +16,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.PlayerInventory;
@@ -173,22 +174,35 @@ public final class SpawnerListener implements Listener {
             }
         }
 
-        event.setDropItems(false);
         int stackSize = data.stackSize();
         EntityType mobType = data.mobType();
         net.kyori.adventure.text.Component displayName = displayNameFor(mobType);
 
-        int dropped = spawnerManager.breakMode() == SpawnerManager.BreakMode.DROP_ALL ? stackSize : 1;
+        // A decrement must leave the physical spawner in place. Letting the
+        // BlockBreakEvent complete here would turn the remaining tracked
+        // stack into an invisible database/PDC record with no block.
+        if (spawnerManager.breakMode() == SpawnerManager.BreakMode.DECREMENT && stackSize > 1) {
+            event.setCancelled(true);
+            block.getWorld().dropItemNaturally(location.clone().add(0.5, 0.5, 0.5),
+                    SpawnerManager.createSpawnerItem(mobType, displayName));
+            spawnerManager.decreaseStack(location, 1);
+            return;
+        }
+
+        event.setDropItems(false);
+        int dropped = stackSize;
         for (int i = 0; i < dropped; i++) {
             block.getWorld().dropItemNaturally(location.clone().add(0.5, 0.5, 0.5),
                     SpawnerManager.createSpawnerItem(mobType, displayName));
         }
 
-        if (dropped >= stackSize) {
-            spawnerManager.remove(location);
-        } else {
-            spawnerManager.decreaseStack(location, dropped);
-        }
+        spawnerManager.remove(location);
+    }
+
+    /** Restores interrupted spawner writes and prunes stale SQL rows lazily as chunks load. */
+    @EventHandler
+    public void onChunkLoad(ChunkLoadEvent event) {
+        spawnerManager.reconcileChunk(event.getChunk());
     }
 
     private net.kyori.adventure.text.Component displayNameFor(EntityType type) {

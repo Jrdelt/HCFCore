@@ -8,6 +8,7 @@ import me.vertex.core.factions.FactionsHook;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Location;
+import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -16,6 +17,9 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import java.util.EnumMap;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,6 +41,8 @@ public final class FactionUpgradeManager implements Listener {
     private final Map<Integer, EnumMap<FactionUpgrade, Integer>> levels = new ConcurrentHashMap<>();
     private final Map<Integer, CompletableFuture<Void>> writeChains = new ConcurrentHashMap<>();
     private final java.util.Set<CompletableFuture<Void>> pendingWrites = ConcurrentHashMap.newKeySet();
+    /** Prevents two clicks from charging for levels before the first durable write finishes. */
+    private final Set<String> pendingPurchases = ConcurrentHashMap.newKeySet();
 
     private volatile Map<FactionUpgrade, Definition> definitions = Map.of();
     private volatile boolean enabled;
@@ -72,13 +78,7 @@ public final class FactionUpgradeManager implements Listener {
             String path = "faction-upgrades.upgrades." + upgrade.configKey();
             ConfigurationSection section = plugin.getConfig().getConfigurationSection(path);
             boolean upgradeEnabled = section == null || section.getBoolean("enabled", true);
-            int maxLevel = Math.max(0, Math.min(MAX_CONFIGURED_LEVEL,
-                    section == null ? 5 : section.getInt("max-level", 5)));
-            double baseCost = clamp(section == null ? 0D : section.getDouble("cost-base", 0D), 0D,
-                    MAX_CONFIGURED_COST);
-            double multiplier = clamp(section == null ? 1D : section.getDouble("cost-multiplier", 1D), 1D, 100D);
-            double bonus = clamp(section == null ? 0D : section.getDouble("bonus-per-level", 0D), 0D, 10_000D);
-            loaded.put(upgrade, new Definition(upgradeEnabled, maxLevel, baseCost, multiplier, bonus));
+            loaded.put(upgrade, new Definition(upgradeEnabled, loadLevels(section)));
         }
         definitions = Map.copyOf(loaded);
     }
@@ -127,11 +127,11 @@ public final class FactionUpgradeManager implements Listener {
         if (!enabled || !definition.enabled()) {
             return 0D;
         }
-        return level(factionId, upgrade) * definition.bonusPerLevel();
+        return bonusAtLevel(upgrade, level(factionId, upgrade));
     }
 
     public double bonusAtLevel(FactionUpgrade upgrade, int level) {
-        return Math.max(0, level) * definition(upgrade).bonusPerLevel();
+        return definition(upgrade).atLevel(level).bonus();
     }
 
     /** The amount charged for the next level, or -1 once maxed/disabled. */
@@ -141,8 +141,7 @@ public final class FactionUpgradeManager implements Listener {
         if (!enabled || !definition.enabled() || current >= definition.maxLevel()) {
             return -1D;
         }
-        double cost = definition.costBase() * Math.pow(definition.costMultiplier(), current);
-        return Double.isFinite(cost) ? Math.min(MAX_CONFIGURED_COST, cost) : MAX_CONFIGURED_COST;
+        return definition.atLevel(current + 1).price();
     }
 
     public PurchaseResult purchase(Player player, Faction faction, FactionUpgrade upgrade) {
@@ -153,18 +152,26 @@ public final class FactionUpgradeManager implements Listener {
             return PurchaseResult.LEADER_ONLY;
         }
         int factionId = faction.id();
+        String purchaseKey = factionId + ":" + upgrade.configKey();
+        if (!pendingPurchases.add(purchaseKey)) {
+            return PurchaseResult.PENDING;
+        }
         int current = level(factionId, upgrade);
         if (current >= definition(upgrade).maxLevel()) {
+            pendingPurchases.remove(purchaseKey);
             return PurchaseResult.MAXED;
         }
         double cost = nextCost(factionId, upgrade);
+        Economy economy = null;
         if (cost > 0D) {
             if (!EconomyHook.isAvailable()) {
+                pendingPurchases.remove(purchaseKey);
                 return PurchaseResult.NO_ECONOMY;
             }
-            Economy economy = EconomyHook.getEconomy();
+            economy = EconomyHook.getEconomy();
             EconomyResponse response = economy.withdrawPlayer(player, cost);
             if (response == null || !response.transactionSuccess()) {
+                pendingPurchases.remove(purchaseKey);
                 return PurchaseResult.CANNOT_AFFORD;
             }
         }
@@ -176,11 +183,39 @@ public final class FactionUpgradeManager implements Listener {
             // native level itself; Vertex only supplies the purchase GUI.
             faction.upgradeLevel(Upgrades.WARPS, newLevel);
         }
-        queueSave(factionId, upgrade, newLevel);
+        Economy chargedEconomy = economy;
+        queueSave(factionId, upgrade, newLevel).whenComplete((ignored, error) -> {
+            pendingPurchases.remove(purchaseKey);
+            if (error == null) {
+                return;
+            }
+            Bukkit.getScheduler().runTask(plugin, () -> rollbackFailedPurchase(player, faction, factionId, upgrade,
+                    current, newLevel, cost, chargedEconomy));
+        });
         if (upgrade == FactionUpgrade.SPAWNER_RATE) {
             spawnerRetune.run();
         }
         return PurchaseResult.SUCCESS;
+    }
+
+    private void rollbackFailedPurchase(Player player, Faction faction, int factionId, FactionUpgrade upgrade,
+            int previousLevel, int attemptedLevel, double cost, Economy economy) {
+        EnumMap<FactionUpgrade, Integer> factionLevels = levels.get(factionId);
+        if (factionLevels != null && factionLevels.getOrDefault(upgrade, 0) == attemptedLevel) {
+            factionLevels.put(upgrade, previousLevel);
+        }
+        if (upgrade == FactionUpgrade.WARPS) {
+            faction.upgradeLevel(Upgrades.WARPS, previousLevel);
+        }
+        if (cost > 0D && economy != null) {
+            EconomyResponse refunded = economy.depositPlayer(player, cost);
+            if (refunded == null || !refunded.transactionSuccess()) {
+                plugin.getLogger().warning("Could not refund a faction-upgrade purchase after its database write failed.");
+            }
+        }
+        if (upgrade == FactionUpgrade.SPAWNER_RATE) {
+            spawnerRetune.run();
+        }
     }
 
     /** True only while a member is standing in land their faction owns. */
@@ -226,21 +261,25 @@ public final class FactionUpgradeManager implements Listener {
         });
     }
 
-    private void queueSave(int factionId, FactionUpgrade upgrade, int level) {
+    private CompletableFuture<Void> queueSave(int factionId, FactionUpgrade upgrade, int level) {
         CompletableFuture<Void> write = writeChains.compute(factionId, (ignored, previous) ->
                 (previous == null ? CompletableFuture.<Void>completedFuture(null) : previous.handle((done, error) -> null))
                         .thenRunAsync(() -> {
                             try {
                                 storage.save(factionId, upgrade.configKey(), level);
                             } catch (Exception e) {
-                                plugin.getLogger().log(Level.WARNING, "Failed to save faction upgrade to the database.", e);
+                                throw new java.util.concurrent.CompletionException(e);
                             }
                         }));
         pendingWrites.add(write);
         write.whenComplete((ignored, error) -> {
             pendingWrites.remove(write);
             writeChains.remove(factionId, write);
+            if (error != null) {
+                plugin.getLogger().log(Level.WARNING, "Failed to save faction upgrade to the database.", error);
+            }
         });
+        return write;
     }
 
     public void awaitWrites() {
@@ -259,10 +298,61 @@ public final class FactionUpgradeManager implements Listener {
         return Double.isFinite(value) ? Math.max(minimum, Math.min(maximum, value)) : minimum;
     }
 
-    public enum PurchaseResult { SUCCESS, DISABLED, LEADER_ONLY, MAXED, NO_ECONOMY, CANNOT_AFFORD }
+    /**
+     * Reads explicit level entries such as {@code levels.3.price} and
+     * {@code levels.3.bonus}. Older configurations are converted once at
+     * load time so upgrading never requires a multiplier-based price.
+     */
+    private List<Tier> loadLevels(ConfigurationSection section) {
+        if (section != null && section.isConfigurationSection("levels")) {
+            ConfigurationSection configured = section.getConfigurationSection("levels");
+            List<Tier> values = new ArrayList<>();
+            for (int level = 1; level <= MAX_CONFIGURED_LEVEL; level++) {
+                ConfigurationSection entry = configured.getConfigurationSection(String.valueOf(level));
+                if (entry == null) {
+                    if (!values.isEmpty()) {
+                        plugin.getLogger().warning("Faction upgrade '" + section.getCurrentPath()
+                                + "' has a missing level " + level
+                                + "; higher configured levels are ignored until the gap is filled.");
+                    }
+                    break;
+                }
+                values.add(new Tier(
+                        clamp(entry.getDouble("price", 0D), 0D, MAX_CONFIGURED_COST),
+                        clamp(entry.getDouble("bonus", 0D), 0D, 10_000D)));
+            }
+            return List.copyOf(values);
+        }
 
-    public record Definition(boolean enabled, int maxLevel, double costBase, double costMultiplier,
-                             double bonusPerLevel) {
-        private static final Definition DISABLED = new Definition(false, 0, 0, 1, 0);
+        int maxLevel = Math.max(0, Math.min(MAX_CONFIGURED_LEVEL,
+                section == null ? 5 : section.getInt("max-level", 5)));
+        double baseCost = clamp(section == null ? 0D : section.getDouble("cost-base", 0D), 0D,
+                MAX_CONFIGURED_COST);
+        double multiplier = clamp(section == null ? 1D : section.getDouble("cost-multiplier", 1D), 1D, 100D);
+        double bonusPerLevel = clamp(section == null ? 0D : section.getDouble("bonus-per-level", 0D), 0D, 10_000D);
+        List<Tier> values = new ArrayList<>();
+        for (int level = 1; level <= maxLevel; level++) {
+            double price = Math.min(MAX_CONFIGURED_COST, baseCost * Math.pow(multiplier, level - 1));
+            values.add(new Tier(Double.isFinite(price) ? price : MAX_CONFIGURED_COST, bonusPerLevel * level));
+        }
+        return List.copyOf(values);
+    }
+
+    public enum PurchaseResult { SUCCESS, PENDING, DISABLED, LEADER_ONLY, MAXED, NO_ECONOMY, CANNOT_AFFORD }
+
+    public record Definition(boolean enabled, List<Tier> levels) {
+        private static final Definition DISABLED = new Definition(false, List.of());
+
+        public int maxLevel() {
+            return levels.size();
+        }
+
+        public Tier atLevel(int level) {
+            return level <= 0 || level > levels.size() ? Tier.ZERO : levels.get(level - 1);
+        }
+    }
+
+    public record Tier(double price, double bonus) {
+        private static final Tier ZERO = new Tier(0D, 0D);
     }
 }

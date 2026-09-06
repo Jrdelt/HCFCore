@@ -53,6 +53,7 @@ class SpawnerManagerTest {
         }
         assertEquals(50, manager.maxStackSize());
         assertFalse(manager.isSilkTouchRequired());
+        assertTrue(manager.spawnInDaylight());
     }
 
     @Test
@@ -99,10 +100,10 @@ class SpawnerManagerTest {
     @Test
     void loadParsesTheBundledMobStackingSection() {
         assertTrue(manager.isMobStackingEnabled());
-        assertEquals(50.0, manager.mergeRadiusBlocks());
-        assertEquals(100, manager.maxStackLimit());
+        assertEquals(75.0, manager.mergeRadiusBlocks());
+        assertEquals(200, manager.maxStackLimit());
         assertEquals(64, manager.dropBatchSize());
-        assertEquals("<gray>[x{count}] <white>{name}", manager.stackDisplayFormat());
+        assertEquals("<yellow>x{count} <gray>{name}", manager.stackDisplayFormat());
         for (EntityType type : List.of(EntityType.ZOMBIE, EntityType.SKELETON, EntityType.BLAZE,
                 EntityType.IRON_GOLEM, EntityType.EVOKER)) {
             assertTrue(manager.stackableTypes().contains(type), type + " should be stackable per spawners.yml");

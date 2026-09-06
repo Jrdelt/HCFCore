@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -113,6 +114,18 @@ public final class Messages {
         return MessageFormatter.deserialize(getRaw(sender, key, placeholders));
     }
 
+    /**
+     * Resolves a YAML list using the same per-player locale and fallback
+     * rules as {@link #get(CommandSender, String, String...)}, making an
+     * entire inventory lore block configurable rather than only individual
+     * lines of it.
+     */
+    public List<Component> getList(CommandSender sender, String key, String... placeholders) {
+        return resolveList(sender, key).stream()
+                .map(line -> MessageFormatter.deserialize(applyPlaceholders(line, placeholders)))
+                .toList();
+    }
+
     /** @deprecated identical to {@link #get}; kept only because many call sites still use it. */
     @Deprecated
     public Component getChat(CommandSender sender, String key, String... placeholders) {
@@ -126,19 +139,46 @@ public final class Messages {
      * string rather than send it directly.
      */
     public String getRaw(CommandSender sender, String key, String... placeholders) {
-        String template = resolveTemplate(sender, key);
+        return applyPlaceholders(resolveTemplate(sender, key), placeholders);
+    }
+
+    private String applyPlaceholders(String template, String... placeholders) {
         for (int i = 0; i + 1 < placeholders.length; i += 2) {
             // Values (unlike the admin-authored template) may come from
             // untrusted sources such as a player's name, so any MiniMessage
             // tags (or legacy &-codes -- escapeTags() alone doesn't stop
             // those) inside them must render as literal text, not formatting.
             String safeValue = MessageFormatter.escapeForSubstitution(placeholders[i + 1]);
-            template = template.replace("{" + placeholders[i] + "}", safeValue);
+            String key = placeholders[i];
+            template = template.replace("{" + key + "}", safeValue)
+                    // Early Blueprint language files used angle-bracket
+                    // placeholders. Continue accepting them so an existing
+                    // customized locale never exposes raw <template> text.
+                    .replace("<" + key + ">", safeValue);
         }
         return template;
     }
 
     private String resolveTemplate(CommandSender sender, String key) {
+        String locale = localeFor(sender);
+
+        String value = getFromLocale(locale, key);
+        if (value == null && !locale.equals(defaultLocale)) {
+            value = getFromLocale(defaultLocale, key);
+        }
+        return value != null ? value : "&cMissing translation: " + key;
+    }
+
+    private List<String> resolveList(CommandSender sender, String key) {
+        String locale = localeFor(sender);
+        List<String> value = getListFromLocale(locale, key);
+        if (value == null && !locale.equals(defaultLocale)) {
+            value = getListFromLocale(defaultLocale, key);
+        }
+        return value != null ? value : List.of("&cMissing translation: " + key);
+    }
+
+    private String localeFor(CommandSender sender) {
         String locale = defaultLocale;
         if (sender instanceof Player player) {
             User user = userManager.get(player.getUniqueId());
@@ -147,12 +187,7 @@ public final class Messages {
                 locale = preferred.toLowerCase(Locale.ROOT);
             }
         }
-
-        String value = getFromLocale(locale, key);
-        if (value == null && !locale.equals(defaultLocale)) {
-            value = getFromLocale(defaultLocale, key);
-        }
-        return value != null ? value : "&cMissing translation: " + key;
+        return locale;
     }
 
     private String getFromLocale(String locale, String key) {
@@ -163,5 +198,14 @@ public final class Messages {
         }
         YamlConfiguration bundled = bundledLocales.get(locale);
         return bundled == null ? null : bundled.getString(key);
+    }
+
+    private List<String> getListFromLocale(String locale, String key) {
+        YamlConfiguration config = locales.get(locale);
+        if (config != null && config.isList(key)) {
+            return config.getStringList(key);
+        }
+        YamlConfiguration bundled = bundledLocales.get(locale);
+        return bundled != null && bundled.isList(key) ? bundled.getStringList(key) : null;
     }
 }

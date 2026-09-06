@@ -69,7 +69,7 @@ public final class MobStackListener implements Listener {
             return;
         }
 
-        Mob target = findMergeTarget(event.getLocation(), type);
+        Mob target = findMergeTarget(event.getLocation(), type, isSpawnerSourced(spawned));
         if (target != null) {
             event.setCancelled(true);
             int newCount = currentStackCount(target) + 1;
@@ -84,7 +84,7 @@ public final class MobStackListener implements Listener {
     }
 
     /** The nearest existing stack of the same type within merge range that isn't already full, or null. */
-    private Mob findMergeTarget(Location location, EntityType type) {
+    private Mob findMergeTarget(Location location, EntityType type, boolean spawnerSourced) {
         double radius = spawnerManager.mergeRadiusBlocks();
         if (radius <= 0 || location.getWorld() == null) {
             return null;
@@ -93,6 +93,9 @@ public final class MobStackListener implements Listener {
         double closestDistanceSquared = Double.MAX_VALUE;
         for (Entity nearby : location.getWorld().getNearbyEntities(location, radius, radius, radius)) {
             if (nearby.getType() != type || !(nearby instanceof Mob mob)) {
+                continue;
+            }
+            if (isSpawnerSourced(mob) != spawnerSourced) {
                 continue;
             }
             Integer count = mob.getPersistentDataContainer().get(stackCountKey, PersistentDataType.INTEGER);
@@ -143,7 +146,8 @@ public final class MobStackListener implements Listener {
                 int countA = currentStackCount(a);
                 for (int j = i + 1; j < tracked.size(); j++) {
                     Mob b = tracked.get(j);
-                    if (!b.isValid() || a.getType() != b.getType()) {
+                    if (!b.isValid() || a.getType() != b.getType()
+                            || isSpawnerSourced(a) != isSpawnerSourced(b)) {
                         continue;
                     }
                     int available = limit - countA;
@@ -169,6 +173,10 @@ public final class MobStackListener implements Listener {
                 }
             }
         }
+    }
+
+    private boolean isSpawnerSourced(Mob mob) {
+        return mob.getPersistentDataContainer().has(spawnerMobKey, PersistentDataType.STRING);
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)

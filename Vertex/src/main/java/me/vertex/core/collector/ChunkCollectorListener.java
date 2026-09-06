@@ -22,6 +22,7 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -88,6 +89,11 @@ public final class ChunkCollectorListener implements Listener {
         }
     }
 
+    @EventHandler
+    public void onChunkLoad(ChunkLoadEvent event) {
+        manager.reconcileChunk(event.getChunk());
+    }
+
     /**
      * Real-time collection: a tagged item that just spawned strictly above
      * a same-chunk collector is vacuumed up immediately instead of ever
@@ -136,6 +142,9 @@ public final class ChunkCollectorListener implements Listener {
             if (room <= 0) {
                 continue;
             }
+            if (!manager.canStore(data, stack.getType())) {
+                continue;
+            }
             long toAbsorb = Math.min(room, stack.getAmount());
             data.setStored(stack.getType(), data.stored(stack.getType()) + toAbsorb);
             manager.writeData(collectorLocation, data);
@@ -173,6 +182,11 @@ public final class ChunkCollectorListener implements Listener {
 
         ChunkCollectorData data = manager.readItemData(event.getItemInHand(), player.getUniqueId(),
                 claimTag != null ? claimTag : playerTag);
+        // A collector item can be traded.  Its stored contents/tier travel
+        // with it, but ownership belongs to the player/faction that places
+        // it now so per-player limits and claim-change protection remain
+        // accurate.
+        data = manager.withOwner(data, player.getUniqueId(), claimTag != null ? claimTag : playerTag);
         manager.register(location, data);
     }
 
@@ -236,7 +250,7 @@ public final class ChunkCollectorListener implements Listener {
 
         event.setDropItems(false);
         block.getWorld().dropItemNaturally(location.clone().add(0.5, 0.5, 0.5),
-                manager.createCollectorItem(manager.displayName(), data));
+                manager.createCollectorItem(manager.displayName(player), data));
         manager.unregister(location);
     }
 

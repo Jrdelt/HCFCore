@@ -100,6 +100,9 @@ Full steps, upgrade notes, and database details are in
 - **Faction upgrades GUI** (`/f upgrades`) with persistent, configurable
   levels for claim damage/protection, armor and fall protection, flight
   speed, faction warps, spawner rate, crop growth, and mob experience.
+- **Faction Bank** (`/f bank`) — a seven-row shared bank for Vault money,
+  experience, and FactionsUUID TNT, with role-configurable deposits and
+  withdrawals.
 
 → [Factions Integration](docs/factions-integration.md)
 

@@ -8,7 +8,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Persists just enough about an active build to resume it after a
@@ -18,6 +21,11 @@ import java.util.List;
  * position list), so there's no need to persist the block list itself.
  */
 public final class BlueprintStorage {
+    private static final String CREATE_COOLDOWN_TABLE = """
+            CREATE TABLE IF NOT EXISTS blueprint_cooldowns (
+                uuid CHAR(36) NOT NULL PRIMARY KEY,
+                available_at BIGINT NOT NULL
+            )""";
 
     private static final String CREATE_TABLE_MYSQL = """
             CREATE TABLE IF NOT EXISTS blueprint_builds (
@@ -54,19 +62,33 @@ public final class BlueprintStorage {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""";
     private static final String UPDATE_PROGRESS = "UPDATE blueprint_builds SET current_index = ? WHERE id = ?";
     private static final String DELETE = "DELETE FROM blueprint_builds WHERE id = ?";
+    private static final String SELECT_COOLDOWNS = "SELECT uuid, available_at FROM blueprint_cooldowns";
+    private static final String UPSERT_COOLDOWN_MYSQL = """
+            INSERT INTO blueprint_cooldowns (uuid, available_at) VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE available_at = VALUES(available_at)""";
+    private static final String UPSERT_COOLDOWN_SQLITE = """
+            INSERT INTO blueprint_cooldowns (uuid, available_at) VALUES (?, ?)
+            ON CONFLICT(uuid) DO UPDATE SET available_at = excluded.available_at""";
+    private static final String DELETE_COOLDOWN = "DELETE FROM blueprint_cooldowns WHERE uuid = ?";
 
     private final Database database;
     private final String createTable;
+    private final String upsertCooldown;
 
     public BlueprintStorage(Database database) {
         this.database = database;
         this.createTable = database.dialect() == Database.Dialect.SQLITE ? CREATE_TABLE_SQLITE : CREATE_TABLE_MYSQL;
+        this.upsertCooldown = database.dialect() == Database.Dialect.SQLITE
+                ? UPSERT_COOLDOWN_SQLITE : UPSERT_COOLDOWN_MYSQL;
     }
 
     public void init() throws SQLException {
         try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(createTable)) {
             statement.executeUpdate();
+            try (PreparedStatement cooldownStatement = connection.prepareStatement(CREATE_COOLDOWN_TABLE)) {
+                cooldownStatement.executeUpdate();
+            }
         }
     }
 
@@ -125,6 +147,40 @@ public final class BlueprintStorage {
         try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(DELETE)) {
             statement.setInt(1, id);
+            statement.executeUpdate();
+        }
+    }
+
+    public Map<UUID, Long> loadCooldowns() throws SQLException {
+        Map<UUID, Long> cooldowns = new HashMap<>();
+        try (Connection connection = database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(SELECT_COOLDOWNS);
+             ResultSet results = statement.executeQuery()) {
+            while (results.next()) {
+                try {
+                    cooldowns.put(UUID.fromString(results.getString("uuid")), results.getLong("available_at"));
+                } catch (IllegalArgumentException ignored) {
+                    // Ignore a malformed legacy row rather than preventing every
+                    // valid cooldown from loading.
+                }
+            }
+        }
+        return cooldowns;
+    }
+
+    public void saveCooldown(UUID uuid, long availableAt) throws SQLException {
+        try (Connection connection = database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(upsertCooldown)) {
+            statement.setString(1, uuid.toString());
+            statement.setLong(2, availableAt);
+            statement.executeUpdate();
+        }
+    }
+
+    public void deleteCooldown(UUID uuid) throws SQLException {
+        try (Connection connection = database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(DELETE_COOLDOWN)) {
+            statement.setString(1, uuid.toString());
             statement.executeUpdate();
         }
     }

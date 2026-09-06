@@ -13,6 +13,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import dev.kitteh.factions.event.FactionAutoDisbandEvent;
+import dev.kitteh.factions.event.FactionDisbandEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -56,7 +58,8 @@ public final class RallyManager implements Listener {
 
     public boolean setRolePermission(int factionId, String role, String action, boolean allowed) {
         if (!List.of("admin", "mod", "member", "recruit").contains(role)
-                || !List.of("rally-set", "rally-clear", "spawner-add", "spawner-remove", "collector-open", "collector-break").contains(action)) {
+                || !List.of("rally-set", "rally-clear", "spawner-add", "spawner-remove", "collector-open", "collector-break",
+                        "bank-deposit", "bank-withdraw").contains(action)) {
             return false;
         }
         plugin.getConfig().set("rally.faction-permissions." + factionId + "." + role + "." + action, allowed);
@@ -94,6 +97,22 @@ public final class RallyManager implements Listener {
                 hideBossBarForPlayer(player);
             }
         }
+    }
+
+    @EventHandler
+    public void onFactionDisband(FactionDisbandEvent event) {
+        clearFactionState(event.getFaction().id());
+    }
+
+    @EventHandler
+    public void onFactionAutoDisband(FactionAutoDisbandEvent event) {
+        clearFactionState(event.getFaction().id());
+    }
+
+    private void clearFactionState(int factionId) {
+        clearRally(factionId);
+        plugin.getConfig().set("rally.faction-permissions." + factionId, null);
+        plugin.saveConfig();
     }
 
     private boolean isRallyActive(int factionId) {

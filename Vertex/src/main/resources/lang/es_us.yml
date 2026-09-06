@@ -15,6 +15,8 @@ admin:
   storage-not-empty: '<red>La base de datos {type} ya contiene {rows} fila(s). Vuelve a ejecutar con confirm para sobrescribirla.'
   storage-migrated: '<green>Se copiaron {rows} fila(s) a {type}. Reinicia el servidor para usarlo.'
   storage-failed: '<red>La migración falló, no se cambió nada: {error}'
+  storage-requires-idle-server: '<red>La migración requiere que no haya jugadores conectados ni Blueprints activos.'
+  storage-login-blocked: '<red>Hay una breve migración de almacenamiento en curso. Vuelve a conectarte pronto.'
 
 tags:
   title-your: 'Tus Tags ({count})'
@@ -205,6 +207,7 @@ faction-upgrades:
   cannot-afford: "<red>✖ <yellow>You need <green>{amount}<yellow> for that upgrade."
   maxed: "<yellow>That faction upgrade is already at its maximum level."
   purchased: "<green>✔ <yellow>Upgraded <green>{upgrade}<yellow> to level <green>{level}<yellow>."
+  purchase-pending: "<yellow>That faction upgrade purchase is still being saved. Please wait a moment."
   gui-title: "<dark_green>Faction Upgrades"
   gui:
     level: "<gray>Level: <green>{level}<gray>/<green>{max}"
@@ -215,6 +218,25 @@ faction-upgrades:
     leader-only: "<red>Only your faction leader can purchase levels."
     maxed: "<green>Maximum level reached."
     disabled: "<red>This upgrade is disabled in the server config."
+    lore:
+      available:
+        - "<gray>Level: <green>{level}<gray>/<green>{max}"
+        - "<gray>Current: <white>{current}"
+        - "<gray>Next: <green>{next}"
+        - "<gray>Cost: <gold>{cost}"
+        - "<green>Click to purchase the next level."
+      leader-only:
+        - "<gray>Level: <green>{level}<gray>/<green>{max}"
+        - "<gray>Current: <white>{current}"
+        - "<gray>Next: <green>{next}"
+        - "<gray>Cost: <gold>{cost}"
+        - "<red>Only your faction leader can purchase levels."
+      maxed:
+        - "<gray>Level: <green>{level}<gray>/<green>{max}"
+        - "<gray>Current: <white>{current}"
+        - "<green>Maximum level reached."
+      disabled:
+        - "<red>This upgrade is disabled in the server config."
     name:
       claim-damage: "<red>Damage in Claims"
       claim-protection: "<blue>Claim Protection"
@@ -226,15 +248,37 @@ faction-upgrades:
       crop-growth: "<green>Crop Growth"
       mob-xp: "<yellow>Mob Experience"
     effect:
-      claim-damage: "<green>+{bonus}% damage in your claim"
-      claim-protection: "<green>{bonus}% less damage in your claim"
-      armor-wear: "<green>{bonus}% less armor wear in your claim"
-      fall-protection: "<green>{bonus}% less fall damage in your claim"
-      fly-boost: "<green>+{bonus}% fly speed in your claim"
-      warps: "<green>Native faction warps unlocked (upgrade level {level})"
-      spawner-rate: "<green>+{bonus}% spawner rate in your claim"
-      crop-growth: "<green>{bonus}% chance for an extra crop-growth stage"
-      mob-xp: "<green>+{bonus}% mob experience in your claim"
+      claim-damage: "+{bonus}% damage in your claim"
+      claim-protection: "{bonus}% less damage in your claim"
+      armor-wear: "{bonus}% less armor wear in your claim"
+      fall-protection: "{bonus}% less fall damage in your claim"
+      fly-boost: "+{bonus}% fly speed in your claim"
+      warps: "Native faction warps unlocked (upgrade level {level})"
+      spawner-rate: "+{bonus}% spawner rate in your claim"
+      crop-growth: "{bonus}% chance for an extra crop-growth stage"
+      mob-xp: "+{bonus}% mob experience in your claim"
+
+faction-bank:
+  gui-title: "<dark_gray>Faction Bank"
+  money-name: "<gold><bold>Money"
+  experience-name: "<green><bold>Experience"
+  tnt-name: "<red><bold>TNT"
+  balance-lore: ["<gray>Faction stored: <yellow>{value}", "<gray>Capacity: <white>{max}"]
+  deposit-name: "<green><bold>Deposit {resource}"
+  deposit-lore: ["<gray>Add {resource} to your faction bank.", "<green>Click to enter an amount."]
+  withdraw-name: "<red><bold>Withdraw {resource}"
+  withdraw-lore: ["<gray>Take {resource} from your faction bank.", "<red>Click to enter an amount."]
+  amount-title: "<dark_gray>How much {resource}?"
+  amount-prompt: "<gray>Type amount"
+  amount-confirm: "<green>Confirm: {amount}"
+  amount-confirm-empty: "<gray>Enter a whole number"
+  invalid-amount: "<red>✖ <gray>Enter a whole number greater than zero."
+  not-enough: "<red>✖ <gray>You do not have enough for that bank transaction."
+  tnt-full: "<red>✖ <gray>The faction TNT bank is full ({max})."
+  no-economy: "<red>✖ <gray>A Vault economy provider is required for faction money."
+  transaction-failed: "<red>✖ <gray>That bank transaction failed. No resources were moved."
+  deposit-success: "<green>✔ <gray>Deposited <yellow>{amount} {resource}<gray>."
+  withdraw-success: "<green>✔ <gray>Withdrew <yellow>{amount} {resource}<gray>."
 
 staff:
   players-only: '<red>Solo los jugadores pueden usar este comando.'
@@ -298,6 +342,7 @@ spawner:
 
 collector:
   title: 'Chunk Collector - Tier {tier}'
+  item-name: '<green>Chunk Collector'
   usage: '<red>Usage: /chunkcollector give <player>'
   gave: '<green>Gave {player} a Chunk Collector.'
   summary-title: '<green>Collector Summary'
@@ -328,18 +373,35 @@ collector:
   silk-touch-required: '<red>You need a Silk Touch tool to break a Chunk Collector.'
   hopper-blocked: '<red>Hoppers can''t be placed this close to a Chunk Collector.'
   cannot-afford: '<gray>You need {amount} to buy this upgrade.'
+  unclaim-blocked: '<red>You cannot unclaim this chunk while it has a Chunk Collector.'
+  unclaimall-warning: '<yellow>{amount} Chunk Collector(s) in your unclaimed land were dropped.'
+  disband-warning: '<yellow>{amount} Chunk Collector(s) in your faction land were dropped.'
 
 blueprint:
+  gui-active-title: '<dark_gray>Active Blueprint'
+  gui-status-title: '<dark_aqua>Blueprint Status'
+  gui-cancel-button: '<red><bold>Cancel Build'
+  gui-repair-button: '<yellow><bold>Repair Blueprint'
+  gui-repair-lore-template: '<gray>Template: <white><template>'
+  gui-repair-lore-missing: '<gray>Missing blocks: <white><missing>'
+  gui-repair-lore-time: '<gray>Repair time: <yellow><seconds>s'
+  gui-repair-intact: '<green>Structure is 100% intact.'
+  gui-repair-action: '<yellow>Click to start repairing missing blocks'
   command-usage: '<red>Usage: /blueprint give <player> <template> or /blueprint cooldown remove <player>'
   template-not-found: '<red>No Blueprint template named {template}.'
+  completed: '<green>The {template} at {x}, {y}, {z} is now fully built!'
+  repair-completed: '<green>Repairs for {template} at {x}, {y}, {z} have finished!'
   gave: '<green>Gave {player} a {template} Blueprint.'
   cooldown-removed: '<green>Removed {player}''s Blueprint cooldown.'
+  cannot-break-anchor: '<red>You cannot break a Blueprint beacon. Use the menu to cancel it.'
+  not-your-faction: '<red>Only members of this faction can access this Blueprint.'
   cooldown-none: '<gray>{player} has no active Blueprint cooldown.'
   unknown-template: '<red>That blueprint template no longer exists.'
   on-cooldown: '<red>You can place another blueprint in {seconds}s.'
   no-faction: '<red>You must be in a faction to place a blueprint.'
   load-failed: '<red>That blueprint failed to load -- contact staff.'
   claim-invalid: '<red>The entire structure must fit within your own faction''s claimed land.'
+  activation-expired: '<red>That Blueprint is no longer available to activate.'
   started: '<green>Started building {template}.'
   cancelled: '<yellow>Build cancelled. Blocks already placed are left as-is.'
   activate-title: 'Enable Blueprint'
@@ -350,9 +412,26 @@ blueprint:
   activate-cancel-lore: '<gray>Keeps your Blueprint item.'
   menu-title: 'Blueprint Progress'
   menu-progress: '<gray>Placed: <yellow>{done} <gray>/ <yellow>{total}'
-  menu-elapsed: '<gray>Elapsed: <yellow>{seconds}s'
-  menu-cancel-lore: '<gray>Stops the build. Blocks already placed stay; the beacon is not refunded.'
+  menu-remaining: '<gray>Time left: <yellow>{seconds}s'
+  menu-cancel-lore: '<gray>Stops the build. Blocks already placed stay; the Beacon is returned.'
   hologram-progress: '&7Progress: &e{progress}'
   hologram-owner: '&7Owner: &b[{faction}] &f{owner}'
   hologram-complete: '&aComplete'
   hologram-aborted: '&cAborted -- land no longer claimed'
+  repair-started: '<green>Repair initiated for {missing} missing blocks.'
+  repair-not-needed: '<green>This Blueprint does not need repairs.'
+  height-limit-exceeded: '<red>The structure exceeds the world build height limit!'
+  holo-preview-activate: '&eRight-click to open the menu'
+  holo-preview-placed-by: '&7Placed by: &b[<faction>] &f<player>'
+  holo-completed-intact: '&a100% (completed)'
+  holo-completed-damaged: '&cBlueprint incomplete (<missing> missing)'
+  holo-completed-manage: '&7Right-click beacon to manage'
+  holo-repair-progress: '<progress> (repairing)'
+  gui-confirm-title: '&8Confirm Blueprint'
+  gui-manage-title: '&8Blueprint: <template>'
+  gui-enable-button: '&a&lEnable Blueprint'
+  gui-enable-lore: '&7Click to start building this structure.'
+  gui-cancel-lore: '&7Click to tear down and refund.'
+  gui-repair-lore:
+    - '&7Missing blocks: &c<missing>'
+    - '&eClick to start repairs.'

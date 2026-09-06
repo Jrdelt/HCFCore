@@ -3,6 +3,7 @@ package me.vertex.core.storage;
 import me.vertex.core.blueprint.BlueprintStorage;
 import me.vertex.core.collector.ChunkCollectorStorage;
 import me.vertex.core.faction.FactionUpgradeStorage;
+import me.vertex.core.faction.FactionBankStorage;
 import me.vertex.core.spawner.SpawnerStorage;
 
 import java.io.File;
@@ -24,10 +25,9 @@ import java.util.Map;
  * other, so switching between the local SQLite file and a MySQL server
  * doesn't mean abandoning the data already in the old one.
  *
- * <p>Auto-generated id columns are deliberately not copied -- the target
- * assigns its own, and nothing outside a single running build references
- * a blueprint id, so regenerating them is safe. Everything else is copied
- * verbatim, including the serialized ItemStack blobs in the death
+ * <p>Blueprint ids are copied too: active beacon PDC records reference that
+ * id, so regenerating it would make a resumed build look detached from its
+ * anchor. Everything else is copied verbatim, including the serialized ItemStack blobs in the death
  * history, which are engine-independent bytes.
  */
 public final class StorageMigrator {
@@ -46,9 +46,11 @@ public final class StorageMigrator {
                 "items", "helmet", "chestplate", "leggings", "boots", "offhand"));
         TABLES.put("spawners", List.of("world", "x", "y", "z", "mob_type", "stack_size", "owner_faction"));
         TABLES.put("chunk_collectors", List.of("world", "x", "y", "z", "owner_faction", "owner_uuid"));
-        TABLES.put("blueprint_builds", List.of("world", "x", "y", "z", "template", "owner_uuid",
+        TABLES.put("blueprint_builds", List.of("id", "world", "x", "y", "z", "template", "owner_uuid",
                 "owner_faction", "current_index", "started_at"));
+        TABLES.put("blueprint_cooldowns", List.of("uuid", "available_at"));
         TABLES.put("faction_upgrade_levels", List.of("faction_id", "upgrade_key", "level"));
+        TABLES.put("faction_banks", List.of("faction_id", "money", "experience"));
     }
 
     private StorageMigrator() {
@@ -153,6 +155,7 @@ public final class StorageMigrator {
         new ChunkCollectorStorage(database).init();
         new BlueprintStorage(database).init();
         new FactionUpgradeStorage(database).init();
+        new FactionBankStorage(database).init();
     }
 
     /**

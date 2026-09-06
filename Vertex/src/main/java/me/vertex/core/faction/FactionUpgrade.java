@@ -8,10 +8,10 @@ import org.bukkit.Material;
  */
 public enum FactionUpgrade {
     CLAIM_DAMAGE("claim-damage", Material.DIAMOND_SWORD),
-    CLAIM_PROTECTION("claim-protection", Material.SHIELD),
-    ARMOR_WEAR("armor-wear", Material.ANVIL),
-    FALL_PROTECTION("fall-protection", Material.FEATHER),
-    FLY_BOOST("fly-boost", Material.PHANTOM_MEMBRANE),
+    CLAIM_PROTECTION("claim-protection", Material.DIAMOND_CHESTPLATE),
+    ARMOR_WEAR("armor-wear", Material.GOLDEN_CHESTPLATE),
+    FALL_PROTECTION("fall-protection", Material.SLIME_BLOCK),
+    FLY_BOOST("fly-boost", Material.FEATHER),
     WARPS("warps", Material.ENDER_PEARL),
     SPAWNER_RATE("spawner-rate", Material.SPAWNER),
     CROP_GROWTH("crop-growth", Material.WHEAT),

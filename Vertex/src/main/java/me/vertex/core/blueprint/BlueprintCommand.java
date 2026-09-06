@@ -10,6 +10,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -78,15 +79,16 @@ public final class BlueprintCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(messages.get(sender, "general.no-permission"));
             return true;
         }
-        Player target = Bukkit.getPlayerExact(playerName);
-        if (target == null) {
+        Player onlineTarget = Bukkit.getPlayerExact(playerName);
+        OfflinePlayer target = onlineTarget != null ? onlineTarget : Bukkit.getOfflinePlayer(playerName);
+        if (target == null || (!target.isOnline() && !target.hasPlayedBefore())) {
             sender.sendMessage(messages.get(sender, "general.player-not-found"));
             return true;
         }
         boolean removed = manager.clearCooldown(target.getUniqueId());
         sender.sendMessage(messages.get(sender,
                 removed ? "blueprint.cooldown-removed" : "blueprint.cooldown-none",
-                "player", target.getName()));
+                "player", target.getName() == null ? playerName : target.getName()));
         return true;
     }
 
@@ -116,7 +118,7 @@ public final class BlueprintCommand implements CommandExecutor, TabCompleter {
                     .toList();
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("cooldown") && args[1].equalsIgnoreCase("remove")) {
-            return onlinePlayerMatches(args[2]);
+            return knownPlayerMatches(args[2]);
         }
         return List.of();
     }
@@ -127,6 +129,19 @@ public final class BlueprintCommand implements CommandExecutor, TabCompleter {
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (player.getName().toLowerCase(Locale.ROOT).startsWith(partial)) {
                 matches.add(player.getName());
+            }
+        }
+        return matches;
+    }
+
+    private List<String> knownPlayerMatches(String input) {
+        List<String> matches = onlinePlayerMatches(input);
+        String partial = input.toLowerCase(Locale.ROOT);
+        for (OfflinePlayer player : Bukkit.getOfflinePlayers()) {
+            String name = player.getName();
+            if (name != null && name.toLowerCase(Locale.ROOT).startsWith(partial)
+                    && matches.stream().noneMatch(name::equalsIgnoreCase)) {
+                matches.add(name);
             }
         }
         return matches;

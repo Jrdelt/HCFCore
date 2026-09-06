@@ -40,7 +40,7 @@ public final class ChunkCollectorCommand implements CommandExecutor, TabComplete
             return true;
         }
         ChunkCollectorData data = new ChunkCollectorData(0, target.getUniqueId(), null);
-        ItemStack item = manager.createCollectorItem(manager.displayName(), data);
+        ItemStack item = manager.createCollectorItem(manager.displayName(target), data);
         for (ItemStack dropped : target.getInventory().addItem(item).values()) {
             target.getWorld().dropItemNaturally(target.getLocation(), dropped);
         }

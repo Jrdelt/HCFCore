@@ -1,11 +1,11 @@
 # ============================================
 # AUTOMATED BLUEPRINT BASE BUILDER
 # ============================================
-# Placing a Blueprint item opens an activation confirmation. Clicking Enable
-# consumes it, places its Beacon, and gradually builds a .schem structure
-# around it using FastAsyncWorldEdit's clipboard API, with a DecentHolograms
-# progress display above the beacon. Requires both FastAsyncWorldEdit and
-# DecentHolograms -- this feature quietly does nothing if either is missing.
+# Placing a Blueprint item creates its Beacon preview and opens an activation
+# confirmation. Clicking Enable gradually builds its .schem structure around
+# that Beacon using FastAsyncWorldEdit's clipboard API, with a DecentHolograms
+# progress display above it. Cancelling returns the Blueprint item. Requires
+# both FastAsyncWorldEdit and DecentHolograms.
 enabled: true
 
 # .schem files live in <plugin data folder>/schematics/<file>.
@@ -15,7 +15,7 @@ schematics-folder: schematics
 cooldown-seconds: 3600
 
 # How long a build should take to fully place, start to finish.
-build-time-seconds: 600
+build-time-seconds: 1800
 
 # How often build progress is saved and the hologram is refreshed. Blocks
 # themselves are placed every tick, bottom-to-top and row-by-row.
@@ -24,7 +24,7 @@ batch-interval-ticks: 20
 # Safety cap for how many blocks one active Blueprint may place in a single
 # server tick. A very large schematic can take longer than build-time-seconds
 # when this cap is reached, protecting TPS instead of causing a paste spike.
-max-blocks-per-tick: 64
+max-blocks-per-tick: 16
 
 # Every touched chunk's claim ownership is re-checked this often while a
 # build is in progress -- if it's no longer 100% the placing faction's
@@ -33,7 +33,17 @@ max-blocks-per-tick: 64
 claim-recheck-interval-ticks: 100
 
 # Each entry here is a placeable Blueprint (see /blueprint give).
+# Global defaults (used if not set in the template)
+
 templates:
   outpost:
     schematic: outpost.schem
-    display-name: '<gold>Outpost Blueprint'
+    display-name: 'Outpost Blueprint'
+    build-time-seconds: 300   # 5 minutes
+    max-blocks-per-tick: 2     # Very slow, 2 blocks per tick
+
+  bunker:
+    schematic: bunker.schem
+    display-name: '<red>Bunker Blueprint'
+    build-time-seconds: 300    # 5 minutes
+    max-blocks-per-tick: 10

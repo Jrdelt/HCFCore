@@ -2,6 +2,7 @@ package me.vertex.core.collector;
 
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.factions.FactionsHook;
+import me.vertex.core.faction.RallyManager;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.staff.StaffManager;
 import net.milkbowl.vault.economy.Economy;
@@ -23,11 +24,14 @@ public final class ChunkCollectorMenuListener implements Listener {
     private final ChunkCollectorManager manager;
     private final StaffManager staffManager;
     private final Messages messages;
+    private final RallyManager rolePermissions;
 
-    public ChunkCollectorMenuListener(ChunkCollectorManager manager, StaffManager staffManager, Messages messages) {
+    public ChunkCollectorMenuListener(ChunkCollectorManager manager, StaffManager staffManager, Messages messages,
+            RallyManager rolePermissions) {
         this.manager = manager;
         this.staffManager = staffManager;
         this.messages = messages;
+        this.rolePermissions = rolePermissions;
     }
 
     @EventHandler
@@ -148,6 +152,10 @@ public final class ChunkCollectorMenuListener implements Listener {
         String claimTag = FactionsHook.getClaimFactionTag(location);
         String playerTag = FactionsHook.getFactionTag(player);
         if (claimTag != null && claimTag.equalsIgnoreCase(playerTag)) {
+            if (!rolePermissions.canUse(player, "collector-open")) {
+                player.sendMessage(messages.get(player, "factions.role-permission-denied"));
+                return false;
+            }
             return true;
         }
         player.sendMessage(messages.get(player, "collector.cannot-access"));

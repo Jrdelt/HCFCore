@@ -85,7 +85,7 @@ abilities:
     cooldown-seconds: 8
     effect-type: WITHER
     effect-amplifier: 0
-    effect-duration-seconds: 3
+    effect-duration-seconds: 5
 
   mage-slowness:
     material: COBWEB
@@ -95,7 +95,7 @@ abilities:
     cooldown-seconds: 8
     effect-type: SLOWNESS
     effect-amplifier: 1
-    effect-duration-seconds: 3
+    effect-duration-seconds: 5
 
   mage-poison:
     material: SPIDER_EYE
@@ -105,7 +105,7 @@ abilities:
     cooldown-seconds: 8
     effect-type: POISON
     effect-amplifier: 1
-    effect-duration-seconds: 3
+    effect-duration-seconds: 5
 
   portable-bard:
     material: NOTE_BLOCK
@@ -127,7 +127,7 @@ abilities:
     cooldown-seconds: 7
     effect-type: SPEED
     effect-amplifier: 1
-    buff-seconds: 5
+    buff-seconds: 4
 
   bard-buff-strength:
     material: BLAZE_POWDER
@@ -138,7 +138,7 @@ abilities:
     cooldown-seconds: 7
     effect-type: STRENGTH
     effect-amplifier: 1
-    buff-seconds: 3
+    buff-seconds: 4
 
   bard-buff-resistance:
     material: IRON_INGOT
@@ -160,7 +160,7 @@ abilities:
     cooldown-seconds: 7
     effect-type: REGENERATION
     effect-amplifier: 1
-    buff-seconds: 5
+    buff-seconds: 6
 
   bard-buff-jump-boost:
     material: FEATHER

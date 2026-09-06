@@ -1,7 +1,5 @@
 package me.vertex.core.spawner;
 
-import dev.kitteh.factions.Board;
-import dev.kitteh.factions.FLocation;
 import dev.kitteh.factions.Faction;
 import dev.kitteh.factions.event.FactionAutoDisbandEvent;
 import dev.kitteh.factions.event.FactionDisbandEvent;
@@ -120,8 +118,11 @@ public final class SpawnerClaimListener implements Listener {
             return 0;
         }
         int dropped = 0;
-        for (FLocation claim : Board.board().allClaims(faction)) {
-            dropped += dropAllIn(claim.asChunk());
+        // Do not enumerate claims: FLocation.asChunk() calls
+        // World#getChunkAt(), which synchronously loads every claimed chunk.
+        // Iterating the spawner index is linear in actual spawners instead.
+        for (Map.Entry<Location, SpawnerData> entry : spawnerManager.getSpawnersOwnedBy(faction.tag())) {
+            dropped += dropSpawner(entry.getKey(), entry.getValue());
         }
         return dropped;
     }

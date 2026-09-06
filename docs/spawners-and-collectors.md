@@ -24,7 +24,12 @@ entity cap, etc.) are scaled by stack size via `spawn-count-per-stack`
 and `max-nearby-entities-per-stack` (each with a hard cap:
 `max-spawn-count`, `max-nearby-entities-cap`), so a bigger stack really
 does spawn more mobs per cycle using vanilla's own spawner logic, not a
-manual re-spawn loop.
+manual re-spawn loop. The exceptions are Iron Golems (which vanilla
+spawners cannot produce reliably) and sunlit spawners: with
+`spawn-in-daylight: true` (the default), Vertex supplies the same
+player-range and nearby-mob-capped fallback spawn cycle during daylight.
+This keeps hostile spawners working outside without doubling normal
+covered/dark-room spawning.
 
 ### Faction Spawner Rate upgrade
 
@@ -88,6 +93,9 @@ dozens of spawns per cycle:
   current down a multi-level shaft still merges once it settles near the
   bottom. Set `merge-radius-blocks` generously enough to cover your
   tallest shaft.
+- Natural mobs and spawner-produced mobs never merge with one another.
+  This preserves the correct loot table even when both reach the same
+  grinder collection area.
 - The merged entity shows a nametag (`display-format`, with
   `{count}`/`{name}` placeholders) once its count reaches 2, and never
   despawns from players being far away — only a restart or a manual clear
@@ -137,7 +145,14 @@ an increasing cost: `upgrade-cost-base * upgrade-cost-multiplier^tier`.
 
 The summary icon shows tier, total stored items, distinct item type
 count, and total capacity. Every label is configurable under `collector:`
-in `lang/*.yml`.
+in `lang/*.yml`. `collector.item-name` is the name written to the actual
+Collector item, both when `/chunkcollector give` grants one and when a
+placed Collector is broken.
+
+`max-stored-material-types` (default 64) bounds how many distinct item
+types can be written into one block's PDC. Once that cap is reached,
+already-stored materials continue collecting normally; a new material is
+left on the ground instead of risking oversized chunk metadata.
 
 ### Placement & protection
 
@@ -150,6 +165,13 @@ in `lang/*.yml`.
   collector, and one already touching the collector block can't push
   into or pull out of it — this prevents automating around the
   intentional manual-withdrawal design.
+- A collector keeps its contents and tier when traded, but its ownership is
+  reassigned to the player/faction that places it. This keeps the owner
+  limit and land protections correct.
+- Single-chunk `/f unclaim` is refused while it contains a collector.
+  Overclaim, `/f unclaimall`, and faction disband drop collectors as their
+  original items (including stored data) rather than exposing their
+  contents to a new land owner.
 
 There's no in-game shop — `/chunkcollector give <player>`
 (`vertex.collector.give`) hands one out directly.

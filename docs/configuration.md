@@ -209,17 +209,14 @@ permissions GUI, and nametag/scoreboard details.
 ```yaml
 faction-upgrades:
   enabled: true
-  leader-only: true
+  leader-only: false
   upgrades:
-    claim-damage: {enabled: true, max-level: 5, cost-base: 50000.0, cost-multiplier: 1.75, bonus-per-level: 5.0}
-    claim-protection: {enabled: true, max-level: 5, cost-base: 60000.0, cost-multiplier: 1.75, bonus-per-level: 4.0}
-    armor-wear: {enabled: true, max-level: 5, cost-base: 40000.0, cost-multiplier: 1.7, bonus-per-level: 10.0}
-    fall-protection: {enabled: true, max-level: 5, cost-base: 35000.0, cost-multiplier: 1.65, bonus-per-level: 10.0}
-    fly-boost: {enabled: true, max-level: 3, cost-base: 75000.0, cost-multiplier: 2.0, bonus-per-level: 20.0}
-    warps: {enabled: true, max-level: 3, cost-base: 100000.0, cost-multiplier: 2.0, bonus-per-level: 1.0}
-    spawner-rate: {enabled: true, max-level: 5, cost-base: 100000.0, cost-multiplier: 2.0, bonus-per-level: 10.0}
-    crop-growth: {enabled: true, max-level: 5, cost-base: 30000.0, cost-multiplier: 1.6, bonus-per-level: 15.0}
-    mob-xp: {enabled: true, max-level: 5, cost-base: 45000.0, cost-multiplier: 1.7, bonus-per-level: 10.0}
+    claim-damage:
+      enabled: true
+      levels:
+        1: {price: 50000.0, bonus: 5.0}
+        2: {price: 87500.0, bonus: 10.0}
+        3: {price: 153125.0, bonus: 15.0}
 ```
 
 `enabled` is the global off switch. `leader-only` lets members browse the
@@ -229,14 +226,13 @@ has the same controls:
 
 - `enabled` hides its gameplay effect and prevents new purchases without
   erasing its saved level.
-- `max-level` is capped at 100 to protect the economy and game balance.
-- `cost-base` is the first-level Vault cost; `cost-multiplier` is applied
-  once per already-owned level. A zero base makes the upgrade free and does
-  not require Vault.
-- `bonus-per-level` is a percentage for every item except `warps`. Crop
-  Growth is a per-growth-stage chance; Fly Boost applies only to players
-  already flying. Warps gives FactionsUUID its native warp upgrade level,
-  so configure the actual count/values in FactionsUUID's own upgrades
+- `levels` is an ordered map of levels (up to 100). Each entry has its own
+  exact Vault `price` and total `bonus`; a price of zero makes that level
+  free and no multiplier is applied.
+- `bonus` is a percentage for every item except `warps`. Crop Growth is a
+  per-growth-stage chance; Fly Boost applies only to players already
+  flying. Warps gives FactionsUUID its native warp upgrade level, so
+  configure the actual count/values in FactionsUUID's own upgrades
   configuration.
 
 All non-warp effects apply only in the upgraded faction's claimed land.

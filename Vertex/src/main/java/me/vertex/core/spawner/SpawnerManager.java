@@ -4,14 +4,19 @@ import me.vertex.core.faction.FactionUpgradeManager;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.CreatureSpawner;
+import org.bukkit.entity.Entity;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import java.io.File;
@@ -42,11 +47,17 @@ public final class SpawnerManager {
     private final Plugin plugin;
     private final SpawnerStorage storage;
     private final File file;
+    private final NamespacedKey markerKey;
+    private final NamespacedKey mobTypeKey;
+    private final NamespacedKey stackSizeKey;
+    private final NamespacedKey ownerFactionKey;
     private final Random random = new Random();
     private final Map<String, SpawnerData> spawners = new ConcurrentHashMap<>();
     private final java.util.Set<CompletableFuture<Void>> pendingWrites = ConcurrentHashMap.newKeySet();
     /** Serializes mutations for each physical location without making unrelated spawners wait. */
     private final Map<String, CompletableFuture<Void>> writeChains = new ConcurrentHashMap<>();
+    /** Next manual fallback cycle for each spawner, matching its configured vanilla delay. */
+    private final Map<String, Long> nextManualSpawnTicks = new ConcurrentHashMap<>();
 
     private volatile int maxStackSize;
     private volatile boolean silkTouchRequired;
@@ -60,6 +71,8 @@ public final class SpawnerManager {
     private volatile int maxSpawnDelayTicks;
     private volatile int requiredPlayerRangeBlocks;
     private volatile int spawnRangeBlocks;
+    /** Whether exposed daytime spawners receive a manual, vanilla-rate fallback spawn. */
+    private volatile boolean spawnInDaylight;
     private volatile Map<EntityType, MobConfig> mobConfigs = Map.of();
 
     private volatile boolean mobStackingEnabled;
@@ -75,6 +88,10 @@ public final class SpawnerManager {
         this.plugin = plugin;
         this.storage = storage;
         this.file = new File(plugin.getDataFolder(), "spawners.yml");
+        this.markerKey = new NamespacedKey(plugin, "tracked_spawner");
+        this.mobTypeKey = new NamespacedKey(plugin, "spawner_mob_type");
+        this.stackSizeKey = new NamespacedKey(plugin, "spawner_stack_size");
+        this.ownerFactionKey = new NamespacedKey(plugin, "spawner_owner_faction");
     }
 
     public void load() {
@@ -117,6 +134,7 @@ public final class SpawnerManager {
         maxSpawnDelayTicks = Math.max(minSpawnDelayTicks, config.getInt("max-spawn-delay-ticks", 400));
         requiredPlayerRangeBlocks = Math.max(1, config.getInt("required-player-range-blocks", 32));
         spawnRangeBlocks = Math.max(1, config.getInt("spawn-range-blocks", 4));
+        spawnInDaylight = config.getBoolean("spawn-in-daylight", true);
 
         mobConfigs = readMobConfigs(config);
 
@@ -248,8 +266,13 @@ public final class SpawnerManager {
                 if (world == null) {
                     continue;
                 }
-                spawners.put(key(stored.world(), stored.x(), stored.y(), stored.z()),
-                        new SpawnerData(stored.mobType(), stored.stackSize(), stored.ownerFactionTag()));
+                Location location = new Location(world, stored.x(), stored.y(), stored.z());
+                SpawnerData data = new SpawnerData(stored.mobType(), Math.max(1, stored.stackSize()),
+                        stored.ownerFactionTag());
+                spawners.put(key(location), data);
+                if (world.isChunkLoaded(stored.x() >> 4, stored.z() >> 4)) {
+                    reconcileChunk(world.getChunkAt(stored.x() >> 4, stored.z() >> 4));
+                }
             }
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to load spawners from the database.", e);
@@ -262,6 +285,69 @@ public final class SpawnerManager {
 
     public boolean isTracked(Location location) {
         return spawners.containsKey(key(location));
+    }
+
+    /**
+     * Reconciles one loaded chunk's physical spawners against both PDC and
+     * SQL. PDC is the recovery source when a background SQL write was
+     * interrupted; SQL supplies PDC for older spawners placed before this
+     * marker existed. Never call this for an unloaded chunk.
+     */
+    public void reconcileChunk(Chunk chunk) {
+        java.util.Set<String> found = new java.util.HashSet<>();
+        for (BlockState state : chunk.getTileEntities()) {
+            if (!(state instanceof CreatureSpawner spawner)) {
+                continue;
+            }
+            Location location = spawner.getLocation();
+            String locationKey = key(location);
+            SpawnerData pdcData = readData(spawner.getPersistentDataContainer());
+            SpawnerData known = spawners.get(locationKey);
+            SpawnerData resolved = pdcData != null ? pdcData : known;
+            if (resolved == null) {
+                continue;
+            }
+            found.add(locationKey);
+            spawners.put(locationKey, resolved);
+            if (pdcData == null) {
+                writeData(spawner.getPersistentDataContainer(), resolved);
+                spawner.update(true, false);
+            }
+            applyTuning(location, resolved);
+            if (known == null || pdcData != null) {
+                persist(location, resolved);
+            }
+        }
+        for (Location indexed : List.copyOf(locationsInChunk(chunk))) {
+            if (!found.contains(key(indexed))) {
+                remove(indexed);
+            }
+        }
+    }
+
+    private List<Location> locationsInChunk(Chunk chunk) {
+        List<Location> result = new ArrayList<>();
+        for (Location location : locations()) {
+            if (location.getWorld().equals(chunk.getWorld())
+                    && (location.getBlockX() >> 4) == chunk.getX()
+                    && (location.getBlockZ() >> 4) == chunk.getZ()) {
+                result.add(location);
+            }
+        }
+        return result;
+    }
+
+    private List<Location> locations() {
+        List<Location> result = new ArrayList<>();
+        for (String locationKey : spawners.keySet()) {
+            String[] parts = locationKey.split(":", 4);
+            World world = plugin.getServer().getWorld(parts[0]);
+            if (world != null) {
+                result.add(new Location(world, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]),
+                        Integer.parseInt(parts[3])));
+            }
+        }
+        return result;
     }
 
     public MobConfig getMobConfig(EntityType type) {
@@ -291,6 +377,11 @@ public final class SpawnerManager {
     /** How far (in blocks) from a spawner block vanilla will actually spawn a mob. */
     public int spawnRangeBlocks() {
         return spawnRangeBlocks;
+    }
+
+    /** True when exposed spawners supplement vanilla spawning during the day. */
+    public boolean spawnInDaylight() {
+        return spawnInDaylight;
     }
 
     public boolean isMobStackingEnabled() {
@@ -329,6 +420,8 @@ public final class SpawnerManager {
     public void place(Location location, EntityType mobType, String ownerFactionTag) {
         SpawnerData data = new SpawnerData(mobType, 1, ownerFactionTag);
         spawners.put(key(location), data);
+        nextManualSpawnTicks.remove(key(location));
+        writeData(location, data);
         applyTuning(location, data);
         persist(location, data);
     }
@@ -343,6 +436,7 @@ public final class SpawnerManager {
         }
         int newSize = Math.min(maxStackSize, data.stackSize() + Math.max(0, amount));
         data.setStackSize(newSize);
+        writeData(location, data);
         applyTuning(location, data);
         persist(location, data);
         return newSize;
@@ -365,6 +459,7 @@ public final class SpawnerManager {
             return 0;
         }
         data.setStackSize(newSize);
+        writeData(location, data);
         applyTuning(location, data);
         persist(location, data);
         return newSize;
@@ -372,9 +467,11 @@ public final class SpawnerManager {
 
     /** Untracks a spawner without touching the physical block. */
     public void remove(Location location) {
-        if (spawners.remove(key(location)) == null) {
+        String locationKey = key(location);
+        if (spawners.remove(locationKey) == null) {
             return;
         }
+        nextManualSpawnTicks.remove(locationKey);
         queue(location, () -> {
             try {
                 storage.delete(location);
@@ -382,6 +479,44 @@ public final class SpawnerManager {
                 plugin.getLogger().log(Level.WARNING, "Failed to delete spawner from the database.", e);
             }
         });
+    }
+
+    private SpawnerData readData(PersistentDataContainer pdc) {
+        if (!pdc.has(markerKey, PersistentDataType.BYTE)) {
+            return null;
+        }
+        String mobTypeName = pdc.get(mobTypeKey, PersistentDataType.STRING);
+        EntityType mobType;
+        try {
+            mobType = mobTypeName == null ? null : EntityType.valueOf(mobTypeName);
+        } catch (IllegalArgumentException ignored) {
+            mobType = null;
+        }
+        if (mobType == null || mobType == EntityType.UNKNOWN) {
+            return null;
+        }
+        int stackSize = Math.max(1, Math.min(maxStackSize,
+                pdc.getOrDefault(stackSizeKey, PersistentDataType.INTEGER, 1)));
+        return new SpawnerData(mobType, stackSize, pdc.get(ownerFactionKey, PersistentDataType.STRING));
+    }
+
+    private void writeData(Location location, SpawnerData data) {
+        if (!(location.getBlock().getState() instanceof CreatureSpawner spawner)) {
+            return;
+        }
+        writeData(spawner.getPersistentDataContainer(), data);
+        spawner.update(true, false);
+    }
+
+    private void writeData(PersistentDataContainer pdc, SpawnerData data) {
+        pdc.set(markerKey, PersistentDataType.BYTE, (byte) 1);
+        pdc.set(mobTypeKey, PersistentDataType.STRING, data.mobType().name());
+        pdc.set(stackSizeKey, PersistentDataType.INTEGER, data.stackSize());
+        if (data.ownerFactionTag() == null || data.ownerFactionTag().isBlank()) {
+            pdc.remove(ownerFactionKey);
+        } else {
+            pdc.set(ownerFactionKey, PersistentDataType.STRING, data.ownerFactionTag());
+        }
     }
 
     private void persist(Location location, SpawnerData data) {
@@ -463,12 +598,14 @@ public final class SpawnerManager {
      * Entity types vanilla's own CreatureSpawner tick refuses to produce no
      * matter how its block state is tuned -- Iron Golems specifically have
      * a built-in spawn-rule predicate that a monster-spawner block can
-     * never satisfy (a well-known vanilla limitation, not specific to this
-     * plugin). These get spawned directly by manualSpawnTick() instead,
-     * tagged with SpawnReason.SPAWNER so SpawnerMobListener/MobStackListener
-     * treat them exactly like any other tracked-spawner mob.
+     * never satisfy. They always use the manual fallback. Exposed spawners
+     * additionally use it in daylight because hostile mobs reject vanilla's
+     * bright-light spawn check even when they came from a player spawner.
      */
     private static final java.util.Set<EntityType> MANUAL_SPAWN_TYPES = java.util.Set.of(EntityType.IRON_GOLEM);
+
+    /** Minecraft's full midday sky light is 15; 8+ reliably means daylight rather than moonlight. */
+    private static final int DAYLIGHT_SKY_LIGHT = 8;
 
     /**
      * Supplements the vanilla spawn cycle for {@link #MANUAL_SPAWN_TYPES}
@@ -480,11 +617,9 @@ public final class SpawnerManager {
         if (spawners.isEmpty()) {
             return;
         }
+        long nowTicks = plugin.getServer().getCurrentTick();
         for (Map.Entry<String, SpawnerData> entry : spawners.entrySet()) {
             SpawnerData data = entry.getValue();
-            if (!MANUAL_SPAWN_TYPES.contains(data.mobType())) {
-                continue;
-            }
             String[] parts = entry.getKey().split(":", 4);
             World world = plugin.getServer().getWorld(parts[0]);
             if (world == null) {
@@ -500,8 +635,42 @@ public final class SpawnerManager {
             if (spawnerLocation.getBlock().getType() != Material.SPAWNER) {
                 continue;
             }
+            if (!MANUAL_SPAWN_TYPES.contains(data.mobType())
+                    && !(spawnInDaylight && isExposedToDaylight(spawnerLocation))) {
+                continue;
+            }
+            if (!isManualSpawnDue(entry.getKey(), nowTicks)) {
+                continue;
+            }
             manualSpawnAt(world, spawnerLocation, data);
         }
+    }
+
+    /**
+     * Keeps fallback spawns on the spawner's configured delay rather than
+     * spawning another full batch every scheduler pass (which runs every five
+     * seconds). The first fallback is immediate so an exposed spawner starts
+     * working as soon as it becomes active.
+     */
+    private boolean isManualSpawnDue(String locationKey, long nowTicks) {
+        Long next = nextManualSpawnTicks.get(locationKey);
+        if (next != null && next > nowTicks) {
+            return false;
+        }
+        int delayRange = maxSpawnDelayTicks - minSpawnDelayTicks;
+        int delay = minSpawnDelayTicks + (delayRange > 0 ? random.nextInt(delayRange + 1) : 0);
+        nextManualSpawnTicks.put(locationKey, nowTicks + delay);
+        return true;
+    }
+
+    /**
+     * Uses sky light instead of only world time, so a covered underground
+     * spawner keeps vanilla's normal cycle while a genuinely sunlit one is
+     * given the fallback it needs. This avoids doubling ordinary dark-room
+     * spawner production during the overworld daytime.
+     */
+    private static boolean isExposedToDaylight(Location spawnerLocation) {
+        return spawnerLocation.getBlock().getLightFromSky() >= DAYLIGHT_SKY_LIGHT;
     }
 
     private void manualSpawnAt(World world, Location spawnerLocation, SpawnerData data) {
@@ -524,12 +693,18 @@ public final class SpawnerManager {
                 scaledCount(maxNearbyEntitiesPerStack * data.stackSize(), rateMultiplier));
         int toSpawn = Math.min(nearbyCap - nearbyCount, Math.min(scaledLimit(maxSpawnCount, rateMultiplier),
                 scaledCount(spawnCountPerStack * data.stackSize(), rateMultiplier)));
+        Class<? extends Entity> entityClass = data.mobType().getEntityClass();
+        if (entityClass == null || !LivingEntity.class.isAssignableFrom(entityClass)) {
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        Class<? extends LivingEntity> livingEntityClass = (Class<? extends LivingEntity>) entityClass;
         for (int i = 0; i < toSpawn; i++) {
             Location spawnAt = randomSpawnLocation(spawnerLocation);
             if (spawnAt == null) {
                 continue;
             }
-            world.spawn(spawnAt, org.bukkit.entity.IronGolem.class,
+            world.spawn(spawnAt, livingEntityClass,
                     org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.SPAWNER, false, entity -> { });
         }
     }
@@ -607,6 +782,32 @@ public final class SpawnerManager {
                 int blockY = Integer.parseInt(parts[2]);
                 found.add(Map.entry(new Location(world, blockX, blockY, blockZ), entry.getValue()));
             }
+        }
+        return found;
+    }
+
+    /**
+     * Every tracked spawner originally placed by {@code factionTag}. This
+     * avoids loading/scanning every claim during /f unclaimall or disband;
+     * only chunks that actually contain that faction's spawners are touched.
+     */
+    public List<Map.Entry<Location, SpawnerData>> getSpawnersOwnedBy(String factionTag) {
+        if (factionTag == null || factionTag.isBlank()) {
+            return List.of();
+        }
+        List<Map.Entry<Location, SpawnerData>> found = new ArrayList<>();
+        for (Map.Entry<String, SpawnerData> entry : spawners.entrySet()) {
+            SpawnerData data = entry.getValue();
+            if (data.ownerFactionTag() == null || !data.ownerFactionTag().equalsIgnoreCase(factionTag)) {
+                continue;
+            }
+            String[] parts = entry.getKey().split(":", 4);
+            World world = plugin.getServer().getWorld(parts[0]);
+            if (world == null) {
+                continue;
+            }
+            found.add(Map.entry(new Location(world, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]),
+                    Integer.parseInt(parts[3])), data));
         }
         return found;
     }

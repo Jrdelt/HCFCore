@@ -75,6 +75,11 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if (!plugin.beginStorageMigration()) {
+            sender.sendMessage(messages.getChat(sender, "admin.storage-requires-idle-server"));
+            return true;
+        }
+
         boolean confirmed = args.length >= 3 && args[2].equalsIgnoreCase("confirm");
         sender.sendMessage(messages.getChat(sender, "admin.storage-migrating",
                 "from", nameOf(current), "to", nameOf(target)));
@@ -84,6 +89,7 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             Database targetDatabase = null;
             try {
+                plugin.awaitStorageWritesForMigration();
                 targetDatabase = new Database(plugin.getConfig(), plugin.getDataFolder(), target);
 
                 int existing = StorageMigrator.countRows(targetDatabase);
@@ -93,6 +99,7 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
                         sender.sendMessage(messages.getChat(sender, "admin.storage-not-empty",
                                 "type", nameOf(target), "rows", String.valueOf(existing)));
                         toClose.close();
+                        plugin.finishStorageMigration();
                     });
                     return;
                 }
@@ -107,6 +114,7 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
                     toClose.close();
                     sender.sendMessage(messages.getChat(sender, "admin.storage-migrated",
                             "rows", String.valueOf(result.total()), "type", nameOf(target)));
+                    plugin.finishStorageMigration();
                 });
             } catch (Exception e) {
                 plugin.getLogger().log(Level.SEVERE, "Storage migration failed", e);
@@ -117,6 +125,7 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
                     }
                     sender.sendMessage(messages.getChat(sender, "admin.storage-failed",
                             "error", String.valueOf(e.getMessage())));
+                    plugin.finishStorageMigration();
                 });
             }
         });

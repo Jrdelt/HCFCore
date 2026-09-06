@@ -7,7 +7,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 
-/** Handles active-build controls and the pre-build activation confirmation. */
+/** Handles active-build controls and completed blueprint repair clicks. */
 public final class BlueprintMenuListener implements Listener {
 
     private final BlueprintManager manager;
@@ -22,8 +22,7 @@ public final class BlueprintMenuListener implements Listener {
 
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
-        if (event.getInventory().getHolder() instanceof BlueprintMenu.Holder
-                || event.getInventory().getHolder() instanceof BlueprintActivationMenu.Holder) {
+        if (event.getInventory().getHolder() instanceof BlueprintMenu.Holder) {
             event.setCancelled(true);
         }
     }
@@ -31,32 +30,48 @@ public final class BlueprintMenuListener implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent event) {
         Object rawHolder = event.getInventory().getHolder();
-        if (rawHolder instanceof BlueprintActivationMenu.Holder activationHolder) {
-            event.setCancelled(true);
-            if (event.getClickedInventory() != null
-                    && event.getClickedInventory().getHolder() instanceof BlueprintActivationMenu.Holder
-                    && event.getWhoClicked() instanceof Player player
-                    && event.getRawSlot() == BlueprintActivationMenu.ENABLE_SLOT) {
-                blueprintListener.activate(player, activationHolder.anchor(), activationHolder.templateName());
-                player.closeInventory();
-            }
-            return;
-        }
+
         if (!(rawHolder instanceof BlueprintMenu.Holder holder)) {
             return;
         }
         event.setCancelled(true);
+
         if (event.getClickedInventory() == null || !(event.getClickedInventory().getHolder() instanceof BlueprintMenu.Holder)) {
             return;
         }
-        if (!(event.getWhoClicked() instanceof Player player) || event.getSlot() != BlueprintMenu.CANCEL_SLOT) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
-        ActiveBuild build = manager.activeBuilds().get(holder.buildId());
-        if (build != null) {
-            build.cancel();
-            player.sendMessage(messages.get(player, "blueprint.cancelled"));
+
+        if (!holder.isCompletedView() && event.getSlot() == BlueprintMenu.CANCEL_SLOT) {
+            ActiveBuild build = manager.activeBuilds().get(holder.buildId());
+            if (build != null) {
+                if (!blueprintListener.canManage(player, build.anchor())) {
+                    player.sendMessage(messages.get(player, "blueprint.not-your-faction"));
+                    player.closeInventory();
+                    return;
+                }
+                build.cancel();
+                player.sendMessage(messages.get(player, "blueprint.cancelled"));
+            }
+            player.closeInventory();
+            return;
         }
-        player.closeInventory();
+
+        if (holder.isCompletedView() && event.getSlot() == BlueprintMenu.REPAIR_SLOT) {
+            if (!blueprintListener.canManage(player, holder.anchor())) {
+                player.sendMessage(messages.get(player, "blueprint.not-your-faction"));
+                player.closeInventory();
+                return;
+            }
+            if (holder.missingBlocks() == null || holder.missingBlocks().isEmpty()) {
+                player.sendMessage(messages.get(player, "blueprint.repair-not-needed"));
+                player.closeInventory();
+                return;
+            }
+
+            blueprintListener.startRepair(player, holder.anchor(), holder.templateName(), holder.missingBlocks());
+            player.closeInventory();
+        }
     }
 }

@@ -49,3 +49,7 @@ message set.
 Each message defines its own set — `{kit}`, `{player}`, `{seconds}`,
 `{faction}`, and so on. Check `lang/en_us.yml` for the exact placeholders
 a given message key supports before translating or customizing it.
+
+Some GUI lore entries are YAML lists rather than one message per line. For
+example, `faction-upgrades.gui.lore` contains the complete editable lore for
+each upgrade state; preserve its list structure when translating it.

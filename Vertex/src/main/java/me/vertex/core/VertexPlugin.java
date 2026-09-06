@@ -81,14 +81,18 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
-public final class VertexPlugin extends JavaPlugin {
+public final class VertexPlugin extends JavaPlugin implements Listener {
 
     private Database database;
     private Storage storage;
@@ -117,8 +121,13 @@ public final class VertexPlugin extends JavaPlugin {
     private ArcherTagManager archerTagManager;
     private DeathManager deathManager;
     private RallyManager rallyManager;
+    private RallyCommand rallyCommand;
     private FactionUpgradeStorage factionUpgradeStorage;
     private FactionUpgradeManager factionUpgradeManager;
+    private me.vertex.core.faction.FactionBankStorage factionBankStorage;
+    private me.vertex.core.faction.FactionBankManager factionBankManager;
+    private me.vertex.core.faction.FactionBankMenu factionBankMenu;
+    private final AtomicBoolean storageMigrationRunning = new AtomicBoolean();
     private ArcherTagListener archerTagListener;
     private CombatListener combatListener;
     private HungerManagementListener hungerManagementListener;
@@ -126,8 +135,19 @@ public final class VertexPlugin extends JavaPlugin {
     private StaffManager staffManager;
 
     @Override
+    public void onLoad() {
+        // FactionsUUID closes its third-party command registry during its
+        // onEnable(). Since Vertex depends on it, this onLoad hook runs after
+        // FactionsUUID has initialized the registry but before it closes.
+        RallyCommand.registerFactionsSubcommand(this, () -> rallyCommand);
+        me.vertex.core.faction.FactionBankMenu.registerFactionsSubcommand(this, () -> factionBankMenu);
+    }
+
+    @Override
     public void onEnable() {
         printStartupBanner();
+
+        Bukkit.getPluginManager().registerEvents(this, this);
 
         saveDefaultConfig();
 
@@ -151,6 +171,8 @@ public final class VertexPlugin extends JavaPlugin {
             blueprintStorage.init();
             factionUpgradeStorage = new FactionUpgradeStorage(database);
             factionUpgradeStorage.init();
+            factionBankStorage = new me.vertex.core.faction.FactionBankStorage(database);
+            factionBankStorage.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize the database, disabling.", e);
             Bukkit.getPluginManager().disablePlugin(this);
@@ -198,7 +220,7 @@ public final class VertexPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new InvRestoreMenuListener(this, deathManager, messages), this);
 
         rallyManager = new RallyManager(this, messages);
-        RallyCommand rallyCommand = new RallyCommand(this, rallyManager, messages);
+        rallyCommand = new RallyCommand(this, rallyManager, messages);
         getCommand("frally").setExecutor(rallyCommand);
         Bukkit.getPluginManager().registerEvents(rallyCommand, this);
         me.vertex.core.faction.RallyPermissionMenu rallyPermissionMenu =
@@ -211,6 +233,11 @@ public final class VertexPlugin extends JavaPlugin {
                 new me.vertex.core.faction.FactionUpgradeMenu(this, factionUpgradeManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.faction.FactionUpgradeEffectsListener(this, factionUpgradeManager), this);
+        factionBankManager = new me.vertex.core.faction.FactionBankManager(this, factionBankStorage);
+        factionBankManager.load();
+        factionBankMenu = new me.vertex.core.faction.FactionBankMenu(this, factionBankManager, rallyManager, messages);
+        Bukkit.getPluginManager().registerEvents(factionBankManager, this);
+        Bukkit.getPluginManager().registerEvents(factionBankMenu, this);
 
         nametagManager = new NametagManager(this);
         Bukkit.getPluginManager().registerEvents(new NametagListener(nametagManager), this);
@@ -258,14 +285,17 @@ public final class VertexPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(mobStackListener, this);
         Bukkit.getScheduler().runTaskTimer(this, mobStackListener::consolidateStacks, 40L, 40L);
 
-        chunkCollectorManager = new me.vertex.core.collector.ChunkCollectorManager(this, chunkCollectorStorage);
+        chunkCollectorManager = new me.vertex.core.collector.ChunkCollectorManager(this, chunkCollectorStorage, messages);
         chunkCollectorManager.load();
         chunkCollectorManager.loadIndexFromDatabase();
         chunkCollectorListener = new me.vertex.core.collector.ChunkCollectorListener(
                 this, chunkCollectorManager, staffManager, messages, rallyManager);
         Bukkit.getPluginManager().registerEvents(chunkCollectorListener, this);
         Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.collector.ChunkCollectorMenuListener(chunkCollectorManager, staffManager, messages), this);
+                new me.vertex.core.collector.ChunkCollectorClaimListener(chunkCollectorManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.collector.ChunkCollectorMenuListener(chunkCollectorManager, staffManager, messages,
+                        rallyManager), this);
         Bukkit.getScheduler().runTaskTimer(this, chunkCollectorListener::scanForMissedItems,
                 chunkCollectorManager.scanIntervalTicks(), chunkCollectorManager.scanIntervalTicks());
         me.vertex.core.collector.ChunkCollectorCommand chunkCollectorCommand =
@@ -286,6 +316,8 @@ public final class VertexPlugin extends JavaPlugin {
             Bukkit.getPluginManager().registerEvents(blueprintListener, this);
             Bukkit.getPluginManager().registerEvents(
                     new me.vertex.core.blueprint.BlueprintMenuListener(blueprintManager, blueprintListener, messages), this);
+            Bukkit.getPluginManager().registerEvents(
+                    new me.vertex.core.blueprint.BlueprintActivationMenuListener(blueprintListener, blueprintManager, messages), this);
             blueprintListener.resumeAll();
             // Blueprint blocks are paced every tick so a structure visibly
             // grows row-by-row instead of appearing in one-second chunks.
@@ -427,6 +459,9 @@ public final class VertexPlugin extends JavaPlugin {
         }
         if (factionUpgradeManager != null) {
             factionUpgradeManager.awaitWrites();
+        }
+        if (factionBankManager != null) {
+            factionBankManager.awaitWrites();
         }
         if (nametagManager != null) {
             nametagManager.shutdown();
@@ -595,5 +630,45 @@ public final class VertexPlugin extends JavaPlugin {
     /** Which backend is actually in use right now, not what config.yml says. */
     public Database.Dialect storageDialect() {
         return database != null ? database.dialect() : Database.Dialect.SQLITE;
+    }
+
+    /**
+     * A storage migration is a point-in-time copy, so it is intentionally
+     * allowed only while no player can mutate data and no Blueprint is
+     * placing blocks. The caller must invoke {@link #finishStorageMigration()}.
+     */
+    public boolean beginStorageMigration() {
+        if (!Bukkit.getOnlinePlayers().isEmpty()
+                || blueprintManager != null && !blueprintManager.activeBuilds().isEmpty()) {
+            return false;
+        }
+        return storageMigrationRunning.compareAndSet(false, true);
+    }
+
+    /** Called off-thread after {@link #beginStorageMigration()} to drain source writes. */
+    public void awaitStorageWritesForMigration() {
+        if (kitManager != null) kitManager.awaitWrites();
+        if (abilityManager != null) abilityManager.awaitWrites();
+        if (languageCommand != null) languageCommand.awaitWrites();
+        if (deathManager != null) deathManager.awaitWrites();
+        if (tagManager != null) tagManager.awaitWrites();
+        if (spawnerManager != null) spawnerManager.awaitWrites();
+        if (chunkCollectorManager != null) chunkCollectorManager.awaitWrites();
+        if (blueprintManager != null) blueprintManager.awaitWrites();
+        if (factionUpgradeManager != null) factionUpgradeManager.awaitWrites();
+        if (factionBankManager != null) factionBankManager.awaitWrites();
+    }
+
+    public void finishStorageMigration() {
+        storageMigrationRunning.set(false);
+    }
+
+    /** Keeps an accepted migration a true point-in-time copy. */
+    @EventHandler
+    public void onPlayerLogin(PlayerLoginEvent event) {
+        if (storageMigrationRunning.get()) {
+            event.disallow(PlayerLoginEvent.Result.KICK_OTHER,
+                    messages.get(null, "admin.storage-login-blocked"));
+        }
     }
 }

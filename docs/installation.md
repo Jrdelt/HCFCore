@@ -83,7 +83,7 @@ other one:
 
 1. It copies every row Vertex owns — kit and ability cooldowns, player
    locales, death history (item blobs included), spawners, chunk
-   collectors, and in-progress blueprint builds — from the running
+   collectors, Blueprint cooldowns and in-progress blueprint builds — from the running
    backend into the target one, creating the target's tables first if
    needed. The copy runs off the main thread, so the server doesn't hang.
 2. It writes `storage.type` into `config.yml`, editing only that one line
@@ -101,10 +101,12 @@ section to be filled in and the database to exist first.
 The copy is idempotent: running it twice replaces the target's contents
 again rather than duplicating rows.
 
-Prefer running it while the server is quiet. The local backend uses a
-single pooled connection (SQLite serializes writes anyway), so a large
-death-history table being copied can briefly make gameplay writes queue
-behind it.
+The command requires an **idle server**: no online players and no active
+Blueprint builds. It drains pending Vertex writes before taking the copy,
+so the result is a consistent snapshot and active Blueprint beacon IDs
+remain valid after the restart. The local backend uses a single pooled
+connection (SQLite serializes writes anyway), so a large death-history
+table can still take time to copy.
 
 If `FactionsUUID` isn't present and enabled, Vertex logs why and disables
 itself immediately rather than running in a half-working state.

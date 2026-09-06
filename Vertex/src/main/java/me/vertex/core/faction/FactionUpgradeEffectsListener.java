@@ -28,7 +28,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class FactionUpgradeEffectsListener implements Listener {
     private final Plugin plugin;
     private final FactionUpgradeManager manager;
-    /** Flight speed before Vertex touched it, so another plugin's value is restored exactly. */
+    /** Latest non-Vertex flight speed, so the claim bonus composes with other flight plugins. */
     private final Map<UUID, Float> priorFlySpeeds = new ConcurrentHashMap<>();
 
     public FactionUpgradeEffectsListener(Plugin plugin, FactionUpgradeManager manager) {
@@ -142,8 +142,20 @@ public final class FactionUpgradeEffectsListener implements Listener {
                 restoreFlightSpeed(player);
                 continue;
             }
-            priorFlySpeeds.putIfAbsent(player.getUniqueId(), player.getFlySpeed());
-            float boosted = (float) Math.min(1D, priorFlySpeeds.get(player.getUniqueId()) * (1D + bonus / 100D));
+            Float baseline = priorFlySpeeds.putIfAbsent(player.getUniqueId(), player.getFlySpeed());
+            if (baseline == null) {
+                baseline = player.getFlySpeed();
+            }
+            float boosted = boostedSpeed(baseline, bonus);
+            // If another plugin changed flight speed since our previous
+            // refresh, treat that value as its new baseline and reapply the
+            // faction boost. This keeps Vertex's boost authoritative while
+            // still cooperating with FactionsUUID/other flight providers.
+            if (Math.abs(player.getFlySpeed() - boosted) > 0.0001F) {
+                baseline = player.getFlySpeed();
+                priorFlySpeeds.put(player.getUniqueId(), baseline);
+                boosted = boostedSpeed(baseline, bonus);
+            }
             if (Math.abs(player.getFlySpeed() - boosted) > 0.0001F) {
                 player.setFlySpeed(boosted);
             }
@@ -155,6 +167,10 @@ public final class FactionUpgradeEffectsListener implements Listener {
         if (prior != null && Math.abs(player.getFlySpeed() - prior) > 0.0001F) {
             player.setFlySpeed(prior);
         }
+    }
+
+    private static float boostedSpeed(float baseline, double bonus) {
+        return (float) Math.min(1D, baseline * (1D + bonus / 100D));
     }
 
     private static Player playerDamager(Entity damager) {

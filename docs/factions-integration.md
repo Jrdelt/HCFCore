@@ -82,14 +82,15 @@ A faction leader opens the complete FactionsUUID permission matrix with
 The title, each role's slot/icon/name, and any action's label override
 live under `rally.permission-gui` in `config.yml` (see
 [Configuration](configuration.md#rally-permission-gui)). Per-faction rally
-permission choices are saved under `rally.faction-permissions`.
+permission choices are saved under `rally.faction-permissions` and are
+removed automatically when a faction disbands.
 
 ## Faction upgrades
 
 `/f upgrades` (or `/f upgrade`, including every configured faction-command
 alias) opens a persistent per-faction upgrade GUI. Any faction member can
-inspect it; by default, only the faction leader can purchase levels. Every
-cost is withdrawn from the leader through Vault and every upgrade level is
+inspect and purchase levels by default; set `leader-only: true` to restrict
+purchases. Every cost is withdrawn from the clicking member through Vault and every upgrade level is
 saved in Vertex's database, so it survives restarts and faction renames.
 
 All values are configurable in `faction-upgrades.upgrades` in `config.yml`:
@@ -99,9 +100,9 @@ All values are configurable in `faction-upgrades.upgrades` in `config.yml`:
 - **Claim Protection**, **Armor Wear**, and **Fall Protection** reduce the
   corresponding damage/durability loss while a member is in their claim.
 - **Fly Boost** increases the speed of members who are already flying in
-  their claim. It deliberately does not grant flight itself, so it stays
-  compatible with the server's FactionsUUID flight rules and other flight
-  plugins.
+  their claim. It deliberately does not grant flight itself. If another
+  plugin changes flight speed, Vertex treats that as the new base and
+  reapplies the faction boost, so the boost remains in effect.
 - **Faction Warps** sets the faction's native FactionsUUID `WARPS` upgrade
   level, so its normal `/f warp` commands and the limit configured by
   FactionsUUID continue to own warp creation and teleportation. Existing
@@ -118,6 +119,28 @@ Set an individual `enabled: false` or set `faction-upgrades.enabled: false`
 to take it out of service without deleting saved levels. A faction disband
 cleans up its Vertex upgrade rows automatically. See
 [Configuration](configuration.md#faction-upgrades) for the complete setup.
+
+The menu title, icon names, effect descriptions, and every lore line are
+localized under `faction-upgrades` in `lang/en_us.yml`. The four
+`faction-upgrades.gui.lore` lists control the exact lore for an available,
+leader-only, maxed, or disabled icon. They support `{level}`, `{max}`,
+`{current}`, `{next}`, and `{cost}`.
+
+## Faction bank
+
+`/f bank` opens a seven-row bank GUI. Its middle row shows the faction's
+stored **money** (Gold Block), **experience** (Experience Bottle), and
+**TNT**. The deposit and withdraw rows open an amount prompt.
+
+Money and experience are stored by Vertex in the database and survive a
+restart; money moves through Vault. Vertex serializes each faction's bank
+writes and commits the bank state before finalizing the GUI operation; if a
+database write fails, a money/XP deposit is compensated automatically.
+TNT uses FactionsUUID's native TNT bank,
+including its configured maximum. `bank-deposit` and `bank-withdraw` appear
+in `/f permissions` and default to allowed for Moderator, Member, and
+Recruit. All names, lore, prompts, and messages are under `faction-bank` in
+the language files.
 
 ## Leader-leave protection
 

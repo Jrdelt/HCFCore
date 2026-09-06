@@ -92,6 +92,15 @@ public final class FactionsHook {
         Faction faction = fPlayer.faction();
         return faction == null ? List.of(player) : faction.membersOnlineAsPlayers();
     }
+    public static void messageFaction(int factionId, net.kyori.adventure.text.Component message) {
+    if (factionId == NO_FACTION) return;
+
+    for (org.bukkit.entity.Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
+        if (getFactionId(player) == factionId) {
+            player.sendMessage(message);
+        }
+    }
+}
 
     public static String getFactionPower(Player player) {
         Faction faction = getFaction(player);

@@ -932,4 +932,10 @@ public final class KitManager {
             }
         }
     }
+
+    /** Flushes durable kit/cooldown writes without disabling the manager. */
+    public void awaitWrites() {
+        waitForPendingPersist();
+        awaitCooldownWrites();
+    }
 }

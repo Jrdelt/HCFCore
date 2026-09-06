@@ -20,9 +20,10 @@ required progress display above the build. See
    `.schem` file are defined in `blueprints.yml`; the schematic file
    itself lives under `<plugin data folder>/schematics/`, a folder
    created automatically at startup.
-2. Placing the item opens an **Enable Blueprint** confirmation GUI. The
-   item is not consumed and no block is placed until the player clicks
-   **Enable**.
+2. Placing the item puts down its marked Beacon preview and immediately
+   opens an **Enable Blueprint** confirmation GUI. **Cancel** (or breaking
+   the unactivated preview Beacon) removes the preview and returns the
+   Blueprint item. Right-clicking the preview reopens the confirmation.
 3. On confirm, the entire schematic's bounding box must fit **100%**
    inside the placing player's own faction's claimed land (checked
    synchronously against every touched chunk) — otherwise the attempt is
@@ -30,8 +31,11 @@ required progress display above the build. See
 
 ## While a build is active
 
-- The beacon is completely unbreakable and unmovable (explosions and
-  pistons included) until the build finishes or is cancelled.
+- The beacon cannot be mined or moved by pistons while active. If an
+  explosion destroys an active anchor, Vertex immediately removes the
+  active record and hologram and leaves only the blocks already placed;
+  the Blueprint is not refunded. A completed Beacon remains protected and
+  opens the repair/status GUI for its faction.
 - A DecentHolograms display above it shows the structure's name, current
   progress, and `[Faction] player name`.
 - The structure is placed progressively in horizontal rows from the
@@ -41,32 +45,40 @@ required progress display above the build. See
   may take longer than `build-time-seconds` as a result, rather than
   causing a lag spike.
 - Progress and the hologram checkpoint every `batch-interval-ticks`.
-- The hologram exists only while the build is active. It is removed when
-  the build completes, is cancelled, or aborts, so mining the completed
-  beacon can never leave an orphaned display behind.
+- Right-clicking the active beacon shows blocks placed and an estimated
+  **time left**. The estimate uses the real per-tick block cap, so a very
+  large schematic correctly shows a longer duration than a small one.
+- When finished, the hologram changes to a completed status display. It
+  reports missing blocks and offers repairs from the Beacon's GUI. Preview
+  and active-build holograms are removed on cancellation/abort, including
+  explosions; a completed hologram is also removed if its anchor disappears
+  through an external change. Existing completed anchors are rediscovered as
+  chunks load after a restart.
 - Every `claim-recheck-interval-ticks`, the build's claim status is
   re-verified. If the land is no longer 100% the owning faction's
   (overclaimed, voluntarily unclaimed, etc.), the build **aborts
-  immediately** — blocks placed so far are left as-is, and the beacon is
-  **not** refunded. This is the same outcome as an explicit cancel via
-  the beacon's own progress GUI (right-click it mid-build).
+  immediately** — blocks placed so far are left as-is, and the Beacon is
+  returned as the Blueprint item. This is the same outcome as an explicit
+  cancel via the beacon's own progress GUI (right-click it mid-build).
 
 ## Persistence across restarts
 
 An active build's world/location, template, owner, owning **faction id**,
 and current progress index are saved to the database at each checkpoint.
 The stable faction id means a faction rename cannot transfer or abort an
-active build. On restart, the same
-`.schem` file is re-loaded (its deterministic iteration order reproduces
-the identical block list) and the build resumes from the saved index —
-after first re-validating claim ownership, since land can change hands
-while the server is down.
+active build. Vertex also creates a private snapshot under
+`plugins/Vertex/blueprint-snapshots/` before marking a build active. On a
+restart it resumes from that snapshot rather than a potentially edited
+template file, after first re-validating the matching active Beacon and
+claim ownership. Snapshot files are removed when their build finishes or
+is cancelled.
 
 ## Cooldown
 
 `cooldown-seconds` (default 3600 = 1 hour) is a per-player cooldown
-between placements. Staff can clear an **online** player's active
-cooldown with `/blueprint cooldown remove <player>`
+between placements. It is stored in the database, survives restarts, and
+staff can clear an online **or offline** player's active cooldown with
+`/blueprint cooldown remove <player>`
 (`vertex.blueprint.cooldown.remove`).
 
 ## Configuration reference (`blueprints.yml`)

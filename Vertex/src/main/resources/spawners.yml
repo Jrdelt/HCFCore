@@ -14,7 +14,7 @@ break-mode: drop-all
 
 # Percentage of the shop price refunded when withdrawing spawners from a
 # stack via the management GUI (right-click a spawner with an empty hand).
-sell-refund-percent: 50
+sell-refund-percent: 35
 
 # --- VANILLA SPAWNER TUNING ---
 # These scale a stack's own CreatureSpawner block-entity fields by its
@@ -28,6 +28,12 @@ min-spawn-delay-ticks: 150
 max-spawn-delay-ticks: 300
 required-player-range-blocks: 32
 spawn-range-blocks: 4
+
+# Hostile mobs normally reject vanilla's bright-light spawn rule. When true,
+# Vertex gives sunlit player spawners the same capped/manual fallback used by
+# Iron Golem spawners, so they keep producing during the day. Covered/dark
+# spawners continue using vanilla's normal spawn cycle.
+spawn-in-daylight: true
 
 # --- SHOP CATALOG & DROP TABLES ---
 # Each entry here is buyable from /spawners and placeable in claimed land.
@@ -45,7 +51,7 @@ mobs:
       - material: IRON_INGOT
         min: 0
         max: 1
-        chance: 0.05
+        chance: 0.25
 
   SKELETON:
     display-name: '<green>ꜱᴋᴇʟᴇᴛᴏɴ ꜱᴘᴀᴡɴᴇʀ'
@@ -67,7 +73,7 @@ mobs:
       - material: BLAZE_ROD
         min: 0
         max: 1
-        chance: 0.5
+        chance: 1.0
 
   IRON_GOLEM:
     display-name: '<green>ɪʀᴏɴ ɢᴏʟᴇᴍ ꜱᴘᴀᴡɴᴇʀ'
@@ -84,12 +90,12 @@ mobs:
     drops:
       - material: EMERALD
         min: 0
-        max: 1
-        chance: 0.5
+        max: 2
+        chance: 1.0
       - material: TOTEM_OF_UNDYING
         min: 0
         max: 1
-        chance: 0.05
+        chance: 0.005
 
 # ============================================
 # MOB STACKING
@@ -106,10 +112,10 @@ mob-stacking:
   # merges once it settles near the collection point, not just mobs that
   # happen to spawn within range of each other. Set this generously enough
   # to cover your tallest shaft's height.
-  merge-radius-blocks: 50
+  merge-radius-blocks: 75
   # A stack already at this size lets a new spawn become its own separate
   # stack instead of being lost.
-  max-stack-limit: 100
+  max-stack-limit: 200
   stackable-types:
     - ZOMBIE
     - SKELETON
@@ -117,7 +123,7 @@ mob-stacking:
     - IRON_GOLEM
     - EVOKER
   # Nametag shown above a stacked mob. {count} and {name} placeholders.
-  display-format: '<gray>[x{count}] <white>{name}'
+  display-format: '<yellow>x{count} <gray>{name}'
   # A whole-stack kill (see below) batches its drops into stacks of at
   # most this size, capped further by each material's own max stack size,
   # to avoid spawning one item entity per mob in a big stack.

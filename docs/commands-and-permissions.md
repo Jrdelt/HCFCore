@@ -46,7 +46,7 @@ permission is checked — anyone can run it.
 | Command | Permission | Notes |
 |---|---|---|
 | `/blueprint give <player> <template>` | `vertex.blueprint.give` | Gives a Blueprint item. |
-| `/blueprint cooldown remove <player>` | `vertex.blueprint.cooldown.remove` | Clears an online player's placement cooldown. |
+| `/blueprint cooldown remove <player>` | `vertex.blueprint.cooldown.remove` | Clears an online or offline player's persisted placement cooldown. |
 
 ## Factions & Rally
 
@@ -54,7 +54,8 @@ permission is checked — anyone can run it.
 |---|---|---|
 | `/f rally [set\|clear]` (alias `/frally`) | Open to all faction members | Sets/clears a 4-minute faction rally point. |
 | `/f permissions` / `/f perms` | Faction leader only (checked in-code, not a permission node) | Opens the faction permission matrix GUI. |
-| `/f upgrades` / `/f upgrade` | Any faction member may view; faction leader purchases by default | Opens the persistent faction-upgrades GUI. The behavior is configurable under `faction-upgrades`. |
+| `/f upgrades` / `/f upgrade` | Any faction member may view and purchase by default | Opens the persistent faction-upgrades GUI. Set `faction-upgrades.leader-only: true` to restrict purchases. |
+| `/f bank` | Faction member; role permissions apply to deposits/withdrawals | Opens the seven-row faction bank for money, experience, and TNT. |
 
 ## Reboot
 

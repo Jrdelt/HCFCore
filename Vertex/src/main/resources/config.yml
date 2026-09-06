@@ -49,7 +49,7 @@ mysql:
 # ============================================
 scoreboard:
   # How often to update the scoreboard (in ticks; 20 ticks = 1 second)
-  update-interval-ticks: 15
+  update-interval-ticks: 20
 
   # Scoreboard title with placeholders
   title: '<blue><bold>ꜰᴀᴄᴛɪᴏɴꜱ<reset>   <gray>{date}'
@@ -63,7 +63,7 @@ scoreboard:
   lines:
     - '     <gray>ꜱᴇᴀꜱᴏɴ I'
     - '%luckperms_prefix%<gray>{name}'
-    - '<gray>• <red>Balance: <white>{balance}'
+    - '<gray>• <red>Balance: <white>%vault_eco_balance_formatted%'
     - '<gray>• <red>Experience: <white>{exp}'
     - '<gray>• <red>K/D: <white>%kdratio_kills%<gray>:<white>%kdratio_deaths%'
     - ''
@@ -300,26 +300,45 @@ factions:
 # ============================================
 # Faction leaders open the persistent purchase GUI with /f upgrades (or
 # /f upgrade). Every bonus works only inside land claimed by that faction.
-# Costs are withdrawn from the clicking leader through Vault; set cost-base
-# to 0 for a free level. `bonus-per-level` is a percentage except for the
+# Costs are withdrawn from the clicking member through Vault. Each level has
+# its own explicit price and total bonus, so no multiplier is applied. Set a
+# level's price to 0 for a free level. `bonus` is a percentage except for the
 # native FactionsUUID Warps entry, where it is display-only because that
 # plugin's own upgrades.yml controls the number of allowed warps.
 faction-upgrades:
   enabled: true
-  # Members may view the GUI; only the faction leader can spend on upgrades.
-  leader-only: true
+  # Members may view and buy upgrades.
+  leader-only: false
   upgrades:
-    claim-damage: {enabled: true, max-level: 5, cost-base: 50000.0, cost-multiplier: 1.75, bonus-per-level: 5.0}
-    claim-protection: {enabled: true, max-level: 5, cost-base: 60000.0, cost-multiplier: 1.75, bonus-per-level: 4.0}
-    armor-wear: {enabled: true, max-level: 5, cost-base: 40000.0, cost-multiplier: 1.7, bonus-per-level: 10.0}
-    fall-protection: {enabled: true, max-level: 5, cost-base: 35000.0, cost-multiplier: 1.65, bonus-per-level: 10.0}
-    fly-boost: {enabled: true, max-level: 3, cost-base: 75000.0, cost-multiplier: 2.0, bonus-per-level: 20.0}
+    claim-damage:
+      enabled: true
+      levels: {1: {price: 50000.0, bonus: 5.0}, 2: {price: 87500.0, bonus: 10.0}, 3: {price: 153125.0, bonus: 15.0}, 4: {price: 267969.0, bonus: 20.0}, 5: {price: 468945.0, bonus: 25.0}}
+    claim-protection:
+      enabled: true
+      levels: {1: {price: 60000.0, bonus: 4.0}, 2: {price: 105000.0, bonus: 8.0}, 3: {price: 183750.0, bonus: 12.0}, 4: {price: 321563.0, bonus: 16.0}, 5: {price: 562734.0, bonus: 20.0}}
+    armor-wear:
+      enabled: true
+      levels: {1: {price: 40000.0, bonus: 10.0}, 2: {price: 68000.0, bonus: 20.0}, 3: {price: 115600.0, bonus: 30.0}, 4: {price: 196520.0, bonus: 40.0}, 5: {price: 334084.0, bonus: 50.0}}
+    fall-protection:
+      enabled: true
+      levels: {1: {price: 1000000.0, bonus: 10.0}}
+    fly-boost:
+      enabled: true
+      levels: {1: {price: 50000.0, bonus: 20.0}, 2: {price: 250000.0, bonus: 40.0}, 3: {price: 1250000.0, bonus: 60.0}, 4: {price: 6250000.0, bonus: 80.0}, 5: {price: 31250000.0, bonus: 100.0}}
     # This sets FactionsUUID's native Warps upgrade level. Configure its
     # actual warp-count values in FactionsUUID's upgrades configuration.
-    warps: {enabled: true, max-level: 3, cost-base: 100000.0, cost-multiplier: 2.0, bonus-per-level: 1.0}
-    spawner-rate: {enabled: true, max-level: 5, cost-base: 100000.0, cost-multiplier: 2.0, bonus-per-level: 10.0}
-    crop-growth: {enabled: true, max-level: 5, cost-base: 30000.0, cost-multiplier: 1.6, bonus-per-level: 15.0}
-    mob-xp: {enabled: true, max-level: 5, cost-base: 45000.0, cost-multiplier: 1.7, bonus-per-level: 10.0}
+    warps:
+      enabled: true
+      levels: {1: {price: 500000.0, bonus: 1.0}, 2: {price: 1000000.0, bonus: 2.0}, 3: {price: 2000000.0, bonus: 3.0}, 4: {price: 4000000.0, bonus: 4.0}, 5: {price: 8000000.0, bonus: 5.0}, 6: {price: 16000000.0, bonus: 6.0}, 7: {price: 32000000.0, bonus: 7.0}, 8: {price: 64000000.0, bonus: 8.0}, 9: {price: 128000000.0, bonus: 9.0}, 10: {price: 256000000.0, bonus: 10.0}, 11: {price: 512000000.0, bonus: 11.0}, 12: {price: 1000000000.0, bonus: 12.0}, 13: {price: 1000000000.0, bonus: 13.0}, 14: {price: 1000000000.0, bonus: 14.0}, 15: {price: 1000000000.0, bonus: 15.0}}
+    spawner-rate:
+      enabled: true
+      levels: {1: {price: 10000000.0, bonus: 15.0}, 2: {price: 50000000.0, bonus: 30.0}, 3: {price: 250000000.0, bonus: 45.0}, 4: {price: 1000000000.0, bonus: 60.0}, 5: {price: 1000000000.0, bonus: 75.0}}
+    crop-growth:
+      enabled: true
+      levels: {1: {price: 500000.0, bonus: 30.0}, 2: {price: 1600000.0, bonus: 60.0}, 3: {price: 5120000.0, bonus: 90.0}, 4: {price: 16384000.0, bonus: 120.0}, 5: {price: 52428800.0, bonus: 150.0}}
+    mob-xp:
+      enabled: true
+      levels: {1: {price: 750000.0, bonus: 20.0}, 2: {price: 2550000.0, bonus: 40.0}, 3: {price: 8670000.0, bonus: 60.0}, 4: {price: 29478000.0, bonus: 80.0}, 5: {price: 100225200.0, bonus: 100.0}}
 
 rally:
   # Faction leaders open the complete permission matrix with /f permissions
@@ -330,12 +349,14 @@ rally:
   permission-gui:
     title: '<gold>Faction Permissions'
     roles:
-      mod: {slot: 2, material: DIAMOND_SWORD, name: '<aqua>Moderator', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true}
-      member: {slot: 4, material: GOLDEN_SWORD, name: '<yellow>Member', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true}
-      recruit: {slot: 6, material: WOODEN_SWORD, name: '<gray>Recruit', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true}
+      mod: {slot: 2, material: DIAMOND_SWORD, name: '<blue>Moderator', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, bank-deposit: true, bank-withdraw: true}
+      member: {slot: 4, material: GOLDEN_SWORD, name: '<yellow>Member', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, bank-deposit: true, bank-withdraw: true}
+      recruit: {slot: 6, material: WOODEN_SWORD, name: '<gray>Recruit', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, bank-deposit: true, bank-withdraw: true}
     actions:
       vertex-rally-set: {name: 'Set Rally'}
       vertex-rally-clear: {name: 'Clear Rally'}
+      vertex-bank-deposit: {name: 'Deposit Bank Resources'}
+      vertex-bank-withdraw: {name: 'Withdraw Bank Resources'}
       # Add a FactionsUUID action here to customize its label. Example:
       # build: {name: 'Build'}
 
@@ -346,9 +367,9 @@ kits:
   # Default kit cooldown in seconds
   default-cooldown-seconds: 30
   # Delay before class effects apply after putting on full armor
-  effect-warmup-seconds: 5
+  effect-warmup-seconds: 7
   # Maximum cooldown allowed (about 1 day)
-  max-cooldown-seconds: 86400
+  max-cooldown-seconds: 86400//2
   # Maximum money cost for a kit
   max-money-cost: 1000000000.0
   # Maximum item cost amount
@@ -359,7 +380,7 @@ kits:
 # ============================================
 abilities:
   # Cooldown shared across all ability items
-  global-cooldown-seconds: 4
+  global-cooldown-seconds: 3
   # Maximum number of items /getitem can give
   max-getitem-amount: 64
   # Portable Bard's buff items only reach faction members within this many
@@ -397,7 +418,7 @@ nametags:
     same-faction: 'green'      # Your own faction
     ally: 'light_purple'
     enemy: 'red'
-    neutral: 'red'             # Factionless subjects, and factions with no ally/enemy relation
+    neutral: 'gray'             # Factionless subjects, and factions with no ally/enemy relation
 
 # ============================================
 # REBOOT SYSTEM

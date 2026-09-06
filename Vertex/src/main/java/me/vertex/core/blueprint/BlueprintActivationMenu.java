@@ -15,7 +15,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.List;
 
-/** Confirmation shown after a Blueprint item is placed, before it consumes the item or starts building. */
+/** Confirmation shown immediately after a Blueprint beacon is placed. */
 public final class BlueprintActivationMenu {
 
     static final int CANCEL_SLOT = 2;

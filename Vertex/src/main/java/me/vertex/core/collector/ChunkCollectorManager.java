@@ -1,6 +1,6 @@
 package me.vertex.core.collector;
 
-import me.vertex.core.lang.MessageFormatter;
+import me.vertex.core.lang.Messages;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -10,6 +10,7 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.ShulkerBox;
+import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
@@ -44,6 +45,7 @@ public final class ChunkCollectorManager {
     private final Plugin plugin;
     private final ChunkCollectorStorage storage;
     private final File file;
+    private final Messages messages;
     private final NamespacedKey markerKey;
     private final NamespacedKey tierKey;
     private final NamespacedKey ownerUuidKey;
@@ -51,6 +53,8 @@ public final class ChunkCollectorManager {
 
     /** Location-key (see {@link #key(Location)}) -> the location itself. */
     private final Map<String, Location> collectors = new ConcurrentHashMap<>();
+    /** Owner -> location keys.  This keeps limit checks from synchronously loading chunks. */
+    private final Map<UUID, java.util.Set<String>> collectorsByOwner = new ConcurrentHashMap<>();
     private final java.util.Set<CompletableFuture<Void>> pendingWrites = ConcurrentHashMap.newKeySet();
     /** Serializes mutations for each collector location while retaining parallel DB work elsewhere. */
     private final Map<String, CompletableFuture<Void>> writeChains = new ConcurrentHashMap<>();
@@ -67,11 +71,12 @@ public final class ChunkCollectorManager {
     private volatile double upgradeCostMultiplier;
     private volatile int hopperBlockRadius;
     private volatile int scanIntervalTicks;
-    private volatile Component displayName;
+    private volatile int maxStoredMaterialTypes;
 
-    public ChunkCollectorManager(Plugin plugin, ChunkCollectorStorage storage) {
+    public ChunkCollectorManager(Plugin plugin, ChunkCollectorStorage storage, Messages messages) {
         this.plugin = plugin;
         this.storage = storage;
+        this.messages = messages;
         this.file = new File(plugin.getDataFolder(), "collectors.yml");
         this.markerKey = new NamespacedKey(plugin, "chunk_collector");
         this.tierKey = new NamespacedKey(plugin, "collector_tier");
@@ -102,11 +107,12 @@ public final class ChunkCollectorManager {
         upgradeCostMultiplier = Math.max(1.0, config.getDouble("upgrade-cost-multiplier", 1.75));
         hopperBlockRadius = Math.max(0, config.getInt("hopper-block-radius", 2));
         scanIntervalTicks = Math.max(20, config.getInt("scan-interval-ticks", 100));
-        displayName = MessageFormatter.deserialize(config.getString("display-name", "<green>Chunk Collector"));
+        maxStoredMaterialTypes = Math.max(1, config.getInt("max-stored-material-types", 64));
     }
 
-    public Component displayName() {
-        return displayName;
+    /** The item name is localized with the recipient's configured language. */
+    public Component displayName(CommandSender recipient) {
+        return messages.get(recipient, "collector.item-name");
     }
 
     Plugin plugin() {
@@ -122,7 +128,16 @@ public final class ChunkCollectorManager {
                     continue;
                 }
                 Location location = new Location(world, stored.x(), stored.y(), stored.z());
-                collectors.put(key(location), location);
+                UUID owner;
+                try {
+                    owner = UUID.fromString(stored.ownerUuid());
+                } catch (IllegalArgumentException ignored) {
+                    owner = new UUID(0L, 0L);
+                }
+                index(location, owner);
+                if (world.isChunkLoaded(location.getBlockX() >> 4, location.getBlockZ() >> 4)) {
+                    reconcileChunk(world.getChunkAt(location));
+                }
             }
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to load chunk collectors from the database.", e);
@@ -162,6 +177,11 @@ public final class ChunkCollectorManager {
         return scanIntervalTicks;
     }
 
+    /** Maximum distinct materials a collector may remember (prevents PDC bloat). */
+    public int maxStoredMaterialTypes() {
+        return maxStoredMaterialTypes;
+    }
+
     public long capacityFor(int upgradeTier) {
         return baseCapacity + (long) upgradeTier * capacityPerUpgrade;
     }
@@ -176,6 +196,38 @@ public final class ChunkCollectorManager {
 
     public boolean isTracked(Location location) {
         return collectors.containsKey(key(location));
+    }
+
+    /**
+     * Reconciles one loaded chunk with the persistent data on its Shulker
+     * Boxes. This removes stale SQL rows and recovers a valid collector whose
+     * asynchronous database write was interrupted by a crash.
+     */
+    public void reconcileChunk(Chunk chunk) {
+        java.util.Set<String> found = new java.util.HashSet<>();
+        for (BlockState state : chunk.getTileEntities()) {
+            if (!(state instanceof ShulkerBox shulkerBox)) {
+                continue;
+            }
+            ChunkCollectorData data = readData(shulkerBox.getPersistentDataContainer());
+            if (data == null) {
+                continue;
+            }
+            Location location = shulkerBox.getLocation();
+            String locationKey = key(location);
+            found.add(locationKey);
+            if (collectors.putIfAbsent(locationKey, location) == null) {
+                index(location, data.ownerUuid());
+                persist(location, data);
+            } else {
+                reindexOwner(location, data.ownerUuid());
+            }
+        }
+        for (Location indexed : List.copyOf(collectors.values())) {
+            if (inChunk(indexed, chunk) && !found.contains(key(indexed))) {
+                unregister(indexed);
+            }
+        }
     }
 
     /** A snapshot of every tracked collector's location, for the periodic fallback sweep. */
@@ -194,14 +246,48 @@ public final class ChunkCollectorManager {
     }
 
     public int countForOwner(UUID ownerUuid) {
-        int count = 0;
+        return collectorsByOwner.getOrDefault(ownerUuid, java.util.Set.of()).size();
+    }
+
+    /** A material already held is always allowed; a new type respects the PDC safety cap. */
+    public boolean canStore(ChunkCollectorData data, Material material) {
+        return data.stored(material) > 0L || data.stored().size() < maxStoredMaterialTypes;
+    }
+
+    /** Returns a copy preserving stored contents but assigning the current placement owner. */
+    public ChunkCollectorData withOwner(ChunkCollectorData source, UUID ownerUuid, String ownerFactionTag) {
+        ChunkCollectorData reassigned = new ChunkCollectorData(source.upgradeTier(), ownerUuid, ownerFactionTag);
+        source.stored().forEach(reassigned::setStored);
+        return reassigned;
+    }
+
+    public List<Map.Entry<Location, ChunkCollectorData>> getCollectorsInChunk(Chunk chunk) {
+        List<Map.Entry<Location, ChunkCollectorData>> found = new ArrayList<>();
         for (Location location : collectors.values()) {
+            if (!inChunk(location, chunk)) {
+                continue;
+            }
             ChunkCollectorData data = readData(location);
-            if (data != null && data.ownerUuid().equals(ownerUuid)) {
-                count++;
+            if (data != null) {
+                found.add(Map.entry(location, data));
             }
         }
-        return count;
+        return found;
+    }
+
+    /** Uses the index, not FactionsUUID's full claim list, to avoid loading empty claimed chunks. */
+    public List<Map.Entry<Location, ChunkCollectorData>> getCollectorsOwnedBy(String factionTag) {
+        if (factionTag == null) {
+            return List.of();
+        }
+        List<Map.Entry<Location, ChunkCollectorData>> found = new ArrayList<>();
+        for (Location location : collectors.values()) {
+            ChunkCollectorData data = readData(location);
+            if (data != null && factionTag.equalsIgnoreCase(data.ownerFactionTag())) {
+                found.add(Map.entry(location, data));
+            }
+        }
+        return found;
     }
 
     /**
@@ -244,16 +330,18 @@ public final class ChunkCollectorManager {
 
     /** Registers a newly-placed collector at `location`, applying `data` to the block's PDC. */
     public void register(Location location, ChunkCollectorData data) {
-        collectors.put(key(location), location);
+        index(location, data.ownerUuid());
         writeData(location, data);
         persist(location, data);
     }
 
     /** Untracks a collector without touching the physical block. */
     public void unregister(Location location) {
-        if (collectors.remove(key(location)) == null) {
+        String locationKey = key(location);
+        if (collectors.remove(locationKey) == null) {
             return;
         }
+        collectorsByOwner.values().forEach(locations -> locations.remove(locationKey));
         queue(location, () -> {
             try {
                 storage.delete(location);
@@ -314,9 +402,14 @@ public final class ChunkCollectorManager {
     public ChunkCollectorData readData(Location location) {
         Block block = location.getBlock();
         if (!(block.getState() instanceof ShulkerBox shulkerBox)) {
+            unregister(location);
             return null;
         }
-        return readData(shulkerBox.getPersistentDataContainer());
+        ChunkCollectorData data = readData(shulkerBox.getPersistentDataContainer());
+        if (data == null) {
+            unregister(location);
+        }
+        return data;
     }
 
     private ChunkCollectorData readData(PersistentDataContainer pdc) {
@@ -372,9 +465,12 @@ public final class ChunkCollectorManager {
         pdc.set(ownerUuidKey, PersistentDataType.STRING, data.ownerUuid().toString());
         if (data.ownerFactionTag() != null) {
             pdc.set(ownerFactionKey, PersistentDataType.STRING, data.ownerFactionTag());
+        } else {
+            pdc.remove(ownerFactionKey);
         }
         for (NamespacedKey existing : List.copyOf(pdc.getKeys())) {
-            if (existing.getKey().startsWith(STORED_PREFIX)) {
+            if (existing.getNamespace().equals(plugin.getName().toLowerCase(Locale.ROOT))
+                    && existing.getKey().startsWith(STORED_PREFIX)) {
                 pdc.remove(existing);
             }
         }
@@ -427,5 +523,17 @@ public final class ChunkCollectorManager {
     private static String key(Location location) {
         return location.getWorld().getName() + ":" + location.getBlockX() + ":"
                 + location.getBlockY() + ":" + location.getBlockZ();
+    }
+
+    private void index(Location location, UUID ownerUuid) {
+        String locationKey = key(location);
+        collectors.put(locationKey, location);
+        reindexOwner(location, ownerUuid);
+    }
+
+    private void reindexOwner(Location location, UUID ownerUuid) {
+        String locationKey = key(location);
+        collectorsByOwner.values().forEach(locations -> locations.remove(locationKey));
+        collectorsByOwner.computeIfAbsent(ownerUuid, ignored -> ConcurrentHashMap.newKeySet()).add(locationKey);
     }
 }

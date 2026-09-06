@@ -9,6 +9,7 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -28,7 +29,12 @@ import java.util.Locale;
 
 /** Routes /f upgrades and provides the faction-owned upgrade purchase GUI. */
 public final class FactionUpgradeMenu implements Listener {
-    private static final List<Integer> UPGRADE_SLOTS = List.of(10, 11, 12, 13, 14, 15, 16, 19, 20);
+    private static final int INVENTORY_SIZE = 54;
+    /**
+     * Matches the framed double-chest layout: four evenly-spaced upgrades on
+     * the first content row and five staggered upgrades on the row beneath.
+     */
+    private static final List<Integer> UPGRADE_SLOTS = List.of(10, 12, 14, 16, 20, 22, 24, 28, 30, 32, 34, 39, 41);
 
     private final Plugin plugin;
     private final FactionUpgradeManager manager;
@@ -55,7 +61,8 @@ public final class FactionUpgradeMenu implements Listener {
         }
 
         Holder holder = new Holder(faction.id());
-        Inventory inventory = Bukkit.createInventory(holder, 27, messages.get(player, "faction-upgrades.gui-title"));
+        Inventory inventory = Bukkit.createInventory(holder, INVENTORY_SIZE,
+                messages.get(player, "faction-upgrades.gui-title"));
         holder.inventory = inventory;
         ItemStack border = border();
         for (int slot = 0; slot < inventory.getSize(); slot++) {
@@ -71,7 +78,10 @@ public final class FactionUpgradeMenu implements Listener {
     }
 
     /** FactionsUUID owns /f, so Vertex routes only the dedicated upgrades aliases. */
-    @EventHandler
+    // Run before FactionsUUID's own command bridge. Vertex owns this GUI;
+    // FactionsUUID remains the source of truth only for its native Warps
+    // upgrade, which FactionUpgradeManager synchronizes on every view/buy.
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onFactionUpgradeCommand(PlayerCommandPreprocessEvent event) {
         String[] parts = event.getMessage().trim().toLowerCase(Locale.ROOT).split("\\s+");
         if (parts.length != 2 || !isFactionCommand(parts[0])
@@ -136,6 +146,7 @@ public final class FactionUpgradeMenu implements Listener {
         switch (result) {
             case SUCCESS -> player.sendMessage(messages.get(player, "faction-upgrades.purchased",
                     "upgrade", upgradeName(player, upgrade), "level", String.valueOf(manager.level(faction.id(), upgrade))));
+            case PENDING -> player.sendMessage(messages.get(player, "faction-upgrades.purchase-pending"));
             case LEADER_ONLY -> player.sendMessage(messages.get(player, "faction-upgrades.leader-only"));
             case MAXED -> player.sendMessage(messages.get(player, "faction-upgrades.maxed"));
             case NO_ECONOMY -> player.sendMessage(messages.get(player, "faction-upgrades.no-economy"));
@@ -155,20 +166,18 @@ public final class FactionUpgradeMenu implements Listener {
         ItemMeta meta = item.getItemMeta();
         meta.displayName(messages.get(player, "faction-upgrades.gui.name." + upgrade.configKey()));
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
-        List<net.kyori.adventure.text.Component> lore = new ArrayList<>();
-        lore.add(messages.get(player, "faction-upgrades.gui.level", "level", String.valueOf(level),
-                "max", String.valueOf(definition.maxLevel())));
-        lore.add(messages.get(player, "faction-upgrades.gui.current-effect", "effect", effect(player, upgrade, level)));
-        if (definition.enabled() && level < definition.maxLevel()) {
-            lore.add(messages.get(player, "faction-upgrades.gui.next-effect", "effect", effect(player, upgrade, level + 1)));
-            double cost = manager.nextCost(faction.id(), upgrade);
-            lore.add(messages.get(player, "faction-upgrades.gui.cost", "amount", EconomyHook.format(cost)));
-            lore.add(messages.get(player, manager.leaderOnly() && !FactionsHook.isLeader(player)
-                    ? "faction-upgrades.gui.leader-only" : "faction-upgrades.gui.click-to-upgrade"));
-        } else {
-            lore.add(messages.get(player, definition.enabled() ? "faction-upgrades.gui.maxed"
-                    : "faction-upgrades.gui.disabled"));
-        }
+        String state = !definition.enabled() ? "disabled"
+                : level >= definition.maxLevel() ? "maxed"
+                : manager.leaderOnly() && !FactionsHook.isLeader(player) ? "leader-only" : "available";
+        double nextCost = definition.enabled() && level < definition.maxLevel()
+                ? manager.nextCost(faction.id(), upgrade) : 0D;
+        List<net.kyori.adventure.text.Component> lore = messages.getList(player,
+                "faction-upgrades.gui.lore." + state,
+                "level", String.valueOf(level),
+                "max", String.valueOf(definition.maxLevel()),
+                "current", effect(player, upgrade, level),
+                "next", effect(player, upgrade, Math.min(level + 1, definition.maxLevel())),
+                "cost", EconomyHook.format(nextCost));
         meta.lore(lore);
         meta.getPersistentDataContainer().set(upgradeKey, PersistentDataType.STRING, upgrade.configKey());
         item.setItemMeta(meta);

@@ -1,59 +1,38 @@
-# Vertex — Audit Status
+# Vertex — Review Status
 
-Reviewed: 2026-09-05. The full code audit is complete. There are no
-known open code defects from this audit; `./mvnw test` and packaging pass.
+Reviewed and resolved 2026-09-06. Build and test checks pass.
 
 ## Fixed
 
-- **Spawner upgrades:** older databases automatically gain the missing
-  `owner_faction` column before spawners load.
-- **Ability cooldowns:** writes are ordered per player and ability, so an
-  older async write cannot overwrite a newer cooldown.
-- **Tag reloads:** reload waits for the queued tag save first.
-- **Blueprint ownership:** active builds store the faction's stable id,
-  not its renameable tag. Claim checks and holograms use that id.
-- **Scoreboard performance:** faction-top ranks are calculated once per
-  scoreboard update, not once per viewer.
-- **Spawner economy:** invalid negative prices and refund percentages over
-  100 are clamped and logged.
-- **Faction aliases:** rally, permission, and upgrade commands work
-  through every alias in `factions.command-aliases`; they no longer rely
-  on Bukkit's unsupported multi-word command aliases.
-- **Documentation coverage:** public commands, permission nodes,
-  configuration roots, language categories, integrations, persistence,
-  and the recent Blueprint/Collector/Faction Upgrade behavior are now
-  cross-referenced in the README and `docs/`.
+- **Spawners:** decrement mode now leaves the remaining live stack intact;
+  spawner PDC is reconciled on startup/chunk load after interrupted SQL
+  writes; daylight fallback spawning works for supported spawners.
+- **Collectors:** ownership is indexed without loading every old chunk;
+  collector data is protected on claim, unclaim, overclaim, and disband;
+  PDC material types are capped; permissions are rechecked in an open GUI.
+- **Faction bank:** money and experience changes are serialized and saved
+  durably before the operation completes; a failed deposit is refunded.
+- **Blueprints:** legacy active anchors are migrated, GUI actions recheck
+  faction/claim access, explosions clear active records and holograms,
+  missing completed holograms are recreated, and active builds use a
+  private schematic snapshot across restart.
+- **Storage migration:** requires an idle server, drains writes, and keeps
+  Blueprint row IDs so anchor PDC remains valid.
+- **Mob stacking:** natural and spawner mobs no longer merge together, so
+  their loot sources stay correct.
+- **Faction upgrades/permissions:** explicit tier gaps warn clearly; stale
+  faction permission settings are removed on disband.
 
-## Manual server checks
+## Notes for live testing
 
-- Before releasing a new Blueprint template, use the checklist in
-  [docs/blueprints.md](docs/blueprints.md#staging-checklist): normal
-  build, faction rename, claim loss, restart/resume, corrupt schematic,
-  and database outage.
-- FactionsUUID Admin is intentionally absent from the GUI: that plugin
-  always lets Admin bypass its role matrix, so there is nothing reliable
-  for Vertex to deny.
-- **CI setup:** the build workflow is ready locally, but GitHub rejected
-  its upload because the configured OAuth token lacks `workflow` scope.
-  Refresh that token with the scope, then add `.github/workflows/build.yml`.
+- Test an active Blueprint through a restart and through an explosion.
+- Test `/f bank` with Vault enabled and a deliberately unavailable database
+  in a staging environment to confirm the configured economy provider's
+  refund behavior.
+- Test `/f unclaim`, `/f unclaimall`, overclaim, and disband with both a
+  spawner stack and a filled Chunk Collector.
 
-## Added in this update
+## Verified
 
-- **Rally state items:** allowed **Set Rally** and **Clear Rally** use
-  `GREEN_STAINED_GLASS_PANE`; denied permissions use red panes.
-- **Permission GUI usability:** all GUI text/lore uses small caps, and
-  `/f perms` plus `/f permissions` tab-complete (including configured
-  faction-command aliases).
-- **Blueprint holograms:** completed, cancelled, and aborted builds now
-  delete their hologram instead of leaving it after the beacon is mined.
-- **Collector custom withdrawals:** the valid amount is stored on the
-  anvil result button, preventing vanilla's rename reset from turning a
-  typed number into an invalid amount on click.
-- **Legacy Blueprint schematics:** retired generic block ids (including
-  `minecraft:bed`) no longer stop a whole build on current Paper; valid
-  modern defaults are used with a one-time re-export warning.
-- **Faction upgrades:** `/f upgrades` / `/f upgrade` now provides a
-  persistent faction GUI for Damage in Claims, Claim Protection, Armor
-  Wear, Fall Protection, Fly Boost, Faction Warps, Spawner Rate, Crop
-  Growth, and Mob XP. Costs, level caps, and bonuses are configurable;
-  all non-warp effects are restricted to the faction's own claim.
+- `./mvnw -q test`
+- `git diff --check`

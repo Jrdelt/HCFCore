@@ -21,7 +21,7 @@ class ChunkCollectorManagerTest {
         // Storage is never touched by load()/capacityFor()/upgradeCost(),
         // only by loadIndexFromDatabase()/register()/unregister() -- this
         // file only covers the parts that don't need a live database.
-        manager = new ChunkCollectorManager(plugin, null);
+        manager = new ChunkCollectorManager(plugin, null, null);
         manager.load();
     }
 
@@ -36,6 +36,7 @@ class ChunkCollectorManagerTest {
         assertTrue(manager.isSilkTouchRequired());
         assertEquals(1, manager.maxPerChunk());
         assertEquals(3, manager.maxPerPlayer());
+        assertEquals(64, manager.maxStoredMaterialTypes());
         assertEquals(5, manager.maxUpgradeTier());
         assertEquals(2, manager.hopperBlockRadius());
     }
@@ -52,5 +53,24 @@ class ChunkCollectorManagerTest {
     void upgradeCostIsPositiveBelowMaxTierAndNegativeAtMax() {
         assertTrue(manager.upgradeCost(0) > 0);
         assertEquals(-1, manager.upgradeCost(manager.maxUpgradeTier()));
+    }
+
+    @Test
+    void materialTypeCapAllowsExistingStoredMaterialOnly() {
+        ChunkCollectorData data = new ChunkCollectorData(0, java.util.UUID.randomUUID(), "test");
+        for (org.bukkit.Material material : org.bukkit.Material.values()) {
+            if (material.isItem() && data.stored().size() < manager.maxStoredMaterialTypes()) {
+                data.setStored(material, 1);
+            }
+        }
+        assertTrue(manager.canStore(data, data.stored().keySet().iterator().next()));
+        org.bukkit.Material newMaterial = org.bukkit.Material.values()[0];
+        for (org.bukkit.Material material : org.bukkit.Material.values()) {
+            if (material.isItem() && !data.stored().containsKey(material)) {
+                newMaterial = material;
+                break;
+            }
+        }
+        assertTrue(!manager.canStore(data, newMaterial));
     }
 }

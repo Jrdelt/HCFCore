@@ -43,7 +43,9 @@ public final class SpawnerMobListener implements Listener {
         this.mobTypeKey = new NamespacedKey(plugin, "spawner_mob_type");
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    // This must run before generic mob stacking so a spawner-produced mob is
+    // source-tagged before the stack listener decides what it may merge with.
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onSpawn(CreatureSpawnEvent event) {
         if (event.getSpawnReason() != CreatureSpawnEvent.SpawnReason.SPAWNER) {
             return;

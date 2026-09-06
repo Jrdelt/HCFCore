@@ -9,10 +9,6 @@
 # catches everything that falls down to it.
 enabled: true
 
-# Display name for the Chunk Collector item (both /chunkcollector give and
-# a broken collector dropping itself use this).
-display-name: '<green>Chunk Collector'
-
 # Whether breaking a Chunk Collector requires a Silk Touch tool.
 silk-touch-required: true
 
@@ -21,6 +17,10 @@ max-per-chunk: 1
 
 # How many Chunk Collectors a single player may have placed, server-wide.
 max-per-player: 3
+
+# Safety cap for distinct material types recorded in one collector's PDC.
+# Existing stored types continue collecting; a new type is skipped when full.
+max-stored-material-types: 64
 
 # Shared storage cap before any upgrades, across every item type combined.
 base-capacity: 50000
