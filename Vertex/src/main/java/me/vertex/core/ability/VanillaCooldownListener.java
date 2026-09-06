@@ -1,0 +1,160 @@
+package me.vertex.core.ability;
+
+import me.vertex.core.lang.MessageFormatter;
+import me.vertex.core.lang.Messages;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
+import org.bukkit.event.Event;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
+
+public final class VanillaCooldownListener implements Listener {
+    private final Plugin plugin;
+    private final Messages messages;
+    private final VanillaCooldownManager cooldownManager;
+    private final int pearlCooldownSeconds;
+
+    public VanillaCooldownListener(Plugin plugin, Messages messages, VanillaCooldownManager cooldownManager) {
+        this.plugin = plugin;
+        this.messages = messages;
+        this.cooldownManager = cooldownManager;
+        this.pearlCooldownSeconds = plugin.getConfig().getInt("pvp.pearl-cooldown-seconds", 12);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onInteract(PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND
+                || (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK)) return;
+        Player player = event.getPlayer();
+        ItemStack item = event.getItem();
+        if (item == null) return;
+        if (item.getType() == Material.ENDER_PEARL && !AbilityGate.isAbility(plugin, item, "fake-pearl")
+                && !isBlockUse(event)) {
+            checkPearlCooldown(event, player);
+        }
+    }
+
+    /**
+     * Whether this click will open/toggle the block rather than throw the
+     * pearl -- vanilla gives the block priority over the held item unless
+     * the player is sneaking. Both halves of the pearl cooldown have to
+     * skip those clicks: starting it would burn a pearl cooldown for
+     * opening a chest, and checking it would stop a player who is already
+     * on cooldown from opening that chest at all.
+     */
+    private static boolean isBlockUse(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getPlayer().isSneaking()) {
+            return false;
+        }
+        if (event.useInteractedBlock() == Event.Result.DENY) {
+            return false;
+        }
+        return event.getClickedBlock() != null && event.getClickedBlock().getType().isInteractable();
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onConsume(PlayerItemConsumeEvent event) {
+        Material material = event.getItem().getType();
+        String configKey;
+        String itemKey;
+        if (material == Material.GOLDEN_APPLE) {
+            configKey = "golden-apple-cooldown-seconds";
+            itemKey = "golden-apple";
+        } else if (material == Material.ENCHANTED_GOLDEN_APPLE) {
+            configKey = "enchanted-golden-apple-cooldown-seconds";
+            itemKey = "enchanted-golden-apple";
+        } else {
+            return;
+        }
+
+        Player player = event.getPlayer();
+        long remaining = cooldownManager.remainingMillis(player.getUniqueId(), material);
+        if (remaining > 0L) {
+            event.setCancelled(true);
+            sendCooldownMessage(player, itemKey, remaining);
+            return;
+        }
+        cooldownManager.start(player.getUniqueId(), material,
+                Math.max(0, plugin.getConfig().getInt("pvp." + configKey, 0)));
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onProjectileLaunch(ProjectileLaunchEvent event) {
+        Projectile projectile = event.getEntity();
+        if (!(projectile instanceof org.bukkit.entity.EnderPearl) || !(projectile.getShooter() instanceof Player)) {
+            return;
+        }
+
+        Player player = (Player) projectile.getShooter();
+
+        // Skip cooldown for fake pearls
+        if (FakePearlListener.isThrowingFakePearl(player.getUniqueId())) {
+            return;
+        }
+
+        long remaining = cooldownManager.remainingMillis(player.getUniqueId(), Material.ENDER_PEARL);
+        if (remaining > 0L) {
+            event.setCancelled(true);
+            sendCooldownMessage(player, "ender-pearl", remaining);
+        }
+        // Cooldown starts on successful landing instead (see onPearlLand
+        // below) -- starting it here would charge a player a full cooldown
+        // for a throw that never actually lands, e.g. one Pearl Stunner or
+        // a protected zone blocks outright.
+    }
+
+    /**
+     * MONITOR + ignoreCancelled so this only fires for a pearl that
+     * actually landed -- one blocked by NoPearlSpawnListener (protected
+     * zone) or PearlStunnerListener (cancels the launch itself, so no
+     * teleport event exists at all in that case) never starts a cooldown.
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPearlLand(PlayerTeleportEvent event) {
+        if (event.getCause() != PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
+            return;
+        }
+        cooldownManager.start(event.getPlayer().getUniqueId(), Material.ENDER_PEARL, pearlCooldownSeconds);
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        cooldownManager.clearIfExpired(event.getPlayer().getUniqueId());
+    }
+
+    private void checkPearlCooldown(PlayerInteractEvent event, Player player) {
+        long remaining = cooldownManager.remainingMillis(player.getUniqueId(), Material.ENDER_PEARL);
+        if (remaining > 0L) {
+            event.setCancelled(true);
+            sendCooldownMessage(player, "ender-pearl", remaining);
+        }
+    }
+
+    /**
+     * Built by hand rather than through {@link Messages#getChat}'s
+     * escaped-placeholder substitution: {@code cooldowns.*-colored} is
+     * admin-authored and meant to carry its own item color (green for
+     * pearl, yellow for golden apple, etc.), and the escaping path would
+     * render that color's markup as literal text instead of applying it --
+     * same reasoning as a tag's `display` string or LuckPerms' `{prefix}`.
+     */
+    private void sendCooldownMessage(Player player, String itemKey, long remainingMillis) {
+        long remainingSeconds = (remainingMillis + 999L) / 1000L;
+        String coloredItem = messages.getRaw(player, "cooldowns." + itemKey + "-colored");
+        String template = messages.getRaw(player, "cooldowns.item-on-cooldown")
+                .replace("{item}", coloredItem)
+                .replace("{seconds}", String.valueOf(remainingSeconds));
+        player.sendMessage(MessageFormatter.deserialize(template));
+    }
+}

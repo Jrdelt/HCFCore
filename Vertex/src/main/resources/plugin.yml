@@ -1,5 +1,5 @@
-name: HCFCore
-main: me.hcfcore.core.HCFCorePlugin
+name: Vertex
+main: me.vertex.core.VertexPlugin
 version: ${project.version}
 api-version: '1.21.10'
 author: cesardeltorojr
@@ -24,9 +24,9 @@ commands:
   kits:
     description: Browse kits in a GUI -- left-click to claim, right-click to preview.
     usage: /<command>
-  hcfcore:
-    description: HCFCore admin/reload command.
-    usage: /<command> reload|clearmobstacks
+  vertex:
+    description: Vertex admin/reload command.
+    usage: /<command> reload|clearmobstacks|storage
   uncombat:
     description: Clear a player's combat tag.
     usage: /<command> <player>
@@ -49,8 +49,8 @@ commands:
     description: Give a player a Chunk Collector (Green Shulker Box).
     usage: /<command> give <player>
   blueprint:
-    description: Give a player a Blueprint (Beacon) for the Automated Base Builder.
-    usage: /<command> give <player> <template>
+    description: Give Blueprint items or manage Blueprint placement cooldowns.
+    usage: /<command> give <player> <template>|cooldown remove <player>
   language:
     description: View or change your language.
     usage: /<command> [code]
@@ -97,66 +97,69 @@ commands:
     usage: /<command> <player>
 
 permissions:
-  hcfcore.admin:
-    description: Reload HCFCore's config, or manually clear stacked mobs.
+  vertex.admin:
+    description: Reload Vertex's config, clear stacked mobs, or switch the storage backend.
     default: op
-  hcfcore.collector.give:
+  vertex.collector.give:
     description: Give a player a Chunk Collector.
     default: op
-  hcfcore.blueprint.give:
+  vertex.blueprint.give:
     description: Give a player a Blueprint.
     default: op
-  hcfcore.kit.create:
+  vertex.blueprint.cooldown.remove:
+    description: Remove an online player's Blueprint placement cooldown.
+    default: op
+  vertex.kit.create:
     description: Create a kit from the currently held inventory.
     default: op
-  hcfcore.kit.save:
+  vertex.kit.save:
     description: Legacy alias permission for creating kits.
     default: op
-  hcfcore.kit.delete:
+  vertex.kit.delete:
     description: Delete a kit.
     default: op
-  hcfcore.kit.bypasscooldown:
+  vertex.kit.bypasscooldown:
     description: Bypass kit cooldowns.
     default: op
-  hcfcore.kit.bypasscost:
+  vertex.kit.bypasscost:
     description: Bypass kit costs (money and item).
     default: op
-  hcfcore.combat.uncombat:
+  vertex.combat.uncombat:
     description: Clear another player's combat tag.
     default: op
-  hcfcore.combat.check:
+  vertex.combat.check:
     description: Check another player's combat status.
     default: op
-  hcfcore.combat.tag:
+  vertex.combat.tag:
     description: Force a player into combat, for testing.
     default: op
-  hcfcore.ability.give:
+  vertex.ability.give:
     description: Give ability items via /getitem or the /abilities GUI.
     default: op
-  hcfcore.reboot.start:
+  vertex.reboot.start:
     description: Start or cancel a server reboot countdown.
     default: op
-  hcfcore.staff.rollback:
+  vertex.staff.rollback:
     description: View and restore items from a player's death history.
     default: op
-  hcfcore.staff.mode:
+  vertex.staff.mode:
     description: Toggle full staff mode (vanish + staff-build).
     default: op
-  hcfcore.staff.vanish:
+  vertex.staff.vanish:
     description: Toggle vanish, and see other vanished staff.
     default: op
-  hcfcore.staff.staffchat:
+  vertex.staff.staffchat:
     description: Toggle staff chat, and read staff chat messages.
     default: op
-  hcfcore.staff.staffbuild:
+  vertex.staff.staffbuild:
     description: Bypass claim protection to build/break/interact anywhere.
     default: op
-  hcfcore.staff.freeze:
+  vertex.staff.freeze:
     description: Freeze/unfreeze a player, and see freeze-related alerts.
     default: op
-  hcfcore.staff.invsee:
+  vertex.staff.invsee:
     description: View a player's live inventory.
     default: op
-  hcfcore.staff.endersee:
+  vertex.staff.endersee:
     description: View a player's live ender chest.
     default: op

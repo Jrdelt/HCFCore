@@ -1,11 +1,11 @@
 # ============================================
 # AUTOMATED BLUEPRINT BASE BUILDER
 # ============================================
-# Placing a Blueprint item drops a Beacon and gradually builds a .schem
-# structure around it over time using FastAsyncWorldEdit's clipboard API,
-# with a DecentHolograms progress display above the beacon. Requires both
-# FastAsyncWorldEdit and DecentHolograms to be installed -- this feature
-# quietly does nothing if either is missing.
+# Placing a Blueprint item opens an activation confirmation. Clicking Enable
+# consumes it, places its Beacon, and gradually builds a .schem structure
+# around it using FastAsyncWorldEdit's clipboard API, with a DecentHolograms
+# progress display above the beacon. Requires both FastAsyncWorldEdit and
+# DecentHolograms -- this feature quietly does nothing if either is missing.
 enabled: true
 
 # .schem files live in <plugin data folder>/schematics/<file>.
@@ -17,9 +17,14 @@ cooldown-seconds: 3600
 # How long a build should take to fully place, start to finish.
 build-time-seconds: 600
 
-# How the build is paced: every batch-interval-ticks, place enough blocks
-# to stay on schedule for build-time-seconds (never fewer than 1 block).
+# How often build progress is saved and the hologram is refreshed. Blocks
+# themselves are placed every tick, bottom-to-top and row-by-row.
 batch-interval-ticks: 20
+
+# Safety cap for how many blocks one active Blueprint may place in a single
+# server tick. A very large schematic can take longer than build-time-seconds
+# when this cap is reached, protecting TPS instead of causing a paste spike.
+max-blocks-per-tick: 64
 
 # Every touched chunk's claim ownership is re-checked this often while a
 # build is in progress -- if it's no longer 100% the placing faction's

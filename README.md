@@ -1,951 +1,156 @@
-# HCFCore
+<div align="center">
 
-Kits with armor-based class effects, a live sidebar scoreboard, faction-aware
-chat formatting, an equippable tags system, PvP combat-tag timers, a
-scheduled reboot system, PvP ability items, and a staff toolkit (vanish,
-staff chat, claim-bypass build mode) — built for Paper and integrated with
-**FactionsUUID**.
+# Vertex
+
+**A complete HCF gameplay layer for Paper, built on FactionsUUID.**
+
+Kit classes · PvP abilities · Legacy combat · Faction rallies · Cosmetic tags
+Stackable spawners · Chunk collectors · Automated base building · Staff toolkit
+
+[**📖 Full Documentation**](docs/README.md) · [Installation](docs/installation.md) · [Commands](docs/commands-and-permissions.md) · [GitHub](https://github.com/Jrdelt/HCFCore)
+
+</div>
+
+---
+
+Vertex turns a plain FactionsUUID server into a full HCF experience: six
+armor-based kit classes with their own PvP ability items, 1.8-style
+legacy combat, a combat-tag system, a live sidebar scoreboard,
+faction-aware chat and nametags, a stackable spawner economy, automatic
+loot collection, and a complete staff toolkit — all configurable, all
+reloadable live, and all documented in depth in [`docs/`](docs/README.md).
+
+This page is the quick tour. For exact mechanics, every config option,
+and what each integration does, see the [full documentation](docs/README.md).
 
 ## Requirements
 
-**Required:**
-- **Paper 1.21.10+** (the server software)
-- **FactionsUUID** (must be installed first)
-- **MySQL 5.7+** or **MariaDB** (reachable from your server)
+| | |
+| --- | --- |
+| **Required** | Paper 1.21.10+, [FactionsUUID](https://www.spigotmc.org/resources/factionsuuid.1035/) |
+| **Optional** | MySQL 5.7+ / MariaDB (only if you'd rather not use the built-in local database), Vault, WorldGuard, LuckPerms, PlaceholderAPI, EssentialsX, FastAsyncWorldEdit + DecentHolograms |
 
-**Optional** (features work without them):
-- **Vault** — Enables money costs on kits. Without it, only item/free kits work.
-- **WorldGuard** — Enables disabling abilities in specific regions (like spawn). Without it, abilities work everywhere.
-- **LuckPerms** — Shows player ranks in chat and enables the Repair ability. Without it, those features are disabled.
-- **PlaceholderAPI** — Lets `chat.*` and `scoreboard.lines` templates use `%placeholder%` tokens (from LuckPerms' own expansion, or any other installed one) alongside this plugin's own `{curly}` placeholders. Without it, any `%...%` you put in a template is left as literal text.
-- **EssentialsX** — Wherever a player's name is shown (chat, scoreboard, tags GUI nickname preview, default join/quit/death messages), their EssentialsX `/nick` nickname is used instead of their real username. Without it, or for players with no nickname set, the real username is used as before.
+**No database setup needed.** Vertex saves everything to a local file
+(`plugins/Vertex/vertex.db`) out of the box. Point it at a MySQL server
+instead only if you need several servers to share the same data.
 
-## Installation
+Every optional plugin only unlocks extra behavior — Vertex runs fine
+without any of them. See [Integrations](docs/integrations.md) for exactly
+what each one does.
 
-1. Build (or grab) `hcfcore-1.0.0.jar` from `target/`.
-2. Drop it into `plugins/` alongside `FactionsUUID.jar`.
-3. Start the server once to generate `plugins/HCFCore/config.yml`, then
-   stop it.
-4. Edit `config.yml` with your real MySQL credentials (see below).
-5. Start the server again.
+## Quick start
 
-### Building from source
-
-```
+```bash
 ./mvnw clean package
 ```
 
-Produces a single shaded jar at `target/hcfcore-1.0.0.jar` — HikariCP and
-the MySQL driver are bundled and relocated, so no separate driver jar is
-needed.
-
-**After any change, redeploy this exact jar to the server and restart** (or
-`/reload`-equivalent full restart) before testing — a stale jar on the
-server is the most common reason a newly added command won't show up or
-won't tab-complete.
-
-## Configuration Guide
-
-All settings are in `config.yml`. See the file for detailed comments on each option.
-
-### Quick Setup
-After installing, edit `config.yml` with your **MySQL credentials** only:
-```yaml
-mysql:
-  host: your-db-host
-  port: 3306
-  database: hcfcore
-  username: your-username
-  password: your-password
-```
-
-### Key Settings Explained
-
-**Database** — `mysql.pool-size` (default: 10) controls how many concurrent database connections are allowed. Increase for larger servers.
-
-**Scoreboard** — Customize with `scoreboard.lines`. Use these placeholders:
-- `{name}` — player name (EssentialsX nickname if one is set, otherwise the real username)
-- `{rank_prefix}` — player's LuckPerms **group's** display name, wrapped in `[brackets]` by the plugin (blank without LuckPerms, or in the built-in `default` group)
-- `{rank}` — same group display name, unwrapped/uncolored
-- `{prefix}` — the player's actual LuckPerms **prefix meta** (`/lp user <name> meta setprefix "..."`), with whatever color/brackets you configured in LuckPerms already baked in — use this instead of `{rank_prefix}` if you want per-user prefixes rather than one per group
-- `{faction}` — player's faction name
-- `{power}` — faction power (current/max)
-- `{ftop}` — faction's position on power ranking
-- `{fplayers_online}` — online faction members
-- `{exp}` — player's XP level
-- `{balance}` — player's money (if using Vault economy)
-
-With **PlaceholderAPI** installed, any line can also use its `%percent%`
-placeholders (e.g. `%luckperms_prefix%`, or anything from another
-installed expansion) mixed in alongside the `{curly}` ones above —
-they're expanded as a final pass over the whole resolved line, per
-viewing player. Without PlaceholderAPI, a `%...%` token is left as
-literal text.
-
-**Chat** — Control the live chat format with `chat.separator`, `chat.faction-format`, `chat.rank-format`. `chat.rank-format` supports the same `{rank}` / `{prefix}` choice as the scoreboard above — `{prefix}` is substituted raw (not escaped) since it's expected to carry its own color/formatting, same treatment as a tag's `display` string. Leave `rank-format` blank if not using LuckPerms. `chat.*` templates get the same PlaceholderAPI `%percent%` support as scoreboard lines.
-
-**PvP Cooldowns** — These override vanilla Minecraft cooldowns:
-- `pearl-cooldown-seconds` — ender pearl reuse timer
-- `golden-apple-cooldown-seconds` — regular gapple timer
-- `enchanted-golden-apple-cooldown-seconds` — enchanted gapple timer
-
-Importantly: **cooldowns survive logout** — players can't escape them by relogging.
-
-**Archer Tag** — The archer class mechanic where arrows mark victims:
-- `arrow-damage-bonus-per-stack` — extra damage per mark (0.10 = +10% per stack)
-- `faction-melee-bonus-per-stack` — bonus for the archer's faction only
-- `duration-seconds` — how long a mark lasts
-- `message-attacker` / `message-victim` — MiniMessage chat templates sent
-  on every hit, with `{player}`, `{percent}` (arrow bonus), `{melee}`
-  (faction melee bonus), and `{seconds}` (mark duration) placeholders
-
-**Combat command blocking** — `pvp.blocked-commands-in-combat` lists
-commands (no leading `/`, case-insensitive) a tagged player can't use. A
-one-word entry like `kit` blocks that whole command tree; a multi-word
-entry like `f home` blocks only that exact subcommand, leaving the rest
-of `/f` untouched.
-
-**Legacy Combat** (`pvp.legacy-combat` in `config.yml`) — Restores a set of
-pre-1.9 PvP mechanics. Leave `worlds: []` to apply everywhere, or list
-specific world names to limit it. Every sub-feature below has its own
-on/off switch and only applies in those worlds:
-- **Attack speed** / **disable-sweeping-attacks** — instant attacks, no
-  cooldown bar, no axe sweep damage.
-- **legacy-weapon-damage** — overrides a weapon's base damage from the
-  `weapon-damage` material table (e.g. diamond sword 8.0 > diamond axe
-  6.0) instead of the modern attribute-based amount. Enchantments,
-  potion effects, and armor still apply normally on top.
-- **legacy-armor-calculations** — cancels out the armor toughness modern
-  armor pieces carry (the mechanic that gives diminishing returns
-  against big hits), so armor reduction goes back to a flat, predictable
-  percentage.
-- **disable-offhand** — blocks putting anything in the offhand slot (F
-  key): no dual-wielding, no shields.
-- **projectile-knockback** (`fishing-rod`/`snowball`/`egg`) — restores
-  those hits pushing the target even though they deal no damage, which
-  modern Minecraft dropped.
-- **knockback** (`horizontal`/`vertical`/`sprint-bonus`) — overrides
-  vanilla's own knockback on every melee hit and every enabled
-  projectile hit above.
-- **legacy-health-regen** — replaces vanilla's fast, food-saturation-
-  boosted regen with a flat 1 heart every 4 seconds (still requires food
-  level 18+, same as vanilla's own gate).
-- **legacy-golden-apples** — replaces vanilla's golden apple / enchanted
-  golden apple effects with the `golden-apple-effects` /
-  `enchanted-golden-apple-effects` lists (each entry: `type`,
-  `amplifier`, `duration-seconds`). An empty list leaves that apple's
-  vanilla effects alone.
-
-Sword blocking (1.8's right-click-to-block with a sword) isn't
-included — it was removed from Minecraft entirely in 1.9 in favor of
-shields, and there's no reliable vanilla event to hang an approximation
-on; ask if you want a best-effort version added.
-
-**Kits** — `effect-warmup-seconds` (default: 5) is the delay before class effects activate after equipping a full armor set. This gives players time to react to the visual change.
-
-**Abilities** — `global-cooldown-seconds` is a shared cooldown across ALL ability items (using any one blocks all others for that duration). Disable regions by adding WorldGuard region names to `disabled-regions`.
-
-**Reboot** — Customize shutdown reminders. `default-delay-minutes: 10` means `/reboot` with no argument schedules a 10-minute countdown.
-
-All changes take effect immediately with `/hcfcore reload` — **no restart required** for config, kits, abilities, tags, or messages.
-
-The database, scoreboard, chat, kit, ability, and tag config all take
-effect immediately on `/hcfcore reload` — including `tags.yml` and
-`kits.yml`, so editing either and reloading updates the live GUIs with no
-restart.
-
-Player locale and ability/kit cooldown writes are flushed during shutdown.
-If player data cannot be loaded from MySQL, kit and ability claims fail closed
-until the player reconnects successfully instead of silently bypassing saved
-cooldowns.
-
-## Chat Format
-
-Chat appears as: `[faction] [tag] [rank] name » message`
-
-Each part is optional:
-- **[faction]** — faction name (omitted if factionless)
-- **[tag]** — equipped cosmetic tag (omitted if none)
-- **[rank]** — LuckPerms rank, either the group's display name or the
-  player's own prefix meta depending on whether `chat.rank-format` uses
-  `{rank}` or `{prefix}` (see **Configuration Guide** above); omitted
-  without LuckPerms
-- **name » message** — the actual chat message; this is the player's EssentialsX nickname when one is set (see **Requirements** above), otherwise their real username
-
-Players can enable **nickname-match** on tags to recolor their name to match the tag's color.
-
-## Languages
-
-All player-facing text lives in `lang/` folder files, not hardcoded. Four languages ship by default: **en_us**, **es_us**, **pt_br**, **de_de**.
-
-Players can change their language with `/language [code]` — their choice is saved to the database and persists across restarts.
-
-**To add a new language:**
-1. Copy `lang/en_us.yml` to `lang/xx_xx.yml` (replace `xx_xx` with your language code)
-2. Translate the messages
-3. Run `/hcfcore reload` — it becomes available immediately
-
-**Color codes:**
-- Use `<red>`, `<green>`, `<blue>`, etc. for colors
-- `<success>`, `<deny>`, `<info>`, `<warning>` are semantic colors (don't hardcode red/green)
-- Legacy `&` codes like `&4` still work
-- Hex codes: `&#FF5555` for custom colors
-
-**Placeholders:**
-- `{kit}`, `{player}`, `{seconds}`, `{faction}`, etc. get filled in automatically
-- Check `en_us.yml` to see what placeholders each message supports
-
-## Kits
-
-Edit `kits.yml` to create kits. Each kit has:
-- **permission** — blank (`''`) = open to everyone, or `hcfcore.kit.name` to restrict
-- **cooldown-seconds** — reuse timer (0 = no cooldown)
-- **cost** — optional money or item cost (or both)
-- **armor** — 4 armor pieces to give
-- **contents** — items for the inventory; a content entry with an
-  `ability: <id>` field is built from that ability's own
-  material/name/lore in `abilities.yml` (matching what `/getitem` would
-  hand out) rather than a bare, unlabeled vanilla item — `amount` and
-  `enchantments` on the content entry still apply on top of it
-- **effects** — passive potion effects while wearing full armor set
-- **icon** — GUI icon (Material name)
-- **purpose** — one-line description in GUI
-
-**To create a kit:**
-1. Equip the armor and hold the items you want
-2. Run `/kit create mykit [permission] [cooldown] [cost]`
-3. Edit `kits.yml` if needed
-4. Run `/hcfcore reload`
-
-**Example cost formats:**
-- `cost: {money: 50000}` — costs 50k money
-- `cost: {item: DIAMOND, item-amount: 32}` — costs 32 diamonds
-- `cost: {money: 50000, item: DIAMOND, item-amount: 32}` — costs both
-
-**Class effects** — When a player wears the full armor set, they get passive buffs (e.g., Speed, Strength) after a 5-second delay. The delay gives visual feedback and prevents instant effect switching. Effects are removed immediately if any armor piece comes off.
-
-**Armor matching** — Matching is exact: same material, enchantments, and durability (worn armor counts). A diamond kit won't match enchanted diamond armor.
-
-## Abilities
-
-Sixteen PvP ability items ship pre-configured in `abilities.yml`. Each has:
-- **material** / **name** / **lore** — fully customizable appearance
-- **cooldown-seconds** — reuse timer (saved to database, persists across restarts)
-- **uses** — number of uses before breaking (optional)
-- Ability-specific settings (e.g., `forward-multiplier`, `duration-seconds`)
-
-**Ability List:**
-- **Pearl Stunner** (melee) — Blocks victim's pearl use
-- **Rabbits Feed** (right-click, in the archer kits) — Speed V buff
-- **Jump Boost Fruit** (right-click, in the archer kits) — Jump Boost V buff
-- **Anti-Blockup Bone** (melee) — Block placement denial after N hits
-- **Fake Pearl** (right-click) — Looks like ender pearl but no teleport
-- **Grappling Hook** (right-click) — Fish hook pull mechanic (8 uses); no fall damage on landing
-- **Leap** (right-click) — Jump forward with velocity; no fall damage on landing
-- **Rogue Backstab** (melee from behind) — Extra damage
-- **Mage Debuffs** (melee) — Wither/Slowness/Poison; doubled duration and
-  effect level when worn in the mage kit's own mixed gold/chainmail set.
-  The mage kit's armor set also grants Speed II, Invisibility, and Jump
-  Boost II as passive class effects (see below)
-- **Ninja Star** (right-click, in the rogue kits) — Teleports you to whoever hit
-  you last, after warning them with a 5-second countdown in chat. Requires
-  that hit to have landed within the last 15 seconds and both of you to
-  currently be in combat. On arrival you get Regeneration II, Strength
-  III, and Speed V, each for 3 seconds.
-- **Portable Bard** (right-click) — Opens a GUI to pick a buff (Speed,
-  Strength, Resistance, Regeneration, Jump Boost); picking one consumes
-  one Portable Bard from your inventory and hands you that buff item
-  instead of applying it directly. The GUI only closes once you're out
-  of Portable Bards — holding several lets you pick a buff for each one
-  in a row without reopening the menu. Right-click the buff item to
-  share it with faction members within `abilities.bard-share-radius-blocks`
-  (default 30) blocks of you, same world only — not the whole online
-  faction regardless of distance. Tells you how many nearby members
-  actually received it. Doubled duration and effect level when worn in
-  the full gold bard set, halved otherwise (never below Level I / 1
-  second). The master item has no cooldown of its own — it's free to
-  reopen any time — since each buff item is its own ability with its
-  own 7s cooldown, spent only once actually used
-- **Repair** (right-click) — Grant block-breaking permission (needs LuckPerms)
-- **Switcher Snowball** (throw) — Swap positions with enemy
-- **Time Warp Pearl** (right-click) — Teleport to last pearl throw location
-
-**Choosing a material:** a right-click ability's `material` in `abilities.yml`
-must be something Minecraft's client recognizes as having its own right-click
-action (a bow, fishing rod, ender eye/pearl, firework rocket, anvil/any
-placeable block, or any edible item all qualify). A material with no
-vanilla right-click behavior at all (a plain feather, rabbit's foot, nether
-star, stick, etc.) only sends the interact packet when the player is
-looking at a block — right-clicking on open air silently does nothing,
-client-side, before HCFCore's own listener ever sees it. This bit Ninja
-Star (nether star), Rabbit's Feed (rabbit foot), and Jump Boost Feather
-(feather) until their materials were swapped to a compass, golden carrot,
-and chorus fruit respectively — none of which changes their cooldown,
-lore, or behavior, only what the item looks like in-hand.
-
-**Key behaviors:**
-- Items are only consumed after successful activation
-- Cooldowns block usage again until timer expires
-- `/cooldowns` shows all active cooldown timers
-- **Global cooldown** (default 4s) blocks all abilities while active
-- Abilities are disabled in two independent ways, both in `config.yml`
-  under `abilities:`:
-  - `disabled-regions` — WorldGuard region names (e.g. `spawn`). No effect
-    without WorldGuard installed.
-  - `disabled-claim-names` — faction **claim** names abilities are blocked
-    in (default: `safezone`); abilities work everywhere else, including
-    the wilderness and any other faction's claimed land. This is a
-    blocklist, not an allowlist — matches the claiming faction's tag
-    case-insensitively, so it also covers the system SafeZone/WarZone
-    factions (`/f safezone`, `/f warzone`) if you've kept their default
-    names.
-
-**Splash potions of Healing** (I or II — the only levels Instant Health
-has) always hit for the full effect, on everyone caught in the splash,
-regardless of how far they were from the impact point. Vanilla scales a
-splash potion's strength down toward the edge of its radius; this plugin
-overrides that specifically for healing potions so a diamond kit's gapple
-alternative doesn't feel like a coin flip.
-
-## Tags (`tags.yml`)
-
-An equippable, cosmetic tags system with a paginated `/tags` GUI:
-
-```yaml
-tags:
-  legend:
-    display: "<gradient:#facc15:#f97316>Legend"
-    permission: hcfcore.tag.legend
-    created-at: 1725235200000
-    owners: 0
-    lore:
-      - '<gray>A name known by all.'
-players: {}
-```
-
-- `display` — the tag's name **and** its color/gradient in one MiniMessage
-  (or legacy `&`) string; there's no separate color field. Sorting,
-  searching, and nickname-matching all resolve the leading color/gradient
-  tag out of `display` automatically.
-- `permission` — blank means unlocked for everyone, same convention as
-  kits; otherwise required to unlock/equip the tag.
-- `created-at` — epoch millis; shown in the GUI as `MM/yy`.
-- `owners` — a lifetime counter of how many times players have equipped
-  this tag (not a live "currently equipped" count — unequipping doesn't
-  roll it back).
-- `lore` — optional extra flavor lines shown under the equipped/unequipped
-  status line, above the auto-generated Created/Owners lines.
-- `material` / `custom-model-data` are still read and round-tripped by
-  `TagManager` but currently unused by the GUI — every tag renders as a
-  plain `NAME_TAG`, including locked ones (there's no separate locked
-  icon anymore either).
-- `players` — per-player state (equipped tag id, nickname-match on/off,
-  nickname-match reversed), keyed by UUID; managed entirely by the plugin,
-  not meant for hand-editing.
-
-`/tags` opens a 4×9 grid of tag icons (rows 2-5, full width) with a
-control row: **filter** (Your/Unowned/All, each with a live count —
-opens to **Your Tags** by default),
-**sort** (Alphabetical/Age/Rarity — click to cycle, shift-click to flip
-direction; Rarity orders by lifetime owner count, fewest first when
-ascending), **search** (opens an anvil to type a query; right-click
-clears it — the anvil's result slot is a free, XP-cost-free confirm
-button that shows what will be searched for, and closing the anvil
-applies whatever is typed exactly once), **prev/next page**, and a
-**nickname-match** button (top row, your own head as the icon) that
-recolors your name in chat to match your equipped tag, including a
-"reversed" gradient-direction option. Its preview shows the actual chat
-line it'll produce — your real faction tag, equipped cosmetic tag, and
-rank, run through the live `chat.faction-format`/`chat.rank-format`
-templates, not a fixed example. There's no close button — leave the GUI
-the normal way (Esc / click outside). Clicking an unlocked tag equips it
-and announces it in chat (`<tag> EQUIPPED`); clicking your
-already-equipped tag unequips it (`<tag> UNEQUIPPED`).
-
-Reloaded along with everything else on `/hcfcore reload`.
-
-## Nametags
-
-Players see nametags above each other's heads showing faction rank and
-affiliation, visible to everyone (not just the wearer):
-
-```
-[ftop] [FactionName] PlayerName
-```
-
-- `[ftop]` — the faction's power-ranking position (`-` if factionless)
-- `[FactionName]` — `Neutral` if factionless
-- Color is relative to each **viewer**, not fixed: your own faction is
-  green, an allied faction is light purple, and everyone else (enemies,
-  truce/no-relation factions, and factionless players alike) is red by
-  default. The same subject genuinely renders differently to different
-  viewers at once, since each nametag is its own team registered on that
-  specific viewer's own scoreboard (see below) — ally/enemy status comes
-  from FactionsUUID's real `/f ally`/`/f enemy` relation (the more hostile
-  of the two factions' one-directional relation wishes wins, so a
-  one-sided ally wish alone doesn't count, but a one-sided enemy wish
-  does).
-- Configurable in `config.yml` under `nametags:` — `enabled`,
-  `update-interval-ticks`, and `colors.same-faction`/`colors.ally`/
-  `colors.enemy`/`colors.neutral` (any Adventure `NamedTextColor` name).
-- Teams live on each **viewer's own scoreboard**, one team per
-  (viewer, subject) pair — not a single shared team on the main
-  scoreboard. Every player has their own `Scoreboard` object (assigned
-  by the sidebar system, which replaces whatever scoreboard they had),
-  and a team only renders for whoever's *currently active* scoreboard
-  it's actually registered on — a shared main-scoreboard team is only
-  visible on the main scoreboard, which nobody stays on once they have
-  a sidebar. Nametags are re-populated onto a player's scoreboard on
-  join and on every `/hcfcore reload` (both replace it with a fresh
-  one), and kept in sync incrementally as factions change in between.
-- Teams are keyed by a short hash of the player's UUID (not their name),
-  so a Mojang username change can't orphan one. The name is kept to 14
-  characters, safely under the classic 16-char vanilla scoreboard-team
-  limit — a longer name works fine between modern Paper clients, but
-  silently breaks nametags for anyone on an older client version (even
-  bridged in via ViaVersion), which is still held to that limit
-  regardless of server version.
-
-## Faction Compatibility
-
-**All abilities respect faction relationships:**
-- ✅ Abilities can NOT be used on faction members/allies (except faction buffs)
-- ✅ Portable Bard buffs work on faction members (Strength, Speed, etc.)
-- ✅ Mage spells, Pearl Stunner, Backstab, etc. blocked on teammates
-- ✅ Melee combat works normally on everyone
-- ✅ Archer tag can't mark faction members
-- ✅ Full FactionsUUID 4.4.0+ compatibility
-
-## Archer tag
-
-A player wearing the full **leather** set (the `archer` kit or its donator
-variant — matched by `ArmorClass.isArcher`, same material-only rule the
-bard uses) marks whoever their arrows hit:
-
-- Each arrow hit adds a stack, up to `pvp.archer-tag.max-stacks`, and
-  refreshes the mark's `duration-seconds`. Stacks are shared across every
-  archer shooting that player, so two archers focusing one target stack
-  twice as fast.
-- **Arrows** landing on a marked player deal
-  `arrow-damage-bonus-per-stack` extra damage per stack. The arrow that
-  *opens* the mark deals normal damage — the bonus only applies from the
-  next arrow on.
-- **Melee** hits get `faction-melee-bonus-per-stack` per stack, but only
-  for members of a faction whose own archer put a mark on that player.
-  A rival faction, or a bystander, deals normal melee damage no matter
-  how deep the stack is. A factionless archer's mark gives *nobody* the
-  melee bonus (including themselves) — there's no faction to grant it to.
-- Both the archer and the target get a chat message on every hit, naming
-  the other player, the stack's current arrow and melee percentages, and
-  the seconds left. Unlike most player-facing text, these come from
-  `pvp.archer-tag.message-attacker` / `message-victim` in `config.yml`
-  (not `lang/*.yml`) — a single admin-authored MiniMessage template rather
-  than a per-locale message, the same treatment the combat action bar
-  templates get.
-- Archers can't mark their own faction members, and the mark clears on
-  death. It deliberately survives a disconnect, so relogging isn't a way
-  to shed it mid-fight.
-
-## Spawners (`spawners.yml`)
-
-A stackable mob-spawner economy, tied into faction claims. Buy a spawner
-from `/spawners` (a shop GUI listing every mob type configured in
-`spawners.yml`), place it inside your own faction's claimed land, and
-right-click it with a matching spawner item to stack it (shift-right-click
-deposits every matching spawner in your inventory at once). Right-clicking
-it with an empty or non-matching hand opens a management GUI to withdraw
-or sell spawners from the stack for a configurable percentage of the shop
-price (`sell-refund-percent`).
-
-**Stacking** scales the block's own vanilla spawn-count/nearby-entity-cap
-by stack size (`spawn-count-per-stack`, `max-nearby-entities-per-stack`,
-each with a hard cap) rather than this plugin manually re-spawning mobs
-every cycle — a bigger stack really does spawn more mobs per cycle, using
-vanilla's own spawner logic.
-
-**Mining** requires Silk Touch (`silk-touch-required`) and only works for
-members of the claim's own faction (or `/staffbuild`) — everyone else is
-blocked outright. `break-mode` controls whether breaking drops the whole
-stack (`drop-all`) or just one spawner at a time (`decrement`).
-
-**Mobs spawned from a tracked spawner** have every AI goal stripped
-(`Bukkit.getMobGoals().removeAllGoals(mob)` — movement, look, jump, and
-targeting alike) so they just stand still and can never attack a player —
-safe for AFK grinders — only moving when actually pushed by lava, a water
-current, or a player. Zombies and skeletons are also made immune to
-sunlight (`setShouldBurnInDay(false)`) — with no AI to walk themselves
-into shade, an above-ground farm would otherwise just burn its own stock
-for free (and for a stack, with no EXP, per the fire-kill rule below).
-Their death drops are replaced entirely by the `drops` list configured for
-that mob type in `spawners.yml`, instead of vanilla drops.
-
-**Iron Golems** can't actually be produced by a vanilla monster-spawner
-block no matter how it's tuned — golems have a built-in spawn-rule check
-that a spawner block can never satisfy, a well-known vanilla limitation,
-not something specific to this plugin. Tracked Iron Golem spawners are
-instead ticked manually (every 5s, respecting the same required-player-
-range/nearby-entity-cap/spawn-count tuning as every other mob type) and
-spawned directly, tagged so they're indistinguishable from a normal
-spawner-produced mob (AI-stripped, stacked, etc.) — every other configured
-mob type spawns through the normal vanilla mechanism.
-
-**Claim integration**: a chunk with active spawners can't be `/f unclaim`'d
-on its own — the plugin refuses and tells the player why. `/f unclaimall`
-isn't blocked (there's no practical way to protect specific chunks from a
-whole-faction unclaim), but every spawner in the land being released is
-dropped as an item and the player is warned how many. A faction disbanding
-(voluntarily or automatically) drops every spawner in all of its claimed
-land the same way, warning whoever disbanded it how many were lost. Each
-spawner remembers which faction actually placed it, so a chunk genuinely
-overclaimed by a *different* faction drops whatever spawners the previous
-owner had there, while a faction simply re-running `/f claim` on land it
-already owns leaves its own spawners untouched.
-
-### Mob Stacking (`spawners.yml` → `mob-stacking`)
-
-Nearby mobs of the same type merge into a single tracked entity instead of
-letting entity count balloon once a stacked spawner is running dozens of
-spawns per cycle. A mob of a `stackable-types` entry within
-`merge-radius-blocks` of an existing stack (of the same type, under
-`max-stack-limit`) is folded into it instead of remaining its own entity —
-this applies regardless of *how* it spawned, bypassing vanilla's own
-nearby-entity spawn limits in the process. Merging is checked both at spawn
-and on a periodic sweep afterward, so a mob that free-falls or rides a
-water stream down a multi-level spawner shaft still merges once it settles
-near the collection point below, not just mobs that happen to spawn within
-range of each other — set `merge-radius-blocks` generously enough to cover
-your tallest shaft. The merged entity shows a nametag (`display-format`,
-with `{count}`/`{name}` placeholders) once its count is 2 or higher, and is
-exempted from despawning when players leave the area
-(`setRemoveWhenFarAway(false)`) — it only goes away on a server restart or
-a manual clear.
-
-**Killing a stack**: a direct player hit peels exactly **one** mob off the
-stack — that one mob's own loot and EXP drop, the stack shrinks by one, and
-the rest of the stack is untouched (no damage carries over). Any other
-lethal cause (fire, lava, ...) instead kills the **entire stack** at once:
-every mob's worth of drops come out, batched into full item stacks
-(capped by `drop-batch-size` and each material's own max stack size) to
-avoid flooding the ground with one item entity per mob, but **no EXP**
-drops — only a direct player kill grants EXP.
-
-Run `/hcfcore clearmobstacks` (`hcfcore.admin`) to manually remove every
-currently-tracked stacked mob across all loaded chunks — the "manual
-entity-clear" a lagclear/entity-clear task would trigger; there's no
-automatic scheduled version of this built in.
-
-## Chunk Collector (`collectors.yml`)
-
-A placeable Green Shulker Box that vacuums up mob-kill drops so a
-grinder/farm doesn't carpet the ground in loot. Every item a **non-player**
-entity drops on death is PDC-tagged the instant it dies — player deaths,
-manually-dropped items, and block-break drops are never tagged (they never
-go through that code path in the first place), and EXP orbs are never
-touched at all. A tagged item that spawns strictly **above** a same-chunk
-collector's Y level is absorbed immediately; a periodic sweep (every
-`scan-interval-ticks`) catches anything that fell through some other path
-(e.g. it existed before the collector was placed).
-
-**Storage** is virtual and per-item-type — right-click a collector to open
-a 27-slot GUI with one slot per unique item type currently stored, showing
-`Stored: {amount} / {capacity}` in its lore. Left-click withdraws one stack
-(64), shift-click withdraws everything stored for that type. A
-`base-capacity-per-type` cap applies to *every* item type independently
-(50,000 rotten flesh **and**, separately, 50,000 bone, not a combined
-total) and can be raised via the Nether Star upgrade button, up to
-`max-upgrade-tier`, at an increasing money cost
-(`upgrade-cost-base * upgrade-cost-multiplier^tier`).
-
-**Placement/breaking** is gated on faction claim ownership exactly like
-spawners (`/staffbuild` bypasses it), capped at `max-per-chunk` and
-`max-per-player`, and requires Silk Touch to break if
-`silk-touch-required` is set. Breaking one drops it as an item with every
-stored count and its upgrade tier intact (round-tripped through the same
-PDC schema the placed block uses), so moving a collector never loses
-anything. Hoppers can't be placed within `hopper-block-radius` blocks of a
-collector, and one already touching the collector block can't push into
-or pull out of it.
-
-There's no in-game shop for these — `/chunkcollector give <player>`
-(`hcfcore.collector.give`) hands one out directly.
-
-## Blueprint Base Builder (`blueprints.yml`)
-
-**Requires both FastAsyncWorldEdit and DecentHolograms installed** — the
-feature is simply never wired up (logged once at startup, no errors) if
-either is missing, since it can't function without them (FAWE is the only
-way this plugin can load a `.schem` file; DecentHolograms is the required
-progress display).
-
-Placing a Blueprint item (a marked Beacon) starts a gradual build: the
-entire schematic's bounding box must fit 100% inside the placing player's
-own faction's claimed land (checked synchronously against every touched
-chunk), or it's refused outright. Once started, the beacon is completely
-unbreakable/unmovable (explosions, pistons included) until the build
-finishes or is cancelled, and a DecentHolograms display above it shows the
-structure name, progress, and owner. The structure is placed gradually
-over `build-time-seconds`, batched every `batch-interval-ticks` — never
-slower than that even for a huge schematic, since each batch's size is
-computed from the remaining block count divided by the remaining batches.
-
-Every `claim-recheck-interval-ticks`, the build's claimed-land status is
-re-checked; if the chunk or territory is no longer 100% the owning
-faction's land (overclaimed, voluntarily unclaimed, etc.), the build
-aborts immediately — blocks already placed are left as-is, and the beacon
-is **not** refunded, matching an explicit cancel via the beacon's own
-progress GUI (right-click it while a build is active).
-
-**Persistence across restarts**: an active build's world/location,
-template, owner, and current progress index are saved to the database on
-every batch. On restart, each one re-loads the same `.schem` file (whose
-deterministic iteration order reproduces the identical block list) and
-resumes from the saved index — after first re-validating claim ownership,
-since land can change hands while the server is down.
-
-Cooldown (`cooldown-seconds`) is per-player between placements. There's no
-in-game shop — `/blueprint give <player> <template>`
-(`hcfcore.blueprint.give`) hands one out directly; templates (and their
-`.schem` file, under `<plugin data folder>/schematics/`) are defined in
-`blueprints.yml`.
-
-## Staff Tools
-
-Session-scoped toggles (nothing persists across a rejoin — same as
-combat tags), all gated behind their own `hcfcore.staff.*` permission:
-
-- **`/vanish`** — hides you from anyone without `hcfcore.staff.vanish`.
-  Applies immediately to every online viewer and to anyone who joins
-  afterward; your quit message is suppressed while vanished so leaving
-  doesn't announce your name. Mobs stop targeting you the instant you
-  vanish (any mob already mid-chase has its target cleared, and nothing
-  can pick you as a new target while vanished), and you can't deal
-  damage to anything — mobs or players, melee or projectile — while
-  vanished either. Both exist for the same reason: a mob swinging at
-  empty air, or a player getting hit/knocked back by nothing, gives
-  away that someone invisible is there.
-- **`/staffchat`** — toggles a mode where *all* your normal chat goes to
-  a staff-only channel (visible to `hcfcore.staff.staffchat`) instead of
-  public chat, until you toggle it off again.
-- **`/staffbuild`** — bypasses FactionsUUID's claim protection entirely:
-  block break/place, containers/doors, buckets, item frames/paintings,
-  and entity interaction all work in any claim while it's on.
-- **`/staff`** — toggles vanish + staff-build together as one "full staff
-  mode" switch, and also grants **godmode** (invulnerability) and
-  **flight** for the duration. Treats everything as already "on" only
-  when vanish and staff-build both are — so if you'd turned one off
-  individually, `/staff` turns everything back on rather than finishing
-  the job of turning it off.
-
-### Freeze
-
-`/freeze <player>` (permission `hcfcore.staff.freeze`) locks a player in
-place while staff investigate — a suspected cheater doesn't get a
-ban's tip-off. While frozen, a player can't move (they can still look
-around), break/place blocks, interact, deal or take any damage, drop
-items, click their own inventory, run any command, launch a projectile
-(ender pearl, arrow, snowball, egg, fishing hook), eat or drink anything,
-use a bucket, pick up items, or swap their main/off hand — the only
-thing left is logging out. They're warned in chat not to log out;
-**disconnecting while frozen bans them for 3 hours** (`Player.ban(...)`,
-not a kick — `/freeze` itself never kicks or bans on its own, only
-leaving while frozen does), and every other online staff member with the
-permission is alerted. `/freeze` again unfreezes. Freeze state is
-session-scoped like the other toggles above — it doesn't survive a
-server restart.
-
-Projectiles get checked twice — once via cancelling the interact event
-that starts the throw, and again on the projectile itself
-(`ProjectileLaunchEvent`) — since cancelling the interact event alone
-doesn't reliably stop every launch path (the plugin's own pearl-cooldown
-and Pearl Stunner code already double up on pearls the same way).
-
-### Invsee / Endersee
-
-`/endersee <player>` (permission `hcfcore.staff.endersee`) opens the
-target's **live** ender chest — Bukkit's `openInventory` on another
-player's actual inventory object is a real two-way view with no custom
-GUI involved: an edit on either side shows up for both immediately.
-
-`/invsee <player>` (permission `hcfcore.staff.invsee`) opens a custom
-GUI showing the target's hotbar, main storage, **and their equipped
-armor and offhand item** — there's no vanilla container type that shows
-someone else's equipment, so a plain inventory view (like `/endersee`
-above) only ever shows the 36 storage/hotbar slots. Unlike `/endersee`,
-this isn't a live shared reference: edits are synced back to the target
-one tick after each click, and armor slots reject anything that isn't
-actually that armor piece (a diamond sword can't end up in the helmet
-slot). A change the target makes to their own gear while the menu is
-open won't show up until it's reopened.
-
-Block breaking in WarZone/SafeZone claims is left entirely to
-FactionsUUID's own native protection — this plugin doesn't duplicate it.
-
-## Reboot scheduling
-
-`/reboot [minutes]` starts a countdown (default `reboot.default-delay-minutes`)
-to a full server shutdown, broadcasting reminders at
-`reboot.reminder-minutes` marks; `/reboot cancel` stops it. `/nextreboot`
-shows any player the currently scheduled countdown, if one is running.
-
-## Commands & Permissions
-
-### Kits
-
-| Command | Permission | Notes |
-|---|---|---|
-| `/kit <name>` | kit's own permission (blank for the six base kits — open to everyone; the `-donator` variants require theirs) | Applies the kit to your inventory, respecting its cooldown and cost. |
-| `/kit create <name> [permission] [cooldownSeconds] [cost] [costItem[:amount]]` | `hcfcore.kit.create` | Saves your current inventory as a kit. `costItem` is a Material name, e.g. `DIAMOND:2`; amount defaults to 1. The older `/kit save` alias remains supported (`hcfcore.kit.save`). |
-| `/kit delete <name>` | `hcfcore.kit.delete` | Deletes a kit. |
-| `/kits` | *(none — open to all players)* | Opens a fixed 4-row GUI: non-donor kits fill row 2, each one's `-donator` variant sits directly below it in row 3 (same column), both kept off the outer columns. Seven columns per page, with labeled arrow buttons in the top corners when there are more; a donor kit with no matching base kit still gets its own column. **Left-click** claims it, **right-click** previews its contents read-only. |
-
-### Tags
-
-| Command | Permission | Notes |
-|---|---|---|
-| `/tags` | *(none — open to all players)* | Opens the tags GUI (see **Tags** above). |
-
-### Abilities
-
-| Command | Permission | Notes |
-|---|---|---|
-| `/getitem <username> <ability> [amount]` | `hcfcore.ability.give` | Gives a player ability items directly, ignoring cooldowns. |
-| `/abilities` | *(none — open to all players)* | Opens a GUI listing every ability's name/lore. A viewer with `hcfcore.ability.give` who clicks one receives a copy; everyone else's click just closes/does nothing. |
-| `/cooldowns` | *(none — open to all players)* | Shows your own active cooldowns: kits, ability items, the shared global ability cooldown, and the vanilla pearl/golden-apple/enchanted-golden-apple timers. |
-| `/spawners` | *(none — open to all players)* | Opens the spawner shop GUI (see **Spawners** above). |
-
-### Language
-
-| Command | Permission | Notes |
-|---|---|---|
-| `/language [code]` | *(none — open to all players)* | With no args, shows your current locale and everything available. With a code (e.g. `es_us`), switches to it and persists the choice. |
-
-### Combat
-
-| Command | Permission | Notes |
-|---|---|---|
-| `/uncombat <player>` | `hcfcore.combat.uncombat` | Clears a player's combat tag; notifies both staff and the target. |
-| `/combatcheck <player>` | `hcfcore.combat.check` | Reports tagged status, time left, and (if tagged) the opponent's name, health, and ping. |
-| `/combattag <player> [opponent\|server]` | `hcfcore.combat.tag` | Testing tool. With no second argument (or `server`), tags the target against a synthetic **"Server"** opponent — lets one admin alone see the action bar without a second player online. With a real opponent name, tags both players against each other. |
-
-While tagged, both players see an action bar built from a fully
-configurable MiniMessage template in `config.yml` under `pvp.actionbar`
-— three separate templates for the three cases:
-
-- `vs-player` — tagged against a real online opponent: `{health}`,
-  `{opponent}`, `{seconds}`, `{your_cps}`, `{their_cps}`
-- `vs-server` — tagged via `/combattag <you> server`: `{seconds}`, `{your_cps}`
-- `vs-unknown` — tagged, but the opponent went offline: `{seconds}`, `{your_cps}`
-
-`{seconds}` and `{health}` arrive pre-colored (the countdown is always
-green, health is always red) since those are computed live and can't be
-a fixed color in a static template — everything else in the wording,
-colors, and layout is yours to rearrange. CPS (clicks per second) is
-tracked from arm swings for every online player, not just tagged ones,
-so the count is already warm the instant a tag starts.
-
-Landing a kill shortens the killer's own combat tag down to
-`pvp.post-kill-combat-seconds` (default 5), instead of leaving them
-stuck waiting out the full `pvp.combat-tag-seconds` duration — enough
-time to loot the body and retreat. It only shortens an existing tag;
-a kill can't start one that wasn't already there. Dying clears the
-victim's own tag entirely (they're out of combat) without touching
-the killer's — so a kill's shortened cooldown always survives the
-death that caused it.
-
-A thrown ender pearl is blocked at **both ends**: throwing one while
-standing inside a WorldGuard region or claim named in
-`pvp.no-pearl-regions` / `pvp.no-pearl-claim-names` (default: `spawn`,
-`safezone`) cancels the throw outright, and one landing inside those
-same zones cancels the teleport — between the two, a pearl can never
-cross into, out of, or through a protected zone in either direction.
-Either way the pearl itself is handed back (dropped at your feet if
-your inventory is full), since vanilla consumes it as part of throwing,
-not landing. Time Warp Pearl checks its recorded origin against the
-same zones too, so a pearl thrown out of spawn long before a fight
-can't become an anytime recall-to-safety button. Switcher Snowball
-won't swap either side if the thrower or the target is standing in one
-of these zones, for the same reason.
-
-The pearl cooldown itself only starts once a throw actually **lands**
-(`PlayerTeleportEvent`, not the initial throw) — a throw that gets
-blocked by a protected zone, or by Pearl Stunner, costs nothing and
-starts no cooldown, since a pearl that never landed shouldn't count
-against you either way. A pearl thrown while actively falling or
-looking downward also gets extra velocity
-(`pvp.pearl-velocity-multiplier`, default 1.35x) — a flat or upward
-throw is untouched, so this can't be used to snipe someone from across
-the map.
-
-`pvp.disable-hunger-worlds` (default: empty) lists worlds where hunger
-never changes at all — useful for a spawn/safezone world where players
-shouldn't need to eat.
-
-### Rally
-
-| Command | Permission | Notes |
-|---|---|---|
-| `/f rally [set\|clear]` (alias `/frally`) | *(none — open to all faction members)* | With no argument, sets a rally at your current location, visible to your whole faction for 4 minutes. `clear` removes it early. |
-
-Faction members see a green bossbar with the distance and a compass arrow
-pointing toward the rally, refreshing every 2 ticks (10×/second) to keep
-up with fast movement. The arrow shows a true compass bearing (north stays
-north) rather than one relative to which way you're facing.
-
-### Reboot
-
-| Command | Permission | Notes |
-|---|---|---|
-| `/reboot [minutes]` | `hcfcore.reboot.start` | Starts a shutdown countdown. |
-| `/reboot cancel` | `hcfcore.reboot.start` | Cancels an in-progress countdown. |
-| `/nextreboot` | *(none — open to all players)* | Shows the currently scheduled countdown, if any. |
-
-### Staff / Rollback
-
-| Command | Permission | Notes |
-|---|---|---|
-| `/rollback <player>` | `hcfcore.staff.rollback` | Opens a death history GUI for a player. Shows the last 20 deaths with timestamps, death causes, and killer info. **Left-click** a death to restore all items to your inventory; **right-click** to view the death's contents in detail. |
-
-The death history system automatically captures:
-- **Inventory items** from the moment of death
-- **Armor pieces** (helmet, chestplate, leggings, boots)
-- **Off-hand items**
-- **Death timestamp** (formatted as MM/dd HH:mm:ss)
-- **Death cause** (damage type)
-- **Killer name** (if killed by a player; otherwise shows "Environment")
-
-Each player's death history persists to MySQL and stores the last 20 deaths automatically. Older deaths are purged, so the database footprint stays constant per player.
-
-**Death restoration workflow:**
-1. Staff member runs `/rollback <player>` to open the death list
-2. Each death shows its number, timestamp, cause, and killer
-3. **Left-click** to restore all items to the staff member's inventory (overflow items drop to the ground)
-4. **Right-click** to view exactly what items/armor/offhand the player had at that death
-5. The "Back" button in the contents view returns to the death list
-
-### Staff
-
-| Command | Permission | Notes |
-|---|---|---|
-| `/staff` | `hcfcore.staff.mode` | Toggles vanish + staff-build + godmode + flight together. |
-| `/vanish` | `hcfcore.staff.vanish` | Toggles vanish; this permission also lets you see other vanished staff. |
-| `/staffchat` | `hcfcore.staff.staffchat` | Toggles redirecting your chat to the staff-only channel; also needed to read it. |
-| `/staffbuild` | `hcfcore.staff.staffbuild` | Toggles bypassing claim protection everywhere. |
-| `/freeze <player>` | `hcfcore.staff.freeze` | Toggles freezing a player in place; also needed to see the leave-while-frozen ban alert. |
-| `/invsee <player>` | `hcfcore.staff.invsee` | Opens a GUI with the target's storage, armor, and offhand; synced back on each edit (not a live shared view). |
-| `/endersee <player>` | `hcfcore.staff.endersee` | Opens the target's live ender chest. |
-
-### Admin / reload
-
-| Command | Permission | Notes |
-|---|---|---|
-| `/hcfcore reload` | `hcfcore.admin` | Reloads config, messages, kits, abilities, tags, and rebuilds the scoreboard for every online player. |
-| `/hcfcore clearmobstacks` | `hcfcore.admin` | Manually removes every currently-tracked stacked mob (see **Mob Stacking**) across all loaded chunks. |
-| `/chunkcollector give <player>` | `hcfcore.collector.give` | Gives a player a Chunk Collector (see **Chunk Collector**) -- there's no in-game shop for these. |
-| `/blueprint give <player> <template>` | `hcfcore.blueprint.give` | Gives a player a Blueprint (see **Blueprint Base Builder**) -- there's no in-game shop for these. |
-
-## Tab-completion
-
-Every command above (`kit`, `kits`, `hcfcore`, `getitem`, `abilities`,
-`language`, `cooldowns`, `tags`, `reboot`, `nextreboot`, `uncombat`,
-`combatcheck`, `combattag`, `rollback`, `staff`, `vanish`, `staffchat`,
-`staffbuild`, `freeze`, `invsee`, `endersee`) registers its own
-`TabCompleter` (except the argument-less ones like
-`kits`/`abilities`/`tags`/`cooldowns`/`staff`/`vanish`/`staffchat`/`staffbuild`), so
-suggestions should appear as soon as the freshly built jar is running on
-the server. If they don't show up in-game:
-
-1. Confirm the server is actually running the jar you just built — check
-   `plugins/HCFCore.jar`'s modified date, or run `/hcfcore reload` and watch
-   the console for the plugin's own log line to confirm it's the loaded
-   instance.
-2. Confirm you have the command's permission — `/kit`, `/kits`, and console
-   generally show suggestions regardless, but a player missing
-   `hcfcore.combat.tag` etc. won't see `/combattag` suggested at all (though
-   they can still see subcommand args once they've typed the base command,
-   if permitted).
-3. Some clients cache command suggestions per-session; rejoin if a command
-   was added while you were already connected.
-
-## Architecture notes
-
-- All player-facing text uses Adventure `Component`s, not legacy color
-  codes (except a couple of plain-string fallbacks for console-only
-  messages). Item display names/lore always run through an explicit
-  `TextDecoration.ITALIC, false` — Minecraft renders those italic by
-  default when unset, which otherwise silently affects any raw
-  `Component.text(...)` used in a GUI.
-- All MySQL access goes through HikariCP off the main thread.
-- HikariCP and the MySQL driver are shaded and relocated into
-  `me.hcfcore.core.libs.*` to avoid classpath collisions with other plugins.
-- GUIs (`/kits`, `/tags`, `/abilities`, kit preview) use a static-nested
-  `Holder implements InventoryHolder` per menu to identify their own
-  inventories in click listeners, rather than comparing title strings.
-  The tags GUI additionally rebuilds itself from an immutable
-  `TagMenuState` (sort/filter/page/search) on every click rather than
-  mutating anything in place.
-- `GradientColor` (in the `tag` package) is a small pure-function utility:
-  reversing a MiniMessage gradient's stop order, and extracting/stripping
-  a tag's leading color (MiniMessage or legacy `&`/`&#RRGGBB`) from its
-  `display` string, since tags embed their color directly rather than
-  storing it separately.
-- Class detection for gameplay rules that key off "what class is this
-  player" (doubling/halving Portable Bard's buff effects) goes through
-  `ArmorClass`, which matches armor **material** only — worn durability,
-  donator enchantments, and repairs must not drop a player out of their
-  class mid-fight. That's deliberately looser than the exact-set match
-  `KitManager` uses to decide whether a kit's passive `effects` apply, and
-  strict enough to keep the mage set (gold helmet + gold boots over
-  chainmail) from reading as a bard.
-- `ArcherTagManager` stores faction **ids**, not `Faction` objects or
-  player lookups, and takes them as plain ints from the caller. That keeps
-  the stacking/expiry logic unit-testable with no Factions plugin running,
-  and confines the FactionsUUID API to `ArcherTagListener`.
-  `FactionsHook.NO_FACTION` is the factionless sentinel and never matches
-  anything, so a mark from a factionless archer grants no melee bonus
-  rather than arming every factionless player.
-- Short-lived cooldowns that would be pointless to persist —
-  `VanillaCooldownManager`'s pearl/gapple timers — live in memory, keyed
-  by UUID. Their quit handlers only drop entries that have already
-  expired; clearing live ones would turn a relog into a cooldown reset.
-- `CombatManager.SERVER_UUID` (`new UUID(0, 0)`) is a reserved sentinel
-  opponent id used only by `/combattag ... server` — never a real player's
-  UUID, so it can't collide.
-- Kit class effects are driven by a single every-tick pass
-  (`KitManager.checkArmorEffects`) that compares each online player's worn
-  armor against every kit's exact armor set. It deliberately only checks
-  effect *presence*, not amplifier, when topping up an already-active
-  kit's effects — an external potion (PvP, milk bucket, etc.) sharing an
-  effect type with the kit legitimately overrides it without the kit
-  effect having "fallen off", and re-triggering the warmup/message for
-  that would misfire mid-fight.
-- `LuckPermsHook.getPrimaryGroupDisplayName` returns `null` (not the raw
-  group id) for LuckPerms' built-in `default` group when it has no
-  configured display name, so chat doesn't print the literal word
-  `default` as everyone's rank.
-- `EconomyHook` and `WorldGuardHook` (Vault and WorldGuard are both
-  softdepends) share one shape with the FactionsUUID-specific
-  `FactionsHook`: a static, stateless wrapper that checks the target
-  plugin is actually enabled before touching any of its classes, so
-  HCFCore runs fine without them installed.
-- `ChatFormatterListener` registers at `EventPriority.MONITOR`, not
-  `HIGHEST`. Paper's `AsyncChatEvent` has exactly one renderer slot — the
-  last handler to call `event.renderer(...)` wins outright, nothing
-  merges — and FactionsUUID ships its own Paper-native chat formatter
-  (enabled by default) that also sets a renderer at `HIGHEST`. At equal
-  priority it came down to plugin load order which formatter actually
-  showed in chat. `MONITOR` guarantees this always runs last so HCFCore's
-  format always wins, regardless of load order.
-
-## Quality Assurance & Recent Improvements
-
-**Production-ready stability fixes:**
-
-- **Thread-safe generation tracking** — `UserManager.nextGeneration()` uses atomic operations to prevent concurrent player data loads from colliding.
-- **Atomic shutdown writes** — `KitManager` and `LanguageCommand` loop until all pending async writes complete, preventing data loss during shutdown.
-- **Transaction safety** — Death records and cleanup are now atomic, preventing race conditions when multiple players die concurrently.
-- **Database pool hardening** — HikariCP configured with minimum idle connections, connection timeouts, and idle/max-lifetime limits to prevent hung connections under load.
-- **Rally visual fixes** — Bossbar colors now properly render MiniMessage format codes (`<green>`, `<white>`, etc.); rally arrows use a true compass bearing (see **Rally** under Commands & Permissions) — an earlier version of that bearing formula had north and south swapped, since Minecraft's +Z axis is south while the formula assumed the opposite.
-- **Message formatting** — Death GUI and rally displays properly deserialize MiniMessage color codes via `MessageFormatter.deserialize()`.
-- **Performance optimization** — Message locale list is now cached, eliminating O(n log n) sorting overhead on every tab-complete.
-
-All critical race conditions, data consistency issues, and shutdown data-loss bugs have been resolved. The plugin is fully tested and ready for production deployment.
+1. Drop the shaded jar from `Vertex/target/` into `plugins/`, next to `FactionsUUID.jar`.
+2. Start the server. You'll see the Vertex banner in the console with the
+   running version, and everything works immediately — data goes into a
+   local `plugins/Vertex/vertex.db` file with no setup.
+3. Optionally tune `plugins/Vertex/config.yml`, then run `/vertex reload`.
+   To use MySQL instead of the local file, set `storage.type: mysql` and
+   fill in the `mysql` section.
+
+Full steps, upgrade notes, and database details are in
+[Installation](docs/installation.md).
+
+## Features
+
+### Kits & Abilities
+
+- **Six kit classes** (Archer, Miner, Bard, Diamond, Rogue, Mage), each
+  with a free tier and a permission-gated donator tier — armor-based, so
+  a class is recognized by what a player is wearing, not a hidden state.
+- **Passive class effects** — wearing a kit's exact armor set grants
+  buffs like Speed, Haste, or Invisibility after a short warmup.
+- **21 PvP ability items** — pearl-blocking, backstabs, mage debuffs, a
+  grappling hook, a teleport-on-hit ninja star, party buffs, and more,
+  each with its own cooldown and full customization.
+- Money and/or item costs, per-kit permissions, and an in-game kit
+  creator (`/kit create`).
+
+→ [Kits & Abilities](docs/kits-and-abilities.md)
+
+### PvP & Combat
+
+- **Combat tag system** with a live action bar, a shortened tag on a
+  kill, and configurable commands blocked while tagged.
+- **Legacy Combat** — an optional full 1.8 PvP restoration: instant
+  attacks, a custom weapon-damage table, flat armor reduction, no
+  offhand, tunable knockback, slow health regen, and admin-defined
+  golden apple effects.
+- **Archer Tag** — arrows mark victims, stacking bonus damage and a
+  faction-wide melee bonus.
+- Persistent, logout-proof cooldowns on pearls and golden apples, with
+  no-pearl safezones enforced at both the throw and the landing.
+
+→ [PvP & Combat](docs/pvp-and-combat.md)
+
+### Factions
+
+- **Faction-aware chat and scoreboard**, with PlaceholderAPI support
+  alongside built-in placeholders.
+- **Relation-colored nametags** — your faction is green, allies are
+  purple, everyone else is red, rendered independently for every viewer.
+- **Rally points** (`/f rally`) with a live compass and distance bossbar.
+- **A visual permission-matrix GUI** for faction leaders, extending
+  FactionsUUID's own role permissions, with clear green/red state panes,
+  small-caps labels, and `/f perms` / `/f permissions` completion.
+
+→ [Factions Integration](docs/factions-integration.md)
+
+### Economy & Automation
+
+- **A stackable spawner shop** (`/spawners`) with per-mob pricing, custom
+  drop tables, and vanilla-accurate stacked spawn rates.
+- **Mob stacking** keeps entity counts sane on busy grinders.
+- **Chunk Collectors** — a placeable block that vacuums up mob-kill
+  drops into shared, upgradeable storage.
+- **Automated Blueprint base building** — place an item, and a full
+  `.schem` structure builds itself inside your claim over time (needs
+  FastAsyncWorldEdit + DecentHolograms).
+
+→ [Spawners & Collectors](docs/spawners-and-collectors.md) · [Blueprints](docs/blueprints.md)
+
+### Cosmetics
+
+- **Equippable tags** with gradient colors, a searchable/sortable GUI,
+  and optional name recoloring to match.
+
+→ [Tags & Cosmetics](docs/tags-and-cosmetics.md)
+
+### Staff & Administration
+
+- **Vanish, staff chat, staff-build, and freeze**, each independently
+  toggleable, plus a one-command combined staff mode.
+- **Invsee/Endersee** for live inventory and ender chest inspection.
+- **Death rollback** — restore a player's items from any of their last
+  20 deaths.
+- **Scheduled reboots** with broadcasted countdown reminders.
+
+→ [Staff Tools](docs/staff-tools.md)
+
+### Everything else
+
+- **Four languages** out of the box (English, Spanish, Portuguese,
+  German), with per-player language selection and easy translation.
+- Every command, permission, and config option is documented in
+  [`docs/`](docs/README.md) — nothing here is hidden or undocumented.
+
+→ [Localization](docs/localization.md)
+
+## Documentation
+
+| | |
+| --- | --- |
+| [Full documentation index](docs/README.md) | Start here |
+| [Installation](docs/installation.md) | Requirements, build, deploy, upgrading |
+| [Configuration](docs/configuration.md) | Every `config.yml` option explained |
+| [Commands & Permissions](docs/commands-and-permissions.md) | Every command and permission node |
+| [Integrations](docs/integrations.md) | What each supported plugin unlocks |
+| [Architecture](docs/architecture.md) | Package layout and internals, for contributors |
+
+## License
+
+MIT — see [LICENSE](LICENSE).

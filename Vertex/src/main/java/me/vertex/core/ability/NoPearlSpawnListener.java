@@ -1,0 +1,103 @@
+package me.vertex.core.ability;
+
+import me.vertex.core.factions.FactionsHook;
+import me.vertex.core.lang.Messages;
+import me.vertex.core.worldguard.WorldGuardHook;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.entity.EnderPearl;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
+
+import java.util.Set;
+
+/**
+ * Stops a thrown ender pearl from crossing into or out of a protected zone
+ * (spawn/safezone by default) -- otherwise a player being chased in combat
+ * can pearl straight into safety, or pearl a fight straight into it from the
+ * other side. HIGH priority, ahead of TimeWarpPearlListener's MONITOR-priority
+ * origin recorder (ignoreCancelled = true there), so a blocked pearl is
+ * never recorded as a valid warp-back point either.
+ */
+public final class NoPearlSpawnListener implements Listener {
+
+    private final Plugin plugin;
+    private final Messages messages;
+
+    public NoPearlSpawnListener(Plugin plugin, Messages messages) {
+        this.plugin = plugin;
+        this.messages = messages;
+    }
+
+    /**
+     * Blocks the throw outright if the player is standing inside a
+     * protected zone -- covers both "pearling out of a safezone" and,
+     * combined with onPearl below checking the landing spot, "pearling
+     * across the safezone/warzone boundary" in either direction.
+     *
+     * <p>No refund here, deliberately: cancelling ProjectileLaunchEvent for
+     * an ender pearl happens before vanilla consumes the item, so the pearl
+     * is still in the player's hand untouched -- handing back an extra one
+     * on top of that duplicates it.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onLaunch(ProjectileLaunchEvent event) {
+        if (!(event.getEntity() instanceof EnderPearl pearl) || !(pearl.getShooter() instanceof Player player)) {
+            return;
+        }
+        if (FakePearlListener.isThrowingFakePearl(player.getUniqueId())) {
+            return;
+        }
+        if (isProtected(plugin, player.getLocation())) {
+            event.setCancelled(true);
+            player.sendMessage(messages.get(player, "combat.no-pearl-spawn"));
+        }
+    }
+
+    /**
+     * Unlike onLaunch above, the pearl here has already flown and is about
+     * to land -- vanilla consumed it back at throw time, a separate,
+     * already-completed step cancelling this teleport can't undo -- so
+     * blocking the landing does need to hand one back, or it's gone for
+     * nothing.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onPearl(PlayerTeleportEvent event) {
+        if (event.getCause() != PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
+            return;
+        }
+        if (isProtected(plugin, event.getTo())) {
+            event.setCancelled(true);
+            refund(event.getPlayer());
+            event.getPlayer().sendMessage(messages.get(event.getPlayer(), "combat.no-pearl-spawn"));
+        }
+    }
+
+    private static void refund(Player player) {
+        ItemStack refund = new ItemStack(Material.ENDER_PEARL, 1);
+        for (ItemStack dropped : player.getInventory().addItem(refund).values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), dropped);
+        }
+    }
+
+    /**
+     * Shared with TimeWarpPearlListener -- a recorded pearl origin can sit
+     * inside a protected zone from a much earlier, perfectly ordinary throw
+     * (e.g. pearling out of spawn before a fight even starts), so the
+     * recall needs the exact same check on its destination.
+     */
+    public static boolean isProtected(Plugin plugin, Location location) {
+        Set<String> regions = Set.copyOf(plugin.getConfig().getStringList("pvp.no-pearl-regions"));
+        if (WorldGuardHook.isInDisabledRegion(location, regions)) {
+            return true;
+        }
+        Set<String> claims = Set.copyOf(plugin.getConfig().getStringList("pvp.no-pearl-claim-names"));
+        return FactionsHook.isDisabledClaim(location, claims);
+    }
+}

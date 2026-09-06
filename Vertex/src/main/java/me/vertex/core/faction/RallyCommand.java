@@ -1,0 +1,73 @@
+package me.vertex.core.faction;
+
+import me.vertex.core.factions.FactionsHook;
+import me.vertex.core.lang.Messages;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
+
+public final class RallyCommand implements CommandExecutor {
+
+    private final RallyManager rallyManager;
+    private final Messages messages;
+
+    public RallyCommand(RallyManager rallyManager, Messages messages) {
+        this.rallyManager = rallyManager;
+        this.messages = messages;
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage(messages.getChat(sender, "general.players-only"));
+            return true;
+        }
+
+        Player player = (Player) sender;
+        int factionId = FactionsHook.getFactionId(player);
+
+        if (factionId == FactionsHook.NO_FACTION) {
+            sender.sendMessage(messages.getChat(sender, "factions.must-be-in-faction"));
+            return true;
+        }
+
+        if (args.length == 0) {
+            if (!rallyManager.canUse(player, "rally-set")) {
+                sender.sendMessage(messages.getChat(sender, "factions.rally-no-permission"));
+                return true;
+            }
+            // /rally with no args - set rally at current location
+            rallyManager.setRally(factionId, player.getLocation());
+            sender.sendMessage(messages.getChat(sender, "factions.rally-set"));
+            rallyManager.broadcastSet(player);
+            return true;
+        }
+
+        String action = args[0].toLowerCase();
+
+        if (action.equals("set")) {
+            if (!rallyManager.canUse(player, "rally-set")) {
+                sender.sendMessage(messages.getChat(sender, "factions.rally-no-permission"));
+                return true;
+            }
+            rallyManager.setRally(factionId, player.getLocation());
+            sender.sendMessage(messages.getChat(sender, "factions.rally-set"));
+            rallyManager.broadcastSet(player);
+            return true;
+        } else if (action.equals("clear")) {
+            if (!rallyManager.canUse(player, "rally-clear")) {
+                sender.sendMessage(messages.getChat(sender, "factions.rally-no-permission"));
+                return true;
+            }
+            rallyManager.clearRally(factionId);
+            sender.sendMessage(messages.getChat(sender, "factions.rally-cleared"));
+            return true;
+        }
+
+        sender.sendMessage(messages.getChat(sender, "factions.rally-usage"));
+        return true;
+    }
+}

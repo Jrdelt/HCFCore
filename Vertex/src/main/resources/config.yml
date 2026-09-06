@@ -1,5 +1,5 @@
 # ============================================
-# HCFCore Configuration
+# Vertex Configuration
 # ============================================
 # This config file controls all core gameplay settings.
 # See README.md for detailed explanations of each option.
@@ -12,13 +12,28 @@ language:
   default: en_us
 
 # ============================================
-# DATABASE (MySQL/MariaDB)
+# STORAGE
+# ============================================
+storage:
+  # Where player/kit/ability/spawner/collector/blueprint data is saved.
+  #   local - a single SQLite file (vertex.db) in this plugin's data
+  #           folder. Zero setup, works immediately, best for a single
+  #           server. This is the default -- leave this section alone
+  #           (or set it to anything other than exactly "mysql") to use it.
+  #   mysql - a MySQL/MariaDB server, configured in the "mysql" section
+  #           below. Only needed if multiple servers must share this
+  #           plugin's data (e.g. a proxied network), or you already run
+  #           a MySQL server and prefer to keep everything there.
+  type: local
+
+# ============================================
+# DATABASE (MySQL/MariaDB) -- only used when storage.type is "mysql"
 # ============================================
 mysql:
   # Connection details
   host: localhost
   port: 3306
-  database: hcfcore
+  database: vertex
   username: root
   password: ''
 
@@ -279,6 +294,24 @@ factions:
     - f
     - factions
     - t
+
+rally:
+  # Faction leaders open the complete permission matrix with /f permissions
+  # or /f perms. Left-click allows and right-click denies. FactionsUUID saves
+  # its built-in actions; this section supplies Vertex-specific actions.
+  # Permission states always use green/red stained-glass panes, so that an
+  # allowed action can never look blocked because of a custom item material.
+  permission-gui:
+    title: '<gold>Faction Permissions'
+    roles:
+      mod: {slot: 2, material: DIAMOND_SWORD, name: '<aqua>Moderator', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true}
+      member: {slot: 4, material: GOLDEN_SWORD, name: '<yellow>Member', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true}
+      recruit: {slot: 6, material: WOODEN_SWORD, name: '<gray>Recruit', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true}
+    actions:
+      vertex-rally-set: {name: 'Set Rally'}
+      vertex-rally-clear: {name: 'Clear Rally'}
+      # Add a FactionsUUID action here to customize its label. Example:
+      # build: {name: 'Build'}
 
 # ============================================
 # KITS

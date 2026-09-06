@@ -1,0 +1,202 @@
+package me.vertex.core.collector;
+
+import me.vertex.core.economy.EconomyHook;
+import me.vertex.core.factions.FactionsHook;
+import me.vertex.core.lang.Messages;
+import me.vertex.core.staff.StaffManager;
+import net.milkbowl.vault.economy.Economy;
+import net.milkbowl.vault.economy.EconomyResponse;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.PrepareAnvilEvent;
+import org.bukkit.inventory.ItemStack;
+
+/** Handles collector withdrawals, amount entry, and upgrades. */
+public final class ChunkCollectorMenuListener implements Listener {
+
+    private final ChunkCollectorManager manager;
+    private final StaffManager staffManager;
+    private final Messages messages;
+
+    public ChunkCollectorMenuListener(ChunkCollectorManager manager, StaffManager staffManager, Messages messages) {
+        this.manager = manager;
+        this.staffManager = staffManager;
+        this.messages = messages;
+    }
+
+    @EventHandler
+    public void onDrag(InventoryDragEvent event) {
+        if (event.getInventory().getHolder() instanceof ChunkCollectorMenu.Holder
+                || event.getInventory().getHolder() instanceof CollectorWithdrawAmountMenu.Holder) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onPrepareAnvil(PrepareAnvilEvent event) {
+        if (!(event.getInventory().getHolder() instanceof CollectorWithdrawAmountMenu.Holder holder)
+                || !(event.getView().getPlayer() instanceof Player player)) {
+            return;
+        }
+        event.getView().setRepairCost(0);
+        event.getView().setMaximumRepairCost(0);
+        Long amount = CollectorWithdrawAmountMenu.readAmount(player, holder.messages(), event.getView(), event.getInventory());
+        holder.setLastPreparedAmount(amount);
+        event.setResult(CollectorWithdrawAmountMenu.confirmButton(player, holder.messages(), amount));
+    }
+
+    @EventHandler
+    public void onClick(InventoryClickEvent event) {
+        Object rawHolder = event.getInventory().getHolder();
+        if (rawHolder instanceof CollectorWithdrawAmountMenu.Holder amountHolder) {
+            event.setCancelled(true);
+            if (event.getRawSlot() == CollectorWithdrawAmountMenu.SLOT_RESULT
+                    && event.getWhoClicked() instanceof Player player) {
+                completeAmountWithdrawal(player, event, amountHolder);
+            }
+            return;
+        }
+        if (!(rawHolder instanceof ChunkCollectorMenu.Holder holder)) {
+            return;
+        }
+        event.setCancelled(true);
+        if (event.getClickedInventory() == null || !(event.getClickedInventory().getHolder() instanceof ChunkCollectorMenu.Holder)) {
+            return;
+        }
+        if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        Location location = holder.location();
+        ChunkCollectorData data = manager.readData(location);
+        if (data == null) {
+            player.closeInventory();
+            return;
+        }
+        if (!canAccess(player, location)) {
+            player.closeInventory();
+            return;
+        }
+
+        if (event.getSlot() == ChunkCollectorMenu.UPGRADE_SLOT) {
+            upgrade(player, location, data);
+            // Keep the collector open after an upgrade attempt so the player
+            // can immediately buy another tier; reopening also refreshes the
+            // tier, capacity, and next-upgrade cost shown by the GUI.
+            ChunkCollectorMenu.open(player, manager, messages, location, data);
+            return;
+        } else if (event.getRawSlot() < ChunkCollectorMenu.SUMMARY_SLOT) {
+            ItemStack clicked = event.getCurrentItem();
+            if (clicked == null || clicked.getType() == Material.AIR) {
+                return;
+            }
+            if (event.isShiftClick()) {
+                withdraw(player, location, data, clicked.getType(), manager.shiftWithdrawAmount());
+                refresh(player, location);
+            } else {
+                CollectorWithdrawAmountMenu.open(player, messages, location, clicked.getType());
+            }
+        }
+    }
+
+    private void completeAmountWithdrawal(Player player, InventoryClickEvent event,
+                                          CollectorWithdrawAmountMenu.Holder holder) {
+        // Prefer a fresh read, but fall back to the last amount the anvil's
+        // own PrepareAnvilEvent successfully parsed -- see the comment on
+        // Holder.lastPreparedAmount for why a fresh read can spuriously
+        // come back blank right as the result slot is clicked.
+        Long amount = CollectorWithdrawAmountMenu.readAmount(player, holder.messages(), event.getView(), event.getInventory());
+        if (amount == null) {
+            amount = holder.lastPreparedAmount();
+        }
+        if (amount == null) {
+            player.sendMessage(messages.get(player, "collector.withdraw-invalid"));
+            return;
+        }
+        Location location = holder.location();
+        if (!canAccess(player, location)) {
+            player.closeInventory();
+            return;
+        }
+        ChunkCollectorData data = manager.readData(location);
+        if (data == null) {
+            player.closeInventory();
+            return;
+        }
+        long stored = data.stored(holder.material());
+        if (amount > stored) {
+            player.sendMessage(messages.get(player, "collector.withdraw-too-many",
+                    "available", String.format("%,d", stored)));
+            return;
+        }
+        withdraw(player, location, data, holder.material(), amount);
+        Bukkit.getScheduler().runTask(manager.plugin(), () -> refresh(player, location));
+    }
+
+    private boolean canAccess(Player player, Location location) {
+        if (staffManager.isStaffBuild(player.getUniqueId())) {
+            return true;
+        }
+        String claimTag = FactionsHook.getClaimFactionTag(location);
+        String playerTag = FactionsHook.getFactionTag(player);
+        if (claimTag != null && claimTag.equalsIgnoreCase(playerTag)) {
+            return true;
+        }
+        player.sendMessage(messages.get(player, "collector.cannot-access"));
+        return false;
+    }
+
+    private void refresh(Player player, Location location) {
+        ChunkCollectorData refreshed = manager.readData(location);
+        if (refreshed != null && player.isOnline()) {
+            ChunkCollectorMenu.open(player, manager, messages, location, refreshed);
+        }
+    }
+
+    private void withdraw(Player player, Location location, ChunkCollectorData data, Material material, long requestedAmount) {
+        long stored = data.stored(material);
+        if (stored <= 0) {
+            return;
+        }
+        long toWithdraw = Math.min(stored, requestedAmount);
+        long remaining = toWithdraw;
+        while (remaining > 0) {
+            int batch = (int) Math.min(remaining, material.getMaxStackSize());
+            for (ItemStack dropped : player.getInventory().addItem(new ItemStack(material, batch)).values()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), dropped);
+            }
+            remaining -= batch;
+        }
+        data.setStored(material, stored - toWithdraw);
+        manager.writeData(location, data);
+        player.sendMessage(messages.get(player, "collector.withdrew",
+                "amount", String.format("%,d", toWithdraw), "item", material.name()));
+    }
+
+    private void upgrade(Player player, Location location, ChunkCollectorData data) {
+        double cost = manager.upgradeCost(data.upgradeTier());
+        if (cost < 0) {
+            player.sendMessage(messages.get(player, "collector.upgrade-maxed", "tier", String.valueOf(data.upgradeTier())));
+            return;
+        }
+        if (!EconomyHook.isAvailable()) {
+            player.sendMessage(messages.get(player, "spawner.no-economy"));
+            return;
+        }
+        Economy economy = EconomyHook.getEconomy();
+        EconomyResponse response = economy.withdrawPlayer(player, cost);
+        if (!response.transactionSuccess()) {
+            player.sendMessage(messages.get(player, "collector.cannot-afford", "amount", EconomyHook.format(cost)));
+            return;
+        }
+        data.setUpgradeTier(data.upgradeTier() + 1);
+        manager.writeData(location, data);
+        player.sendMessage(messages.get(player, "collector.upgraded",
+                "tier", String.valueOf(data.upgradeTier()), "capacity", String.format("%,d", manager.capacityFor(data.upgradeTier()))));
+    }
+}

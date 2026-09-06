@@ -2,10 +2,10 @@
 # SPAWNER STACKING
 # ============================================
 # Maximum number of spawners a single stack can hold.
-max-stack-size: 64
+max-stack-size: 50
 
 # Whether breaking a spawner requires a Silk Touch pickaxe.
-silk-touch-required: true
+silk-touch-required: false
 
 # What breaking a stacked spawner does:
 #   drop-all   - drops every spawner in the stack as items, removes the block
@@ -24,8 +24,8 @@ spawn-count-per-stack: 1
 max-spawn-count: 8
 max-nearby-entities-per-stack: 2
 max-nearby-entities-cap: 32
-min-spawn-delay-ticks: 200
-max-spawn-delay-ticks: 400
+min-spawn-delay-ticks: 150
+max-spawn-delay-ticks: 300
 required-player-range-blocks: 32
 spawn-range-blocks: 4
 
@@ -35,7 +35,7 @@ spawn-range-blocks: 4
 # to keep vanilla drops instead.
 mobs:
   ZOMBIE:
-    display-name: '<green>Zombie Spawner'
+    display-name: '<green>ᴢᴏᴍʙɪᴇ ꜱᴘᴀᴡɴᴇʀ'
     price: 50000.0
     drops:
       - material: ROTTEN_FLESH
@@ -48,7 +48,7 @@ mobs:
         chance: 0.05
 
   SKELETON:
-    display-name: '<green>Skeleton Spawner'
+    display-name: '<green>ꜱᴋᴇʟᴇᴛᴏɴ ꜱᴘᴀᴡɴᴇʀ'
     price: 50000.0
     drops:
       - material: BONE
@@ -61,7 +61,7 @@ mobs:
         chance: 1.0
 
   BLAZE:
-    display-name: '<green>Blaze Spawner'
+    display-name: '<green>ʙʟᴀᴢᴇ ꜱᴘᴀᴡɴᴇʀ'
     price: 150000.0
     drops:
       - material: BLAZE_ROD
@@ -70,7 +70,7 @@ mobs:
         chance: 0.5
 
   IRON_GOLEM:
-    display-name: '<green>Iron Golem Spawner'
+    display-name: '<green>ɪʀᴏɴ ɢᴏʟᴇᴍ ꜱᴘᴀᴡɴᴇʀ'
     price: 200000.0
     drops:
       - material: IRON_INGOT
@@ -79,7 +79,7 @@ mobs:
         chance: 1.0
 
   EVOKER:
-    display-name: '<green>Evoker Spawner'
+    display-name: '<green>ᴇᴠᴏᴋᴇʀ ꜱᴘᴀᴡɴᴇʀ'
     price: 300000.0
     drops:
       - material: EMERALD

@@ -1,0 +1,149 @@
+package me.vertex.core;
+
+import me.vertex.core.lang.Messages;
+import me.vertex.core.storage.Database;
+import me.vertex.core.storage.StorageMigrator;
+import org.bukkit.Bukkit;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.logging.Level;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+public final class VertexCommand implements CommandExecutor, TabCompleter {
+
+    private final VertexPlugin plugin;
+    private final Messages messages;
+
+    public VertexCommand(VertexPlugin plugin, Messages messages) {
+        this.plugin = plugin;
+        this.messages = messages;
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (!sender.hasPermission("vertex.admin")) {
+            sender.sendMessage(messages.getChat(sender, "general.no-permission"));
+            return true;
+        }
+
+        if (args.length == 1 && args[0].equalsIgnoreCase("reload")) {
+            plugin.reload();
+            sender.sendMessage(messages.getChat(sender, "admin.reloaded"));
+            return true;
+        }
+
+        if (args.length == 1 && args[0].equalsIgnoreCase("clearmobstacks")) {
+            int removed = plugin.clearMobStacks();
+            sender.sendMessage(messages.getChat(sender, "admin.mobstacks-cleared", "amount", String.valueOf(removed)));
+            return true;
+        }
+
+        if (args.length >= 1 && args[0].equalsIgnoreCase("storage")) {
+            return handleStorage(sender, args);
+        }
+
+        sender.sendMessage(messages.getChat(sender, "admin.usage"));
+        return true;
+    }
+
+    private boolean handleStorage(CommandSender sender, String[] args) {
+        Database.Dialect current = plugin.storageDialect();
+
+        if (args.length == 1) {
+            sender.sendMessage(messages.getChat(sender, "admin.storage-current",
+                    "type", nameOf(current)));
+            return true;
+        }
+
+        Database.Dialect target = Database.dialectOf(args[1]);
+        boolean namedLocal = args[1].equalsIgnoreCase("local") || args[1].equalsIgnoreCase("sqlite");
+        boolean namedMysql = args[1].equalsIgnoreCase("mysql");
+        if (!namedLocal && !namedMysql) {
+            sender.sendMessage(messages.getChat(sender, "admin.storage-usage"));
+            return true;
+        }
+
+        if (target == current) {
+            sender.sendMessage(messages.getChat(sender, "admin.storage-already",
+                    "type", nameOf(current)));
+            return true;
+        }
+
+        boolean confirmed = args.length >= 3 && args[2].equalsIgnoreCase("confirm");
+        sender.sendMessage(messages.getChat(sender, "admin.storage-migrating",
+                "from", nameOf(current), "to", nameOf(target)));
+
+        // The copy touches two databases and can take a while on a large
+        // history table -- it must not run on the main thread.
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            Database targetDatabase = null;
+            try {
+                targetDatabase = new Database(plugin.getConfig(), plugin.getDataFolder(), target);
+
+                int existing = StorageMigrator.countRows(targetDatabase);
+                if (existing > 0 && !confirmed) {
+                    Database toClose = targetDatabase;
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        sender.sendMessage(messages.getChat(sender, "admin.storage-not-empty",
+                                "type", nameOf(target), "rows", String.valueOf(existing)));
+                        toClose.close();
+                    });
+                    return;
+                }
+
+                StorageMigrator.Result result =
+                        StorageMigrator.migrate(plugin.database(), targetDatabase);
+                StorageMigrator.writeStorageType(new java.io.File(plugin.getDataFolder(), "config.yml"),
+                        target == Database.Dialect.MYSQL ? "mysql" : "local");
+
+                Database toClose = targetDatabase;
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    toClose.close();
+                    sender.sendMessage(messages.getChat(sender, "admin.storage-migrated",
+                            "rows", String.valueOf(result.total()), "type", nameOf(target)));
+                });
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.SEVERE, "Storage migration failed", e);
+                Database toClose = targetDatabase;
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (toClose != null) {
+                        toClose.close();
+                    }
+                    sender.sendMessage(messages.getChat(sender, "admin.storage-failed",
+                            "error", String.valueOf(e.getMessage())));
+                });
+            }
+        });
+        return true;
+    }
+
+    private static String nameOf(Database.Dialect dialect) {
+        return dialect == Database.Dialect.MYSQL ? "mysql" : "local";
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (args.length == 1) {
+            String partial = args[0].toLowerCase(Locale.ROOT);
+            return Stream.of("reload", "clearmobstacks", "storage")
+                    .filter(sub -> sub.startsWith(partial))
+                    .collect(Collectors.toList());
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("storage")) {
+            String partial = args[1].toLowerCase(Locale.ROOT);
+            return Stream.of("local", "mysql")
+                    .filter(sub -> sub.startsWith(partial))
+                    .collect(Collectors.toList());
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("storage")) {
+            return "confirm".startsWith(args[2].toLowerCase(Locale.ROOT)) ? List.of("confirm") : List.of();
+        }
+        return List.of();
+    }
+}

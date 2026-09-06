@@ -1,42 +1,42 @@
 tags:
   berserker:
       display: "&8[<gradient:#ff512f:#f09819><b>Berserker</b></gradient>&8]&r"
-      permission: hcfcore.tag.berserker
+      permission: vertex.tag.berserker
       created-at: 1725235200000
       owners: 0
       lore:
         - '<gray>ᴅʀɪᴠᴇɴ ʙʏ ᴘᴜʀᴇ ʀᴀɢᴇ.'
   venom:
       display: "&8[<gradient:#00b09b:#96c93d><b>Venom</b></gradient>&8]&r"
-      permission: hcfcore.tag.venom
+      permission: vertex.tag.venom
       created-at: 1725235200000
       owners: 0
       lore:
         - '<gray>ᴛᴏxɪᴄ sᴛʀɪᴋᴇ.'
   ruin:
       display: "&8[<gradient:#f12711:#f5af19><b>Ruin</b></gradient>&8]&r"
-      permission: hcfcore.tag.ruin
+      permission: vertex.tag.ruin
       created-at: 1725235200000
       owners: 0
       lore:
         - '<gray>ʙʀɪɴɢ ᴛᴏᴛᴀʟ ᴄᴏʟʟᴀᴘsᴇ.'
   frostbite:
       display: "&8[<gradient:#2980b9:#6dd5fa><b>Frostbite</b></gradient>&8]&r"
-      permission: hcfcore.tag.frostbite
+      permission: vertex.tag.frostbite
       created-at: 1725235200000
       owners: 0
       lore:
         - '<gray>ғʀᴏᴢᴇɴ ɪɴ ᴄᴏᴍʙᴀᴛ.'
   eclipse:
       display: "&8[<gradient:#0f2027:#203a43:#2c5364><b>Eclipse</b></gradient>&8]&r"
-      permission: hcfcore.tag.eclipse
+      permission: vertex.tag.eclipse
       created-at: 1725235200000
       owners: 0
       lore:
         - '<gray>sʜᴀᴅᴏᴡs ᴄᴏɴᴄᴇᴀʟ ᴛʜᴇ ᴋɪʟʟ.'
   vortex:
       display: "&8[<gradient:#3a1c71:#d76d77:#ffaf7b><b>Vortex</b></gradient>&8]&r"
-      permission: hcfcore.tag.vortex
+      permission: vertex.tag.vortex
       created-at: 1725235200000
       owners: 0
       lore:

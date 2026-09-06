@@ -1,0 +1,109 @@
+package me.vertex.core.ability;
+
+import me.vertex.core.factions.FactionsHook;
+import me.vertex.core.lang.Messages;
+import me.vertex.core.user.User;
+import me.vertex.core.user.UserManager;
+import me.vertex.core.worldguard.WorldGuardHook;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
+
+import java.util.Set;
+
+
+public final class RogueBackstabListener implements Listener {
+
+    private static final String ABILITY_ID = "rogue-backstab";
+    private final Plugin plugin;
+    private final AbilityManager abilityManager;
+    private final UserManager userManager;
+    private final Messages messages;
+
+    public RogueBackstabListener(Plugin plugin, AbilityManager abilityManager, UserManager userManager,
+                                  Messages messages) {
+        this.plugin = plugin;
+        this.abilityManager = abilityManager;
+        this.userManager = userManager;
+        this.messages = messages;
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onHit(EntityDamageByEntityEvent event) {
+        if (!(event.getDamager() instanceof Player attacker) || !(event.getEntity() instanceof Player victim)
+                || attacker.equals(victim)
+                || !AbilityGate.isAbility(plugin, attacker.getInventory().getItemInMainHand(), ABILITY_ID)) {
+            return;
+        }
+        // Prevent backstab from affecting teammates/allies
+        if (FactionsHook.isSameFaction(attacker, victim)) {
+            return;
+        }
+        Ability ability = abilityManager.get(ABILITY_ID);
+        if (ability == null) {
+            return;
+        }
+        if (abilityManager.isOnGlobalCooldown(attacker.getUniqueId())) {
+            long remaining = (abilityManager.globalCooldownRemainingMillis(attacker.getUniqueId()) + 999) / 1000;
+            attacker.sendMessage(messages.get(attacker, "ability.on-global-cooldown", "seconds", String.valueOf(remaining)));
+            return;
+        }
+        User user = userManager.get(attacker.getUniqueId());
+        if (user == null) {
+            return;
+        }
+        if (abilityManager.isOnCooldown(user, ability)) {
+            long remaining = (abilityManager.remainingCooldownMillis(user, ability) + 999) / 1000;
+            attacker.sendMessage(messages.get(attacker, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
+            return;
+        }
+        if (!isBehind(attacker, victim)) {
+            return;
+        }
+        Set<String> disabledRegions = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-regions"));
+        if (WorldGuardHook.isInDisabledRegion(attacker, disabledRegions)) {
+            return;
+        }
+        Set<String> disabledClaims = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-claim-names"));
+        if (FactionsHook.isDisabledClaim(attacker.getLocation(), disabledClaims)) {
+            return;
+        }
+
+        abilityManager.markGlobalCooldown(attacker.getUniqueId());
+        abilityManager.startCooldown(attacker, user, ability);
+        consume(attacker);
+        double damage = Math.max(0.0, ability.getDouble("damage", 6.0));
+        event.setDamage(damage);
+        attacker.sendMessage(messages.get(attacker, "ability.rogue-backstab", "hearts", formatHearts(damage)));
+        victim.sendMessage(messages.get(victim, "ability.rogue-backstabbed"));
+    }
+
+    /** damage is in half-hearts (vanilla convention); shown as whole hearts unless it needs a decimal. */
+    private static String formatHearts(double damage) {
+        double hearts = damage / 2;
+        return hearts == Math.floor(hearts) ? String.valueOf((int) hearts) : String.format("%.1f", hearts);
+    }
+
+    private static boolean isBehind(Player attacker, Player victim) {
+        org.bukkit.util.Vector victimFacing = victim.getLocation().getDirection().setY(0).normalize();
+        org.bukkit.util.Vector victimToAttacker = attacker.getLocation().toVector()
+                .subtract(victim.getLocation().toVector()).setY(0).normalize();
+        return victimFacing.lengthSquared() > 0 && victimToAttacker.lengthSquared() > 0
+                && victimFacing.dot(victimToAttacker) < -0.35;
+    }
+
+    private static void consume(Player player) {
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (item == null || item.getType().isAir()) {
+            return;
+        }
+        if (item.getAmount() <= 1) {
+            player.getInventory().setItemInMainHand(null);
+        } else {
+            item.setAmount(item.getAmount() - 1);
+        }
+    }
+}

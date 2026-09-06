@@ -9,6 +9,10 @@
 # catches everything that falls down to it.
 enabled: true
 
+# Display name for the Chunk Collector item (both /chunkcollector give and
+# a broken collector dropping itself use this).
+display-name: '<green>Chunk Collector'
+
 # Whether breaking a Chunk Collector requires a Silk Touch tool.
 silk-touch-required: true
 
@@ -18,16 +22,18 @@ max-per-chunk: 1
 # How many Chunk Collectors a single player may have placed, server-wide.
 max-per-player: 3
 
-# Per-item-type storage cap before any upgrades (e.g. up to this many
-# rotten flesh AND, independently, up to this many bones -- not a combined
-# total across every item type).
-base-capacity-per-type: 50000
+# Shared storage cap before any upgrades, across every item type combined.
+base-capacity: 50000
 
-# Extra per-item-type capacity granted by each upgrade tier.
+# Extra shared storage capacity granted by each upgrade tier.
 capacity-per-upgrade: 25000
 
 # Highest upgrade tier a single collector can reach.
 max-upgrade-tier: 5
+
+# Amount a player receives when shift-clicking an item in the collector GUI.
+# A normal left-click opens an amount prompt instead.
+shift-withdraw-amount: 64
 
 # Cost (in money) to buy the next upgrade tier: base * multiplier^(tier-1),
 # where tier is the 1-based tier being purchased.
