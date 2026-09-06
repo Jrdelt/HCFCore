@@ -129,6 +129,7 @@ public final class SqlStorage implements Storage {
     private static final long DEATH_RETENTION_MILLIS = java.util.concurrent.TimeUnit.DAYS.toMillis(14);
 
     private static final String CLEANUP_DEATHS = "DELETE FROM player_deaths WHERE uuid = ? AND timestamp < ?";
+    private static final String CLEANUP_ALL_DEATHS = "DELETE FROM player_deaths WHERE timestamp < ?";
 
     private final Database database;
     private final boolean sqlite;
@@ -326,6 +327,15 @@ public final class SqlStorage implements Storage {
         try (PreparedStatement statement = connection.prepareStatement(CLEANUP_DEATHS)) {
             statement.setString(1, uuid.toString());
             statement.setLong(2, System.currentTimeMillis() - DEATH_RETENTION_MILLIS);
+            statement.executeUpdate();
+        }
+    }
+
+    @Override
+    public void cleanupExpiredDeaths() throws SQLException {
+        try (Connection connection = database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(CLEANUP_ALL_DEATHS)) {
+            statement.setLong(1, System.currentTimeMillis() - DEATH_RETENTION_MILLIS);
             statement.executeUpdate();
         }
     }

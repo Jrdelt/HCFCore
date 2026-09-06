@@ -48,11 +48,14 @@ public final class ChunkCollectorMenuListener implements Listener {
                 || !(event.getView().getPlayer() instanceof Player player)) {
             return;
         }
-        event.getView().setRepairCost(0);
-        event.getView().setMaximumRepairCost(0);
-        Long amount = CollectorWithdrawAmountMenu.readAmount(player, holder.messages(), event.getView(), event.getInventory());
+        Long amount = CollectorWithdrawAmountMenu.readAmount(event.getView(), event.getInventory());
         holder.setLastPreparedAmount(amount);
         event.setResult(CollectorWithdrawAmountMenu.confirmButton(player, holder.messages(), amount));
+        // Set after the result, not before: some Paper builds recompute a
+        // fresh repair cost from the new result item when setResult() runs,
+        // silently undoing an override applied earlier in the handler.
+        event.getView().setRepairCost(0);
+        event.getView().setMaximumRepairCost(CollectorWithdrawAmountMenu.FREE_ANVIL_MAX_COST);
     }
 
     @EventHandler
@@ -82,7 +85,7 @@ public final class ChunkCollectorMenuListener implements Listener {
             player.closeInventory();
             return;
         }
-        if (!canAccess(player, location)) {
+        if (!canAccess(player, location, data)) {
             player.closeInventory();
             return;
         }
@@ -116,7 +119,7 @@ public final class ChunkCollectorMenuListener implements Listener {
         // another plugin that replaced the result item.
         Long amount = CollectorWithdrawAmountMenu.confirmedAmount(event.getCurrentItem());
         if (amount == null) {
-            amount = CollectorWithdrawAmountMenu.readAmount(player, holder.messages(), event.getView(), event.getInventory());
+            amount = CollectorWithdrawAmountMenu.readAmount(event.getView(), event.getInventory());
         }
         if (amount == null) {
             amount = holder.lastPreparedAmount();
@@ -126,12 +129,12 @@ public final class ChunkCollectorMenuListener implements Listener {
             return;
         }
         Location location = holder.location();
-        if (!canAccess(player, location)) {
+        ChunkCollectorData data = manager.readData(location);
+        if (data == null) {
             player.closeInventory();
             return;
         }
-        ChunkCollectorData data = manager.readData(location);
-        if (data == null) {
+        if (!canAccess(player, location, data)) {
             player.closeInventory();
             return;
         }
@@ -145,15 +148,18 @@ public final class ChunkCollectorMenuListener implements Listener {
         Bukkit.getScheduler().runTask(manager.plugin(), () -> refresh(player, location));
     }
 
-    private boolean canAccess(Player player, Location location) {
+    private boolean canAccess(Player player, Location location, ChunkCollectorData data) {
         if (staffManager.isStaffBuild(player.getUniqueId())) {
             return true;
         }
         String claimTag = FactionsHook.getClaimFactionTag(location);
         String playerTag = FactionsHook.getFactionTag(player);
-        if (claimTag != null && claimTag.equalsIgnoreCase(playerTag)) {
+        boolean mayUse = (claimTag != null && claimTag.equalsIgnoreCase(playerTag))
+                || (claimTag == null && data.ownerFactionTag() != null
+                        && data.ownerFactionTag().equalsIgnoreCase(playerTag));
+        if (mayUse) {
             if (!rolePermissions.canUse(player, "collector-open")) {
-                player.sendMessage(messages.get(player, "factions.role-permission-denied"));
+                player.sendMessage(messages.get(player, "collector.open-permission-denied"));
                 return false;
             }
             return true;

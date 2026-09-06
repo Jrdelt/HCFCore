@@ -54,8 +54,10 @@ Every mob spawned from a tracked spawner has **all AI goals stripped**
 a player, only moving if actually pushed by lava, a water current, or a
 player. Zombies and skeletons are additionally made immune to sunlight,
 since with no AI to seek shade an above-ground farm would otherwise burn
-its own stock for free. Death drops are replaced entirely by that mob's
-configured `drops` list.
+its own stock for free. Spawner-produced mobs are protected from ordinary
+fire, fire ticks, and magma-block heat. **Lava is not cancelled**: it
+remains a valid grinder kill method. Death drops are replaced entirely by
+that mob's configured `drops` list.
 
 **Iron Golems are a special case** — a vanilla monster-spawner block can
 never actually produce one; golems have a built-in spawn-rule check a
@@ -75,10 +77,9 @@ configured mob type spawns through the normal vanilla mechanism.
   in the released land drops as an item, and the player is told how many.
 - A faction disbanding (voluntarily or automatically) drops every spawner
   in all of its claimed land the same way.
-- Each spawner remembers which faction actually placed it — a chunk
-  overclaimed by a *different* faction drops whatever spawners the
-  previous owner had there, while a faction re-claiming its own land
-  leaves its own spawners untouched.
+- An overclaim **does not drop or destroy spawners**. They stay in place
+  and ownership transfers to the faction that now owns the land, allowing
+  the new faction to manage them normally.
 
 ## Mob stacking (`spawners.yml` → `mob-stacking`)
 
@@ -154,13 +155,21 @@ types can be written into one block's PDC. Once that cap is reached,
 already-stored materials continue collecting normally; a new material is
 left on the ground instead of risking oversized chunk metadata.
 
+Malformed Collector PDC values are normalized on read: tier, per-item
+counts, total capacity, and distinct type count are capped by the active
+configuration. Collector lookup is indexed by chunk, so item collection and
+hopper checks do not scan every Collector on the server.
+
 ### Placement & protection
 
 - Gated on faction claim ownership exactly like spawners (staff-build
   bypasses it), capped at `max-per-chunk` and `max-per-player`.
-- Requires Silk Touch to break if `silk-touch-required` is set. Breaking
-  one drops it with its stored counts and upgrade tier intact, so moving
-  a collector never loses anything.
+- Does **not** require Silk Touch. Breaking one drops it with its stored
+  counts and upgrade tier intact, so moving a collector never loses
+  anything.
+- If a role is denied **Open Collectors** in `/f permissions`, its
+  right-click is cancelled before Minecraft can open the underlying Shulker
+  Box inventory; it cannot be used as a vanilla Shulker workaround.
 - Hoppers can't be placed within `hopper-block-radius` blocks of a
   collector, and one already touching the collector block can't push
   into or pull out of it — this prevents automating around the
@@ -168,10 +177,10 @@ left on the ground instead of risking oversized chunk metadata.
 - A collector keeps its contents and tier when traded, but its ownership is
   reassigned to the player/faction that places it. This keeps the owner
   limit and land protections correct.
-- Single-chunk `/f unclaim` is refused while it contains a collector.
-  Overclaim, `/f unclaimall`, and faction disband drop collectors as their
-  original items (including stored data) rather than exposing their
-  contents to a new land owner.
+- Unclaiming or disbanding does not change, drop, or de-tag a placed
+  collector: it remains a Chunk Collector with all stored contents intact.
+  When another faction claims that chunk, the Collector remains in place
+  and its faction ownership transfers to the new claim owner.
 
 There's no in-game shop — `/chunkcollector give <player>`
 (`vertex.collector.give`) hands one out directly.

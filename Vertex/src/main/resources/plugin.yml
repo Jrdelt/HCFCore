@@ -105,7 +105,7 @@ permissions:
     description: Give a player a Blueprint.
     default: op
   vertex.blueprint.cooldown.remove:
-    description: Remove an online player's Blueprint placement cooldown.
+    description: Remove an online or offline player's Blueprint placement cooldown.
     default: op
   vertex.kit.create:
     description: Create a kit from the currently held inventory.

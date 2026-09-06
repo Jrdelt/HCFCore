@@ -12,6 +12,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
@@ -94,5 +95,24 @@ public final class SpawnerMobListener implements Listener {
         List<ItemStack> drops = spawnerManager.rollDrops(entity.getType());
         event.getDrops().clear();
         event.getDrops().addAll(drops);
+    }
+
+    /**
+     * Daylight must not burn away Vertex-produced mobs. Lava remains a normal
+     * grinder kill method, along with ordinary player combat and other
+     * intentional kill methods.
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onSpawnerMobHeatDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Mob mob)
+                || !mob.getPersistentDataContainer().has(mobTypeKey, PersistentDataType.STRING)) {
+            return;
+        }
+        switch (event.getCause()) {
+            case FIRE, FIRE_TICK, HOT_FLOOR -> event.setCancelled(true);
+            default -> {
+                // Not heat damage; a player, fall, suffocation, etc. works normally.
+            }
+        }
     }
 }

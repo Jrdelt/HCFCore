@@ -43,6 +43,15 @@ public final class BlueprintMenuListener implements Listener {
             return;
         }
 
+        if (!holder.isCompletedView() && event.getSlot() == BlueprintMenu.RESUME_SLOT) {
+            ActiveBuild build = manager.activeBuilds().get(holder.buildId());
+            if (build != null && build.isPaused()) {
+                blueprintListener.resume(player, build);
+            }
+            player.closeInventory();
+            return;
+        }
+
         if (!holder.isCompletedView() && event.getSlot() == BlueprintMenu.CANCEL_SLOT) {
             ActiveBuild build = manager.activeBuilds().get(holder.buildId());
             if (build != null) {

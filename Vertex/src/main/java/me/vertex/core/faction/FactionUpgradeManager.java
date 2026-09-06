@@ -1,6 +1,7 @@
 package me.vertex.core.faction;
 
 import dev.kitteh.factions.Faction;
+import dev.kitteh.factions.event.FactionAutoDisbandEvent;
 import dev.kitteh.factions.event.FactionDisbandEvent;
 import dev.kitteh.factions.upgrade.Upgrades;
 import me.vertex.core.economy.EconomyHook;
@@ -185,12 +186,21 @@ public final class FactionUpgradeManager implements Listener {
         }
         Economy chargedEconomy = economy;
         queueSave(factionId, upgrade, newLevel).whenComplete((ignored, error) -> {
-            pendingPurchases.remove(purchaseKey);
             if (error == null) {
+                // Only release the lock here on success. On failure, a
+                // second purchase must not be able to start (and price
+                // itself off the about-to-be-reverted level) before the
+                // rollback below actually runs.
+                pendingPurchases.remove(purchaseKey);
                 return;
             }
-            Bukkit.getScheduler().runTask(plugin, () -> rollbackFailedPurchase(player, faction, factionId, upgrade,
-                    current, newLevel, cost, chargedEconomy));
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                try {
+                    rollbackFailedPurchase(player, faction, factionId, upgrade, current, newLevel, cost, chargedEconomy);
+                } finally {
+                    pendingPurchases.remove(purchaseKey);
+                }
+            });
         });
         if (upgrade == FactionUpgrade.SPAWNER_RATE) {
             spawnerRetune.run();
@@ -239,7 +249,15 @@ public final class FactionUpgradeManager implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onFactionDisband(FactionDisbandEvent event) {
-        int factionId = event.getFaction().id();
+        deleteFactionLevels(event.getFaction().id());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onFactionAutoDisband(FactionAutoDisbandEvent event) {
+        deleteFactionLevels(event.getFaction().id());
+    }
+
+    private void deleteFactionLevels(int factionId) {
         levels.remove(factionId);
         // Reuse the faction's write chain. A just-purchased level may still
         // be queued; deleting independently could race ahead of it and let

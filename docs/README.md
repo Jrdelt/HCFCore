@@ -3,9 +3,10 @@
 Vertex is a Paper plugin that adds a full HCF
 gameplay layer on top of **FactionsUUID**: armor-based kit classes, PvP
 ability items, 1.8-style legacy combat, a combat-tag system, a live
-sidebar scoreboard, faction-aware chat and nametags, faction rallies,
-faction upgrades, cosmetic tags, stackable spawners, chunk collectors, an automated
-schematic base-builder, and a staff toolkit.
+sidebar scoreboard, faction-aware chat and nametags, rallies, a faction
+permission matrix, faction upgrades, a shared faction bank, cosmetic tags,
+stackable spawners, Chunk Collectors, a progressive schematic base-builder,
+and a staff toolkit.
 
 This is the detailed, developer-facing reference. If you just want a
 quick tour of what the plugin does, see the [main README](../README.md)
@@ -21,8 +22,8 @@ integration behavior.
 | [Configuration](configuration.md) | Full walkthrough of `config.yml`: database, scoreboard, chat, factions/upgrades, nametags, reboot, and reload semantics |
 | [PvP & Combat](pvp-and-combat.md) | Combat tag, action bar, item cooldowns, no-pearl zones, Legacy Combat (1.8 PvP), Archer Tag |
 | [Kits & Abilities](kits-and-abilities.md) | Kit classes, class effects, kit costs, the full ability item catalog and their mechanics |
-| [Factions Integration](factions-integration.md) | Chat/scoreboard placeholders, nametag coloring, rallies, permission and upgrades GUIs, leader-leave protection |
-| [Spawners & Mob Stacking](spawners-and-collectors.md) | The spawner shop and economy, stack scaling, mob AI stripping, mob stacking, Chunk Collectors |
+| [Factions Integration](factions-integration.md) | FactionsUUID compatibility, chat/scoreboard placeholders, nametags, rallies, permissions, upgrades, bank, leader-leave protection |
+| [Spawners & Collectors](spawners-and-collectors.md) | Spawner shop/economy, daylight and lava behavior, stacking, mob stacks, and Chunk Collectors |
 | [Blueprint Base Builder](blueprints.md) | Automated `.schem` base building with FastAsyncWorldEdit + DecentHolograms |
 | [Tags & Cosmetics](tags-and-cosmetics.md) | The `/tags` system: unlocking, equipping, nickname-match, the GUI |
 | [Staff Tools](staff-tools.md) | Vanish, staff chat, staff-build, freeze, invsee/endersee, and death rollback |
@@ -39,10 +40,10 @@ integration behavior.
 - "No effect without X installed" means the feature quietly does nothing
   rather than erroring — Vertex never requires an optional integration to
   boot.
-- Everything under `kits.yml`, `abilities.yml`, `tags.yml`, `spawners.yml`,
-  `collectors.yml`, `blueprints.yml`, `config.yml`, and `lang/*.yml`
-  reloads live with `/vertex reload` — no restart needed for content or
-  message changes.
+- `/vertex reload` reloads `config.yml`, language files, kits, abilities,
+  tags, spawner tuning, collector tuning, Blueprint templates, and Vertex
+  upgrade definitions. A full restart is still required after replacing a
+  jar, changing dependencies, or switching the storage backend.
 
 Found something these docs don't cover, or something that's out of date?
 Check [issues.md](../issues.md) at the repo root for known open items, or

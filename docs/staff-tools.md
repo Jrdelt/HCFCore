@@ -59,8 +59,8 @@ killer (or "Environment").
 - **Right-click** a death to view its exact contents read-only, with a
   **Back** button to return to the list.
 
-Every player's death history persists to MySQL automatically; older
-entries beyond the last 20 are purged, so the database footprint per
+Every player's death history persists to the selected SQLite or MySQL
+backend automatically; older entries beyond the last 20 are purged, so the database footprint per
 player stays constant. A single corrupted row (e.g. a truncated blob)
 is skipped and logged rather than hiding every other death behind it, up
 to a protective 500-row scan limit while searching for valid history.

@@ -85,7 +85,7 @@ kit:
   deleted: '<green>Kit {kit} geloescht.'
   not-found: '<red>Kein Kit namens ''{kit}''.'
   saved: '<green>Kit {kit} aus deinem aktuellen Inventar gespeichert.'
-  no-kit-permission: '<red>Du hast keine Berechtigung, dieses Kit zu benutzen.'
+  no-kit-permission: '&c&lKITS&r &7> <red>Du hast keine Berechtigung, dieses Kit zu benutzen.'
   cooldown: '<red>Du kannst dieses Kit in {seconds}s wieder benutzen.'
   applied: '<green>Kit {kit} angewendet.'
   effects-warmup: '<yellow>Klassen-Effekte werden in <white>{seconds}s<yellow> aktiviert. Behalte die Kit-Ruestung an.'
@@ -202,6 +202,7 @@ factions:
 faction-upgrades:
   no-faction: "<red>✖ <yellow>You must be in a faction to view faction upgrades."
   disabled: "<red>✖ <yellow>Faction upgrades are currently disabled."
+  role-permission-denied: "<red>✖ <yellow>Your faction role cannot use faction upgrades."
   leader-only: "<red>✖ <yellow>Only your faction leader can purchase faction upgrades."
   no-economy: "<red>✖ <yellow>Faction upgrades need a Vault economy provider."
   cannot-afford: "<red>✖ <yellow>You need <green>{amount}<yellow> for that upgrade."
@@ -371,6 +372,8 @@ collector:
   not-your-claim: '<red>You can''t break a Chunk Collector outside your own faction''s claim.'
   cannot-access: '<red>You can''t access a Chunk Collector outside your own faction''s claim.'
   silk-touch-required: '<red>You need a Silk Touch tool to break a Chunk Collector.'
+  open-permission-denied: '<red>✖ <gray>Your faction role cannot open Chunk Collectors.'
+  break-permission-denied: '<red>✖ <gray>Your faction role cannot break Chunk Collectors.'
   hopper-blocked: '<red>Hoppers can''t be placed this close to a Chunk Collector.'
   cannot-afford: '<gray>You need {amount} to buy this upgrade.'
   unclaim-blocked: '<red>You cannot unclaim this chunk while it has a Chunk Collector.'
@@ -380,6 +383,7 @@ collector:
 blueprint:
   gui-active-title: '<dark_gray>Active Blueprint'
   gui-status-title: '<dark_aqua>Blueprint Status'
+  gui-resume-button: '<green><bold>Resume Build'
   gui-cancel-button: '<red><bold>Cancel Build'
   gui-repair-button: '<yellow><bold>Repair Blueprint'
   gui-repair-lore-template: '<gray>Template: <white><template>'
@@ -403,6 +407,7 @@ blueprint:
   claim-invalid: '<red>The entire structure must fit within your own faction''s claimed land.'
   activation-expired: '<red>That Blueprint is no longer available to activate.'
   started: '<green>Started building {template}.'
+  resumed: '<green>Resumed building {template}.'
   cancelled: '<yellow>Build cancelled. Blocks already placed are left as-is.'
   activate-title: 'Enable Blueprint'
   activate-info-lore: '<gray>Confirm this location before building.'
@@ -413,8 +418,11 @@ blueprint:
   menu-title: 'Blueprint Progress'
   menu-progress: '<gray>Placed: <yellow>{done} <gray>/ <yellow>{total}'
   menu-remaining: '<gray>Time left: <yellow>{seconds}s'
-  menu-cancel-lore: '<gray>Stops the build. Blocks already placed stay; the Beacon is returned.'
+  menu-paused: '<yellow>Paused after server restart.'
+  menu-resume-lore: '<gray>Click to continue the build.'
+  menu-cancel-lore: '<gray>Stops the build. A partial build does not return a Blueprint.'
   hologram-progress: '&7Progress: &e{progress}'
+  hologram-paused: '&ePaused — right-click to resume'
   hologram-owner: '&7Owner: &b[{faction}] &f{owner}'
   hologram-complete: '&aComplete'
   hologram-aborted: '&cAborted -- land no longer claimed'

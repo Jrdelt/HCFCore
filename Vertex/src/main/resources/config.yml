@@ -298,16 +298,18 @@ factions:
 # ============================================
 # FACTION UPGRADES
 # ============================================
-# Faction leaders open the persistent purchase GUI with /f upgrades (or
-# /f upgrade). Every bonus works only inside land claimed by that faction.
-# Costs are withdrawn from the clicking member through Vault. Each level has
-# its own explicit price and total bonus, so no multiplier is applied. Set a
-# level's price to 0 for a free level. `bonus` is a percentage except for the
-# native FactionsUUID Warps entry, where it is display-only because that
-# plugin's own upgrades.yml controls the number of allowed warps.
+# `/f upgrades` (or `/f upgrade`) opens Vertex's persistent purchase GUI for
+# roles allowed FactionsUUID's native UPGRADE action. Costs are withdrawn from
+# the clicking member through Vault. Each level has its own explicit price and
+# total bonus, so no multiplier is applied. Set a level's price to 0 for a
+# free level. Player effects require the member to be in their own claim;
+# Spawner Rate and Crop Growth apply to managed blocks/crops in that claim.
+# Warps is the native FactionsUUID bridge: its `bonus` is display-only because
+# FactionsUUID controls the number of allowed warps. Keep matching native
+# FactionsUUID upgrades disabled unless you deliberately want effects to stack.
 faction-upgrades:
   enabled: true
-  # Members may view and buy upgrades.
+  # With the native UPGRADE action allowed, members may view and buy upgrades.
   leader-only: false
   upgrades:
     claim-damage:
@@ -325,8 +327,9 @@ faction-upgrades:
     fly-boost:
       enabled: true
       levels: {1: {price: 50000.0, bonus: 20.0}, 2: {price: 250000.0, bonus: 40.0}, 3: {price: 1250000.0, bonus: 60.0}, 4: {price: 6250000.0, bonus: 80.0}, 5: {price: 31250000.0, bonus: 100.0}}
-    # This sets FactionsUUID's native Warps upgrade level. Configure its
-    # actual warp-count values in FactionsUUID's upgrades configuration.
+    # This sets FactionsUUID's native Warps upgrade level. Configure matching
+    # maximum levels and complete warp-count values in FactionsUUID's upgrade
+    # configuration; Vertex's price/bonus controls only its own GUI.
     warps:
       enabled: true
       levels: {1: {price: 500000.0, bonus: 1.0}, 2: {price: 1000000.0, bonus: 2.0}, 3: {price: 2000000.0, bonus: 3.0}, 4: {price: 4000000.0, bonus: 4.0}, 5: {price: 8000000.0, bonus: 5.0}, 6: {price: 16000000.0, bonus: 6.0}, 7: {price: 32000000.0, bonus: 7.0}, 8: {price: 64000000.0, bonus: 8.0}, 9: {price: 128000000.0, bonus: 9.0}, 10: {price: 256000000.0, bonus: 10.0}, 11: {price: 512000000.0, bonus: 11.0}, 12: {price: 1000000000.0, bonus: 12.0}, 13: {price: 1000000000.0, bonus: 13.0}, 14: {price: 1000000000.0, bonus: 14.0}, 15: {price: 1000000000.0, bonus: 15.0}}
@@ -369,7 +372,7 @@ kits:
   # Delay before class effects apply after putting on full armor
   effect-warmup-seconds: 7
   # Maximum cooldown allowed (about 1 day)
-  max-cooldown-seconds: 86400//2
+  max-cooldown-seconds: 43200
   # Maximum money cost for a kit
   max-money-cost: 1000000000.0
   # Maximum item cost amount

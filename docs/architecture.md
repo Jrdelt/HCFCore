@@ -16,7 +16,7 @@ All code lives under `me.vertex.core`, one package per feature area:
 | `collector` | Chunk Collector |
 | `economy` | Vault wrapper |
 | `essentials` | EssentialsX wrapper |
-| `faction` | Rally system, faction permission matrix, and persistent faction upgrades |
+| `faction` | Rally system, faction permission matrix, persistent upgrades, and faction bank |
 | `factions` | FactionsUUID wrapper and faction-command interception |
 | `kit` | Kit classes, GUI, armor-effect tracking |
 | `lang` | Message loading/formatting, `/language` |
@@ -45,16 +45,17 @@ lifecycle and wires listeners/commands together in `onEnable()`.
   explicit `TextDecoration.ITALIC, false` — Minecraft renders those
   italic by default when unset, which otherwise silently affects any raw
   `Component.text(...)` used in a GUI.
-- **All database access goes through HikariCP off the main thread.**
-  HikariCP and both JDBC drivers (SQLite and MySQL) are shaded and
-  relocated into `me.vertex.core.libs.*` to avoid classpath collisions
-  with other plugins bundling their own copies.
+- **Gameplay database work is asynchronous.** Schema setup and the one-time
+  cache loads run during startup; recurring gameplay mutations use HikariCP
+  away from the server thread. HikariCP and both JDBC drivers (SQLite and
+  MySQL) are shaded and relocated into `me.vertex.core.libs.*` to avoid
+  classpath collisions with other plugins bundling their own copies.
 - **Two backends, one implementation.** `Database` reads `storage.type`
   and connects to either a local SQLite file (the default) or a MySQL
   server, exposing which one it picked as a `Database.Dialect`.
-  `SqlStorage` and the four feature-specific stores
+  `SqlStorage` and the five feature-specific stores
   (`SpawnerStorage`, `ChunkCollectorStorage`, `BlueprintStorage`,
-  `FactionUpgradeStorage`) then
+  `FactionUpgradeStorage`, `FactionBankStorage`) then
   select only the statements that genuinely differ between the two --
   the upserts (`ON DUPLICATE KEY UPDATE` vs `ON CONFLICT ... DO UPDATE`)
   and the auto-incrementing id columns. Everything else is shared
@@ -78,8 +79,10 @@ lifecycle and wires listeners/commands together in `onEnable()`.
   for why both exist.
 - **`ArcherTagManager`** stores faction **ids**, not `Faction` objects or
   player lookups, taking them as plain ints from the caller — keeps the
-  stacking/expiry logic unit-testable with no Factions plugin running,
-  and confines the FactionsUUID API surface to `ArcherTagListener`.
+  stacking/expiry logic unit-testable with no Factions plugin running.
+  `FactionsHook` centralizes normal faction/claim/relation reads; the
+  faction package uses the narrow native APIs needed for permissions, TNT,
+  Warp levels, and third-party faction commands.
   `FactionsHook.NO_FACTION` is the factionless sentinel and never matches
   anything, so a mark from a factionless archer grants no melee bonus
   rather than arming every factionless player.
@@ -135,6 +138,9 @@ lifecycle and wires listeners/commands together in `onEnable()`.
 - Faction-upgrade writes are serialized per faction and flushed during
   shutdown. A disband queues its delete behind every prior write, so a
   delayed upgrade save cannot recreate rows for a disbanded faction.
+- Faction-bank money/XP mutations are serialized per faction too. Cached
+  balances change only after their database write succeeds, so failed
+  transactions cannot silently change the durable balance.
 
 ## Testing
 

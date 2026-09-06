@@ -24,8 +24,10 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 
 /**
@@ -128,52 +130,131 @@ public final class MobStackListener implements Listener {
         if (radius <= 0) {
             return;
         }
-        double radiusSquared = radius * radius;
         int limit = spawnerManager.maxStackLimit();
+        // Half-radius cells ensure every pair inside the same cell is close
+        // enough to merge. Only the 26 neighboring cells then need a distance
+        // check; this avoids comparing every stack in a world to every other.
+        double cellSize = radius / 2D;
 
         for (World world : plugin.getServer().getWorlds()) {
-            List<Mob> tracked = new ArrayList<>();
+            Map<StackCell, Map<StackGroup, List<Mob>>> cells = new HashMap<>();
             for (Entity entity : world.getEntities()) {
                 if (entity instanceof Mob mob && mob.getPersistentDataContainer().has(stackCountKey, PersistentDataType.INTEGER)) {
-                    tracked.add(mob);
+                    Location location = mob.getLocation();
+                    StackCell cell = new StackCell(
+                            (int) Math.floor(location.getX() / cellSize),
+                            (int) Math.floor(location.getY() / cellSize),
+                            (int) Math.floor(location.getZ() / cellSize));
+                    cells.computeIfAbsent(cell, ignored -> new HashMap<>())
+                            .computeIfAbsent(new StackGroup(mob.getType(), isSpawnerSourced(mob)),
+                                    ignored -> new ArrayList<>())
+                            .add(mob);
                 }
             }
-            for (int i = 0; i < tracked.size(); i++) {
-                Mob a = tracked.get(i);
-                if (!a.isValid()) {
-                    continue;
-                }
-                int countA = currentStackCount(a);
-                for (int j = i + 1; j < tracked.size(); j++) {
-                    Mob b = tracked.get(j);
-                    if (!b.isValid() || a.getType() != b.getType()
-                            || isSpawnerSourced(a) != isSpawnerSourced(b)) {
-                        continue;
-                    }
-                    int available = limit - countA;
-                    if (available <= 0) {
-                        break;
-                    }
-                    if (a.getLocation().distanceSquared(b.getLocation()) > radiusSquared) {
-                        continue;
-                    }
-                    int countB = currentStackCount(b);
-                    int transfer = Math.min(countB, available);
-                    countA += transfer;
-                    setStackCount(a, countA);
-                    updateDisplay(a, countA);
 
-                    int remaining = countB - transfer;
-                    if (remaining <= 0) {
-                        b.remove();
-                    } else {
-                        setStackCount(b, remaining);
-                        updateDisplay(b, remaining);
+            // Collapse each compact cell first; at most a small number of
+            // partially-full stacks remains per type/source group.
+            for (Map<StackGroup, List<Mob>> groups : cells.values()) {
+                groups.replaceAll((ignored, mobs) -> consolidateCell(mobs, limit));
+            }
+
+            for (Map.Entry<StackCell, Map<StackGroup, List<Mob>>> entry : cells.entrySet()) {
+                StackCell cell = entry.getKey();
+                for (int offsetX = -1; offsetX <= 1; offsetX++) {
+                    for (int offsetY = -1; offsetY <= 1; offsetY++) {
+                        for (int offsetZ = -1; offsetZ <= 1; offsetZ++) {
+                            StackCell neighbor = new StackCell(cell.x + offsetX, cell.y + offsetY, cell.z + offsetZ);
+                            if (compareCells(cell, neighbor) >= 0) {
+                                continue;
+                            }
+                            Map<StackGroup, List<Mob>> neighborGroups = cells.get(neighbor);
+                            if (neighborGroups == null) {
+                                continue;
+                            }
+                            for (Map.Entry<StackGroup, List<Mob>> group : entry.getValue().entrySet()) {
+                                List<Mob> candidates = neighborGroups.get(group.getKey());
+                                if (candidates != null) {
+                                    mergeNearby(group.getValue(), candidates, radius * radius, limit);
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
+
+    private List<Mob> consolidateCell(List<Mob> mobs, int limit) {
+        List<Mob> survivors = new ArrayList<>();
+        for (Mob candidate : mobs) {
+            if (!candidate.isValid()) {
+                continue;
+            }
+            for (Mob target : survivors) {
+                if (!candidate.isValid()) {
+                    break;
+                }
+                transferInto(target, candidate, limit);
+            }
+            if (candidate.isValid()) {
+                survivors.add(candidate);
+            }
+        }
+        return survivors;
+    }
+
+    private void mergeNearby(List<Mob> targets, List<Mob> candidates, double radiusSquared, int limit) {
+        for (Mob target : targets) {
+            if (!target.isValid() || currentStackCount(target) >= limit) {
+                continue;
+            }
+            for (Mob candidate : candidates) {
+                if (!target.isValid() || currentStackCount(target) >= limit) {
+                    break;
+                }
+                if (candidate.isValid()
+                        && target.getLocation().distanceSquared(candidate.getLocation()) <= radiusSquared) {
+                    transferInto(target, candidate, limit);
+                }
+            }
+        }
+    }
+
+    private void transferInto(Mob target, Mob source, int limit) {
+        if (!target.isValid() || !source.isValid() || target.equals(source)) {
+            return;
+        }
+        int available = limit - currentStackCount(target);
+        if (available <= 0) {
+            return;
+        }
+        int sourceCount = currentStackCount(source);
+        int transfer = Math.min(sourceCount, available);
+        if (transfer <= 0) {
+            return;
+        }
+        int targetCount = currentStackCount(target) + transfer;
+        setStackCount(target, targetCount);
+        updateDisplay(target, targetCount);
+        int remaining = sourceCount - transfer;
+        if (remaining == 0) {
+            source.remove();
+        } else {
+            setStackCount(source, remaining);
+            updateDisplay(source, remaining);
+        }
+    }
+
+    private static int compareCells(StackCell first, StackCell second) {
+        int x = Integer.compare(first.x, second.x);
+        if (x != 0) return x;
+        int y = Integer.compare(first.y, second.y);
+        return y != 0 ? y : Integer.compare(first.z, second.z);
+    }
+
+    private record StackCell(int x, int y, int z) { }
+
+    private record StackGroup(EntityType type, boolean spawnerSourced) { }
 
     private boolean isSpawnerSourced(Mob mob) {
         return mob.getPersistentDataContainer().has(spawnerMobKey, PersistentDataType.STRING);
@@ -235,6 +316,10 @@ public final class MobStackListener implements Listener {
             return List.of();
         }
         LootContext context = new LootContext.Builder(mob.getLocation())
+                // Entity loot tables on current Paper require this context
+                // value. Without it, peeling a natural mob stack throws
+                // before its drops and XP can be awarded.
+                .lootedEntity(mob)
                 .killer(attacker)
                 .build();
         return new ArrayList<>(table.populateLoot(random, context));

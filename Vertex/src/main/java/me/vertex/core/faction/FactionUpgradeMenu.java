@@ -1,6 +1,7 @@
 package me.vertex.core.faction;
 
 import dev.kitteh.factions.Faction;
+import dev.kitteh.factions.permissible.PermissibleActions;
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.Messages;
@@ -52,6 +53,10 @@ public final class FactionUpgradeMenu implements Listener {
         Faction faction = FactionsHook.getFaction(player);
         if (faction == null) {
             player.sendMessage(messages.get(player, "faction-upgrades.no-faction"));
+            return;
+        }
+        if (!canUseUpgrades(player, faction)) {
+            player.sendMessage(messages.get(player, "faction-upgrades.role-permission-denied"));
             return;
         }
         manager.adoptNativeWarpLevel(faction);
@@ -133,6 +138,11 @@ public final class FactionUpgradeMenu implements Listener {
             player.closeInventory();
             return;
         }
+        if (!canUseUpgrades(player, faction)) {
+            player.sendMessage(messages.get(player, "faction-upgrades.role-permission-denied"));
+            player.closeInventory();
+            return;
+        }
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) {
             return;
@@ -182,6 +192,12 @@ public final class FactionUpgradeMenu implements Listener {
         meta.getPersistentDataContainer().set(upgradeKey, PersistentDataType.STRING, upgrade.configKey());
         item.setItemMeta(meta);
         return item;
+    }
+
+    /** The native UPGRADE switch in /f permissions also controls this GUI. */
+    private static boolean canUseUpgrades(Player player, Faction faction) {
+        return RallyPermissionMenu.isNativeActionAllowed(
+                faction, RallyManager.roleId(player), PermissibleActions.UPGRADE);
     }
 
     private String upgradeName(Player player, FactionUpgrade upgrade) {

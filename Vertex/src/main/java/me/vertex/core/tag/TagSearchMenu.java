@@ -21,6 +21,8 @@ public final class TagSearchMenu {
 
     static final int SLOT_INPUT = 0;
     static final int SLOT_RESULT = 2;
+    /** A zero-cost result still needs a positive vanilla "too expensive" ceiling. */
+    static final int FREE_ANVIL_MAX_COST = 40;
 
     private TagSearchMenu() {
     }
@@ -99,18 +101,24 @@ public final class TagSearchMenu {
         }
         String trimmed = text.trim();
         String prompt = MessageFormatter.plain(messages.getRaw(player, "tags.search-prompt")).trim();
-        return trimmed.equalsIgnoreCase(prompt) ? null : trimmed;
+        if (trimmed.equalsIgnoreCase(prompt)) {
+            return null;
+        }
+        // The displayed prompt is also the input item's actual name. Strip
+        // it when Minecraft appends a normally typed query to that name.
+        return trimmed.regionMatches(true, 0, prompt, 0, prompt.length())
+                ? trimmed.substring(prompt.length()).trim() : trimmed;
     }
 
     @SuppressWarnings("removal")
     private static void setFreeCost(Player player, Inventory inventory) {
         if (player.getOpenInventory() instanceof AnvilView view) {
             view.setRepairCost(0);
-            view.setMaximumRepairCost(0);
+            view.setMaximumRepairCost(FREE_ANVIL_MAX_COST);
         } else if (inventory instanceof AnvilInventory anvil) {
             // Compatibility fallback for the test/runtime shim only.
             anvil.setRepairCost(0);
-            anvil.setMaximumRepairCost(0);
+            anvil.setMaximumRepairCost(FREE_ANVIL_MAX_COST);
         }
     }
 

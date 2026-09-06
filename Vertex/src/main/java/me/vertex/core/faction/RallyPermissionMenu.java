@@ -161,6 +161,19 @@ public final class RallyPermissionMenu implements Listener {
 
     private boolean allowed(Faction faction, String role, String action) {
         if (action.startsWith("vertex:")) return manager.rolePermission(faction.id(), role, action.substring("vertex:".length()));
+        return isNativeActionAllowed(faction, role, action);
+    }
+
+    /** Reads the same native FactionsUUID action state rendered by this menu. */
+    public static boolean isNativeActionAllowed(Faction faction, String role, PermissibleActions action) {
+        return isNativeActionAllowed(faction, role, action.name());
+    }
+
+    private static boolean isNativeActionAllowed(Faction faction, String role, String action) {
+        // Admin is intentionally not editable and FactionsUUID permits it.
+        if ("admin".equals(role)) {
+            return true;
+        }
         Faction.Permissions permissions = faction.permissions();
         return factionSelectors(role).stream().allMatch(selector -> !permissions.has(selector)
                 || permissions.get(selector).get(action) != PermState.DENY);

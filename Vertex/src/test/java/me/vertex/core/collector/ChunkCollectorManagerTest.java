@@ -33,7 +33,6 @@ class ChunkCollectorManagerTest {
     @Test
     void loadParsesBundledDefaults() {
         assertTrue(manager.isEnabled());
-        assertTrue(manager.isSilkTouchRequired());
         assertEquals(1, manager.maxPerChunk());
         assertEquals(3, manager.maxPerPlayer());
         assertEquals(64, manager.maxStoredMaterialTypes());

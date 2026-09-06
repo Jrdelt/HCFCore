@@ -158,6 +158,9 @@ public final class BlueprintListener implements Listener {
                     continue;
                 }
                 build.setBlocks(manager.flattenSnapshot(stored.id(), template));
+                // A restart must never cause a structure to continue without a
+                // faction member consciously choosing to resume it.
+                build.pause();
             } catch (IOException e) {
                 plugin.getLogger().log(Level.WARNING, "Failed to resume blueprint build " + stored.id(), e);
                 continue;
@@ -167,6 +170,38 @@ public final class BlueprintListener implements Listener {
                     build.blocks().isEmpty() ? 100.0 : 100.0 * build.currentIndex() / build.blocks().size()));
         }
         Bukkit.getScheduler().runTask(plugin, this::restoreLoadedCompletedAnchors);
+    }
+
+    /** Resumes a build recovered from a restart after rechecking its anchor and claim. */
+    public void resume(Player player, ActiveBuild build) {
+        if (player == null || build == null || !build.isPaused()) {
+            return;
+        }
+        if (!canManage(player, build.anchor())) {
+            player.sendMessage(messages.get(player, "blueprint.not-your-faction"));
+            return;
+        }
+        if (build.id() < 0 || !isSavedActiveAnchor(build.anchor(), build.id())) {
+            player.sendMessage(messages.get(player, "blueprint.activation-expired"));
+            return;
+        }
+        try {
+            BlockVector3[] bounds = manager.relativeBoundsSnapshot(build.id(), build.template());
+            if (!manager.isFullyClaimedBy(build.anchor(), bounds[0], bounds[1], build.ownerFactionId())) {
+                player.sendMessage(messages.get(player, "blueprint.claim-invalid"));
+                return;
+            }
+        } catch (IOException e) {
+            plugin.getLogger().log(Level.WARNING, "Failed to validate paused blueprint build " + build.id(), e);
+            player.sendMessage(messages.get(player, "blueprint.load-failed"));
+            return;
+        }
+
+        build.resume();
+        int total = build.blocks() == null ? 0 : build.blocks().size();
+        String progress = String.format("%.0f%%", total == 0 ? 100.0 : 100.0 * build.currentIndex() / total);
+        createOrUpdateHologram(build, progress);
+        player.sendMessage(messages.get(player, "blueprint.resumed", "template", build.template().displayName()));
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -189,7 +224,7 @@ public final class BlueprintListener implements Listener {
         }
 
         Location loc = event.getBlock().getLocation();
-        String previewHoloName = "blueprint_preview_" + loc.getBlockX() + "_" + loc.getBlockY() + "_" + loc.getBlockZ();
+        String previewHoloName = previewHologramName(loc);
 
         if (event.getBlock().getState() instanceof org.bukkit.block.Beacon beacon) {
             beacon.getPersistentDataContainer().set(templateKey, PersistentDataType.STRING, template.name());
@@ -293,8 +328,7 @@ public final class BlueprintListener implements Listener {
                         return;
                     }
 
-                    String previewHolo = "blueprint_preview_" + anchor.getBlockX() + "_" + anchor.getBlockY() + "_"
-                            + anchor.getBlockZ();
+                    String previewHolo = previewHologramName(anchor);
                     if (hologramsAvailable) {
                         try {
                             DHAPI.removeHologram(previewHolo);
@@ -318,6 +352,7 @@ public final class BlueprintListener implements Listener {
                     ActiveBuild build = new ActiveBuild(id, anchor, template, player.getUniqueId(), playerFactionId,
                             startedAt, "blueprint_" + id, 0);
                     build.setBlocks(blocks);
+                    build.allowInitialRefund();
                     manager.register(build);
                     manager.startCooldown(player.getUniqueId());
                     createOrUpdateHologram(build, "0%");
@@ -498,8 +533,7 @@ public final class BlueprintListener implements Listener {
                 event.setDropItems(false);
 
                 // Clean up preview hologram
-                String previewHolo = "blueprint_preview_" + loc.getBlockX() + "_" + loc.getBlockY() + "_"
-                        + loc.getBlockZ();
+                String previewHolo = previewHologramName(loc);
                 if (hologramsAvailable) {
                     try {
                         DHAPI.removeHologram(previewHolo);
@@ -739,9 +773,14 @@ public final class BlueprintListener implements Listener {
                 finish(build);
                 continue;
             }
+            if (build.isPaused()) {
+                continue;
+            }
             if (nowTicks % manager.claimRecheckIntervalTicks() == 0) {
                 try {
-                    BlockVector3[] bounds = manager.relativeBounds(build.template());
+                    BlockVector3[] bounds = build.id() >= 0
+                            ? manager.relativeBoundsSnapshot(build.id(), build.template())
+                            : manager.relativeBounds(build.template());
                     if (!manager.isFullyClaimedBy(build.anchor(), bounds[0], bounds[1], build.ownerFactionId())) {
                         plugin.getLogger()
                                 .warning("[Blueprint Debug] Build cancelled due to claim check failing: " + build.id());
@@ -880,13 +919,18 @@ public final class BlueprintListener implements Listener {
             if (beaconBlock.getType() == Material.BEACON) {
                 beaconBlock.setType(Material.AIR, false);
 
-                ItemStack blueprintItem = createBlueprintItem(build.template());
-                Player owner = Bukkit.getPlayer(build.ownerUuid());
-                if (owner != null && owner.isOnline()) {
-                    owner.getInventory().addItem(blueprintItem).values()
-                            .forEach(leftover -> owner.getWorld().dropItemNaturally(owner.getLocation(), leftover));
-                } else {
-                    build.anchor().getWorld().dropItemNaturally(build.anchor(), blueprintItem);
+                // Only an initial build cancelled before its first placed block
+                // can safely return its token. Repairs never consume one, and
+                // a partial build must not create a free duplicate structure.
+                if (build.id() >= 0 && build.currentIndex() == 0 && build.isRefundEligible()) {
+                    ItemStack blueprintItem = createBlueprintItem(build.template());
+                    Player owner = Bukkit.getPlayer(build.ownerUuid());
+                    if (owner != null && owner.isOnline()) {
+                        owner.getInventory().addItem(blueprintItem).values()
+                                .forEach(leftover -> owner.getWorld().dropItemNaturally(owner.getLocation(), leftover));
+                    } else {
+                        build.anchor().getWorld().dropItemNaturally(build.anchor(), blueprintItem);
+                    }
                 }
             }
         }
@@ -923,8 +967,7 @@ public final class BlueprintListener implements Listener {
         if (!hologramsAvailable) {
             return;
         }
-        String holoName = "blueprint_preview_" + anchor.getBlockX() + "_" + anchor.getBlockY() + "_"
-                + anchor.getBlockZ();
+        String holoName = previewHologramName(anchor);
         Location above = anchor.clone().add(0.5, 2, 0.5);
         List<String> lines = List.of(
                 MessageFormatter.legacyAmpersand(template.displayName()),
@@ -960,8 +1003,20 @@ public final class BlueprintListener implements Listener {
     private List<String> activeHologramLines(ActiveBuild build, String progress) {
         return List.of(
                 MessageFormatter.legacyAmpersand(build.template().displayName()),
-                hologramMessage("blueprint.hologram-progress", "progress", progress),
+                build.isPaused()
+                        ? hologramMessage("blueprint.hologram-paused")
+                        : hologramMessage("blueprint.hologram-progress", "progress", progress),
                 hologramMessage("blueprint.hologram-owner", "faction", factionName(build), "owner", ownerName(build)));
+    }
+
+    /** DecentHolograms names are global, so world identity must be part of a preview name. */
+    public String previewHologramName(Location anchor) {
+        if (anchor == null || anchor.getWorld() == null) {
+            return "blueprint_preview_unknown";
+        }
+        String worldId = anchor.getWorld().getUID().toString().replace("-", "");
+        return "blueprint_preview_" + worldId + "_" + anchor.getBlockX() + "_" + anchor.getBlockY() + "_"
+                + anchor.getBlockZ();
     }
 
     private String hologramMessage(String key, String... placeholders) {

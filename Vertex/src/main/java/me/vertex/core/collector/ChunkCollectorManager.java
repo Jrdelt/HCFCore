@@ -41,6 +41,10 @@ import java.util.logging.Level;
 public final class ChunkCollectorManager {
 
     private static final String STORED_PREFIX = "stored_";
+    /** Prevent malformed configuration/PDC data from overflowing capacity arithmetic. */
+    private static final long MAX_CAPACITY = 1_000_000_000L;
+    private static final int MAX_UPGRADE_TIER = 100;
+    private static final int MAX_STORED_MATERIAL_TYPES = 256;
 
     private final Plugin plugin;
     private final ChunkCollectorStorage storage;
@@ -53,6 +57,8 @@ public final class ChunkCollectorManager {
 
     /** Location-key (see {@link #key(Location)}) -> the location itself. */
     private final Map<String, Location> collectors = new ConcurrentHashMap<>();
+    /** Chunk location -> collector location keys, keeping farm drop lookups local. */
+    private final Map<String, java.util.Set<String>> collectorsByChunk = new ConcurrentHashMap<>();
     /** Owner -> location keys.  This keeps limit checks from synchronously loading chunks. */
     private final Map<UUID, java.util.Set<String>> collectorsByOwner = new ConcurrentHashMap<>();
     private final java.util.Set<CompletableFuture<Void>> pendingWrites = ConcurrentHashMap.newKeySet();
@@ -60,7 +66,6 @@ public final class ChunkCollectorManager {
     private final Map<String, CompletableFuture<Void>> writeChains = new ConcurrentHashMap<>();
 
     private volatile boolean enabled;
-    private volatile boolean silkTouchRequired;
     private volatile int maxPerChunk;
     private volatile int maxPerPlayer;
     private volatile long baseCapacity;
@@ -91,23 +96,23 @@ public final class ChunkCollectorManager {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
 
         enabled = config.getBoolean("enabled", true);
-        silkTouchRequired = config.getBoolean("silk-touch-required", true);
         maxPerChunk = Math.max(1, config.getInt("max-per-chunk", 1));
         maxPerPlayer = Math.max(1, config.getInt("max-per-player", 3));
         // `base-capacity-per-type` was the old setting. Retain it as a
         // fallback for existing servers while new installs use shared
         // `base-capacity` across the entire collector.
-        baseCapacity = Math.max(1, config.contains("base-capacity")
+        baseCapacity = boundedCapacity(config.contains("base-capacity")
                 ? config.getLong("base-capacity")
-                : config.getLong("base-capacity-per-type", 50000));
-        capacityPerUpgrade = Math.max(0, config.getLong("capacity-per-upgrade", 25000));
-        maxUpgradeTier = Math.max(0, config.getInt("max-upgrade-tier", 5));
+                : config.getLong("base-capacity-per-type", 50000), 1);
+        capacityPerUpgrade = boundedCapacity(config.getLong("capacity-per-upgrade", 25000), 0);
+        maxUpgradeTier = Math.max(0, Math.min(MAX_UPGRADE_TIER, config.getInt("max-upgrade-tier", 5)));
         shiftWithdrawAmount = Math.max(1, config.getInt("shift-withdraw-amount", 64));
         upgradeCostBase = Math.max(0, config.getDouble("upgrade-cost-base", 100000.0));
         upgradeCostMultiplier = Math.max(1.0, config.getDouble("upgrade-cost-multiplier", 1.75));
         hopperBlockRadius = Math.max(0, config.getInt("hopper-block-radius", 2));
         scanIntervalTicks = Math.max(20, config.getInt("scan-interval-ticks", 100));
-        maxStoredMaterialTypes = Math.max(1, config.getInt("max-stored-material-types", 64));
+        maxStoredMaterialTypes = Math.max(1, Math.min(MAX_STORED_MATERIAL_TYPES,
+                config.getInt("max-stored-material-types", 64)));
     }
 
     /** The item name is localized with the recipient's configured language. */
@@ -148,10 +153,6 @@ public final class ChunkCollectorManager {
         return enabled;
     }
 
-    public boolean isSilkTouchRequired() {
-        return silkTouchRequired;
-    }
-
     public int maxPerChunk() {
         return maxPerChunk;
     }
@@ -183,7 +184,14 @@ public final class ChunkCollectorManager {
     }
 
     public long capacityFor(int upgradeTier) {
-        return baseCapacity + (long) upgradeTier * capacityPerUpgrade;
+        int tier = Math.max(0, Math.min(maxUpgradeTier, upgradeTier));
+        if (capacityPerUpgrade == 0 || tier == 0 || baseCapacity >= MAX_CAPACITY) {
+            return baseCapacity;
+        }
+        long additional = capacityPerUpgrade > (MAX_CAPACITY - baseCapacity) / tier
+                ? MAX_CAPACITY - baseCapacity
+                : capacityPerUpgrade * tier;
+        return Math.min(MAX_CAPACITY, baseCapacity + additional);
     }
 
     /** Cost to go from `currentTier` to `currentTier + 1`, or -1 if already at the max. */
@@ -223,7 +231,7 @@ public final class ChunkCollectorManager {
                 reindexOwner(location, data.ownerUuid());
             }
         }
-        for (Location indexed : List.copyOf(collectors.values())) {
+        for (Location indexed : locationsInChunk(chunk)) {
             if (inChunk(indexed, chunk) && !found.contains(key(indexed))) {
                 unregister(indexed);
             }
@@ -236,13 +244,7 @@ public final class ChunkCollectorManager {
     }
 
     public int countInChunk(Chunk chunk) {
-        int count = 0;
-        for (Location location : collectors.values()) {
-            if (inChunk(location, chunk)) {
-                count++;
-            }
-        }
-        return count;
+        return collectorsByChunk.getOrDefault(chunkKey(chunk), java.util.Set.of()).size();
     }
 
     public int countForOwner(UUID ownerUuid) {
@@ -261,12 +263,24 @@ public final class ChunkCollectorManager {
         return reassigned;
     }
 
+    /** Transfers faction ownership after an overclaim without touching contents or tier. */
+    public void transferFactionOwnership(Location location, String ownerFactionTag) {
+        if (ownerFactionTag == null || ownerFactionTag.isBlank()) {
+            return;
+        }
+        ChunkCollectorData current = readData(location);
+        if (current == null || ownerFactionTag.equalsIgnoreCase(current.ownerFactionTag())) {
+            return;
+        }
+        ChunkCollectorData transferred = withOwner(current, current.ownerUuid(), ownerFactionTag);
+        writeData(location, transferred);
+        persist(location, transferred);
+        reindexOwner(location, transferred.ownerUuid());
+    }
+
     public List<Map.Entry<Location, ChunkCollectorData>> getCollectorsInChunk(Chunk chunk) {
         List<Map.Entry<Location, ChunkCollectorData>> found = new ArrayList<>();
-        for (Location location : collectors.values()) {
-            if (!inChunk(location, chunk)) {
-                continue;
-            }
+        for (Location location : locationsInChunk(chunk)) {
             ChunkCollectorData data = readData(location);
             if (data != null) {
                 found.add(Map.entry(location, data));
@@ -297,8 +311,8 @@ public final class ChunkCollectorManager {
      */
     public List<Location> collectorsBelow(Chunk chunk, double maxY) {
         List<Location> found = new ArrayList<>();
-        for (Location location : collectors.values()) {
-            if (inChunk(location, chunk) && location.getBlockY() < maxY) {
+        for (Location location : locationsInChunk(chunk)) {
+            if (location.getBlockY() < maxY) {
                 found.add(location);
             }
         }
@@ -309,14 +323,24 @@ public final class ChunkCollectorManager {
     /** Every tracked collector within `radius` blocks (any direction) of `center`. */
     public List<Location> collectorsNear(Location center, int radius) {
         List<Location> found = new ArrayList<>();
-        for (Location location : collectors.values()) {
-            if (!location.getWorld().equals(center.getWorld())) {
-                continue;
-            }
-            if (Math.abs(location.getBlockX() - center.getBlockX()) <= radius
-                    && Math.abs(location.getBlockY() - center.getBlockY()) <= radius
-                    && Math.abs(location.getBlockZ() - center.getBlockZ()) <= radius) {
-                found.add(location);
+        if (center == null || center.getWorld() == null) {
+            return found;
+        }
+        int minChunkX = (center.getBlockX() - radius) >> 4;
+        int maxChunkX = (center.getBlockX() + radius) >> 4;
+        int minChunkZ = (center.getBlockZ() - radius) >> 4;
+        int maxChunkZ = (center.getBlockZ() + radius) >> 4;
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                for (String locationKey : collectorsByChunk.getOrDefault(chunkKey(center.getWorld(), chunkX, chunkZ),
+                        java.util.Set.of())) {
+                    Location location = collectors.get(locationKey);
+                    if (location != null && Math.abs(location.getBlockX() - center.getBlockX()) <= radius
+                            && Math.abs(location.getBlockY() - center.getBlockY()) <= radius
+                            && Math.abs(location.getBlockZ() - center.getBlockZ()) <= radius) {
+                        found.add(location);
+                    }
+                }
             }
         }
         return found;
@@ -341,6 +365,10 @@ public final class ChunkCollectorManager {
         if (collectors.remove(locationKey) == null) {
             return;
         }
+        collectorsByChunk.computeIfPresent(chunkKey(location), (ignored, locations) -> {
+            locations.remove(locationKey);
+            return locations.isEmpty() ? null : locations;
+        });
         collectorsByOwner.values().forEach(locations -> locations.remove(locationKey));
         queue(location, () -> {
             try {
@@ -416,7 +444,8 @@ public final class ChunkCollectorManager {
         if (!pdc.has(markerKey, PersistentDataType.BYTE)) {
             return null;
         }
-        int tier = pdc.getOrDefault(tierKey, PersistentDataType.INTEGER, 0);
+        int tier = Math.max(0, Math.min(maxUpgradeTier,
+                pdc.getOrDefault(tierKey, PersistentDataType.INTEGER, 0)));
         String ownerUuidRaw = pdc.get(ownerUuidKey, PersistentDataType.STRING);
         UUID ownerUuid;
         try {
@@ -428,6 +457,8 @@ public final class ChunkCollectorManager {
         }
         String ownerFaction = pdc.get(ownerFactionKey, PersistentDataType.STRING);
         ChunkCollectorData data = new ChunkCollectorData(tier, ownerUuid, ownerFaction);
+        long remainingCapacity = capacityFor(tier);
+        int storedTypes = 0;
         for (NamespacedKey namespacedKey : pdc.getKeys()) {
             if (!namespacedKey.getNamespace().equals(plugin.getName().toLowerCase(Locale.ROOT))
                     || !namespacedKey.getKey().startsWith(STORED_PREFIX)) {
@@ -441,8 +472,11 @@ public final class ChunkCollectorManager {
                 continue;
             }
             Long amount = pdc.get(namespacedKey, PersistentDataType.LONG);
-            if (amount != null && amount > 0) {
-                data.setStored(material, amount);
+            if (amount != null && amount > 0 && remainingCapacity > 0 && storedTypes < maxStoredMaterialTypes) {
+                long accepted = Math.min(amount, remainingCapacity);
+                data.setStored(material, accepted);
+                remainingCapacity -= accepted;
+                storedTypes++;
             }
         }
         return data;
@@ -461,7 +495,8 @@ public final class ChunkCollectorManager {
 
     private void writeData(PersistentDataContainer pdc, ChunkCollectorData data) {
         pdc.set(markerKey, PersistentDataType.BYTE, (byte) 1);
-        pdc.set(tierKey, PersistentDataType.INTEGER, data.upgradeTier());
+        pdc.set(tierKey, PersistentDataType.INTEGER,
+                Math.max(0, Math.min(maxUpgradeTier, data.upgradeTier())));
         pdc.set(ownerUuidKey, PersistentDataType.STRING, data.ownerUuid().toString());
         if (data.ownerFactionTag() != null) {
             pdc.set(ownerFactionKey, PersistentDataType.STRING, data.ownerFactionTag());
@@ -528,7 +563,35 @@ public final class ChunkCollectorManager {
     private void index(Location location, UUID ownerUuid) {
         String locationKey = key(location);
         collectors.put(locationKey, location);
+        collectorsByChunk.computeIfAbsent(chunkKey(location), ignored -> ConcurrentHashMap.newKeySet()).add(locationKey);
         reindexOwner(location, ownerUuid);
+    }
+
+    private List<Location> locationsInChunk(Chunk chunk) {
+        List<Location> locations = new ArrayList<>();
+        for (String locationKey : collectorsByChunk.getOrDefault(chunkKey(chunk), java.util.Set.of())) {
+            Location location = collectors.get(locationKey);
+            if (location != null) {
+                locations.add(location);
+            }
+        }
+        return locations;
+    }
+
+    private static String chunkKey(Chunk chunk) {
+        return chunkKey(chunk.getWorld(), chunk.getX(), chunk.getZ());
+    }
+
+    private static String chunkKey(Location location) {
+        return chunkKey(location.getWorld(), location.getBlockX() >> 4, location.getBlockZ() >> 4);
+    }
+
+    private static String chunkKey(World world, int chunkX, int chunkZ) {
+        return world.getUID() + ":" + chunkX + ":" + chunkZ;
+    }
+
+    private static long boundedCapacity(long configured, long minimum) {
+        return Math.max(minimum, Math.min(MAX_CAPACITY, configured));
     }
 
     private void reindexOwner(Location location, UUID ownerUuid) {

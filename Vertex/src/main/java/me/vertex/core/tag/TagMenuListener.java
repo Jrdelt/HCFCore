@@ -49,7 +49,7 @@ public final class TagMenuListener implements Listener {
             return;
         }
         event.getView().setRepairCost(0);
-        event.getView().setMaximumRepairCost(0);
+        event.getView().setMaximumRepairCost(TagSearchMenu.FREE_ANVIL_MAX_COST);
         event.setResult(TagSearchMenu.confirmButton(player, holder.messages(),
                 TagSearchMenu.readQuery(player, holder.messages(), event.getView(), event.getInventory())));
     }

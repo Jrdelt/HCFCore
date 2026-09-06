@@ -9,9 +9,6 @@
 # catches everything that falls down to it.
 enabled: true
 
-# Whether breaking a Chunk Collector requires a Silk Touch tool.
-silk-touch-required: true
-
 # How many Chunk Collectors a single chunk may contain at once.
 max-per-chunk: 1
 

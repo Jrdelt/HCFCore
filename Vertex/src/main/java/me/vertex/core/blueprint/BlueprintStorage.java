@@ -14,11 +14,11 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Persists just enough about an active build to resume it after a
+ * Persists just enough about an active build to restore it as paused after a
  * restart: where it is, which template, whose it is, and how far it got.
- * The clipboard itself is re-loaded from the same .schem file on resume
- * (deterministic iteration order means re-flattening it produces the same
- * position list), so there's no need to persist the block list itself.
+ * The clipboard itself is re-loaded from its private snapshot (deterministic
+ * iteration order means re-flattening it produces the same position list),
+ * so there's no need to persist the block list itself.
  */
 public final class BlueprintStorage {
     private static final String CREATE_COOLDOWN_TABLE = """

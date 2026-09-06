@@ -36,16 +36,24 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
 
-/** Seven-row faction bank for money, experience, and FactionsUUID's TNT bank. */
+/**
+ * Six-row faction bank for money, experience, and FactionsUUID's TNT bank.
+ * Paper's standard chest inventory API permits 9–54 slots only; a seventh
+ * row (63 slots) is not a valid client inventory.
+ */
 public final class FactionBankMenu implements Listener {
-    private static final int SIZE = 63;
-    private static final int MONEY_SLOT = 29;
-    private static final int EXPERIENCE_SLOT = 31;
-    private static final int TNT_SLOT = 33;
-    private static final int DEPOSIT_ROW = 40;
-    private static final int WITHDRAW_ROW = 49;
+    private static final int SIZE = 54;
+    // Keep the three bank sections in the upper half of the double chest.
+    // These are each two chest rows (18 slots) above the prior layout.
+    private static final int MONEY_SLOT = 11;
+    private static final int EXPERIENCE_SLOT = 13;
+    private static final int TNT_SLOT = 15;
+    private static final int DEPOSIT_ROW = 22;
+    private static final int WITHDRAW_ROW = 31;
     private static final int ANVIL_INPUT = 0;
     private static final int ANVIL_RESULT = 2;
+    /** See {@link org.bukkit.inventory.view.AnvilView#setMaximumRepairCost(int)}. */
+    private static final int FREE_ANVIL_MAX_COST = 40;
 
     private final Plugin plugin;
     private final FactionBankManager manager;
@@ -209,11 +217,14 @@ public final class FactionBankMenu implements Listener {
                 || !(event.getView().getPlayer() instanceof Player player)) {
             return;
         }
-        event.getView().setRepairCost(0);
-        event.getView().setMaximumRepairCost(0);
         Long amount = readAmount(event.getView(), event.getInventory());
         holder.lastAmount = amount;
         event.setResult(confirmItem(player, amount));
+        // Set after the result, not before: some Paper builds recompute a
+        // fresh repair cost from the new result item when setResult() runs,
+        // silently undoing an override applied earlier in the handler.
+        event.getView().setRepairCost(0);
+        event.getView().setMaximumRepairCost(FREE_ANVIL_MAX_COST);
     }
 
     private void openAmountPrompt(Player player, int factionId, Resource resource, Operation operation) {
@@ -223,14 +234,17 @@ public final class FactionBankMenu implements Listener {
         holder.inventory = inventory;
         ItemStack input = new ItemStack(resource.material);
         ItemMeta inputMeta = input.getItemMeta();
-        inputMeta.displayName(noItalic(messages.get(player, "faction-bank.amount-prompt")));
+        // Deliberately no displayName() here -- see readAmount()'s comment
+        // for why leaving the name unset (rather than pre-filling it with
+        // the prompt text) is what makes the anvil's rename box start blank.
+        inputMeta.lore(java.util.List.of(noItalic(messages.get(player, "faction-bank.amount-prompt"))));
         input.setItemMeta(inputMeta);
         inventory.setItem(ANVIL_INPUT, input);
         inventory.setItem(ANVIL_RESULT, confirmItem(player, null));
         player.openInventory(inventory);
         if (player.getOpenInventory() instanceof AnvilView view) {
             view.setRepairCost(0);
-            view.setMaximumRepairCost(0);
+            view.setMaximumRepairCost(FREE_ANVIL_MAX_COST);
         }
     }
 
@@ -450,8 +464,9 @@ public final class FactionBankMenu implements Listener {
         if (text == null || text.isBlank()) {
             return null;
         }
+        String value = text.trim();
         try {
-            long amount = Long.parseLong(text.trim().replace(",", ""));
+            long amount = Long.parseLong(value.replace(",", ""));
             return amount > 0 && amount <= Integer.MAX_VALUE ? amount : null;
         } catch (NumberFormatException ignored) {
             return null;

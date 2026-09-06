@@ -7,6 +7,7 @@ import dev.kitteh.factions.event.LandClaimEvent;
 import dev.kitteh.factions.event.LandUnclaimAllEvent;
 import dev.kitteh.factions.event.LandUnclaimEvent;
 import me.vertex.core.lang.Messages;
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -17,7 +18,14 @@ import org.bukkit.event.Listener;
 
 import java.util.Map;
 
-/** Applies faction land changes to collectors exactly as it does to spawners. */
+/**
+ * Keeps Chunk Collectors honest with faction land ownership, the same way
+ * {@code SpawnerClaimListener} does for spawners: a chunk with an active
+ * Collector can't be casually /f unclaim'd away, an overclaim keeps the
+ * physical block and just changes who can open it, and unclaim-all/disband
+ * return every Collector as an item rather than stranding it in unclaimed
+ * land with a faction tag nobody can act on anymore.
+ */
 public final class ChunkCollectorClaimListener implements Listener {
     private final ChunkCollectorManager manager;
     private final Messages messages;
@@ -29,24 +37,23 @@ public final class ChunkCollectorClaimListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onClaim(LandClaimEvent event) {
-        if (event.isCancelled()) {
+        if (event.isCancelled() || event.getFaction() == null) {
             return;
         }
-        String claimingTag = event.getFaction() == null ? null : event.getFaction().tag();
+        String claimingTag = event.getFaction().tag();
         for (Map.Entry<Location, ChunkCollectorData> entry : manager.getCollectorsInChunk(event.getLocation().asChunk())) {
-            String ownerTag = entry.getValue().ownerFactionTag();
-            // Pre-ownership collectors cannot be safely identified as an
-            // overclaim, so never destroy legacy player property on a normal
-            // same-faction claim refresh.
-            if (ownerTag != null && (claimingTag == null || !ownerTag.equalsIgnoreCase(claimingTag))) {
-                drop(entry.getKey(), entry.getValue());
-            }
+            manager.transferFactionOwnership(entry.getKey(), claimingTag);
         }
     }
 
+    /** Blocks unclaiming a single chunk outright while it has an active Collector. */
     @EventHandler(priority = EventPriority.HIGH)
     public void onUnclaim(LandUnclaimEvent event) {
-        if (event.isCancelled() || manager.getCollectorsInChunk(event.getLocation().asChunk()).isEmpty()) {
+        if (event.isCancelled()) {
+            return;
+        }
+        Chunk chunk = event.getLocation().asChunk();
+        if (manager.getCollectorsInChunk(chunk).isEmpty()) {
             return;
         }
         event.setCancelled(true);
@@ -56,51 +63,66 @@ public final class ChunkCollectorClaimListener implements Listener {
         }
     }
 
+    /**
+     * /f unclaimall isn't blocked -- it releases the whole faction's land at
+     * once, and singling out which chunks to protect isn't practical -- but
+     * every Collector in the land being released still gets dropped instead
+     * of left behind in an unclaimed chunk.
+     */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onUnclaimAll(LandUnclaimAllEvent event) {
         if (event.isCancelled()) {
             return;
         }
-        int dropped = dropAll(event.getFPlayer().faction());
+        Faction faction = event.getFPlayer().faction();
+        int dropped = dropAllInFactionClaims(faction);
+        if (dropped <= 0) {
+            return;
+        }
         Player player = event.getFPlayer().asPlayer();
-        if (dropped > 0 && player != null) {
+        if (player != null) {
             player.sendMessage(messages.get(player, "collector.unclaimall-warning", "amount", String.valueOf(dropped)));
         }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onDisband(FactionDisbandEvent event) {
-        if (!event.isCancelled()) {
-            int dropped = dropAll(event.getFaction());
-            Player player = event.getFPlayer().asPlayer();
-            if (dropped > 0 && player != null) {
-                player.sendMessage(messages.get(player, "collector.disband-warning", "amount", String.valueOf(dropped)));
-            }
+        if (event.isCancelled()) {
+            return;
+        }
+        int dropped = dropAllInFactionClaims(event.getFaction());
+        if (dropped <= 0) {
+            return;
+        }
+        Player player = event.getFPlayer().asPlayer();
+        if (player != null) {
+            player.sendMessage(messages.get(player, "collector.disband-warning", "amount", String.valueOf(dropped)));
         }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onAutoDisband(FactionAutoDisbandEvent event) {
-        dropAll(event.getFaction());
+        dropAllInFactionClaims(event.getFaction());
     }
 
-    private int dropAll(Faction faction) {
+    private int dropAllInFactionClaims(Faction faction) {
         if (faction == null) {
             return 0;
         }
         int dropped = 0;
-        // Indexed collectors only: do not force every faction claim chunk to
-        // load just to discover that it contains nothing.
+        // Do not enumerate claims: FLocation.asChunk() calls
+        // World#getChunkAt(), which synchronously loads every claimed chunk.
+        // Iterating the collector index is linear in actual Collectors instead.
         for (Map.Entry<Location, ChunkCollectorData> entry : manager.getCollectorsOwnedBy(faction.tag())) {
-            drop(entry.getKey(), entry.getValue());
+            dropCollector(entry.getKey(), entry.getValue());
             dropped++;
         }
         return dropped;
     }
 
-    private void drop(Location location, ChunkCollectorData data) {
-        location.getWorld().dropItemNaturally(location.clone().add(.5, .5, .5),
-                manager.createCollectorItem(manager.displayName(org.bukkit.Bukkit.getConsoleSender()), data));
+    private void dropCollector(Location location, ChunkCollectorData data) {
+        location.getWorld().dropItemNaturally(location.clone().add(0.5, 0.5, 0.5),
+                manager.createCollectorItem(manager.displayName(Bukkit.getConsoleSender()), data));
         manager.unregister(location);
         if (location.getBlock().getType() == Material.GREEN_SHULKER_BOX) {
             location.getBlock().setType(Material.AIR);

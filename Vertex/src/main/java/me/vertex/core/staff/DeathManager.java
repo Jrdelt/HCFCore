@@ -31,6 +31,10 @@ public final class DeathManager {
     public DeathManager(Plugin plugin, Storage storage) {
         this.plugin = plugin;
         this.storage = storage;
+        // Retention cannot depend on the same player dying again. The actual
+        // work still runs through the serialized DB executor below.
+        plugin.getServer().getScheduler().runTaskTimerAsynchronously(plugin,
+                this::cleanupExpiredDeaths, 20L * 60L, 20L * 60L * 60L * 6L);
     }
 
     public void saveDeath(UUID uuid, Death death) {
@@ -60,6 +64,23 @@ public final class DeathManager {
                 plugin.getServer().getScheduler().runTask(plugin, () -> callback.onDeathsLoadFailed());
             }
         });
+    }
+
+    private void cleanupExpiredDeaths() {
+        pendingWrites.incrementAndGet();
+        try {
+            ioExecutor.submit(() -> {
+                try {
+                    storage.cleanupExpiredDeaths();
+                } catch (SQLException e) {
+                    plugin.getLogger().log(Level.WARNING, "Failed to clean up expired rollback records.", e);
+                } finally {
+                    pendingWrites.decrementAndGet();
+                }
+            });
+        } catch (java.util.concurrent.RejectedExecutionException ignored) {
+            pendingWrites.decrementAndGet();
+        }
     }
 
     public void awaitWrites() {

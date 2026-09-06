@@ -58,8 +58,10 @@ required progress display above the build. See
   re-verified. If the land is no longer 100% the owning faction's
   (overclaimed, voluntarily unclaimed, etc.), the build **aborts
   immediately** — blocks placed so far are left as-is, and the Beacon is
-  returned as the Blueprint item. This is the same outcome as an explicit
-  cancel via the beacon's own progress GUI (right-click it mid-build).
+  removed. A Blueprint item is returned only for a same-session cancel before
+  the first block is placed; a restored build and repairs never return an
+  item. This is the same outcome as an explicit cancel via the beacon's own
+  progress GUI (right-click it mid-build).
 
 ## Persistence across restarts
 
@@ -68,10 +70,12 @@ and current progress index are saved to the database at each checkpoint.
 The stable faction id means a faction rename cannot transfer or abort an
 active build. Vertex also creates a private snapshot under
 `plugins/Vertex/blueprint-snapshots/` before marking a build active. On a
-restart it resumes from that snapshot rather than a potentially edited
-template file, after first re-validating the matching active Beacon and
-claim ownership. Snapshot files are removed when their build finishes or
-is cancelled.
+restart it restores from that snapshot as **paused**, rather than continuing
+automatically. A member of the owning faction must right-click the matching
+Beacon and click **Resume Build** in its GUI; Vertex validates the active
+Beacon and the complete claimed footprint again before it continues. This
+also uses the snapshot rather than a potentially edited template file.
+Snapshot files are removed when their build finishes or is cancelled.
 
 ## Cooldown
 
@@ -91,6 +95,9 @@ staff can clear an online **or offline** player's active cooldown with
 | `build-time-seconds` | Target total build duration |
 | `batch-interval-ticks` | How often progress/hologram checkpoints save |
 | `max-blocks-per-tick` | Safety cap on blocks placed per tick (protects TPS) |
+| `max-schematic-bytes` | Largest `.schem` file Vertex will load (default 32 MiB) |
+| `max-schematic-blocks` | Maximum non-air blocks accepted from one schematic |
+| `max-schematic-dimension` | Maximum width, height, or depth of one schematic |
 | `claim-recheck-interval-ticks` | How often claim ownership is re-verified mid-build |
 | `templates` | Each placeable Blueprint: `schematic` (file name) and `display-name` |
 

@@ -80,6 +80,9 @@ public final class BlueprintManager {
     private volatile int batchIntervalTicks;
     private volatile int maxBlocksPerTick;
     private volatile int claimRecheckIntervalTicks;
+    private volatile long maxSchematicBytes;
+    private volatile int maxSchematicBlocks;
+    private volatile int maxSchematicDimension;
 
     public BlueprintManager(Plugin plugin, BlueprintStorage storage) {
         this.plugin = plugin;
@@ -106,6 +109,12 @@ public final class BlueprintManager {
         batchIntervalTicks = Math.max(1, config.getInt("batch-interval-ticks", 20));
         maxBlocksPerTick = Math.max(1, config.getInt("max-blocks-per-tick", 64));
         claimRecheckIntervalTicks = Math.max(20, config.getInt("claim-recheck-interval-ticks", 100));
+        maxSchematicBytes = Math.max(1_048_576L, Math.min(536_870_912L,
+                config.getLong("max-schematic-bytes", 33_554_432L)));
+        maxSchematicBlocks = Math.max(1, Math.min(1_000_000,
+                config.getInt("max-schematic-blocks", 250_000)));
+        maxSchematicDimension = Math.max(1, Math.min(4_096,
+                config.getInt("max-schematic-dimension", 512)));
 
         Map<String, BlueprintTemplate> loaded = new LinkedHashMap<>();
         ConfigurationSection templatesSection = config.getConfigurationSection("templates");
@@ -376,6 +385,10 @@ public final class BlueprintManager {
         }
 
         File schemFile = schematicFile(template);
+        if (!schemFile.isFile() || schemFile.length() > maxSchematicBytes) {
+            throw new IOException("Schematic is missing or exceeds max-schematic-bytes (" + maxSchematicBytes
+                    + "): " + schemFile);
+        }
         ClipboardFormat format = ClipboardFormats.findByFile(schemFile);
         if (format == null) {
             throw new IOException("Unrecognized or missing schematic file: " + schemFile);
@@ -405,6 +418,10 @@ public final class BlueprintManager {
             int y = pos.y();
             int z = pos.z();
 
+            if (rawBlocks.size() >= maxSchematicBlocks) {
+                throw new IOException("Schematic '" + template.name() + "' exceeds max-schematic-blocks ("
+                        + maxSchematicBlocks + ").");
+            }
             rawBlocks.add(new RawBlock(x, y, z, adaptBlockData(template, block)));
 
             if (x < minX)
@@ -425,6 +442,14 @@ public final class BlueprintManager {
             CachedTemplate empty = new CachedTemplate(List.of(), BlockVector3.ZERO, BlockVector3.ZERO);
             parsedTemplates.put(template.name().toLowerCase(Locale.ROOT), empty);
             return empty;
+        }
+
+        long width = (long) maxX - minX + 1L;
+        long height = (long) maxY - minY + 1L;
+        long depth = (long) maxZ - minZ + 1L;
+        if (width > maxSchematicDimension || height > maxSchematicDimension || depth > maxSchematicDimension) {
+            throw new IOException("Schematic '" + template.name() + "' exceeds max-schematic-dimension ("
+                    + maxSchematicDimension + ").");
         }
 
         // Anchor the schematic's bottom corner directly above the beacon
@@ -658,6 +683,16 @@ public final class BlueprintManager {
     public void persistProgress(ActiveBuild build) {
         queueWrite(build.id(), () -> storage.updateProgress(build.id(), build.currentIndex()),
                 "Failed to persist blueprint build progress.");
+    }
+
+    /** Saves live build positions before shutdown; loaded builds are paused on the next boot. */
+    public void pauseForRestart() {
+        for (ActiveBuild build : activeBuilds.values()) {
+            if (build.id() >= 0 && !build.isCancelled()) {
+                build.pause();
+                persistProgress(build);
+            }
+        }
     }
 
     public void persistRemoval(int id) {

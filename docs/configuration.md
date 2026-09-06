@@ -1,11 +1,11 @@
 # Configuration
 
-Everything below lives in `config.yml` unless stated otherwise. All of it
-reloads live with `/vertex reload` (permission `vertex.admin`) — no
-restart required. This page covers the server-wide settings; the large
-feature-specific files (`kits.yml`, `abilities.yml`, `tags.yml`,
-`spawners.yml`, `collectors.yml`, `blueprints.yml`) each have their own
-doc page linked from [the index](README.md).
+Everything below lives in `config.yml` unless stated otherwise. Gameplay
+settings reload with `/vertex reload` (permission `vertex.admin`); changing
+the storage backend still requires a restart. This page covers the
+server-wide settings; the large feature-specific files (`kits.yml`,
+`abilities.yml`, `tags.yml`, `spawners.yml`, `collectors.yml`,
+`blueprints.yml`) each have their own doc page linked from [the index](README.md).
 
 ## Localization
 
@@ -202,7 +202,7 @@ factions:
   add any custom alias here too or those won't be reachable from it.
 
 See [Factions Integration](factions-integration.md) for rallies, the
-permissions GUI, and nametag/scoreboard details.
+permissions GUI, upgrades/bank behavior, and nametag/scoreboard details.
 
 ## Faction upgrades
 
@@ -219,10 +219,12 @@ faction-upgrades:
         3: {price: 153125.0, bonus: 15.0}
 ```
 
-`enabled` is the global off switch. `leader-only` lets members browse the
-menu while preventing them from spending faction resources; set it to
-`false` if any member should be able to buy levels. Every individual entry
-has the same controls:
+`enabled` is the global off switch. The native FactionsUUID `UPGRADE`
+permission in `/f permissions` determines which roles may open or purchase
+from this menu. `leader-only: true` lets allowed members browse while
+preventing them from spending their own Vault balance; set it to `false` if
+any allowed member should be able to buy levels. Every individual entry has
+the same controls:
 
 - `enabled` hides its gameplay effect and prevents new purchases without
   erasing its saved level.
@@ -231,12 +233,19 @@ has the same controls:
   free and no multiplier is applied.
 - `bonus` is a percentage for every item except `warps`. Crop Growth is a
   per-growth-stage chance; Fly Boost applies only to players already
-  flying. Warps gives FactionsUUID its native warp upgrade level, so
-  configure the actual count/values in FactionsUUID's own upgrades
-  configuration.
+  flying. Warps writes FactionsUUID's native Warp level; Vertex's `bonus`
+  is display-only for that entry.
 
-All non-warp effects apply only in the upgraded faction's claimed land.
-Their GUI labels, lore, and purchase/failure messages are configurable in
+The owner/scope matters: Damage, Claim Protection, Armor Wear, Fall
+Protection, and Fly Boost require a faction member to be standing in their
+own claim. Spawner Rate and Crop Growth apply to the managed block/crop in
+the upgraded claim even when no member is nearby. Mob XP requires a member
+to kill a mob in that faction's claim. Configure Warp maximum/count values
+in FactionsUUID as well, and do not enable duplicate native FactionsUUID
+upgrades unless you intentionally want their effects to stack. The complete
+compatibility rules are in [Factions Integration](factions-integration.md#faction-upgrades).
+
+GUI labels, lore, and purchase/failure messages are configurable in
 `lang/en_us.yml` under `faction-upgrades` (and can be translated per locale).
 
 ## Kits & abilities (global settings)

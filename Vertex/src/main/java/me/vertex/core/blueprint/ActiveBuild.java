@@ -9,9 +9,9 @@ import java.util.UUID;
 
 /**
  * Runtime state for one in-progress (or paused-across-restart) build. The
- * flattened block list is rebuilt from the same .schem file on load/resume
- * (see {@link BlueprintManager#flatten}) rather than persisted -- only
- * {@code currentIndex} is durable (see {@link BlueprintStorage}).
+ * flattened block list is rebuilt from its private snapshot on load, rather
+ * than persisted; only {@code currentIndex} is durable
+ * (see {@link BlueprintStorage}).
  */
 public final class ActiveBuild {
 
@@ -27,6 +27,10 @@ public final class ActiveBuild {
     private List<PendingBlock> blocks;
     private int currentIndex;
     private boolean cancelled;
+    /** Restored builds wait for a faction member to explicitly resume them. */
+    private boolean paused;
+    /** Only a brand-new, not-yet-placed build may return its consumed item. */
+    private boolean refundEligible;
 
     public ActiveBuild(int id, Location anchor, BlueprintTemplate template, UUID ownerUuid, int ownerFactionId,
                         long startedAtMillis, String hologramName, int currentIndex) {
@@ -94,6 +98,26 @@ public final class ActiveBuild {
 
     public void cancel() {
         this.cancelled = true;
+    }
+
+    public boolean isPaused() {
+        return paused;
+    }
+
+    public void pause() {
+        this.paused = true;
+    }
+
+    public void resume() {
+        this.paused = false;
+    }
+
+    public boolean isRefundEligible() {
+        return refundEligible;
+    }
+
+    public void allowInitialRefund() {
+        this.refundEligible = true;
     }
 
     /** One block position (relative to the clipboard's own origin, converted to world-space at placement time) and its data. */

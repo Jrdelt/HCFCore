@@ -80,6 +80,8 @@ import me.vertex.core.tag.TagMenuListener;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
+import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -288,11 +290,14 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         chunkCollectorManager = new me.vertex.core.collector.ChunkCollectorManager(this, chunkCollectorStorage, messages);
         chunkCollectorManager.load();
         chunkCollectorManager.loadIndexFromDatabase();
+        reconcileLoadedManagedBlocks();
         chunkCollectorListener = new me.vertex.core.collector.ChunkCollectorListener(
                 this, chunkCollectorManager, staffManager, messages, rallyManager);
         Bukkit.getPluginManager().registerEvents(chunkCollectorListener, this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.collector.ChunkCollectorClaimListener(chunkCollectorManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.faction.FactionRenameListener(spawnerManager, chunkCollectorManager), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.collector.ChunkCollectorMenuListener(chunkCollectorManager, staffManager, messages,
                         rallyManager), this);
@@ -419,6 +424,29 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         }
     }
 
+    /**
+     * SQL only tells us about rows that finished saving. Scan chunks Paper
+     * already has loaded so a valid Collector/Spawner PDC record left by an
+     * interrupted asynchronous write is recovered before any player can use it.
+     */
+    private void reconcileLoadedManagedBlocks() {
+        if (spawnerManager == null || chunkCollectorManager == null) {
+            return;
+        }
+        for (World world : Bukkit.getWorlds()) {
+            for (Chunk chunk : world.getLoadedChunks()) {
+                try {
+                    spawnerManager.reconcileChunk(chunk);
+                    chunkCollectorManager.reconcileChunk(chunk);
+                } catch (Exception e) {
+                    getLogger().log(java.util.logging.Level.WARNING,
+                            "Failed to reconcile managed blocks in loaded chunk " + world.getName() + ","
+                                    + chunk.getX() + "," + chunk.getZ(), e);
+                }
+            }
+        }
+    }
+
     @Override
     public void onDisable() {
         if (scoreboardManager != null) {
@@ -452,6 +480,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             chunkCollectorManager.awaitWrites();
         }
         if (blueprintManager != null) {
+            blueprintManager.pauseForRestart();
             blueprintManager.awaitWrites();
         }
         if (rallyManager != null) {

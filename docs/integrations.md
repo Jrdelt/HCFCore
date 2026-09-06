@@ -8,10 +8,13 @@ rather than causing an error.
 ## FactionsUUID — required
 
 The one hard dependency (`depend` in `plugin.yml`). Vertex refuses to
-enable if it isn't present and enabled. Every faction-aware feature reads
-and writes through FactionsUUID's own API: faction identity, claims,
-relations (ally/enemy), power, and its permission system. Built and
-tested against **FactionsUUID 4.4.0+**. See
+enable if it isn't present and enabled. Vertex reads faction identity,
+claims, relations, power, roles, native permissions, the TNT bank, and
+the native Warp upgrade through FactionsUUID's API. Vertex stores its own
+upgrade levels, money/XP bank balances, rally permissions, and managed
+block ownership in its selected database/configuration. It is built against
+**FactionsUUID 4.4.0**; the 4.7.0 API has also been checked for the direct
+methods Vertex uses. See
 [Factions Integration](factions-integration.md) for the full picture.
 
 ## Vault — optional
@@ -22,10 +25,13 @@ Enables money costs. Specifically:
 - Buying spawners from `/spawners` and selling them back.
 - Buying Chunk Collector upgrade tiers.
 - Buying faction-upgrade levels through `/f upgrades`.
+- Depositing to or withdrawing from the faction **money** bank.
 - The `{balance}` scoreboard placeholder.
 
 Without Vault, only free or item-cost kits work, spawners/collectors that
-require a purchase can't be bought, and `{balance}` resolves to nothing.
+require a purchase can't be bought, faction money transactions and paid
+upgrade levels are unavailable, and `{balance}` resolves to nothing. Faction
+XP and TNT bank operations do not require Vault.
 
 ## WorldGuard — optional
 
@@ -89,8 +95,8 @@ partial/degraded mode, it's fully off until both are present.
 
 | Plugin | Required? | Powers |
 |---|---|---|
-| FactionsUUID | **Yes** | Everything faction-aware: claims, relations, chat/scoreboard/nametags, rallies |
-| Vault | No | Kit money costs, spawner/collector/faction-upgrade economy, `{balance}` |
+| FactionsUUID | **Yes** | Claims, roles/permissions, relations, chat/scoreboard/nametags, rallies, native TNT/Warps |
+| Vault | No | Kit money costs, spawner/collector/faction-upgrade economy, faction money bank, `{balance}` |
 | WorldGuard | No | Region-based ability and no-pearl restrictions |
 | LuckPerms | No | Rank display, the Repair ability |
 | PlaceholderAPI | No | `%placeholder%` support in chat/scoreboard templates |

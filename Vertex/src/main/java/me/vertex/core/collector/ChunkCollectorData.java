@@ -37,6 +37,9 @@ public final class ChunkCollectorData {
     public long totalStored() {
         long total = 0L;
         for (long amount : stored.values()) {
+            if (amount > Long.MAX_VALUE - total) {
+                return Long.MAX_VALUE;
+            }
             total += amount;
         }
         return total;

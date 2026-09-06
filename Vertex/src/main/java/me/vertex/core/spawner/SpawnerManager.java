@@ -427,6 +427,25 @@ public final class SpawnerManager {
     }
 
     /**
+     * Transfers a placed spawner's faction ownership without changing its
+     * type or stack size. Used when land is successfully overclaimed so the
+     * new claim owner can manage the spawner and a later old-faction disband
+     * cannot remove property from land it no longer owns.
+     */
+    public void transferOwnership(Location location, String ownerFactionTag) {
+        SpawnerData current = get(location);
+        if (current == null || ownerFactionTag == null || ownerFactionTag.isBlank()
+                || ownerFactionTag.equalsIgnoreCase(current.ownerFactionTag())) {
+            return;
+        }
+        SpawnerData transferred = new SpawnerData(current.mobType(), current.stackSize(), ownerFactionTag);
+        spawners.put(key(location), transferred);
+        writeData(location, transferred);
+        applyTuning(location, transferred);
+        persist(location, transferred);
+    }
+
+    /**
      * @return the new stack size, capped at {@link #maxStackSize()}.
      */
     public int increaseStack(Location location, int amount) {

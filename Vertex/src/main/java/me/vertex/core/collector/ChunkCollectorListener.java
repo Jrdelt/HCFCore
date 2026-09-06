@@ -9,7 +9,6 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
 import org.bukkit.block.ShulkerBox;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -192,7 +191,7 @@ public final class ChunkCollectorListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent event) {
-        if (event.getHand() != EquipmentSlot.HAND || event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
             return;
         }
         Block block = event.getClickedBlock();
@@ -203,17 +202,24 @@ public final class ChunkCollectorListener implements Listener {
         if (data == null) {
             return;
         }
+        // Do this before any permission return. Otherwise Bukkit sees an
+        // uncancelled right-click and opens the Shulker's normal inventory.
+        event.setCancelled(true);
+        // The off-hand interaction is a second event for the same click.
+        // It must be cancelled too, but must not open a duplicate menu.
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
         Player player = event.getPlayer();
         if (!staffManager.isStaffBuild(player.getUniqueId())) {
             String claimTag = FactionsHook.getClaimFactionTag(block.getLocation());
             String playerTag = FactionsHook.getFactionTag(player);
-            if (claimTag == null || !claimTag.equalsIgnoreCase(playerTag)) {
+            if (!canUseCollector(playerTag, claimTag, data)) {
                 player.sendMessage(messages.get(player, "collector.cannot-access"));
                 return;
             }
-            if (!rolePermissions.canUse(player, "collector-open")) { player.sendMessage(messages.get(player, "factions.role-permission-denied")); return; }
+            if (!rolePermissions.canUse(player, "collector-open")) { player.sendMessage(messages.get(player, "collector.open-permission-denied")); return; }
         }
-        event.setCancelled(true);
         ChunkCollectorMenu.open(player, manager, messages, block.getLocation(), data);
     }
 
@@ -234,18 +240,12 @@ public final class ChunkCollectorListener implements Listener {
         if (!staffBuild) {
             String claimTag = FactionsHook.getClaimFactionTag(location);
             String playerTag = FactionsHook.getFactionTag(player);
-            if (claimTag == null || !claimTag.equalsIgnoreCase(playerTag)) {
+            if (!canUseCollector(playerTag, claimTag, data)) {
                 event.setCancelled(true);
                 player.sendMessage(messages.get(player, "collector.not-your-claim"));
                 return;
             }
-            if (!rolePermissions.canUse(player, "collector-break")) { event.setCancelled(true); player.sendMessage(messages.get(player, "factions.role-permission-denied")); return; }
-            if (manager.isSilkTouchRequired()
-                    && player.getInventory().getItemInMainHand().getEnchantmentLevel(Enchantment.SILK_TOUCH) <= 0) {
-                event.setCancelled(true);
-                player.sendMessage(messages.get(player, "collector.silk-touch-required"));
-                return;
-            }
+            if (!rolePermissions.canUse(player, "collector-break")) { event.setCancelled(true); player.sendMessage(messages.get(player, "collector.break-permission-denied")); return; }
         }
 
         event.setDropItems(false);
@@ -284,6 +284,16 @@ public final class ChunkCollectorListener implements Listener {
             return false;
         }
         return manager.isTracked(shulkerBox.getLocation());
+    }
+
+    /** Claimed land follows its present owner; unclaimed land remains usable by its recorded faction. */
+    private static boolean canUseCollector(String playerFactionTag, String claimFactionTag, ChunkCollectorData data) {
+        if (playerFactionTag == null) {
+            return false;
+        }
+        return (claimFactionTag != null && claimFactionTag.equalsIgnoreCase(playerFactionTag))
+                || (claimFactionTag == null && data.ownerFactionTag() != null
+                        && data.ownerFactionTag().equalsIgnoreCase(playerFactionTag));
     }
 
     /**

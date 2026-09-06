@@ -12,6 +12,7 @@
 ## Building from source
 
 ```bash
+cd Vertex
 ./mvnw clean package
 ```
 
@@ -23,6 +24,7 @@ be dropped in alongside it.
 To also run the MockBukkit test suite (no real server needed):
 
 ```bash
+cd Vertex
 ./mvnw clean test
 ```
 
@@ -30,11 +32,12 @@ To also run the MockBukkit test suite (no real server needed):
 
 1. Build (or download) `vertex-1.0.0.jar`.
 2. Drop it into `plugins/`, alongside `FactionsUUID.jar`.
-3. Start the server. Vertex generates `plugins/Vertex/config.yml` and
-   every other resource file (`kits.yml`, `abilities.yml`, `tags.yml`,
-   `spawners.yml`, `collectors.yml`, `blueprints.yml`, `lang/*.yml`),
-   creates its local database at `plugins/Vertex/vertex.db`, and starts
-   working immediately — there's nothing to configure first.
+3. Start the server. Vertex creates `plugins/Vertex/config.yml`, its local
+   database at `plugins/Vertex/vertex.db`, language files, and the active
+   feature files (`kits.yml`, `abilities.yml`, `tags.yml`, `spawners.yml`,
+   and `collectors.yml`). When **both** FAWE and DecentHolograms are present,
+   it also creates `blueprints.yml`, `schematics/`, and
+   `blueprint-snapshots/`. It works immediately with the defaults.
 4. On a successful boot you'll see the Vertex banner in the console with
    the running version, before anything else loads.
 5. Edit `config.yml` to taste and run `/vertex reload` — no restart
@@ -83,9 +86,10 @@ other one:
 
 1. It copies every row Vertex owns — kit and ability cooldowns, player
    locales, death history (item blobs included), spawners, chunk
-   collectors, Blueprint cooldowns and in-progress blueprint builds — from the running
-   backend into the target one, creating the target's tables first if
-   needed. The copy runs off the main thread, so the server doesn't hang.
+   collectors, Blueprint cooldowns/builds, faction-upgrade levels, and
+   faction money/XP banks — from the running backend into the target one,
+   creating the target's tables first if needed. The copy runs off the main
+   thread, so the server doesn't hang.
 2. It writes `storage.type` into `config.yml`, editing only that one line
    so your comments survive.
 3. **Restart the server** to actually start using the new backend. The
@@ -107,9 +111,6 @@ so the result is a consistent snapshot and active Blueprint beacon IDs
 remain valid after the restart. The local backend uses a single pooled
 connection (SQLite serializes writes anyway), so a large death-history
 table can still take time to copy.
-
-If `FactionsUUID` isn't present and enabled, Vertex logs why and disables
-itself immediately rather than running in a half-working state.
 
 If `FactionsUUID` isn't present and enabled, Vertex logs why and disables
 itself immediately rather than running in a half-working state.
@@ -180,9 +181,10 @@ is required for this release.
 ## Reload vs. restart
 
 `/vertex reload` (permission `vertex.admin`) reloads `config.yml`,
-`kits.yml`, `abilities.yml`, `tags.yml`, and every `lang/*.yml` file live,
-and rebuilds the scoreboard for every online player — no restart needed
-for content or message changes.
+`kits.yml`, `abilities.yml`, `tags.yml`, `spawners.yml`, `collectors.yml`,
+`blueprints.yml` (when Blueprints are enabled), and every `lang/*.yml` file
+live. It reapplies current spawner tuning and faction upgrade definitions,
+then rebuilds the scoreboard for every online player.
 
 For anything that isn't a config/content change (a plugin update, a JVM
 flag change, a dependency being added/removed), perform a full server

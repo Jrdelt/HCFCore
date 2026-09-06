@@ -27,8 +27,8 @@ it survives restarts and follows the player across sessions.
 
 Messages are namespaced by feature area in every `lang/*.yml` file:
 `ability`, `admin`, `blueprint`, `collector`, `combat`, `cooldowns`,
-`faction-upgrades`, `factions`, `general`, `kit`, `language`, `reboot`,
-`spawner`, `staff`, `tags`. A few templates are the exception and live in `config.yml`
+`faction-bank`, `faction-upgrades`, `factions`, `general`, `kit`,
+`language`, `reboot`, `spawner`, `staff`, `tags`. A few templates are the exception and live in `config.yml`
 instead — the combat action bar (`pvp.actionbar`) and Archer Tag's hit
 messages (`archer-tag.message-attacker` / `message-victim`) — since
 those are single admin-authored templates rather than a per-locale

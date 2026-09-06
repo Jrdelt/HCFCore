@@ -45,17 +45,17 @@ permission is checked — anyone can run it.
 
 | Command | Permission | Notes |
 |---|---|---|
-| `/blueprint give <player> <template>` | `vertex.blueprint.give` | Gives a Blueprint item. |
-| `/blueprint cooldown remove <player>` | `vertex.blueprint.cooldown.remove` | Clears an online or offline player's persisted placement cooldown. |
+| `/blueprint give <player> <template>` | `vertex.blueprint.give` | Gives a Blueprint item. Available only when both FAWE and DecentHolograms are loaded. |
+| `/blueprint cooldown remove <player>` | `vertex.blueprint.cooldown.remove` | Clears an online or offline player's persisted placement cooldown. Available only when both Blueprint dependencies are loaded. |
 
 ## Factions & Rally
 
 | Command | Permission | Notes |
 |---|---|---|
-| `/f rally [set\|clear]` (alias `/frally`) | Open to all faction members | Sets/clears a 4-minute faction rally point. |
+| `/f rally [set\|clear]` (alias `/frally`) | The role's **Set Rally** / **Clear Rally** permission | Sets/clears a 4-minute faction rally point. Defaults allow every editable role; leaders change it in `/f permissions`. |
 | `/f permissions` / `/f perms` | Faction leader only (checked in-code, not a permission node) | Opens the faction permission matrix GUI. |
-| `/f upgrades` / `/f upgrade` | Any faction member may view and purchase by default | Opens the persistent faction-upgrades GUI. Set `faction-upgrades.leader-only: true` to restrict purchases. |
-| `/f bank` | Faction member; role permissions apply to deposits/withdrawals | Opens the seven-row faction bank for money, experience, and TNT. |
+| `/f upgrades` / `/f upgrade` | Faction role needs FactionsUUID's native `UPGRADE` action allowed | Opens Vertex's persistent faction-upgrades GUI. Set `faction-upgrades.leader-only: true` to restrict purchases further. FactionsUUID's native upgrade administration remains separate. |
+| `/f bank` | Faction member; role permissions apply to deposits/withdrawals | Opens the six-row faction bank for money, experience, and TNT. |
 
 ## Reboot
 

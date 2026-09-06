@@ -85,7 +85,7 @@ class TagSearchMenuTest {
 
         AnvilInventoryMock anvil = openAnvil(player);
         assertEquals(0, anvil.getRepairCost(), "searching is not a repair and must not cost levels");
-        assertEquals(0, anvil.getMaximumRepairCost());
+        assertEquals(TagSearchMenu.FREE_ANVIL_MAX_COST, anvil.getMaximumRepairCost());
         assertNotNull(anvil.getItem(TagSearchMenu.SLOT_RESULT),
                 "the result slot needs an item for the player to click");
     }

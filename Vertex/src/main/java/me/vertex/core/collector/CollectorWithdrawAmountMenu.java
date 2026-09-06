@@ -1,6 +1,5 @@
 package me.vertex.core.collector;
 
-import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -23,6 +22,12 @@ public final class CollectorWithdrawAmountMenu {
 
     static final int SLOT_INPUT = 0;
     static final int SLOT_RESULT = 2;
+    /**
+     * Vanilla considers a result whose cost is greater than or equal to this
+     * value "Too Expensive".  It must therefore stay above our zero-cost
+     * confirm button; using zero here disables every result slot.
+     */
+    static final int FREE_ANVIL_MAX_COST = 40;
     /** Stores the exact parsed amount on the result item through vanilla's rename reset. */
     private static final NamespacedKey CONFIRMED_AMOUNT_KEY = new NamespacedKey("vertex", "collector_withdraw_amount");
 
@@ -37,7 +42,13 @@ public final class CollectorWithdrawAmountMenu {
 
         ItemStack input = new ItemStack(material);
         ItemMeta meta = input.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "collector.withdraw-prompt")));
+        // Deliberately no displayName() here: setting one makes the anvil's
+        // rename box start pre-filled with that exact text, which the
+        // player then has to select-all and clear before typing a number.
+        // Leaving the name unset makes vanilla start the box blank, so
+        // typing a number works immediately. The instruction still shows
+        // up in the item's tooltip as lore instead.
+        meta.lore(java.util.List.of(noItalic(messages.get(player, "collector.withdraw-prompt"))));
         input.setItemMeta(meta);
         inventory.setItem(SLOT_INPUT, input);
         inventory.setItem(SLOT_RESULT, confirmButton(player, messages, null));
@@ -71,7 +82,7 @@ public final class CollectorWithdrawAmountMenu {
     }
 
     @SuppressWarnings("removal")
-    static Long readAmount(Player player, Messages messages, org.bukkit.inventory.InventoryView view, Inventory inventory) {
+    static Long readAmount(org.bukkit.inventory.InventoryView view, Inventory inventory) {
         String text;
         if (view instanceof AnvilView anvilView) {
             text = anvilView.getRenameText();
@@ -84,10 +95,6 @@ public final class CollectorWithdrawAmountMenu {
             return null;
         }
         String value = text.trim();
-        String prompt = MessageFormatter.plain(messages.getRaw(player, "collector.withdraw-prompt")).trim();
-        if (value.equalsIgnoreCase(prompt)) {
-            return null;
-        }
         try {
             long amount = Long.parseLong(value.replace(",", ""));
             return amount > 0 ? amount : null;
@@ -100,10 +107,10 @@ public final class CollectorWithdrawAmountMenu {
     private static void setFreeCost(Player player, Inventory inventory) {
         if (player.getOpenInventory() instanceof AnvilView view) {
             view.setRepairCost(0);
-            view.setMaximumRepairCost(0);
+            view.setMaximumRepairCost(FREE_ANVIL_MAX_COST);
         } else if (inventory instanceof AnvilInventory anvil) {
             anvil.setRepairCost(0);
-            anvil.setMaximumRepairCost(0);
+            anvil.setMaximumRepairCost(FREE_ANVIL_MAX_COST);
         }
     }
 

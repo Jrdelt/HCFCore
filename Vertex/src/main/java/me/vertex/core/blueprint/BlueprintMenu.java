@@ -21,6 +21,7 @@ import java.util.List;
  */
 public final class BlueprintMenu {
 
+    public static final int RESUME_SLOT = 0;
     public static final int CANCEL_SLOT = 8;
     public static final int REPAIR_SLOT = 4;
 
@@ -40,12 +41,27 @@ public final class BlueprintMenu {
         ItemStack info = new ItemStack(Material.PAPER);
         ItemMeta infoMeta = info.getItemMeta();
         infoMeta.displayName(MessageFormatter.deserialize(build.template().displayName()));
-        infoMeta.lore(List.of(
-                messages.get(player, "blueprint.menu-progress", "done", String.valueOf(done), "total",
-                        String.valueOf(total)),
-                messages.get(player, "blueprint.menu-remaining", "seconds", String.valueOf(remainingSeconds))));
+        infoMeta.lore(build.isPaused()
+                ? List.of(
+                        messages.get(player, "blueprint.menu-progress", "done", String.valueOf(done), "total",
+                                String.valueOf(total)),
+                        messages.get(player, "blueprint.menu-remaining", "seconds", String.valueOf(remainingSeconds)),
+                        messages.get(player, "blueprint.menu-paused"))
+                : List.of(
+                        messages.get(player, "blueprint.menu-progress", "done", String.valueOf(done), "total",
+                                String.valueOf(total)),
+                        messages.get(player, "blueprint.menu-remaining", "seconds", String.valueOf(remainingSeconds))));
         info.setItemMeta(infoMeta);
         inventory.setItem(4, info);
+
+        if (build.isPaused()) {
+            ItemStack resume = new ItemStack(Material.LIME_DYE);
+            ItemMeta resumeMeta = resume.getItemMeta();
+            resumeMeta.displayName(messages.get(player, "blueprint.gui-resume-button"));
+            resumeMeta.lore(List.of(messages.get(player, "blueprint.menu-resume-lore")));
+            resume.setItemMeta(resumeMeta);
+            inventory.setItem(RESUME_SLOT, resume);
+        }
 
         ItemStack cancel = new ItemStack(Material.BARRIER);
         ItemMeta cancelMeta = cancel.getItemMeta();

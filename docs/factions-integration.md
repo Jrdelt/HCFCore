@@ -1,9 +1,10 @@
 # Factions Integration
 
 Vertex is built directly on top of **FactionsUUID** — it's a hard
-dependency, not an optional one. This page covers everything that plugs
-into faction identity and relationships: nametags, rallies, the
-permissions GUI, and a couple of small protections. Chat formatting and
+dependency, not an optional one. Vertex is compiled against FactionsUUID
+4.4.0, and its direct API use has also been checked against 4.7.0. This page
+covers everything that plugs into faction identity and relationships:
+nametags, rallies, permissions, upgrades, and the bank. Chat formatting and
 scoreboard placeholders are covered in
 [Configuration](configuration.md#chat-formatting) since they're primarily
 config-driven.
@@ -43,12 +44,16 @@ Toggle the whole system with `nametags.enabled`; refresh rate is
 
 ## Rally
 
-`/f rally [set|clear]` (alias `/frally`, open to all faction members) —
-with no argument, sets a rally point at your current location, visible to
-your whole faction for 4 minutes; `clear` removes it early.
+`/f rally [set|clear]` (alias `/frally`) sets a rally point at the
+sender's current location; with no argument it acts as `set`. The point is
+visible to the whole faction for four minutes; `clear` removes it early.
+The **Set Rally** and **Clear Rally** role permissions control the two
+actions independently. They default to allowed for Moderator, Member, and
+Recruit, but the faction leader can change them in `/f permissions`.
 
-Faction members see a green bossbar with live distance and a compass
-arrow pointing toward the rally, refreshing every 2 ticks (10×/second).
+Faction members in the rally's world see a green bossbar with live distance
+and a compass arrow pointing toward it, refreshing every 10 ticks
+(twice per second).
 The arrow points to a true compass bearing (north stays north) rather
 than one relative to the viewer's own facing. Rally indicators only
 display in the same world the rally was set in, preserve each player's
@@ -65,15 +70,18 @@ A faction leader opens the complete FactionsUUID permission matrix with
   roles), **Member**, or **Recruit**.
 - The grid lists every FactionsUUID native permission plus Vertex's **Set
   Rally**, **Clear Rally**, **Add Spawners**, **Remove Spawners**, **Open
-  Collectors**, and **Break Collectors** actions. Every permission is a
+  Collectors**, **Break Collectors**, **Deposit Bank Resources**, and
+  **Withdraw Bank Resources** actions. Every permission is a
   green stained-glass pane when allowed for that role and a red pane when
-  denied. The state material is deliberately not configurable.
+  denied. The native **Upgrade** permission controls access to Vertex's
+  `/f upgrades` menu as well. The state material is deliberately not
+  configurable.
 - All visible GUI text (title, roles, action names, status, and click
   instructions) renders in small caps. Color tags in `config.yml` still
   work normally.
 - **Left-click allows**, **right-click denies**. Changes save immediately
-  to FactionsUUID's own permission system for its native actions, and to
-  Vertex's own per-faction storage for the six Vertex-specific actions.
+  to FactionsUUID's own permission system for native actions, and to
+  Vertex's per-faction configuration for the eight Vertex-specific actions.
 - **Admin is intentionally not selectable.** FactionsUUID always permits
   its own Admin role to perform every native action regardless of any
   configured permission, so there is nothing for this GUI to toggle for
@@ -87,60 +95,72 @@ removed automatically when a faction disbands.
 
 ## Faction upgrades
 
-`/f upgrades` (or `/f upgrade`, including every configured faction-command
-alias) opens a persistent per-faction upgrade GUI. Any faction member can
-inspect and purchase levels by default; set `leader-only: true` to restrict
-purchases. Every cost is withdrawn from the clicking member through Vault and every upgrade level is
-saved in Vertex's database, so it survives restarts and faction renames.
+`/f upgrades` (or `/f upgrade`, including configured faction-command
+aliases) opens Vertex's persistent per-faction upgrade GUI. The role needs
+FactionsUUID's native **UPGRADE** action allowed to open or buy from it.
+`leader-only: true` adds a leader-only purchase rule; with the shipped
+`false` setting, any role allowed to use **UPGRADE** can buy a level using
+their own Vault balance.
 
-All values are configurable in `faction-upgrades.upgrades` in `config.yml`:
+Vertex owns the price, level, and bonus for the following entries. Every
+level is stored by stable faction id, so it survives restarts and faction
+renames; faction disband deletes Vertex-owned levels and bank balances.
 
-- **Damage in Claims** increases damage dealt by members standing in their
-  own claim.
-- **Claim Protection**, **Armor Wear**, and **Fall Protection** reduce the
-  corresponding damage/durability loss while a member is in their claim.
-- **Fly Boost** increases the speed of members who are already flying in
-  their claim. It deliberately does not grant flight itself. If another
-  plugin changes flight speed, Vertex treats that as the new base and
-  reapplies the faction boost, so the boost remains in effect.
-- **Faction Warps** sets the faction's native FactionsUUID `WARPS` upgrade
-  level, so its normal `/f warp` commands and the limit configured by
-  FactionsUUID continue to own warp creation and teleportation. Existing
-  native warp levels are adopted on first menu view and are never lowered.
-- **Spawner Rate** retunes Vertex spawners in the faction's claim at once,
-  including the manual Iron Golem fallback. The configured normal spawner
-  limits remain the baseline and scale with the earned rate.
-- **Crop Growth** gives each crop growth stage an additional configurable
-  chance to advance one more stage.
-- **Mob Experience** increases XP dropped when a faction member kills a
-  mob in that faction's claim.
+| Upgrade | Where it applies | Exact effect |
+| --- | --- | --- |
+| Claim Damage | Attacker standing in their own claim | Increases damage from the player or their projectile. |
+| Claim Protection | Member standing in their own claim | Reduces all incoming damage. |
+| Armor Wear | Member standing in their own claim | Reduces durability damage, preserving fractional reductions fairly over repeated hits. |
+| Fall Protection | Member standing in their own claim | Adds a second fall-damage reduction. It combines with Claim Protection if both exist. |
+| Fly Boost | Already-flying member in their own claim | Multiplies flight speed; does not grant flight. Vertex reapplies the multiplier after another plugin changes the base speed. |
+| Spawner Rate | Vertex spawner physically in that faction's claim | Retunes its spawn count and nearby-mob cap, including the daylight/Iron Golem fallback. |
+| Crop Growth | Crop physically in that faction's claim | Gives a configured chance for one extra growth stage. No player needs to be present. |
+| Mob Experience | Mob killed by a member in that faction's claim | Increases the XP dropped by that kill. |
+
+**Warps is the one native bridge.** Buying a Vertex **Warps** level calls
+FactionsUUID's `WARPS` upgrade directly. FactionsUUID remains responsible
+for `/f warp`, warp creation, and the number of permitted warps. Vertex
+adopts an existing native Warp level when the GUI opens and never lowers it.
+Set the same maximum level and a complete level-to-warp-count mapping in
+FactionsUUID's own upgrades configuration; Vertex's price/`bonus` field is
+only GUI text for this entry.
+
+FactionsUUID also offers native upgrades with overlapping effects (territory
+damage, armor durability, fall reduction, growth, mob XP, and spawner rate).
+Keep those native duplicates disabled when using Vertex's matching entries
+or their effects can stack. Native **Flight** can remain enabled when it is
+used to grant flight: Vertex's Fly Boost only changes the speed of players
+already flying. Vertex intentionally routes `/f upgrades` to its GUI, so
+manage any remaining native FactionsUUID upgrades through FactionsUUID's
+administration/configuration rather than expecting that player command to
+open both menus.
 
 Set an individual `enabled: false` or set `faction-upgrades.enabled: false`
-to take it out of service without deleting saved levels. A faction disband
-cleans up its Vertex upgrade rows automatically. See
-[Configuration](configuration.md#faction-upgrades) for the complete setup.
-
-The menu title, icon names, effect descriptions, and every lore line are
-localized under `faction-upgrades` in `lang/en_us.yml`. The four
-`faction-upgrades.gui.lore` lists control the exact lore for an available,
-leader-only, maxed, or disabled icon. They support `{level}`, `{max}`,
-`{current}`, `{next}`, and `{cost}`.
+to stop new purchases and its Vertex effect without deleting the saved
+level. See [Configuration](configuration.md#faction-upgrades) for explicit
+per-level prices and bonuses. GUI title, names, effects, lore, and messages
+are localized under `faction-upgrades` in `lang/en_us.yml`.
 
 ## Faction bank
 
-`/f bank` opens a seven-row bank GUI. Its middle row shows the faction's
+`/f bank` opens a six-row bank GUI. Its upper rows show the faction's
 stored **money** (Gold Block), **experience** (Experience Bottle), and
-**TNT**. The deposit and withdraw rows open an amount prompt.
+**TNT**, followed by deposit and withdraw controls that open an amount
+prompt.
 
-Money and experience are stored by Vertex in the database and survive a
-restart; money moves through Vault. Vertex serializes each faction's bank
-writes and commits the bank state before finalizing the GUI operation; if a
-database write fails, a money/XP deposit is compensated automatically.
-TNT uses FactionsUUID's native TNT bank,
-including its configured maximum. `bank-deposit` and `bank-withdraw` appear
-in `/f permissions` and default to allowed for Moderator, Member, and
-Recruit. All names, lore, prompts, and messages are under `faction-bank` in
-the language files.
+Money and experience are stored by Vertex in the selected database and
+survive a restart; money moves through Vault. TNT uses FactionsUUID's native
+TNT bank and its configured maximum. Deposit/withdraw opens a free anvil
+prompt: type a positive whole number, then click the green confirm result.
+Vertex accepts a number typed after the displayed prompt as well as a
+replaced prompt.
+
+Vertex serializes each faction's money/XP write before it changes the cached
+balance. If a money/XP deposit cannot be saved, it returns the resources;
+failed money payouts are compensated back into the bank. `bank-deposit` and
+`bank-withdraw` appear in `/f permissions` and default to allowed for
+Moderator, Member, and Recruit. All names, lore, prompts, and messages are
+under `faction-bank` in the language files.
 
 ## Leader-leave protection
 
@@ -156,4 +176,5 @@ Every hostile ability, and Archer Tag, refuses to target faction members
 or allies; Portable Bard's buffs are the deliberate exception, designed
 to be shared with your own faction. See
 [PvP & Combat](pvp-and-combat.md#faction-compatibility) for the full
-list. Vertex is built and tested against FactionsUUID 4.4.0+.
+list. Vertex is built against FactionsUUID 4.4.0; the currently used 4.7.0
+API has been checked for compatibility with Vertex's direct integrations.

@@ -58,7 +58,7 @@ public final class RallyManager implements Listener {
 
     public boolean setRolePermission(int factionId, String role, String action, boolean allowed) {
         if (!List.of("admin", "mod", "member", "recruit").contains(role)
-                || !List.of("rally-set", "rally-clear", "spawner-add", "spawner-remove", "collector-open", "collector-break",
+            || !List.of("rally-set", "rally-clear", "spawner-add", "spawner-remove", "collector-open", "collector-break",
                         "bank-deposit", "bank-withdraw").contains(action)) {
             return false;
         }
@@ -68,7 +68,8 @@ public final class RallyManager implements Listener {
     }
 
     public static String roleId(Player player) {
-        String role = FactionsHook.getRoleName(player).toLowerCase(java.util.Locale.ROOT);
+        String role = FactionsHook.getRoleName(player).toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z]", "");
         if (role.contains("admin") || role.contains("leader")) return "admin";
         if (role.contains("mod") || role.contains("coleader")) return "mod";
         if (role.contains("recruit")) return "recruit";

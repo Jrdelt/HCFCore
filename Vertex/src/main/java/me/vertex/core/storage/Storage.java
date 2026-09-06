@@ -27,5 +27,9 @@ public interface Storage {
 
     List<Death> loadDeaths(UUID uuid, int limit) throws SQLException;
 
+    /** Prunes expired rollback records for every player. Backends without history may ignore it. */
+    default void cleanupExpiredDeaths() throws SQLException {
+    }
+
     void close();
 }

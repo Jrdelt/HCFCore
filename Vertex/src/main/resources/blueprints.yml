@@ -4,8 +4,9 @@
 # Placing a Blueprint item creates its Beacon preview and opens an activation
 # confirmation. Clicking Enable gradually builds its .schem structure around
 # that Beacon using FastAsyncWorldEdit's clipboard API, with a DecentHolograms
-# progress display above it. Cancelling returns the Blueprint item. Requires
-# both FastAsyncWorldEdit and DecentHolograms.
+# progress display above it. Cancelling a preview returns the Blueprint item;
+# cancelling after blocks are placed does not. Requires both
+# FastAsyncWorldEdit and DecentHolograms.
 enabled: true
 
 # .schem files live in <plugin data folder>/schematics/<file>.
@@ -25,6 +26,12 @@ batch-interval-ticks: 20
 # server tick. A very large schematic can take longer than build-time-seconds
 # when this cap is reached, protecting TPS instead of causing a paste spike.
 max-blocks-per-tick: 16
+
+# Limits applied before a Blueprint can consume server memory or create a
+# massive build. Raise deliberately for a vetted large schematic.
+max-schematic-bytes: 33554432
+max-schematic-blocks: 250000
+max-schematic-dimension: 512
 
 # Every touched chunk's claim ownership is re-checked this often while a
 # build is in progress -- if it's no longer 100% the placing faction's

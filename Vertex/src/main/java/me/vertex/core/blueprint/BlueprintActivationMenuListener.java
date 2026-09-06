@@ -73,7 +73,7 @@ public final class BlueprintActivationMenuListener implements Listener {
             if (block.getType() == Material.BEACON && block.getState() instanceof org.bukkit.block.Beacon beacon) {
                 if (beacon.getPersistentDataContainer().has(listener.templateKey(), PersistentDataType.STRING)) {
                     // Remove preview hologram
-                    String previewHolo = "blueprint_preview_" + anchor.getBlockX() + "_" + anchor.getBlockY() + "_" + anchor.getBlockZ();
+                    String previewHolo = listener.previewHologramName(anchor);
                     if (hologramsAvailable) {
                         try {
                             DHAPI.removeHologram(previewHolo);

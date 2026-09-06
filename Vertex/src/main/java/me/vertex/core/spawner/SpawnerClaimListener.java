@@ -3,9 +3,9 @@ package me.vertex.core.spawner;
 import dev.kitteh.factions.Faction;
 import dev.kitteh.factions.event.FactionAutoDisbandEvent;
 import dev.kitteh.factions.event.FactionDisbandEvent;
-import dev.kitteh.factions.event.LandClaimEvent;
 import dev.kitteh.factions.event.LandUnclaimAllEvent;
 import dev.kitteh.factions.event.LandUnclaimEvent;
+import dev.kitteh.factions.event.LandClaimEvent;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import net.kyori.adventure.text.Component;
@@ -20,10 +20,10 @@ import java.util.Map;
 
 /**
  * Keeps spawners honest with faction land ownership: a chunk with active
- * spawners can't be casually /f unclaim'd away, and land that stops being
- * yours -- overclaimed, unclaimed entirely via /f unclaimall, or freed by a
- * disband -- drops every spawner in it as items rather than leaving them
- * floating around still tracked against nobody's claim.
+ * spawners can't be casually /f unclaim'd away. An overclaim retains the
+ * physical spawners and transfers their ownership to the new faction;
+ * unclaim-all and disband still return spawners as items rather than
+ * leaving them in unclaimed territory.
  */
 public final class SpawnerClaimListener implements Listener {
 
@@ -36,22 +36,19 @@ public final class SpawnerClaimListener implements Listener {
     }
 
     /**
-     * A chunk being overclaimed out from under its actual owner drops
-     * whatever spawners were tracked there -- the land is changing hands,
-     * so whoever placed them no longer controls it. A faction re-claiming
-     * land that was already theirs (re-running /f claim, claim-filling,
-     * etc.) must NOT trigger this -- there's no ownership change to react
-     * to, so this only drops a spawner whose recorded owner tag actually
-     * differs from the faction claiming right now.
+     * Overclaiming keeps every placed spawner where it is. Its faction tag
+     * moves to the faction that now owns the land, avoiding dropped items
+     * and ensuring the old faction cannot later remove it on disband.
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onClaim(LandClaimEvent event) {
-        if (event.isCancelled()) {
+        if (event.isCancelled() || event.getFaction() == null) {
             return;
         }
-        Chunk chunk = event.getLocation().asChunk();
-        String claimingTag = event.getFaction() == null ? null : event.getFaction().tag();
-        dropOverclaimedIn(chunk, claimingTag);
+        String claimingTag = event.getFaction().tag();
+        for (Map.Entry<Location, SpawnerData> entry : spawnerManager.getSpawnersInChunk(event.getLocation().asChunk())) {
+            spawnerManager.transferOwnership(entry.getKey(), claimingTag);
+        }
     }
 
     /** Blocks unclaiming a single chunk outright while it has active spawners. */
@@ -125,42 +122,6 @@ public final class SpawnerClaimListener implements Listener {
             dropped += dropSpawner(entry.getKey(), entry.getValue());
         }
         return dropped;
-    }
-
-    /** @return how many individual spawners (not stacks) were dropped. */
-    private int dropAllIn(Chunk chunk) {
-        int totalDropped = 0;
-        for (Map.Entry<Location, SpawnerData> entry : spawnerManager.getSpawnersInChunk(chunk)) {
-            totalDropped += dropSpawner(entry.getKey(), entry.getValue());
-        }
-        return totalDropped;
-    }
-
-    /**
-     * Like dropAllIn, but only for spawners whose recorded owner tag
-     * doesn't match the faction now claiming the chunk -- see onClaim's
-     * javadoc for why this distinction matters.
-     */
-    private int dropOverclaimedIn(Chunk chunk, String claimingFactionTag) {
-        int totalDropped = 0;
-        for (Map.Entry<Location, SpawnerData> entry : spawnerManager.getSpawnersInChunk(chunk)) {
-            SpawnerData data = entry.getValue();
-            String ownerTag = data.ownerFactionTag();
-            if (ownerTag == null) {
-                // Legacy spawner, placed before ownership tracking existed
-                // -- there's no reliable signal here to tell a genuine
-                // overclaim apart from the same faction simply reclaiming
-                // its own land, so (unlike a tracked spawner) this is left
-                // alone rather than risk dropping a faction's own
-                // long-standing spawner on an entirely ordinary reclaim.
-                continue;
-            }
-            if (claimingFactionTag != null && ownerTag.equalsIgnoreCase(claimingFactionTag)) {
-                continue;
-            }
-            totalDropped += dropSpawner(entry.getKey(), data);
-        }
-        return totalDropped;
     }
 
     private int dropSpawner(Location location, SpawnerData data) {
