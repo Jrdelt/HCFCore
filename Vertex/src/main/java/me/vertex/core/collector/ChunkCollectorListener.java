@@ -60,7 +60,7 @@ public final class ChunkCollectorListener implements Listener {
      * lava/fire before {@link ItemSpawnEvent} can see them. Player deaths,
      * manually-dropped items, and block-break drops never reach this event.
      */
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDeath(EntityDeathEvent event) {
         if (event.getEntity() instanceof Player) {
             return;
@@ -128,9 +128,14 @@ public final class ChunkCollectorListener implements Listener {
         return false;
     }
 
-    /** @return the amount absorbed by the highest eligible collector, if any. */
+    /**
+     * @return the amount absorbed by the highest eligible collector, if any.
+     * A tagged farm drop introducing a 25th material is deliberately
+     * consumed as waste, rather than left on the ground to accumulate.
+     */
     private int absorb(ItemStack stack, Location itemLocation) {
         List<Location> candidates = manager.collectorsBelow(itemLocation.getChunk(), itemLocation.getY());
+        boolean rejectedByTypeLimit = false;
         for (Location collectorLocation : candidates) {
             ChunkCollectorData data = manager.readData(collectorLocation);
             if (data == null) {
@@ -142,6 +147,7 @@ public final class ChunkCollectorListener implements Listener {
                 continue;
             }
             if (!manager.canStore(data, stack.getType())) {
+                rejectedByTypeLimit = true;
                 continue;
             }
             long toAbsorb = Math.min(room, stack.getAmount());
@@ -149,7 +155,7 @@ public final class ChunkCollectorListener implements Listener {
             manager.writeData(collectorLocation, data);
             return (int) toAbsorb;
         }
-        return 0;
+        return rejectedByTypeLimit ? stack.getAmount() : 0;
     }
 
     @EventHandler(ignoreCancelled = true)

@@ -16,6 +16,8 @@ softdepend:
   - Essentials
   - FastAsyncWorldEdit
   - DecentHolograms
+  - ProtocolLib
+  - Citizens
 
 commands:
   kit:
@@ -93,6 +95,18 @@ commands:
   endersee:
     description: View a player's live ender chest.
     usage: /<command> <player>
+  backpack:
+    description: Give a player a Backpack.
+    usage: /<command> give <player> <tier>
+  filter:
+    description: Configure which auto-collected Backpack items are discarded.
+    usage: /<command> <material|clear>
+  koth:
+    description: Focus an active KOTH or manage KOTH regions as staff.
+    usage: /<command> focus [name|off]|create|wand|cancel|start|stop|delete|list|validate
+  outpost:
+    description: Focus an active Outpost or manage Outpost regions as staff.
+    usage: /<command> focus [name|off]|create|wand|cancel|start|stop|delete|list|validate
 
 permissions:
   vertex.admin:
@@ -106,6 +120,15 @@ permissions:
     default: op
   vertex.blueprint.cooldown.remove:
     description: Remove an online or offline player's Blueprint placement cooldown.
+    default: op
+  vertex.backpack.give:
+    description: Give a player a Backpack.
+    default: op
+  vertex.koth.admin:
+    description: Create, edit, start, stop, and delete KOTH events.
+    default: op
+  vertex.outpost.admin:
+    description: Create, edit, start, stop, and delete Outpost events.
     default: op
   vertex.kit.create:
     description: Create a kit from the currently held inventory.

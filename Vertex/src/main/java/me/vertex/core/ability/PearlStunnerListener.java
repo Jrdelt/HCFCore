@@ -69,6 +69,9 @@ public final class PearlStunnerListener implements Listener {
             attacker.sendMessage(messages.get(attacker, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
             return;
         }
+        if (AbilityGate.isCaptureZoneDisabled(attacker.getLocation())) {
+            return;
+        }
         Set<String> disabledRegions = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-regions"));
         if (WorldGuardHook.isInDisabledRegion(attacker, disabledRegions)) {
             return;

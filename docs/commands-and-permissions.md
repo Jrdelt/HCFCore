@@ -48,6 +48,14 @@ permission is checked — anyone can run it.
 | `/blueprint give <player> <template>` | `vertex.blueprint.give` | Gives a Blueprint item. Available only when both FAWE and DecentHolograms are loaded. |
 | `/blueprint cooldown remove <player>` | `vertex.blueprint.cooldown.remove` | Clears an online or offline player's persisted placement cooldown. Available only when both Blueprint dependencies are loaded. |
 
+## Backpacks
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/backpack give <player> <tier> [level]` | `vertex.backpack.give` | Gives a Backpack of that tier, optionally starting at any positive level (default 1) — no in-game shop for these. Its material and custom model data come from `backpacks.yml`. |
+| `/backpack debug` | `vertex.backpack.debug` | Toggles personal Backpack interaction diagnostics. It prints the received action, hand, cancellation state, and reject/open reason to chat and console; run it again to turn tracing off. |
+| `/filter <material>` / `/filter clear` | — | Toggles or clears persistent Backpack auto-collection filters. Filters discard matching routed drops only while a Backpack is equipped. |
+
 ## Factions & Rally
 
 | Command | Permission | Notes |
@@ -56,6 +64,18 @@ permission is checked — anyone can run it.
 | `/f permissions` / `/f perms` | Faction leader only (checked in-code, not a permission node) | Opens the faction permission matrix GUI. |
 | `/f upgrades` / `/f upgrade` | Faction role needs FactionsUUID's native `UPGRADE` action allowed | Opens Vertex's persistent faction-upgrades GUI. Set `faction-upgrades.leader-only: true` to restrict purchases further. FactionsUUID's native upgrade administration remains separate. |
 | `/f bank` | Faction member; role permissions apply to deposits/withdrawals | Opens the six-row faction bank for money, experience, and TNT. |
+
+## KOTH & Outposts
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/koth focus [name\|off]` | Open to all | Focuses an active same-world KOTH for that player only, using a BossBar/compass instead of their faction rally. |
+| `/outpost focus [name\|off]` | Open to all | The Outpost equivalent of `/koth focus`. |
+| `/koth create\|wand\|cancel\|start\|stop\|delete\|list\|validate` | `vertex.koth.admin` | Creates cuboid KOTH regions with a Blaze Rod, starts/stops any configured KOTH, and validates KOTH config paths in-game. |
+| `/outpost create\|wand\|cancel\|start\|stop\|delete\|list\|validate` | `vertex.outpost.admin` | Creates, starts/stops, and validates Outpost regions. |
+
+See [KOTH & Outposts](koth-and-outposts.md) for capture rules, schedules,
+rewards, and the `capture-events.yml` reference.
 
 ## Reboot
 

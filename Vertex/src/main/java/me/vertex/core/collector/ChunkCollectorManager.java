@@ -44,7 +44,8 @@ public final class ChunkCollectorManager {
     /** Prevent malformed configuration/PDC data from overflowing capacity arithmetic. */
     private static final long MAX_CAPACITY = 1_000_000_000L;
     private static final int MAX_UPGRADE_TIER = 100;
-    private static final int MAX_STORED_MATERIAL_TYPES = 256;
+    /** Fixed, deliberate cap: the menu exposes all 24 possible types. */
+    private static final int MAX_STORED_MATERIAL_TYPES = 24;
 
     private final Plugin plugin;
     private final ChunkCollectorStorage storage;
@@ -111,8 +112,10 @@ public final class ChunkCollectorManager {
         upgradeCostMultiplier = Math.max(1.0, config.getDouble("upgrade-cost-multiplier", 1.75));
         hopperBlockRadius = Math.max(0, config.getInt("hopper-block-radius", 2));
         scanIntervalTicks = Math.max(20, config.getInt("scan-interval-ticks", 100));
-        maxStoredMaterialTypes = Math.max(1, Math.min(MAX_STORED_MATERIAL_TYPES,
-                config.getInt("max-stored-material-types", 64)));
+        // This is intentionally fixed rather than configurable: accepting
+        // types the GUI cannot show would strand items and excessive PDC
+        // entries make high-volume farms needlessly expensive to save.
+        maxStoredMaterialTypes = MAX_STORED_MATERIAL_TYPES;
     }
 
     /** The item name is localized with the recipient's configured language. */

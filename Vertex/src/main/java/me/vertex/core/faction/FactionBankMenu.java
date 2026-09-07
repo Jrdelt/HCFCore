@@ -6,6 +6,7 @@ import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.util.ChatAmountPrompt;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.milkbowl.vault.economy.Economy;
@@ -18,16 +19,12 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.event.inventory.InventoryType;
-import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.server.TabCompleteEvent;
-import org.bukkit.inventory.AnvilInventory;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.view.AnvilView;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
@@ -40,6 +37,11 @@ import java.util.function.Supplier;
  * Six-row faction bank for money, experience, and FactionsUUID's TNT bank.
  * Paper's standard chest inventory API permits 9–54 slots only; a seventh
  * row (63 slots) is not a valid client inventory.
+ *
+ * <p>The deposit/withdraw amount is typed in chat via
+ * {@link ChatAmountPrompt}, not an anvil GUI -- see that class's own
+ * documentation for why the anvil approach was replaced after repeated
+ * attempts to make its rename-text field reliable at click time.
  */
 public final class FactionBankMenu implements Listener {
     private static final int SIZE = 54;
@@ -50,27 +52,24 @@ public final class FactionBankMenu implements Listener {
     private static final int TNT_SLOT = 15;
     private static final int DEPOSIT_ROW = 22;
     private static final int WITHDRAW_ROW = 31;
-    private static final int ANVIL_INPUT = 0;
-    private static final int ANVIL_RESULT = 2;
-    /** See {@link org.bukkit.inventory.view.AnvilView#setMaximumRepairCost(int)}. */
-    private static final int FREE_ANVIL_MAX_COST = 40;
 
     private final Plugin plugin;
     private final FactionBankManager manager;
     private final RallyManager rolePermissions;
     private final Messages messages;
+    private final ChatAmountPrompt chatAmountPrompt;
     private final NamespacedKey resourceKey;
     private final NamespacedKey operationKey;
-    private final NamespacedKey amountKey;
 
-    public FactionBankMenu(Plugin plugin, FactionBankManager manager, RallyManager rolePermissions, Messages messages) {
+    public FactionBankMenu(Plugin plugin, FactionBankManager manager, RallyManager rolePermissions, Messages messages,
+            ChatAmountPrompt chatAmountPrompt) {
         this.plugin = plugin;
         this.manager = manager;
         this.rolePermissions = rolePermissions;
         this.messages = messages;
+        this.chatAmountPrompt = chatAmountPrompt;
         this.resourceKey = new NamespacedKey(plugin, "faction_bank_resource");
         this.operationKey = new NamespacedKey(plugin, "faction_bank_operation");
-        this.amountKey = new NamespacedKey(plugin, "faction_bank_amount");
     }
 
     /** Registers /f bank early enough that Paper's client command tree recognizes it. */
@@ -147,7 +146,7 @@ public final class FactionBankMenu implements Listener {
 
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
-        if (event.getInventory().getHolder() instanceof Holder || event.getInventory().getHolder() instanceof AmountHolder) {
+        if (event.getInventory().getHolder() instanceof Holder) {
             event.setCancelled(true);
         }
     }
@@ -155,26 +154,6 @@ public final class FactionBankMenu implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent event) {
         Object holder = event.getInventory().getHolder();
-        if (holder instanceof AmountHolder amountHolder) {
-            event.setCancelled(true);
-            if (event.getRawSlot() == ANVIL_RESULT && event.getWhoClicked() instanceof Player player) {
-                if (amountHolder.pending) {
-                    return;
-                }
-                Long amount = confirmedAmount(event.getCurrentItem());
-                if (amount == null) {
-                    amount = amountHolder.lastAmount;
-                }
-                if (amount == null) {
-                    player.sendMessage(messages.get(player, "faction-bank.invalid-amount"));
-                    return;
-                }
-                amountHolder.pending = true;
-                apply(player, amountHolder.factionId, amountHolder.resource, amountHolder.operation, amount,
-                        () -> amountHolder.pending = false);
-            }
-            return;
-        }
         if (!(holder instanceof Holder bankHolder)) {
             return;
         }
@@ -208,44 +187,17 @@ public final class FactionBankMenu implements Listener {
             player.sendMessage(messages.get(player, "factions.role-permission-denied"));
             return;
         }
-        openAmountPrompt(player, faction.id(), resource, operation);
+        promptForAmount(player, faction.id(), resource, operation);
     }
 
-    @EventHandler
-    public void onPrepareAnvil(PrepareAnvilEvent event) {
-        if (!(event.getInventory().getHolder() instanceof AmountHolder holder)
-                || !(event.getView().getPlayer() instanceof Player player)) {
-            return;
-        }
-        Long amount = readAmount(event.getView(), event.getInventory());
-        holder.lastAmount = amount;
-        event.setResult(confirmItem(player, amount));
-        // Set after the result, not before: some Paper builds recompute a
-        // fresh repair cost from the new result item when setResult() runs,
-        // silently undoing an override applied earlier in the handler.
-        event.getView().setRepairCost(0);
-        event.getView().setMaximumRepairCost(FREE_ANVIL_MAX_COST);
-    }
-
-    private void openAmountPrompt(Player player, int factionId, Resource resource, Operation operation) {
-        AmountHolder holder = new AmountHolder(factionId, resource, operation);
-        Inventory inventory = Bukkit.createInventory(holder, InventoryType.ANVIL,
-                messages.get(player, "faction-bank.amount-title", "resource", resource.label(messages, player)));
-        holder.inventory = inventory;
-        ItemStack input = new ItemStack(resource.material);
-        ItemMeta inputMeta = input.getItemMeta();
-        // Deliberately no displayName() here -- see readAmount()'s comment
-        // for why leaving the name unset (rather than pre-filling it with
-        // the prompt text) is what makes the anvil's rename box start blank.
-        inputMeta.lore(java.util.List.of(noItalic(messages.get(player, "faction-bank.amount-prompt"))));
-        input.setItemMeta(inputMeta);
-        inventory.setItem(ANVIL_INPUT, input);
-        inventory.setItem(ANVIL_RESULT, confirmItem(player, null));
-        player.openInventory(inventory);
-        if (player.getOpenInventory() instanceof AnvilView view) {
-            view.setRepairCost(0);
-            view.setMaximumRepairCost(FREE_ANVIL_MAX_COST);
-        }
+    private void promptForAmount(Player player, int factionId, Resource resource, Operation operation) {
+        player.closeInventory();
+        String promptKey = operation == Operation.DEPOSIT
+                ? "faction-bank.amount-chat-prompt-deposit" : "faction-bank.amount-chat-prompt-withdraw";
+        chatAmountPrompt.request(player,
+                messages.get(player, promptKey, "resource", resource.label(messages, player)),
+                amount -> apply(player, factionId, resource, operation, amount),
+                () -> { });
     }
 
     private ItemStack balanceItem(Player player, Faction faction, Resource resource) {
@@ -272,22 +224,27 @@ public final class FactionBankMenu implements Listener {
         return item;
     }
 
-    private void apply(Player player, int factionId, Resource resource, Operation operation, long amount,
-                       Runnable finished) {
+    private void apply(Player player, int factionId, Resource resource, Operation operation, long amount) {
+        if (amount > Integer.MAX_VALUE) {
+            // Experience and TNT amounts get narrowed with Math.toIntExact()
+            // below, which throws above this -- money itself would tolerate
+            // a larger value, but the same cap applies to all three
+            // uniformly rather than plumbing a resource-specific one through
+            // the chat prompt.
+            player.sendMessage(messages.get(player, "faction-bank.invalid-amount"));
+            return;
+        }
         Faction faction = FactionsHook.getFaction(player);
         if (faction == null || faction.id() != factionId) {
             player.closeInventory();
-            finished.run();
             return;
         }
         String permission = operation == Operation.DEPOSIT ? "bank-deposit" : "bank-withdraw";
         if (!rolePermissions.canUse(player, permission)) {
             player.sendMessage(messages.get(player, "factions.role-permission-denied"));
-            finished.run();
             return;
         }
         OperationResult result = success -> {
-            finished.run();
             if (!success || !player.isOnline()) {
                 return;
             }
@@ -440,39 +397,6 @@ public final class FactionBankMenu implements Listener {
         return true;
     }
 
-    private ItemStack confirmItem(Player player, Long amount) {
-        ItemStack result = new ItemStack(amount == null ? Material.PAPER : Material.LIME_DYE);
-        ItemMeta meta = result.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, amount == null ? "faction-bank.amount-confirm-empty"
-                : "faction-bank.amount-confirm", "amount", amount == null ? "" : String.format("%,d", amount))));
-        if (amount != null) {
-            meta.getPersistentDataContainer().set(amountKey, PersistentDataType.LONG, amount);
-        }
-        result.setItemMeta(meta);
-        return result;
-    }
-
-    private Long confirmedAmount(ItemStack item) {
-        return item == null || !item.hasItemMeta() ? null
-                : item.getItemMeta().getPersistentDataContainer().get(amountKey, PersistentDataType.LONG);
-    }
-
-    @SuppressWarnings("removal")
-    private Long readAmount(org.bukkit.inventory.InventoryView view, Inventory inventory) {
-        String text = view instanceof AnvilView anvilView ? anvilView.getRenameText()
-                : inventory instanceof AnvilInventory anvil ? anvil.getRenameText() : null;
-        if (text == null || text.isBlank()) {
-            return null;
-        }
-        String value = text.trim();
-        try {
-            long amount = Long.parseLong(value.replace(",", ""));
-            return amount > 0 && amount <= Integer.MAX_VALUE ? amount : null;
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
     private ItemStack border() {
         ItemStack item = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
         ItemMeta meta = item.getItemMeta();
@@ -529,19 +453,6 @@ public final class FactionBankMenu implements Listener {
         private final int factionId;
         private Inventory inventory;
         private Holder(int factionId) { this.factionId = factionId; }
-        @Override public Inventory getInventory() { return inventory; }
-    }
-
-    private static final class AmountHolder implements InventoryHolder {
-        private final int factionId;
-        private final Resource resource;
-        private final Operation operation;
-        private Inventory inventory;
-        private Long lastAmount;
-        private boolean pending;
-        private AmountHolder(int factionId, Resource resource, Operation operation) {
-            this.factionId = factionId; this.resource = resource; this.operation = operation;
-        }
         @Override public Inventory getInventory() { return inventory; }
     }
 }

@@ -35,7 +35,7 @@ class ChunkCollectorManagerTest {
         assertTrue(manager.isEnabled());
         assertEquals(1, manager.maxPerChunk());
         assertEquals(3, manager.maxPerPlayer());
-        assertEquals(64, manager.maxStoredMaterialTypes());
+        assertEquals(24, manager.maxStoredMaterialTypes());
         assertEquals(5, manager.maxUpgradeTier());
         assertEquals(2, manager.hopperBlockRadius());
     }

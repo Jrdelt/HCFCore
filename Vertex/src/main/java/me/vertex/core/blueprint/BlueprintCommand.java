@@ -70,7 +70,8 @@ public final class BlueprintCommand implements CommandExecutor, TabCompleter {
         for (ItemStack dropped : target.getInventory().addItem(item).values()) {
             target.getWorld().dropItemNaturally(target.getLocation(), dropped);
         }
-        sender.sendMessage(messages.get(sender, "blueprint.gave", "player", target.getName(), "template", template.displayName()));
+        sender.sendMessage(messages.get(sender, "blueprint.gave", "player", target.getName(), "template",
+                MessageFormatter.plain(template.displayName())));
         return true;
     }
 

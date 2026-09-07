@@ -24,6 +24,7 @@ public final class BlueprintMenu {
     public static final int RESUME_SLOT = 0;
     public static final int CANCEL_SLOT = 8;
     public static final int REPAIR_SLOT = 4;
+    public static final int DESTROY_SLOT = 8;
 
     private BlueprintMenu() {
     }
@@ -102,7 +103,7 @@ public final class BlueprintMenu {
 
         meta.lore(List.of(
                 noItalic(messages.get(player, "blueprint.gui-repair-lore-template", "template",
-                        template.displayName())),
+                        MessageFormatter.plain(template.displayName()))),
                 noItalic(messages.get(player, "blueprint.gui-repair-lore-missing", "missing",
                         String.valueOf(totalTasks))),
                 noItalic(messages.get(player, "blueprint.gui-repair-lore-time", "seconds",
@@ -112,6 +113,13 @@ public final class BlueprintMenu {
 
         diamond.setItemMeta(meta);
         inventory.setItem(REPAIR_SLOT, diamond);
+
+        ItemStack barrier = new ItemStack(Material.BARRIER);
+        ItemMeta barrierMeta = barrier.getItemMeta();
+        barrierMeta.displayName(noItalic(messages.get(player, "blueprint.gui-destroy-button")));
+        barrierMeta.lore(List.of(noItalic(messages.get(player, "blueprint.gui-destroy-lore"))));
+        barrier.setItemMeta(barrierMeta);
+        inventory.setItem(DESTROY_SLOT, barrier);
 
         player.openInventory(inventory);
     }

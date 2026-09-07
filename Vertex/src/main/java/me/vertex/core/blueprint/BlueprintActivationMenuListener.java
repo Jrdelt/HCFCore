@@ -68,6 +68,7 @@ public final class BlueprintActivationMenuListener implements Listener {
         // 2. Cancel Placement
         if (slot == BlueprintActivationMenu.CANCEL_SLOT) {
             player.closeInventory();
+            listener.stopParticlePreview(anchor);
 
             Block block = anchor.getBlock();
             if (block.getType() == Material.BEACON && block.getState() instanceof org.bukkit.block.Beacon beacon) {

@@ -15,9 +15,10 @@ max-per-chunk: 1
 # How many Chunk Collectors a single player may have placed, server-wide.
 max-per-player: 3
 
-# Safety cap for distinct material types recorded in one collector's PDC.
-# Existing stored types continue collecting; a new type is skipped when full.
-max-stored-material-types: 64
+# Exactly 24 distinct item types can be recorded, matching every display
+# slot in the collector GUI. A new 25th tagged farm drop is destroyed so it
+# cannot create ground-item lag; existing types continue collecting.
+max-stored-material-types: 24
 
 # Shared storage cap before any upgrades, across every item type combined.
 base-capacity: 50000

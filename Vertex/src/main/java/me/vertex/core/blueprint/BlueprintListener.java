@@ -6,11 +6,13 @@ import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import org.bukkit.Bukkit;
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Chunk;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Particle;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -30,10 +32,12 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -66,6 +70,12 @@ public final class BlueprintListener implements Listener {
     private final Set<UUID> pendingPlacements = ConcurrentHashMap.newKeySet();
     private final Set<CompletedAnchor> completedAnchors = ConcurrentHashMap.newKeySet();
     private final AtomicInteger nextRepairId = new AtomicInteger(-1);
+    private final Map<String, BukkitTask> previewParticleTasks = new ConcurrentHashMap<>();
+
+    private static final double PREVIEW_PARTICLE_STEP = 0.5;
+    private static final long PREVIEW_PARTICLE_INTERVAL_TICKS = 5L;
+    private static final Particle.DustOptions PREVIEW_PARTICLE_DUST = new Particle.DustOptions(
+            Color.fromRGB(0x33, 0xCC, 0xFF), 1.0F);
 
     public BlueprintListener(Plugin plugin, BlueprintManager manager, Messages messages) {
         this.plugin = plugin;
@@ -201,7 +211,8 @@ public final class BlueprintListener implements Listener {
         int total = build.blocks() == null ? 0 : build.blocks().size();
         String progress = String.format("%.0f%%", total == 0 ? 100.0 : 100.0 * build.currentIndex() / total);
         createOrUpdateHologram(build, progress);
-        player.sendMessage(messages.get(player, "blueprint.resumed", "template", build.template().displayName()));
+        player.sendMessage(messages.get(player, "blueprint.resumed", "template",
+                MessageFormatter.plain(build.template().displayName())));
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -239,6 +250,7 @@ public final class BlueprintListener implements Listener {
                 return;
             }
             createPreviewHologram(loc, template, player);
+            startParticlePreview(player, loc, template);
             BlueprintActivationMenu.open(player, messages, loc, template);
         });
     }
@@ -335,6 +347,7 @@ public final class BlueprintListener implements Listener {
                         } catch (Exception ignored) {
                         }
                     }
+                    stopParticlePreview(anchor);
 
                     if (anchor.getBlock().getState() instanceof org.bukkit.block.Beacon beacon) {
                         try {
@@ -356,7 +369,8 @@ public final class BlueprintListener implements Listener {
                     manager.register(build);
                     manager.startCooldown(player.getUniqueId());
                     createOrUpdateHologram(build, "0%");
-                    player.sendMessage(messages.get(player, "blueprint.started", "template", template.displayName()));
+                    player.sendMessage(messages.get(player, "blueprint.started", "template",
+                            MessageFormatter.plain(template.displayName())));
                 }));
     }
 
@@ -674,6 +688,35 @@ public final class BlueprintListener implements Listener {
                 messages.get(player, "blueprint.repair-started", "missing", String.valueOf(missingBlocks.size())));
     }
 
+    /**
+     * Tears a completed Blueprint down to make way for a rebuild: removes
+     * just the beacon and its hologram, leaving the already-placed structure
+     * untouched so a fresh Blueprint can be placed and built over it.
+     */
+    public void destroyCompleted(Player player, Location anchor) {
+        if (anchor == null || !isCompletedAnchor(anchor) || manager.activeBuildAt(anchor) != null) {
+            return;
+        }
+
+        int playerFactionId = FactionsHook.getFactionId(player);
+        if (playerFactionId == FactionsHook.NO_FACTION
+                || playerFactionId != FactionsHook.getClaimFactionId(anchor)) {
+            player.sendMessage(messages.get(player, "blueprint.not-your-faction"));
+            return;
+        }
+
+        String holoName = completedHologramName(anchor);
+        completedAnchors.removeIf(existing -> sameBlock(existing.anchor(), anchor));
+        removeHologram(holoName);
+
+        Block beaconBlock = anchor.getBlock();
+        if (beaconBlock.getType() == Material.BEACON) {
+            beaconBlock.setType(Material.AIR, false);
+        }
+
+        player.sendMessage(messages.get(player, "blueprint.destroyed"));
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEntityExplode(EntityExplodeEvent event) {
         handleExplodedBlocks(event.blockList());
@@ -892,7 +935,7 @@ public final class BlueprintListener implements Listener {
             // build)
             String messageKey = build.id() < 0 ? "blueprint.repair-completed" : "blueprint.completed";
             Component completeMsg = messages.get(null, messageKey,
-                    "template", build.template().displayName(),
+                    "template", MessageFormatter.plain(build.template().displayName()),
                     "x", String.valueOf(build.anchor().getBlockX()),
                     "y", String.valueOf(build.anchor().getBlockY()),
                     "z", String.valueOf(build.anchor().getBlockZ()));
@@ -1017,6 +1060,51 @@ public final class BlueprintListener implements Listener {
         String worldId = anchor.getWorld().getUID().toString().replace("-", "");
         return "blueprint_preview_" + worldId + "_" + anchor.getBlockX() + "_" + anchor.getBlockY() + "_"
                 + anchor.getBlockZ();
+    }
+
+    /**
+     * Outlines the box a template's structure will occupy with particles
+     * visible only to {@code player}, refreshed on a repeating task until the
+     * build starts, the beacon is removed, or the placement is cancelled.
+     * The task checks {@link #isUnactivatedAnchor} itself every tick, so any
+     * exit path -- Enable, Cancel, the beacon being broken or exploded --
+     * self-terminates it without needing to be hooked at every call site.
+     */
+    private void startParticlePreview(Player player, Location anchor, BlueprintTemplate template) {
+        String key = previewHologramName(anchor);
+        stopParticlePreview(anchor);
+
+        BlockVector3[] bounds;
+        try {
+            bounds = manager.relativeBounds(template);
+        } catch (IOException e) {
+            return;
+        }
+        double[] box = BlueprintOutline.worldBounds(anchor, bounds[0], bounds[1]);
+        List<double[]> points = BlueprintOutline.edgePoints(
+                box[0], box[1], box[2], box[3], box[4], box[5], PREVIEW_PARTICLE_STEP);
+        String templateName = template.name();
+
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (!player.isOnline() || !isUnactivatedAnchor(anchor, templateName)) {
+                stopParticlePreview(anchor);
+                return;
+            }
+            for (double[] point : points) {
+                player.spawnParticle(Particle.DUST, point[0], point[1], point[2], 1,
+                        0.0, 0.0, 0.0, 0.0, PREVIEW_PARTICLE_DUST);
+            }
+        }, 0L, PREVIEW_PARTICLE_INTERVAL_TICKS);
+
+        previewParticleTasks.put(key, task);
+    }
+
+    /** Stops the placement-preview particle box for the given anchor, if one is running. */
+    void stopParticlePreview(Location anchor) {
+        BukkitTask task = previewParticleTasks.remove(previewHologramName(anchor));
+        if (task != null) {
+            task.cancel();
+        }
     }
 
     private String hologramMessage(String key, String... placeholders) {

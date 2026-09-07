@@ -74,6 +74,64 @@ scoreboard:
     - '<gray>hub.mc-vertex.com'
 
 # ============================================
+# TAB LIST
+# Supports the same {curly} placeholders as scoreboard.lines above (name,
+# rank_prefix, rank, prefix, faction, ftop, power, fplayers_online, exp,
+# balance, online, date), plus PlaceholderAPI %percent% tokens.
+#
+# Vanished staff are not a setting here: Bukkit's own vanish (hidePlayer/
+# showPlayer, used by /vanish) already removes a vanished player from a
+# non-staff viewer's tab list at the packet level, the same way it removes
+# them from view entirely -- there's no separate "in tab but invisible"
+# state for this plugin to manage on top of that.
+# ============================================
+tablist:
+  enabled: true
+
+  # How often the tab list refreshes (in ticks; 20 ticks = 1 second).
+  update-interval-ticks: 15
+
+  # Shown next to each player's name in the tab list.
+  format: '{prefix}<gray>{name}'
+
+  # Sent to the top of everyone's tab list. Each entry is one line; leave
+  # the list empty for no header. Resolved per-viewer, so a line can use
+  # that player's own {faction}/{balance}/etc., not just {online}/{date}.
+  header:
+    - '<blue><bold>VERTEX'
+    - '<gray>{online} players online'
+    - ''
+
+  # Sent to the bottom of everyone's tab list. Leave empty for no footer.
+  footer:
+    - ''
+    - '<white>{faction} <gray>[<yellow>#{ftop}<gray>]'
+    - '<gray>{date}'
+
+  # Separates the tab list body into a block per LuckPerms rank (highest
+  # weight first), each with a header row showing that rank's online
+  # count, in place of the flat "format" list above. Requires LuckPerms
+  # for grouping and ProtocolLib for the header rows themselves --
+  # without ProtocolLib, real rows still sort/render correctly, just with
+  # no header line above each block. Real usernames only: {username}
+  # never reflects a nickname plugin, unlike {name} above.
+  grouped:
+    enabled: true
+
+    # One row per online player. Tokens: {prefix} (LuckPerms prefix,
+    # already colored), {name} (Essentials nickname if present), {username}
+    # (real name), and {faction} (e.g. "[TAG]", blank if none).
+    player-format: '{prefix}<white>{name} <gray>{faction}'
+
+    # One row per rank, shown above that rank's players. The rank's display
+    # name is used by default; adding {prefix} too usually duplicates it.
+    # Tokens: {prefix}, {group} (LuckPerms group display name), {count}.
+    header-format: '<bold>{group} <gray>({count})'
+
+    # Header shown for players with no LuckPerms rank to group under.
+    fallback-group-name: 'Members'
+
+# ============================================
 # CHAT FORMATTING
 # Chat format components (use MiniMessage or legacy & color codes).
 # rank-format also supports {rank}, {prefix}, or a PlaceholderAPI
@@ -87,6 +145,21 @@ chat:
   name-format: '{name} '
 
 # ============================================
+# ITEM RESTRICTIONS
+# ============================================
+item-restrictions:
+  # Items that cannot be used or swapped into the offhand. This replaces the
+  # old blanket offhand lock, so Backpacks and every other allowed item can
+  # now use the offhand normally.
+  disabled-items:
+    - SHIELD
+
+  # Crafted recipe results that should be blocked. Use Bukkit material names.
+  # This applies to both the 2x2 inventory grid and crafting tables.
+  disabled-crafting-results:
+    - SHIELD
+
+# ============================================
 # PVP MECHANICS
 # ============================================
 pvp:
@@ -97,6 +170,12 @@ pvp:
   # seconds instead of running out the full combat-tag-seconds duration --
   # lets them loot the body/retreat without being stuck in combat.
   post-kill-combat-seconds: 5
+
+  # PvP death drops are collectible by the killer only for this long.
+  # Set seconds to 0 or enabled to false to disable protection.
+  loot-protection:
+    enabled: true
+    seconds: 20
 
   # Item cooldowns (in seconds)
   pearl-cooldown-seconds: 12
@@ -123,6 +202,24 @@ pvp:
 
   # Logout penalty: if true, disconnecting while tagged counts as combat logout
   logout-penalty: true
+
+  # Optional Citizens ghost NPCs. When enabled, an eligible player who is
+  # kicked or force-disconnected is represented by a killable Citizens NPC
+  # instead of being killed immediately. Voluntary logouts are never given
+  # an NPC and receive the normal combat-logout penalty. Citizens must be
+  # installed; Vertex safely disables this feature when it is absent.
+  ghost-players:
+    enabled: false
+    # If true, only players with an active Vertex combat tag leave a ghost.
+    # Set false to allow every forced disconnect in allowed worlds.
+    combat-tagged-only: true
+    # Bukkit/Citizens entity type used for the NPC (normally PLAYER).
+    npc-type: PLAYER
+    # Empty means every world. World names are case-insensitive.
+    allowed-worlds: []
+    # Remove an untouched ghost after this many seconds. 0 means never.
+    # Its saved inventory is restored when the owner next joins.
+    despawn-after-seconds: 300
 
   # Commands blocked while tagged into combat (case-insensitive, without
   # the leading "/"). An entry with more than one word only blocks that
@@ -232,10 +329,6 @@ pvp:
     # mechanic that gives diminishing returns against big hits), so armor
     # reduction goes back to being a flat, predictable percentage.
     legacy-armor-calculations: true
-    # Blocks swapping any item into the offhand slot (F key) -- no
-    # dual-wielding, no shields.
-    disable-offhand: true
-
     # --- KNOCKBACK & PROJECTILES ---
     # Restores the pre-1.9 behavior of snowball/egg/fishing-rod hits
     # pushing the target even though they deal no damage.

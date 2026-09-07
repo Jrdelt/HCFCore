@@ -81,6 +81,12 @@ public final class BlueprintMenuListener implements Listener {
 
             blueprintListener.startRepair(player, holder.anchor(), holder.templateName(), holder.missingBlocks());
             player.closeInventory();
+            return;
+        }
+
+        if (holder.isCompletedView() && event.getSlot() == BlueprintMenu.DESTROY_SLOT) {
+            blueprintListener.destroyCompleted(player, holder.anchor());
+            player.closeInventory();
         }
     }
 }

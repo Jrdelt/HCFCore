@@ -120,7 +120,7 @@ buff from the Portable Bard menu rather than handed out directly.
 | Repair | Right-click | Grants temporary permission to repair gear, with a countdown shown on the scoreboard (needs LuckPerms) |
 | Switcher Snowball | Throw | Swaps positions with whoever it hits |
 | Time Warp Pearl | Right-click | Teleports back to the last location you actually ender-pearled from |
-| Ninja Star | Right-click | Teleports to whoever hit you last, after a 5s warning to them — needs that hit within the last 15s and both of you currently in combat; grants Regeneration II, Strength III, Speed V for 3s on arrival |
+| Ninja Star | Right-click | Teleports to whoever hit you last, after a 5s warning to them — needs that hit within the last 15s and both of you currently in combat; grants Regeneration II, Strength III, Speed V for 3s on arrival. It fizzles if either player is in a configured no-pearl safezone when the countdown ends. |
 
 **Portable Bard in detail:** opening the menu and picking a buff consumes
 one Portable Bard from your inventory and hands you that buff item

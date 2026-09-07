@@ -24,6 +24,11 @@ required progress display above the build. See
    opens an **Enable Blueprint** confirmation GUI. **Cancel** (or breaking
    the unactivated preview Beacon) removes the preview and returns the
    Blueprint item. Right-clicking the preview reopens the confirmation.
+   While the confirmation is open, a particle box outlines exactly where
+   the structure will be built — visible only to the placing player, so it
+   never clutters anyone else's screen. It disappears the moment the build
+   starts (or the placement is cancelled), letting a player wall off or
+   line up the footprint by eye first if they want to.
 3. On confirm, the entire schematic's bounding box must fit **100%**
    inside the placing player's own faction's claimed land (checked
    synchronously against every touched chunk) — otherwise the attempt is
@@ -54,6 +59,10 @@ required progress display above the build. See
   explosions; a completed hologram is also removed if its anchor disappears
   through an external change. Existing completed anchors are rediscovered as
   chunks load after a restart.
+- The completed Beacon's GUI also has a **Destroy Beacon** button, for
+  starting a rebuild. It only removes the Beacon and its hologram — the
+  already-built structure's blocks are left exactly as they are — clearing
+  the way to place and build a fresh Blueprint over (or beside) it.
 - Every `claim-recheck-interval-ticks`, the build's claim status is
   re-verified. If the land is no longer 100% the owning faction's
   (overclaimed, voluntarily unclaimed, etc.), the build **aborts

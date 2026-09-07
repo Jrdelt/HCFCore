@@ -41,7 +41,9 @@ local, so a bad value can't stop the server from booting.
 Both backends store the same data with the same schema. To move an
 existing server from one to the other, use `/vertex storage <local|mysql>`
 — it copies every row across, updates this setting for you, and takes
-effect on the next restart. See
+effect on the next restart. The final `storage.type` change is written to a
+temporary sibling file and atomically replaced, so a crash cannot leave a
+partially written `config.yml`. See
 [Installation](installation.md#switching-backends-in-game).
 
 ## Database (MySQL only)
@@ -115,6 +117,79 @@ PlaceholderAPI, a `%...%` token is left as literal text.
 rate; a line is only re-sent to a player if its resolved text actually
 changed since the last tick.
 
+## Tab list
+
+```yaml
+tablist:
+  enabled: true
+  update-interval-ticks: 15
+  format: '{prefix}<gray>{name}'
+  header:
+    - '<blue><bold>VERTEX'
+    - '<gray>{online} players online'
+    - ''
+  footer:
+    - ''
+    - '<white>{faction} <gray>[<yellow>#{ftop}<gray>]'
+    - '<gray>{date}'
+```
+
+`format` controls how each player's name is shown to everyone in the tab
+list. `header`/`footer` are each a list of lines (empty list = no
+header/footer) resolved **per viewer**, so a line can use that viewer's
+own `{faction}`/`{balance}`/etc., not just server-wide values like
+`{online}`. All three accept the same placeholders as
+[Scoreboard](#scoreboard) above, plus PlaceholderAPI `%percent%` tokens.
+Vertex resolves the colored `{prefix}` again one and twenty ticks after a
+join, covering LuckPerms' delayed inherited-meta load. Even in flat mode,
+real players are ordered by their highest inherited LuckPerms group weight
+(then username); grouped mode adds rank headers to that same order.
+
+**Vanished staff are never shown in the tab list to anyone who can't
+already see them** — this isn't a setting because it isn't really this
+plugin's to control: `/vanish` already uses Bukkit's own
+`hidePlayer`/`showPlayer`, which removes a hidden player from the
+viewer's tab list at the packet level as part of hiding them at all.
+There's no separate "listed but invisible" state for Vertex to manage on
+top of that.
+
+### Grouped mode (rank-separated tab list)
+
+```yaml
+tablist:
+  grouped:
+    enabled: true
+    player-format: '{prefix}<white>{name} <gray>{faction}'
+    header-format: '<bold>{group} <gray>({count})'
+    fallback-group-name: 'Members'
+```
+
+`grouped.enabled: true` replaces the flat `format` list above with one
+block per LuckPerms group, highest [group
+weight](https://luckperms.net/wiki/Command-Usage#group-setweight) first,
+each with a header row showing that group's online count — the layout in
+[Complex](https://mc-complex.com)-style tab lists. `player-format` uses
+`{prefix}` (the player's resolved LuckPerms prefix), `{name}` (Essentials
+nickname when present, otherwise the Mojang username), `{username}`
+(always the real Mojang username), and `{faction}` (`[TAG]`, or blank with
+no faction). `header-format` uses `{group}` (the group's LuckPerms display
+name) and `{count}` by default. It can also use `{prefix}` (borrowed from
+the first online member found in that group), but combining it with `{group}`
+will commonly repeat the rank name. Players with no resolvable LuckPerms rank (no
+LuckPerms, no loaded user, or LuckPerms' own unconfigured `default` base
+group) are grouped under `fallback-group-name`, always sorted last.
+
+Real rows are ordered with `Player#setPlayerListOrder` — vanilla Paper
+API since 1.21.2, independent of scoreboard teams, so this doesn't
+interact with [nametag](#nametags) team assignments at all. **Header
+rows need [ProtocolLib](https://www.spigotmc.org/resources/protocollib.1997/)**
+installed too: Bukkit has no concept of a tab entry that isn't a real
+connected player, so a header is injected as a fake `PLAYER_INFO` packet.
+Without ProtocolLib, grouped mode still sorts and labels every real row
+correctly — there just isn't a header line above each block. `grouped`
+is independent of `format`/`header`/`footer`: the header/footer lines
+configured above still apply on top of a grouped body.
+
 ## Chat formatting
 
 ```yaml
@@ -147,6 +222,9 @@ faction relations plug into this.
 pvp:
   combat-tag-seconds: 30
   post-kill-combat-seconds: 5
+  loot-protection:
+    enabled: true
+    seconds: 20
   pearl-cooldown-seconds: 12
   golden-apple-cooldown-seconds: 8
   enchanted-golden-apple-cooldown-seconds: 120
@@ -155,10 +233,22 @@ pvp:
   pearl-velocity-multiplier: 1.35
   disable-hunger-worlds: [world]
   logout-penalty: true
+  ghost-players:
+    enabled: false
+    combat-tagged-only: true
+    npc-type: PLAYER
+    allowed-worlds: []
+    despawn-after-seconds: 300
   actionbar-update-interval-ticks: 2
   blocked-commands-in-combat: [ ... ]
   actionbar: { vs-server: ..., vs-player: ..., vs-unknown: ... }
   legacy-combat: { ... }
+```
+
+```yaml
+item-restrictions:
+  disabled-items: [SHIELD]
+  disabled-crafting-results: [SHIELD]
 ```
 
 Full combat-tag mechanics, item cooldown behavior, the no-pearl zone
@@ -178,8 +268,16 @@ config shape. A quick summary of what lives here:
 - **`actionbar`** — three MiniMessage templates for the three ways a
   player can be tagged (against a real opponent, against "the server",
   or against an opponent who went offline).
+- **`ghost-players`** — optional Citizens combat-log NPCs. It is ignored
+  safely unless Citizens is installed; see [PvP & Combat](pvp-and-combat.md#ghost-players-citizens)
+  for the inventory-safety behavior and every setting.
 - **`legacy-combat`** — the full 1.8-style PvP overhaul; see
   [PvP & Combat](pvp-and-combat.md#legacy-combat-18-pvp-style).
+- **`item-restrictions`** — Bukkit material lists. `disabled-items` blocks
+  using an item and moving it into the offhand, while
+  `disabled-crafting-results` blocks its normal crafting recipe. The shipped
+  default blocks shields only; the offhand itself remains available for
+  Backpacks and every other allowed item.
 
 ## Factions
 

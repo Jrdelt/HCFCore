@@ -38,6 +38,7 @@ import me.vertex.core.pvp.CombatCheckCommand;
 import me.vertex.core.pvp.ArcherTagListener;
 import me.vertex.core.pvp.ArcherTagManager;
 import me.vertex.core.pvp.CombatManager;
+import me.vertex.core.pvp.GhostPlayerManager;
 import me.vertex.core.pvp.FullHealSplashListener;
 import me.vertex.core.pvp.HungerManagementListener;
 import me.vertex.core.pvp.CombatTagCommand;
@@ -51,6 +52,9 @@ import me.vertex.core.faction.RallyCommand;
 import me.vertex.core.faction.RallyManager;
 import me.vertex.core.faction.FactionUpgradeManager;
 import me.vertex.core.faction.FactionUpgradeStorage;
+import me.vertex.core.capture.CaptureCommand;
+import me.vertex.core.capture.CaptureEventManager;
+import me.vertex.core.capture.CaptureEventType;
 import me.vertex.core.staff.DeathListener;
 import me.vertex.core.staff.DeathManager;
 import me.vertex.core.staff.InvRestoreMenuListener;
@@ -100,10 +104,12 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private Storage storage;
     private UserManager userManager;
     private Messages messages;
+    private me.vertex.core.util.ChatAmountPrompt chatAmountPrompt;
     private LanguageCommand languageCommand;
     private KitManager kitManager;
     private AbilityManager abilityManager;
     private ScoreboardManager scoreboardManager;
+    private me.vertex.core.tablist.TablistManager tablistManager;
     private CombatManager combatManager;
     private LegacyCombatManager legacyCombatManager;
     private me.vertex.core.spawner.SpawnerStorage spawnerStorage;
@@ -124,6 +130,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private DeathManager deathManager;
     private RallyManager rallyManager;
     private RallyCommand rallyCommand;
+    private CaptureEventManager captureEventManager;
     private FactionUpgradeStorage factionUpgradeStorage;
     private FactionUpgradeManager factionUpgradeManager;
     private me.vertex.core.faction.FactionBankStorage factionBankStorage;
@@ -132,9 +139,13 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private final AtomicBoolean storageMigrationRunning = new AtomicBoolean();
     private ArcherTagListener archerTagListener;
     private CombatListener combatListener;
+    private me.vertex.core.pvp.LootProtectionListener lootProtectionListener;
     private HungerManagementListener hungerManagementListener;
+    private me.vertex.core.listener.ItemRestrictionListener itemRestrictionListener;
     private NametagManager nametagManager;
     private StaffManager staffManager;
+    private me.vertex.core.backpack.BackpackManager backpackManager;
+    private GhostPlayerManager ghostPlayerManager;
 
     @Override
     public void onLoad() {
@@ -184,6 +195,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         userManager = new UserManager(this, storage);
         messages = new Messages(this, userManager);
         messages.load();
+        chatAmountPrompt = new me.vertex.core.util.ChatAmountPrompt(this);
+        Bukkit.getPluginManager().registerEvents(chatAmountPrompt, this);
         abilityManager = new AbilityManager(this, storage);
         abilityManager.load();
         Bukkit.getPluginManager().registerEvents(abilityManager, this);
@@ -197,6 +210,9 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
 
         scoreboardManager = new ScoreboardManager(this, getConfig(), userManager, abilityManager);
         scoreboardManager.start();
+
+        tablistManager = new me.vertex.core.tablist.TablistManager(this, getConfig());
+        tablistManager.start();
 
         combatManager = new CombatManager(
                 this,
@@ -213,12 +229,14 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         legacyCombatManager = new LegacyCombatManager(this);
         Bukkit.getPluginManager().registerEvents(legacyCombatManager, this);
         legacyCombatManager.start();
+        itemRestrictionListener = new me.vertex.core.listener.ItemRestrictionListener(this, messages);
+        Bukkit.getPluginManager().registerEvents(itemRestrictionListener, this);
 
         rebootManager = new RebootManager(this, messages);
         rebootManager.start();
 
         deathManager = new DeathManager(this, storage);
-        Bukkit.getPluginManager().registerEvents(new DeathListener(deathManager), this);
+        Bukkit.getPluginManager().registerEvents(new DeathListener(deathManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new InvRestoreMenuListener(this, deathManager, messages), this);
 
         rallyManager = new RallyManager(this, messages);
@@ -237,7 +255,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 new me.vertex.core.faction.FactionUpgradeEffectsListener(this, factionUpgradeManager), this);
         factionBankManager = new me.vertex.core.faction.FactionBankManager(this, factionBankStorage);
         factionBankManager.load();
-        factionBankMenu = new me.vertex.core.faction.FactionBankMenu(this, factionBankManager, rallyManager, messages);
+        factionBankMenu = new me.vertex.core.faction.FactionBankMenu(this, factionBankManager, rallyManager, messages,
+                chatAmountPrompt);
         Bukkit.getPluginManager().registerEvents(factionBankManager, this);
         Bukkit.getPluginManager().registerEvents(factionBankMenu, this);
 
@@ -248,6 +267,19 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         if (scoreboardManager != null) {
             scoreboardManager.setStaffManager(staffManager);
         }
+        if (tablistManager != null) {
+            tablistManager.setStaffManager(staffManager);
+        }
+        captureEventManager = new CaptureEventManager(this, messages, rallyManager, staffManager);
+        captureEventManager.load();
+        captureEventManager.start();
+        Bukkit.getPluginManager().registerEvents(captureEventManager, this);
+        CaptureCommand kothCommand = new CaptureCommand(captureEventManager, messages, CaptureEventType.KOTH);
+        getCommand("koth").setExecutor(kothCommand);
+        getCommand("koth").setTabCompleter(kothCommand);
+        CaptureCommand outpostCommand = new CaptureCommand(captureEventManager, messages, CaptureEventType.OUTPOST);
+        getCommand("outpost").setExecutor(outpostCommand);
+        getCommand("outpost").setTabCompleter(outpostCommand);
         Bukkit.getPluginManager().registerEvents(new VanishListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new StaffChatListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new StaffBuildListener(staffManager), this);
@@ -300,7 +332,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 new me.vertex.core.faction.FactionRenameListener(spawnerManager, chunkCollectorManager), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.collector.ChunkCollectorMenuListener(chunkCollectorManager, staffManager, messages,
-                        rallyManager), this);
+                        rallyManager, chatAmountPrompt), this);
         Bukkit.getScheduler().runTaskTimer(this, chunkCollectorListener::scanForMissedItems,
                 chunkCollectorManager.scanIntervalTicks(), chunkCollectorManager.scanIntervalTicks());
         me.vertex.core.collector.ChunkCollectorCommand chunkCollectorCommand =
@@ -308,36 +340,38 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         getCommand("chunkcollector").setExecutor(chunkCollectorCommand);
         getCommand("chunkcollector").setTabCompleter(chunkCollectorCommand);
 
-        // The Blueprint Base Builder is meaningless without FAWE (it's the
-        // only way this plugin can load a .schem file) and DecentHolograms
-        // (the required progress display) -- rather than risk a
-        // NoClassDefFoundError the moment a player ever touches the
-        // feature, it's simply never wired up at all if either is absent.
-        if (Bukkit.getPluginManager().getPlugin("FastAsyncWorldEdit") != null
-                && Bukkit.getPluginManager().getPlugin("DecentHolograms") != null) {
-            blueprintManager = new me.vertex.core.blueprint.BlueprintManager(this, blueprintStorage);
-            blueprintManager.load();
-            blueprintListener = new me.vertex.core.blueprint.BlueprintListener(this, blueprintManager, messages);
-            Bukkit.getPluginManager().registerEvents(blueprintListener, this);
-            Bukkit.getPluginManager().registerEvents(
-                    new me.vertex.core.blueprint.BlueprintMenuListener(blueprintManager, blueprintListener, messages), this);
-            Bukkit.getPluginManager().registerEvents(
-                    new me.vertex.core.blueprint.BlueprintActivationMenuListener(blueprintListener, blueprintManager, messages), this);
-            blueprintListener.resumeAll();
-            // Blueprint blocks are paced every tick so a structure visibly
-            // grows row-by-row instead of appearing in one-second chunks.
-            Bukkit.getScheduler().runTaskTimer(this, blueprintListener::tickBuilds, 1L, 1L);
-            me.vertex.core.blueprint.BlueprintCommand blueprintCommand =
-                    new me.vertex.core.blueprint.BlueprintCommand(this, blueprintManager, messages);
-            getCommand("blueprint").setExecutor(blueprintCommand);
-            getCommand("blueprint").setTabCompleter(blueprintCommand);
-        } else {
-            getLogger().info("Blueprint Base Builder disabled -- requires both FastAsyncWorldEdit and DecentHolograms.");
-        }
+        backpackManager = new me.vertex.core.backpack.BackpackManager(this, messages);
+        backpackManager.load();
+        me.vertex.core.backpack.BackpackFilterManager backpackFilterManager =
+                new me.vertex.core.backpack.BackpackFilterManager(this);
+        backpackFilterManager.load();
+        me.vertex.core.backpack.BackpackInteractListener backpackInteractListener =
+                new me.vertex.core.backpack.BackpackInteractListener(backpackManager, messages);
+        Bukkit.getPluginManager().registerEvents(backpackInteractListener, this);
+        me.vertex.core.backpack.BackpackAutoStoreListener backpackAutoStoreListener =
+                new me.vertex.core.backpack.BackpackAutoStoreListener(backpackManager, backpackFilterManager, messages);
+        Bukkit.getPluginManager().registerEvents(backpackAutoStoreListener, this);
+        mobStackListener.setPlayerDropRouter(backpackAutoStoreListener::routePlayerMobDrops);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.backpack.BackpackMenuListener(backpackManager, messages), this);
+        me.vertex.core.backpack.BackpackCommand backpackCommand =
+                new me.vertex.core.backpack.BackpackCommand(backpackManager, messages, backpackInteractListener);
+        getCommand("backpack").setExecutor(backpackCommand);
+        getCommand("backpack").setTabCompleter(backpackCommand);
+        me.vertex.core.backpack.BackpackFilterCommand backpackFilterCommand =
+                new me.vertex.core.backpack.BackpackFilterCommand(backpackFilterManager, messages);
+        getCommand("filter").setExecutor(backpackFilterCommand);
+        getCommand("filter").setTabCompleter(backpackFilterCommand);
+
+        initializeBlueprintFeature();
+        initializeGhostPlayerFeature();
 
         combatListener = new CombatListener(this, combatManager, messages);
         Bukkit.getPluginManager().registerEvents(combatListener, this);
-        playerConnectionListener = new PlayerConnectionListener(userManager, scoreboardManager, combatManager);
+        lootProtectionListener = new me.vertex.core.pvp.LootProtectionListener(this, messages);
+        Bukkit.getPluginManager().registerEvents(lootProtectionListener, this);
+        playerConnectionListener = new PlayerConnectionListener(userManager, scoreboardManager, tablistManager, combatManager);
+        playerConnectionListener.setGhostPlayerManager(ghostPlayerManager);
         Bukkit.getPluginManager().registerEvents(playerConnectionListener, this);
         Bukkit.getPluginManager().registerEvents(new AbilityMenuListener(this, abilityManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
@@ -452,8 +486,14 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         if (scoreboardManager != null) {
             scoreboardManager.stop();
         }
+        if (tablistManager != null) {
+            tablistManager.stop();
+        }
         if (combatManager != null) {
             combatManager.stop();
+        }
+        if (ghostPlayerManager != null) {
+            ghostPlayerManager.shutdown();
         }
         if (rebootManager != null) {
             rebootManager.stop();
@@ -468,10 +508,10 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             languageCommand.awaitWrites();
         }
         if (deathManager != null) {
-            deathManager.awaitWrites();
+            deathManager.shutdown();
         }
         if (tagManager != null) {
-            tagManager.awaitWrites();
+            tagManager.shutdown();
         }
         if (spawnerManager != null) {
             spawnerManager.awaitWrites();
@@ -482,6 +522,9 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         if (blueprintManager != null) {
             blueprintManager.pauseForRestart();
             blueprintManager.awaitWrites();
+        }
+        if (captureEventManager != null) {
+            captureEventManager.shutdown();
         }
         if (rallyManager != null) {
             rallyManager.shutdown();
@@ -536,9 +579,58 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         console.sendMessage(Component.empty());
     }
 
+    /** Wires Blueprints only while both optional runtime dependencies are enabled. */
+    private void initializeBlueprintFeature() {
+        if (blueprintManager != null) {
+            return;
+        }
+        Plugin fawe = Bukkit.getPluginManager().getPlugin("FastAsyncWorldEdit");
+        Plugin holograms = Bukkit.getPluginManager().getPlugin("DecentHolograms");
+        if (fawe == null || !fawe.isEnabled() || holograms == null || !holograms.isEnabled()) {
+            getLogger().info("Blueprint Base Builder disabled -- requires enabled FastAsyncWorldEdit and DecentHolograms.");
+            return;
+        }
+
+        blueprintManager = new me.vertex.core.blueprint.BlueprintManager(this, blueprintStorage);
+        blueprintManager.load();
+        blueprintListener = new me.vertex.core.blueprint.BlueprintListener(this, blueprintManager, messages);
+        Bukkit.getPluginManager().registerEvents(blueprintListener, this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.blueprint.BlueprintMenuListener(blueprintManager, blueprintListener, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.blueprint.BlueprintActivationMenuListener(blueprintListener, blueprintManager, messages), this);
+        blueprintListener.resumeAll();
+        Bukkit.getScheduler().runTaskTimer(this, blueprintListener::tickBuilds, 1L, 1L);
+        me.vertex.core.blueprint.BlueprintCommand blueprintCommand =
+                new me.vertex.core.blueprint.BlueprintCommand(this, blueprintManager, messages);
+        getCommand("blueprint").setExecutor(blueprintCommand);
+        getCommand("blueprint").setTabCompleter(blueprintCommand);
+        getLogger().info("Blueprint Base Builder enabled.");
+    }
+
+    /** Enables Ghost Players if Citizens is presently available, including after a live reload. */
+    private void initializeGhostPlayerFeature() {
+        if (ghostPlayerManager != null) {
+            return;
+        }
+        Plugin citizens = Bukkit.getPluginManager().getPlugin("Citizens");
+        if (citizens == null || !citizens.isEnabled()) {
+            if (getConfig().getBoolean("pvp.ghost-players.enabled", false)) {
+                getLogger().warning("Ghost Players are enabled in config.yml but Citizens is not enabled; feature disabled.");
+            }
+            return;
+        }
+        ghostPlayerManager = new GhostPlayerManager(this, combatManager, messages);
+        Bukkit.getPluginManager().registerEvents(ghostPlayerManager, this);
+        if (playerConnectionListener != null) {
+            playerConnectionListener.setGhostPlayerManager(ghostPlayerManager);
+        }
+        getLogger().info("Ghost Players integration enabled.");
+    }
+
     public static boolean hasRequiredDependency(PluginManager pluginManager) {
         Plugin factions = pluginManager.getPlugin("FactionsUUID");
-        return factions != null;
+        return factions != null && factions.isEnabled();
     }
 
     public boolean validateRuntimeDependencies() {
@@ -547,9 +639,11 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             return false;
         }
 
-        List<String> optionalDependencies = List.of("Vault", "WorldGuard", "LuckPerms");
+        List<String> optionalDependencies = List.of("Vault", "WorldGuard", "LuckPerms", "ProtocolLib",
+                "FastAsyncWorldEdit", "DecentHolograms", "Citizens");
         for (String dependency : optionalDependencies) {
-            if (Bukkit.getPluginManager().getPlugin(dependency) == null) {
+            Plugin present = Bukkit.getPluginManager().getPlugin(dependency);
+            if (present == null || !present.isEnabled()) {
                 getLogger().warning("Optional dependency not detected: " + dependency + ". Related features will be disabled.");
             }
         }
@@ -559,9 +653,13 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
 
     public void reload() {
         reloadConfig();
+        validateRuntimeDependencies();
 
         if (messages != null) {
             messages.load();
+        }
+        if (itemRestrictionListener != null) {
+            itemRestrictionListener.reload();
         }
         if (abilityManager != null) {
             abilityManager.load();
@@ -580,6 +678,14 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         }
         if (blueprintManager != null) {
             blueprintManager.load();
+        } else {
+            initializeBlueprintFeature();
+        }
+        if (captureEventManager != null) {
+            captureEventManager.reload();
+        }
+        if (backpackManager != null) {
+            backpackManager.load();
         }
         if (kitManager != null) {
             kitManager.load();
@@ -601,8 +707,20 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             scoreboardManager.start();
         }
 
+        if (tablistManager != null) {
+            tablistManager.stop();
+            tablistManager = null;
+        }
+        tablistManager = new me.vertex.core.tablist.TablistManager(this, getConfig());
+        tablistManager.setStaffManager(staffManager);
+        tablistManager.start();
+        for (var player : Bukkit.getOnlinePlayers()) {
+            tablistManager.renderNow(player);
+        }
+
         if (playerConnectionListener != null) {
             playerConnectionListener.setScoreboardManager(scoreboardManager);
+            playerConnectionListener.setTablistManager(tablistManager);
         }
         if (repairListener != null) {
             repairListener.setScoreboardManager(scoreboardManager);
@@ -629,6 +747,11 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                     getConfig().getString("pvp.actionbar.vs-player", ""),
                     getConfig().getString("pvp.actionbar.vs-unknown", ""));
         }
+        if (ghostPlayerManager != null) {
+            ghostPlayerManager.reload();
+        } else {
+            initializeGhostPlayerFeature();
+        }
         if (archerTagListener != null) {
             archerTagListener.reloadConfig();
         }
@@ -637,6 +760,9 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         }
         if (combatListener != null) {
             combatListener.reloadConfig();
+        }
+        if (lootProtectionListener != null) {
+            lootProtectionListener.reload(this);
         }
         if (legacyCombatManager != null) {
             legacyCombatManager.reconfigure();

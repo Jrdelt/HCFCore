@@ -169,6 +169,16 @@ public final class NinjaStarListener implements Listener {
                     return;
                 }
                 if (remaining <= 0) {
+                    // Re-check at the exact teleport time. Either player
+                    // may have moved into a protected/safe region during
+                    // the five-second countdown.
+                    if (NoPearlSpawnListener.isProtected(plugin, user.getLocation())
+                            || NoPearlSpawnListener.isProtected(plugin, target.getLocation())) {
+                        user.sendMessage(messages.get(user, "ability.ninja-star-protected"));
+                        target.sendMessage(messages.get(target, "ability.ninja-star-protected"));
+                        cancel();
+                        return;
+                    }
                     user.teleport(target.getLocation());
                     user.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, BUFF_DURATION_TICKS, 1));
                     user.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, BUFF_DURATION_TICKS, 2));

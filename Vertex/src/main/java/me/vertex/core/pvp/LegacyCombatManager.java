@@ -25,7 +25,6 @@ import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
@@ -47,7 +46,7 @@ import java.util.logging.Level;
  * Restores a handful of pre-1.9 PvP mechanics that got reworked away over
  * the years: fixed attack speed (no cooldown bar), no sweeping-edge damage,
  * a configurable weapon-damage table, armor without the modern toughness/
- * damage-penetration mechanic, no offhand, tunable knockback (including on
+ * damage-penetration mechanic, tunable knockback (including on
  * normally-harmless snowball/egg/fishing-rod hits), flat slow health regen
  * instead of saturation-boosted fast regen, and admin-defined golden apple
  * effects instead of vanilla's current ones. Every sub-feature has its own
@@ -71,8 +70,6 @@ public final class LegacyCombatManager implements Listener {
     private Map<Material, Double> weaponDamage = Map.of();
 
     private boolean legacyArmorCalculations;
-
-    private boolean disableOffhand;
 
     private double knockbackHorizontal;
     private double knockbackVertical;
@@ -117,8 +114,6 @@ public final class LegacyCombatManager implements Listener {
         weaponDamage = readWeaponDamage();
 
         legacyArmorCalculations = plugin.getConfig().getBoolean("pvp.legacy-combat.legacy-armor-calculations", false);
-
-        disableOffhand = plugin.getConfig().getBoolean("pvp.legacy-combat.disable-offhand", false);
 
         knockbackHorizontal = plugin.getConfig().getDouble("pvp.legacy-combat.knockback.horizontal", 0.4);
         knockbackVertical = plugin.getConfig().getDouble("pvp.legacy-combat.knockback.vertical", 0.4);
@@ -218,13 +213,6 @@ public final class LegacyCombatManager implements Listener {
                 && disableSweepingAttacks
                 && event.getEntity().getWorld() != null
                 && isEnabledIn(event.getEntity().getWorld())) {
-            event.setCancelled(true);
-        }
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    public void onSwapHands(PlayerSwapHandItemsEvent event) {
-        if (disableOffhand && isEnabledIn(event.getPlayer().getWorld())) {
             event.setCancelled(true);
         }
     }

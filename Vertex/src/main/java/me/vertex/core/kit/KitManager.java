@@ -68,7 +68,15 @@ public final class KitManager {
     private final java.util.Set<CompletableFuture<Void>> pendingCooldownWrites = ConcurrentHashMap.newKeySet();
     private BukkitTask armorMonitorTask;
     private final Map<String, Kit> kits = new LinkedHashMap<>();
-    private volatile List<Kit> kitsWithEffects = new ArrayList<>();
+    /**
+     * Each effect-bearing kit paired with its armor pre-converted to Bukkit's
+     * slot order. checkArmorEffects() runs this comparison for every online
+     * player, every tick; without this cache, converting each kit's armor
+     * order was repeated from scratch on every single one of those checks,
+     * even though a kit's definition only actually changes on
+     * /vertex reload.
+     */
+    private volatile List<EffectKit> kitsWithEffects = new ArrayList<>();
     // Single thread so concurrent /kit save and /kit delete calls persist in
     // the order they happened, instead of racing on kits.yml.
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(r -> {
@@ -579,13 +587,24 @@ public final class KitManager {
     }
 
     private Kit findArmorKit(Player player) {
-        ItemStack[] actualArmor = player.getInventory().getArmorContents();
-        for (Kit kit : kitsWithEffects) {
-            if (hasSameArmor(actualArmor, toBukkitArmorOrder(kit.getArmor()))) {
-                return kit;
+        // Normalized once per player per check, not once per kit compared --
+        // the player's own armor doesn't change between those comparisons,
+        // so re-cloning it for each candidate kit was pure waste.
+        ItemStack[] normalizedActual = normalizeWear(player.getInventory().getArmorContents());
+        for (EffectKit entry : kitsWithEffects) {
+            if (hasSameArmor(normalizedActual, entry.bukkitArmor())) {
+                return entry.kit();
             }
         }
         return null;
+    }
+
+    private static ItemStack[] normalizeWear(ItemStack[] armor) {
+        ItemStack[] normalized = new ItemStack[armor.length];
+        for (int i = 0; i < armor.length; i++) {
+            normalized[i] = armor[i] == null ? null : withoutWear(armor[i]);
+        }
+        return normalized;
     }
 
     private void startEffectWarmup(Player player, Kit kit) {
@@ -619,18 +638,19 @@ public final class KitManager {
         return effectWarmups.getOrDefault(uuid, -1L) == token;
     }
 
-    private static boolean hasSameArmor(ItemStack[] actual, ItemStack[] expected) {
-        if (actual.length != expected.length) {
+    /** @param normalizedActual already passed through {@link #normalizeWear}. */
+    private static boolean hasSameArmor(ItemStack[] normalizedActual, ItemStack[] expected) {
+        if (normalizedActual.length != expected.length) {
             return false;
         }
-        for (int i = 0; i < actual.length; i++) {
-            ItemStack actualItem = actual[i];
+        for (int i = 0; i < normalizedActual.length; i++) {
+            ItemStack actualItem = normalizedActual[i];
             ItemStack expectedItem = expected[i];
             if (actualItem == null || expectedItem == null) {
                 if (actualItem != expectedItem) {
                     return false;
                 }
-            } else if (!withoutWear(actualItem).isSimilar(withoutWear(expectedItem))) {
+            } else if (!actualItem.isSimilar(withoutWear(expectedItem))) {
                 return false;
             }
         }
@@ -717,18 +737,21 @@ public final class KitManager {
         kits.put(name.toLowerCase(Locale.ROOT), kit);
         rebuildEffectsCache();
         persistAsync();
-        waitForPendingPersist();
     }
 
     /** Keeps kitsWithEffects in sync with kits -- must run after every mutation, not just load(). */
     private void rebuildEffectsCache() {
-        List<Kit> effectKits = new ArrayList<>();
+        List<EffectKit> effectKits = new ArrayList<>();
         for (Kit kit : kits.values()) {
             if (!kit.getEffects().isEmpty()) {
-                effectKits.add(kit);
+                effectKits.add(new EffectKit(kit, toBukkitArmorOrder(kit.getArmor())));
             }
         }
         kitsWithEffects = effectKits;
+    }
+
+    /** A kit with passive effects, paired with its armor already in Bukkit's slot order. */
+    private record EffectKit(Kit kit, ItemStack[] bukkitArmor) {
     }
 
     private static ItemStack[] toBukkitArmorOrder(ItemStack[] armor) {
@@ -788,7 +811,6 @@ public final class KitManager {
         // armor set, since checkArmorEffects() reads kitsWithEffects, not kits.
         rebuildEffectsCache();
         persistAsync();
-        waitForPendingPersist();
         return true;
     }
 
@@ -803,7 +825,7 @@ public final class KitManager {
         Future<?> task;
         synchronized (persistLock) {
             task = ioExecutor.submit(() -> {
-                if (shuttingDown || generation != saveGeneration.get() || !plugin.isEnabled()) {
+                if (shuttingDown || generation != saveGeneration.get()) {
                     return;
                 }
 
@@ -889,10 +911,12 @@ public final class KitManager {
      * Flushes any pending kit saves/deletes before the plugin shuts down.
      */
     public void shutdown() {
-        shuttingDown = true;
         stopArmorMonitor();
-        saveGeneration.incrementAndGet();
+        // Finish the snapshot that was already queued before preventing
+        // any further mutations.  Setting shuttingDown first used to make
+        // that queued write silently no-op, losing the last /kit save.
         waitForPendingPersist();
+        shuttingDown = true;
         awaitCooldownWrites();
         ioExecutor.shutdown();
         try {

@@ -20,6 +20,7 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Map;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class RallyManager implements Listener {
@@ -30,6 +31,8 @@ public final class RallyManager implements Listener {
     private final Map<Player, BossBar> playerBossBars = new ConcurrentHashMap<>();
     /** Compass targets are player-owned state, so restore them when a rally is no longer shown. */
     private final Map<java.util.UUID, org.bukkit.Location> originalCompassTargets = new ConcurrentHashMap<>();
+    /** A personal Capture focus intentionally takes over the direction bar from a faction rally. */
+    private volatile Predicate<Player> externalDirectionFocus = player -> false;
     private BukkitTask updateTask;
     private static final long RALLY_DURATION_MILLIS = 4 * 60 * 1000; // 4 minutes
 
@@ -43,6 +46,20 @@ public final class RallyManager implements Listener {
     public void setRally(int factionId, org.bukkit.Location location) {
         rallyLocations.put(factionId, location.clone());
         rallyExpires.put(factionId, System.currentTimeMillis() + RALLY_DURATION_MILLIS);
+    }
+
+    /** Lets a personal event focus temporarily take over this player's direction display. */
+    public void setExternalDirectionFocus(Predicate<Player> externalDirectionFocus) {
+        this.externalDirectionFocus = externalDirectionFocus == null ? player -> false : externalDirectionFocus;
+    }
+
+    /** True only when a live faction rally can actively direct this player in their current world. */
+    public boolean hasActiveRally(Player player) {
+        if (player == null || !isRallyActive(FactionsHook.getFactionId(player))) {
+            return false;
+        }
+        org.bukkit.Location location = rallyLocations.get(FactionsHook.getFactionId(player));
+        return location != null && player.getWorld().equals(location.getWorld());
     }
 
     /** Rally permissions are faction-specific; every role starts allowed until its leader changes it. */
@@ -141,6 +158,10 @@ public final class RallyManager implements Listener {
 
     private void updateRallyDisplay() {
         for (Player player : Bukkit.getOnlinePlayers()) {
+            if (externalDirectionFocus.test(player)) {
+                hideBossBarForPlayer(player);
+                continue;
+            }
             int factionId = FactionsHook.getFactionId(player);
             if (factionId == FactionsHook.NO_FACTION) {
                 hideBossBarForPlayer(player);

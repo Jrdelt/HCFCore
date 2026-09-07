@@ -96,6 +96,11 @@ public final class DeathManager {
         if (pendingWrites.get() > 0) {
             plugin.getLogger().warning("Death writes did not complete within timeout");
         }
+    }
+
+    /** Flushes queued writes then permanently stops this executor at plugin shutdown. */
+    public void shutdown() {
+        awaitWrites();
         ioExecutor.shutdown();
     }
 

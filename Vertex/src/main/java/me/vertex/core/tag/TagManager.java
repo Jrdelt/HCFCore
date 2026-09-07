@@ -262,8 +262,13 @@ public final class TagManager {
         }, ioExecutor);
     }
 
-    /** Blocks until the most recently queued save has finished -- call on plugin disable. */
+    /** Blocks until the most recently queued save has finished without disabling future saves. */
     public void awaitWrites() {
+        awaitPendingWrite();
+    }
+
+    /** Flushes then permanently stops the private executor during plugin disable only. */
+    public void shutdown() {
         awaitPendingWrite();
         ioExecutor.shutdown();
         try {

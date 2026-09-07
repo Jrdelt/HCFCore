@@ -1,0 +1,63 @@
+# Faction KOTH and Outpost definitions. Events are created in game with
+# /koth create <id> or /outpost create <id>; the staff wand writes their
+# selected bounds below. Edit display names, schedules, capture pace, rewards,
+# and the hologram after creation, then run /vertex reload.
+enabled: true
+
+# Java time-zone ID used by schedule-times. Examples: America/Los_Angeles, UTC.
+schedule-time-zone: 'America/Los_Angeles'
+
+defaults:
+  # A single faction member needs this many seconds to reach 100%.
+  capture-seconds: 300
+  # An unclaimed event automatically ends after this many seconds (45 minutes).
+  max-duration-seconds: 2700
+  # Each extra same-faction member adds this fraction of the one-player speed.
+  # 0.25 means two members capture at 1.25x, three at 1.50x, etc.
+  additional-member-speed: 0.25
+
+# Text used in holograms, broadcasts, and reward commands for a solo player
+# who is not in a faction. Factionless players capture individually; they do
+# not combine their speed with other factionless players.
+neutral-display-name: 'No Faction'
+
+selection:
+  # Safety cap for a staff-selected cuboid, including every block between both corners.
+  maximum-volume: 1000000
+
+hologram:
+  enabled: true
+  # {type}, {name}, {progress}, {remaining}, {event-remaining}, and {faction} are available.
+  lines:
+    - '&4&l{type} &f{name}'
+    - '&e{progress}% &7• &f{remaining}s remaining'
+    - '&7Capturing: &b{faction}'
+
+# Every entry must have a unique ID, even across KOTH and Outpost.
+# schedule-times uses 24-hour HH:mm values. An empty list means staff start it
+# manually with /koth start <id> or /outpost start <id>.
+events: {}
+
+# Example event (remove the leading # lines only after changing world and bounds):
+# central_koth:
+#   type: koth
+#   display-name: 'Central KOTH'
+#   world: world
+#   minimum: { x: 0, y: 64, z: 0 }
+#   maximum: { x: 10, y: 75, z: 10 }
+#   hologram: { x: 5.5, y: 66.0, z: 5.5 }
+#   capture-seconds: 300
+#   max-duration-seconds: 2700
+#   additional-member-speed: 0.25
+#   # When true, Vertex ability items cannot be used from inside this active capture zone.
+#   disable-abilities: false
+#   schedule-times: ['18:00', '21:00']
+#   rewards:
+#     commands:
+#       - 'eco give {player} 5000'
+#       - 'crate key give {player} koth 1'
+#     # XP booster settings are only used by an Outpost.
+#     xp-booster:
+#       enabled: false
+#       multiplier: 2.0
+#       duration-seconds: 3600

@@ -6,7 +6,7 @@ ability items, 1.8-style legacy combat, a combat-tag system, a live
 sidebar scoreboard, faction-aware chat and nametags, rallies, a faction
 permission matrix, faction upgrades, a shared faction bank, cosmetic tags,
 stackable spawners, Chunk Collectors, a progressive schematic base-builder,
-and a staff toolkit.
+KOTH/Outpost captures, and a staff toolkit.
 
 This is the detailed, developer-facing reference. If you just want a
 quick tour of what the plugin does, see the [main README](../README.md)
@@ -25,6 +25,8 @@ integration behavior.
 | [Factions Integration](factions-integration.md) | FactionsUUID compatibility, chat/scoreboard placeholders, nametags, rallies, permissions, upgrades, bank, leader-leave protection |
 | [Spawners & Collectors](spawners-and-collectors.md) | Spawner shop/economy, daylight and lava behavior, stacking, mob stacks, and Chunk Collectors |
 | [Blueprint Base Builder](blueprints.md) | Automated `.schem` base building with FastAsyncWorldEdit + DecentHolograms |
+| [Backpacks](backpacks.md) | Tiered offhand auto-storage: drop bonuses, filters, leveling, and custom models |
+| [KOTH & Outposts](koth-and-outposts.md) | Faction capture rules, directions/focus, schedules, staff selection, holograms, rewards, and Outpost XP boosters |
 | [Tags & Cosmetics](tags-and-cosmetics.md) | The `/tags` system: unlocking, equipping, nickname-match, the GUI |
 | [Staff Tools](staff-tools.md) | Vanish, staff chat, staff-build, freeze, invsee/endersee, and death rollback |
 | [Localization](localization.md) | Supported languages, `/language`, adding a translation, color/placeholder conventions |
@@ -41,9 +43,11 @@ integration behavior.
   rather than erroring — Vertex never requires an optional integration to
   boot.
 - `/vertex reload` reloads `config.yml`, language files, kits, abilities,
-  tags, spawner tuning, collector tuning, Blueprint templates, and Vertex
-  upgrade definitions. A full restart is still required after replacing a
-  jar, changing dependencies, or switching the storage backend.
+  tags, spawner tuning, collector tuning, Backpack tiers, Blueprint
+  templates, capture-event definitions, and Vertex upgrade definitions. It also rechecks all required
+  and optional integrations, enabling Blueprints or Ghost Players if their
+  dependencies became available after Vertex started. A full restart is
+  still required after replacing a jar or switching the storage backend.
 
 Found something these docs don't cover, or something that's out of date?
 Check [issues.md](../issues.md) at the repo root for known open items, or

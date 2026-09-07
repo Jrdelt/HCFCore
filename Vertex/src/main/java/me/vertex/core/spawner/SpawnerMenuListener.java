@@ -167,7 +167,11 @@ public final class SpawnerMenuListener implements Listener {
                 player.sendMessage(messages.get(player, "spawner.no-economy"));
                 return;
             }
-            EconomyHook.getEconomy().depositPlayer(player, refund);
+            EconomyResponse response = EconomyHook.getEconomy().depositPlayer(player, refund);
+            if (!response.transactionSuccess()) {
+                player.sendMessage(messages.get(player, "spawner.no-economy"));
+                return;
+            }
         }
         int newSize = spawnerManager.decreaseStack(location, amount);
         clearBlockIfEmpty(location, newSize);

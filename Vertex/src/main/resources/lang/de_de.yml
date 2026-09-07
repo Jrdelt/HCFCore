@@ -4,6 +4,16 @@ general:
   player-not-found: '<red>Spieler nicht gefunden.'
   players-only: '<red>Nur Spieler koennen diesen Befehl verwenden.'
 
+death:
+  player-killed: '<red>{victim}</red> <gray>was slain by <red>{killer}</red><gray>.'
+  lava: '<red>{victim}</red> <gray>tried to swim in lava.'
+  fire: '<red>{victim}</red> <gray>burned to death.'
+  fall: '<red>{victim}</red> <gray>fell too far.'
+  void: '<red>{victim}</red> <gray>fell into the void.'
+  drowning: '<red>{victim}</red> <gray>drowned.'
+  suffocation: '<red>{victim}</red> <gray>suffocated.'
+  generic: '<red>{victim}</red> <gray>died from {cause}.'
+
 admin:
   usage: '<red>Verwendung: /vertex reload|clearmobstacks|storage'
   reloaded: '<green>Vertex neu geladen.'
@@ -128,6 +138,12 @@ combat:
   tag-success: '<green>{player} und {opponent} wurden in den Kampf versetzt.'
   no-pearl-spawn: '<red>✖ <gray>Du kannst nicht in eine geschützte Zone perlen.'
   command-blocked: '<red>✖ <gray>Du kannst diesen Befehl im Kampf nicht benutzen.'
+  loot-protected: '<red>✖ <gray>Nur der Killer kann diese Beute gerade aufheben.'
+
+ghost-players:
+  spawned: '<yellow>Dein Geist bleibt in der Welt, bis er besiegt wird oder du zurueckkehrst.'
+  restored: '<green>Dein Geist wurde entfernt und dein Inventar wurde wiederhergestellt.'
+  killed-on-login: '<red>Dein Geist wurde besiegt, waehrend du offline warst.'
 
 ability:
   on-global-cooldown: '<red>You''re on ability cooldown for another {seconds}s.'
@@ -173,6 +189,7 @@ ability:
   ninja-star-activated: '&e&lABILITES&r &7> <light_purple>Teleportiere zu {player} in {seconds}s.'
   ninja-star-warning: '&e&lABILITES&r &7> <red>{player} hat einen Ninja Star auf dich aktiviert und teleportiert sich in {seconds}s zu dir.'
   ninja-star-fizzled: '&e&lABILITES&r &7> <red>Der andere Spieler hat die Verbindung getrennt, die Ninja Star Teleportation ist fehlgeschlagen.'
+  ninja-star-protected: '&e&lABILITES&r &7> <red>Eine geschuetzte Region hat die Ninja Star Teleportation verhindert.'
 
 reboot:
   usage: '<red>Verwendung: /reboot [cancel]'
@@ -270,9 +287,12 @@ faction-bank:
   withdraw-name: "<red><bold>Withdraw {resource}"
   withdraw-lore: ["<gray>Take {resource} from your faction bank.", "<red>Click to enter an amount."]
   amount-title: "<dark_gray>How much {resource}?"
+  amount-chat-prompt-deposit: '<green>[Fraktionsbank]</green> <yellow>Tippe im Chat, wie viel <white>{resource}<yellow> eingezahlt werden soll. <gray>Akzeptiert <white>100k<gray>/<white>1.5m<gray>/<white>1b<gray>, oder tippe <white>cancel<gray>.'
+  amount-chat-prompt-withdraw: '<red>[Fraktionsbank]</red> <yellow>Tippe im Chat, wie viel <white>{resource}<yellow> abgehoben werden soll. <gray>Akzeptiert <white>100k<gray>/<white>1.5m<gray>/<white>1b<gray>, oder tippe <white>cancel<gray>.'
   amount-prompt: "<gray>Type amount"
   amount-confirm: "<green>Confirm: {amount}"
   amount-confirm-empty: "<gray>Enter a whole number"
+  amount-format-hint: '<gray>Akzeptiert Kurzform: <white>100k<gray>, <white>1.5m<gray>, <white>1b'
   invalid-amount: "<red>✖ <gray>Enter a whole number greater than zero."
   not-enough: "<red>✖ <gray>You do not have enough for that bank transaction."
   tnt-full: "<red>✖ <gray>The faction TNT bank is full ({max})."
@@ -355,9 +375,11 @@ collector:
   withdraw-amount-lore: '<gray>Left-click: <white>Choose amount'
   withdraw-shift-lore: '<gray>Shift-click: <white>Withdraw {amount}'
   withdraw-title: 'Withdraw {item}'
+  withdraw-chat-prompt: '&a&lCOLLECTOR&r &7> <yellow>Tippe im Chat, wie viele <white>{item}<yellow> abgehoben werden sollen <gray>(<white>{available}<gray> gelagert). <gray>Akzeptiert <white>100k<gray>/<white>1.5m<gray>/<white>1b<gray>, oder tippe <white>cancel<gray>.'
   withdraw-prompt: 'Type amount'
   withdraw-confirm: '<green>Withdraw {amount}'
   withdraw-confirm-empty: '<gray>Type an amount'
+  withdraw-format-hint: '<gray>Akzeptiert Kurzform: <white>100k<gray>, <white>1.5m<gray>, <white>1b'
   withdraw-invalid: '<red>Enter a whole number greater than zero.'
   withdraw-too-many: '<red>Only {available} of that item are stored.'
   upgrade-title: '<gold>Upgrade Storage'
@@ -391,6 +413,9 @@ blueprint:
   gui-repair-lore-time: '<gray>Repair time: <yellow><seconds>s'
   gui-repair-intact: '<green>Structure is 100% intact.'
   gui-repair-action: '<yellow>Click to start repairing missing blocks'
+  gui-destroy-button: '<red><bold>Destroy Beacon'
+  gui-destroy-lore: '<gray>Removes the beacon and hologram. Blocks stay placed.'
+  destroyed: '<yellow>Beacon and hologram removed. The structure''s blocks were left in place.'
   command-usage: '<red>Usage: /blueprint give <player> <template> or /blueprint cooldown remove <player>'
   template-not-found: '<red>No Blueprint template named {template}.'
   completed: '<green>The {template} at {x}, {y}, {z} is now fully built!'
@@ -443,3 +468,108 @@ blueprint:
   gui-repair-lore:
     - '&7Missing blocks: &c<missing>'
     - '&eClick to start repairs.'
+
+backpack:
+  gui-title: '<dark_gray>Upgrade Your Backpack'
+  gui-empty-button: '<yellow><bold>Empty Backpack'
+  gui-empty-lore:
+    - '<gray>Empty the contents of your backpack into your inventory.'
+    - '<green>Click to empty.'
+  gui-upgrade-button: '<green><bold>Upgrade Backpack'
+  gui-upgrade-lore-cost: '<gray>Click to upgrade for <yellow>{cost}<gray>.'
+  gui-upgrade-lore-maxed: '<green>This backpack is already at its max level.'
+  lore:
+    - '<gray>Level <white>{level}'
+    - ''
+    - '<green>+{bonus}% Auto-collect Drops'
+    - ''
+    - '<gray>Contents: <white>{stored}<gray>/<white>{capacity}'
+    - ''
+    - '<yellow>Hold in your offhand!'
+    - '<yellow>Sneak + Right Click in the air to open.'
+  store-action-bar: '<gold>{backpack_name} <dark_gray>• <aqua>{tier} <dark_gray>• <yellow>Level {backpack_level} <dark_gray>• <white>{used_storage}<gray>/<white>{storage}'
+  command-usage: '&e&lBACKPACKS &7> <gray>Usage: /backpack give <player> <tier> [level]'
+  unknown-tier: '&e&lBACKPACKS &7> <red>No Backpack tier by that name.'
+  invalid-item-type: '&e&lBACKPACKS &7> <red>That Backpack tier has an invalid item type.'
+  invalid-level: '&e&lBACKPACKS &7> <red>Level must be a whole number.'
+  invalid-level-range: '&e&lBACKPACKS &7> <red>Level must be between 1 and {max}.'
+  gave: '&e&lBACKPACKS &7> <green>Gave {player} a level {level} {tier}.'
+  upgraded: '&e&lBACKPACKS &7> <green>Your backpack is now level {level}.'
+  upgrade-maxed: '&e&lBACKPACKS &7> <gray>Your backpack is already at its max level ({level}).'
+  cannot-afford: '&e&lBACKPACKS &7> <red>You can''t afford this upgrade ({amount}).'
+  disabled: '&e&lBACKPACKS &7> <red>Backpacks are currently disabled.'
+  must-be-single: '&e&lBACKPACKS &7> <red>Split this Backpack into a single item before opening it.'
+  cannot-store-backpack: '&e&lBACKPACKS &7> <red>You cannot store a Backpack inside a Backpack.'
+  capacity-reached: '&e&lBACKPACKS &7> <red>Dein Backpack ist voll. Ueberlaufende Items wurden dir zurueckgegeben.'
+  debug-enabled: '&e&lBACKPACKS &7> <green>Backpack-Debugging aktiviert. Wiederhole die Aktion und sende die Ausgabe.'
+  debug-disabled: '&e&lBACKPACKS &7> <gray>Backpack-Debugging deaktiviert.'
+  debug-trace: '&e&lBACKPACKS &7> <gray>DEBUG: {detail}'
+  filter-usage: '&e&lBACKPACKS &7> <gray>Usage: /filter <material|clear>'
+  filter-none: '<gray>none'
+  filter-list: '&e&lBACKPACKS &7> <gray>Filtered: <white>{items}'
+  filter-enabled: '&e&lBACKPACKS &7> <green>{item} will be discarded while a Backpack is equipped.'
+  filter-disabled: '&e&lBACKPACKS &7> <gray>{item} will no longer be discarded.'
+  filter-cleared: '&e&lBACKPACKS &7> <green>Cleared {count} Backpack filter(s).'
+  filter-invalid-item: '&e&lBACKPACKS &7> <red>Use a valid Minecraft material name.'
+
+item-restrictions:
+  item-disabled: '&c✘ &7That item is disabled.'
+  crafting-disabled: '&c✘ &7You cannot craft that item.'
+
+capture:
+  command-usage: "&c&l{command}&r &7> <yellow>/{command} focus [name|off] <gray>| <yellow>/{command} create|wand|cancel|start|stop|delete|list|validate"
+  invalid-name: "<red>✖ <gray>Use 1–32 lowercase letters, numbers, underscores, or hyphens for the event ID."
+  already-exists: "<red>✖ <gray>An event named <white>{name}</white> already exists."
+  wand-name: "<gold><bold>ᴄᴀᴘᴛᴜʀᴇ ꜱᴇʟᴇᴄᴛɪᴏɴ ᴡᴀɴᴅ"
+  wand-lore: ["<gray>Left-click a block for corner one.", "<gray>Right-click a block for corner two.", "<yellow>Sneak + click air <gray>to save the event."]
+  wand-given: "<green>✔ <gray>Given a {type} selection wand."
+  selection-started: "<green>✔ <gray>Select the two corners for <white>{name}</white> ({type}), then sneak + click air."
+  selection-first: "<green>✔ <gray>First corner: <white>{x}, {y}, {z}</white>."
+  selection-second: "<green>✔ <gray>Second corner: <white>{x}, {y}, {z}</white>."
+  selection-incomplete: "<red>✖ <gray>Select both corners before saving."
+  selection-world-mismatch: "<red>✖ <gray>Both corners must be in the same world."
+  selection-too-large: "<red>✖ <gray>That region exceeds the {maximum}-block selection limit."
+  selection-cancelled: "<green>✔ <gray>Capture selection cancelled."
+  selection-none: "<yellow>There is no active capture selection to cancel."
+  save-failed: "<red>✖ <gray>Could not save that capture event. Check the server console."
+  created: "<green>✔ <gray>Created {type} <white>{name}</white>. Configure it in <white>capture-events.yml</white>."
+  admin-start: "<green>✔ <gray>Started {type} <white>{name}</white>."
+  admin-stop: "<green>✔ <gray>Stopped {type} <white>{name}</white>."
+  admin-delete: "<green>✔ <gray>Deleted {type} <white>{name}</white>."
+  admin-failed: "<red>✖ <gray>That {type} event could not be changed. Check its ID, enabled setting, and whether another event of this type is active."
+  list-heading: "<gold><bold>{type} events:"
+  list-empty: "<yellow>There are no configured {type} events."
+  list-entry: "<gray>- <white>{name}</white> <dark_gray>({id}) <gray>in <white>{world}</white>: <yellow>{state}</yellow>"
+  focus-no-active: "<yellow>There is no active {type} in your world to focus."
+  focus-not-found: "<red>✖ <gray>That active {type} could not be found."
+  focused: "<green>✔ <gray>Now focusing {type} <white>{name}</white>. Use <white>/{type} focus off</white> to return to your rally."
+  focus-cleared: "<green>✔ <gray>Capture focus cleared; your faction rally can show again."
+  focus-none: "<yellow>You are not focusing a capture event."
+  direction-bossbar: "&4&l{type} &7>&r <white>{name}</white> <gray>• <white>{distance} blocks away <yellow>{arrow}"
+  validate-heading: "&c&lSTAFF&r &7> <yellow>{type} validation: <white>{count} issue(s) found."
+  validate-valid: "&c&lSTAFF&r &7> <green>{type} configuration is valid."
+  validate-error: "&c&lSTAFF&r &7> <red>{event}</red> <gray>at <white>{path}</white><gray>: "
+  validate-missing: "<red>Required value is missing."
+  validate-invalid-section: "<red>This event must be a YAML section."
+  validate-invalid-type: "<red>Type must be <white>koth</white> or <white>outpost</white>."
+  validate-invalid-id: "<red>ID must use lowercase letters, numbers, underscores, or hyphens."
+  validate-unknown-world: "<red>World <white>{value}</white> is not loaded."
+  validate-number: "<red>Expected a numeric coordinate."
+  validate-volume: "<red>Selection volume <white>{value}</white> exceeds the configured maximum."
+  validate-positive: "<red>Expected a whole number greater than zero."
+  validate-non-negative: "<red>Expected zero or a positive number."
+  validate-list: "<red>Expected a YAML list."
+  validate-time: "<red>Invalid time <white>{value}</white>; use 24-hour HH:mm."
+  validate-booster-multiplier: "<red>Enabled XP boosters must be greater than 1.0."
+  koth:
+    started: "&4&lKOTH &7>&r <red>{name}</red> <gray>is now claimable. <yellow>/koth focus <gray>to get directions."
+    stopped: "&4&lKOTH &7>&r <red>{name}</red> <gray>has ended."
+    timed-out: "&4&lKOTH &7>&r <red>{name}</red> <gray>ended because its time limit expired."
+    uncontested: "&4&lKOTH &7>&r <white>{player}</white> <gray>from <aqua>{faction}</aqua> is uncontested at <red>{name}</red>."
+    claimed: "&4&lKOTH &7>&r <aqua>{faction}</aqua> <gray>has claimed <red>{name}</red>!"
+  outpost:
+    started: "&6&lOUTPOST &7>&r <gold>{name}</gold> <gray>is now claimable. <yellow>/outpost focus <gray>to get directions."
+    stopped: "&6&lOUTPOST &7>&r <gold>{name}</gold> <gray>has ended."
+    timed-out: "&6&lOUTPOST &7>&r <gold>{name}</gold> <gray>ended because its time limit expired."
+    uncontested: "&6&lOUTPOST &7>&r <white>{player}</white> <gray>from <aqua>{faction}</aqua> is uncontested at <gold>{name}</gold>."
+    claimed: "&6&lOUTPOST &7>&r <aqua>{faction}</aqua> <gray>has claimed <gold>{name}</gold>!"

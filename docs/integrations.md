@@ -82,6 +82,18 @@ one is set.
 Without EssentialsX, or for a player with no nickname set, the real
 username is used as before.
 
+## ProtocolLib — optional
+
+Powers the header rows in [grouped-mode tab list](configuration.md#grouped-mode-rank-separated-tab-list)
+(`tablist.grouped.enabled`) — a fake, non-player row showing each
+LuckPerms group's name and online count above its block of players.
+Bukkit has no API for a tab entry that isn't a real connected player, so
+this is the one piece of Vertex that needs a packet library at all.
+
+Without ProtocolLib, grouped mode still works otherwise: every real
+player row is still sorted and grouped by LuckPerms weight correctly,
+there's just no header line above each block.
+
 ## FastAsyncWorldEdit + DecentHolograms — optional, required together
 
 Both are required for the **Blueprint Base Builder**
@@ -90,6 +102,16 @@ Vertex can load and paste a `.schem` file, and DecentHolograms provides
 the required build-progress display. If either is missing, the feature
 is never wired up (logged once at startup, no errors); it isn't a
 partial/degraded mode, it's fully off until both are present.
+
+## Citizens — optional
+
+Powers `pvp.ghost-players`: a player who is kicked or force-disconnected can
+leave behind a killable Citizens NPC. Voluntary logouts use the normal
+combat-log penalty. Vertex does not enable the feature merely because
+Citizens is present; set `pvp.ghost-players.enabled: true` after Citizens
+has been installed. Without Citizens, Vertex logs one clear warning if that
+setting is enabled and continues normally with the existing combat-log
+penalty.
 
 ## Summary table
 
@@ -101,5 +123,7 @@ partial/degraded mode, it's fully off until both are present.
 | LuckPerms | No | Rank display, the Repair ability |
 | PlaceholderAPI | No | `%placeholder%` support in chat/scoreboard templates |
 | EssentialsX | No | Nickname display everywhere a player's name appears |
+| ProtocolLib | No | Header rows in grouped-mode tab list |
 | FastAsyncWorldEdit | No (paired with DecentHolograms) | Loading/pasting Blueprint `.schem` files |
 | DecentHolograms | No (paired with FastAsyncWorldEdit) | Blueprint build-progress display |
+| Citizens | No | Configurable Ghost Player NPCs for forced disconnects |

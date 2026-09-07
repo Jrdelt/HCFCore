@@ -1,0 +1,81 @@
+# ============================================
+# BACKPACKS
+# ============================================
+# A Backpack is an item (not a block) holding its own inventory. Hold one
+# in your offhand and Sneak + Right Click in the air to open its GUI --
+# empty its contents into your inventory, or upgrade it. Each tier uses a
+# Bukkit item type plus CustomModelData, so no custom-item plugin is
+# required. Configure the model values to match your resource pack.
+enabled: true
+
+# Capacity is counted by actual stack amounts, not occupied slots. A full
+# stack of 64 consumes 64 capacity. Each Backpack level increases the item
+# capacity; Backpacks store items only, never experience.
+base-item-capacity: 1250
+item-capacity-per-level: 250
+
+# Normal drops from these blocks are routed into an equipped Backpack.
+# Fortune/Silk Touch are calculated first, then the Backpack bonus applies,
+# so both bonuses stack safely.
+auto-store:
+  mining-materials:
+    - COAL_ORE
+    - DEEPSLATE_COAL_ORE
+    - COPPER_ORE
+    - DEEPSLATE_COPPER_ORE
+    - IRON_ORE
+    - DEEPSLATE_IRON_ORE
+    - GOLD_ORE
+    - DEEPSLATE_GOLD_ORE
+    - REDSTONE_ORE
+    - DEEPSLATE_REDSTONE_ORE
+    - LAPIS_ORE
+    - DEEPSLATE_LAPIS_ORE
+    - DIAMOND_ORE
+    - DEEPSLATE_DIAMOND_ORE
+    - EMERALD_ORE
+    - DEEPSLATE_EMERALD_ORE
+    - NETHER_GOLD_ORE
+    - NETHER_QUARTZ_ORE
+  # Player-killed, non-player mobs route their final drops to the Backpack.
+  mob-drops: true
+
+# Vault economy cost to upgrade a Backpack. Levels 1 through 50 have a
+# gentle multiplier. Starting with the cost after level 50, each level
+# doubles the previous cost. This keeps early progression affordable while
+# making very high levels a meaningful investment.
+upgrade-cost:
+  base: 500.0
+  easy-through-level: 50
+  easy-multiplier: 1.10
+  post-50-multiplier: 2.0
+
+# Each tier is a separate Backpack a player can be given (see
+# /backpack give <player> <tier>). item-type is any Bukkit Material. Its
+# custom-model-data is the positive integer your resource pack assigns to
+# that material's Backpack model. Use 0 for the normal vanilla model.
+# There is no per-tier maximum level: every Backpack can keep upgrading.
+# Every tier starts at a guaranteed +100% auto-collection bonus, so one
+# eligible drop always becomes at least two stored items. Higher tiers keep
+# their advantage through their larger per-level bonus.
+tiers:
+  t1_basic:
+    display-name: '<white>T1 Winter Backpack'
+    item-type: LEATHER
+    custom-model-data: 10001
+    drop-bonus-base-percent: 100.0
+    drop-bonus-per-level-percent: 1.0
+
+  t2_reinforced:
+    display-name: '<aqua>T2 Reinforced Backpack'
+    item-type: LEATHER
+    custom-model-data: 10002
+    drop-bonus-base-percent: 100.0
+    drop-bonus-per-level-percent: 2.0
+
+  t3_corrupted:
+    display-name: '<light_purple>T3 Corrupted Backpack'
+    item-type: LEATHER
+    custom-model-data: 10003
+    drop-bonus-base-percent: 100.0
+    drop-bonus-per-level-percent: 3.75

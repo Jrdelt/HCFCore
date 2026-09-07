@@ -9,7 +9,10 @@ import me.vertex.core.spawner.SpawnerStorage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -181,7 +184,7 @@ public final class StorageMigrator {
                 java.util.regex.Matcher matcher = TYPE_LINE.matcher(line);
                 if (matcher.matches()) {
                     lines.set(i, matcher.group(1) + "type: " + type + matcher.group(3));
-                    Files.write(configFile.toPath(), lines, StandardCharsets.UTF_8);
+                    writeAtomically(configFile.toPath(), lines);
                     return;
                 }
             } else if (withoutComment.stripTrailing().equals("storage:")) {
@@ -193,7 +196,34 @@ public final class StorageMigrator {
         lines.add("");
         lines.add("storage:");
         lines.add("  type: " + type);
-        Files.write(configFile.toPath(), lines, StandardCharsets.UTF_8);
+        writeAtomically(configFile.toPath(), lines);
+    }
+
+    /**
+     * Saves an edited configuration as a complete sibling file before a
+     * single atomic replacement. A power loss can therefore leave either
+     * the old, valid config or the new, valid config -- never a truncated
+     * halfway-written one.
+     */
+    private static void writeAtomically(java.nio.file.Path target, List<String> lines) throws IOException {
+        java.nio.file.Path absoluteTarget = target.toAbsolutePath();
+        java.nio.file.Path directory = absoluteTarget.getParent();
+        if (directory == null) {
+            throw new IOException("Cannot determine parent directory for " + target);
+        }
+        java.nio.file.Path temporary = Files.createTempFile(directory,
+                absoluteTarget.getFileName().toString() + ".", ".tmp");
+        try {
+            Files.write(temporary, lines, StandardCharsets.UTF_8,
+                    StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+            try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.WRITE)) {
+                channel.force(true);
+            }
+            Files.move(temporary, absoluteTarget,
+                    StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
     }
 
     private static final java.util.regex.Pattern TYPE_LINE =

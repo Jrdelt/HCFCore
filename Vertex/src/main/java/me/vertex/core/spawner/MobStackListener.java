@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.BiFunction;
 import java.util.Random;
 
 /**
@@ -47,6 +48,7 @@ import java.util.Random;
  * "no EXP unless it dies directly to a player" rule.
  */
 public final class MobStackListener implements Listener {
+    private volatile BiFunction<Player, List<ItemStack>, List<ItemStack>> playerDropRouter;
 
     private final Plugin plugin;
     private final SpawnerManager spawnerManager;
@@ -59,6 +61,11 @@ public final class MobStackListener implements Listener {
         this.spawnerManager = spawnerManager;
         this.stackCountKey = new NamespacedKey(plugin, "mob_stack_count");
         this.spawnerMobKey = new NamespacedKey(plugin, "spawner_mob_type");
+    }
+
+    /** Lets a later-initialized feature (Backpacks) route peeled player-kill drops. */
+    public void setPlayerDropRouter(BiFunction<Player, List<ItemStack>, List<ItemStack>> playerDropRouter) {
+        this.playerDropRouter = playerDropRouter;
     }
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
@@ -300,6 +307,10 @@ public final class MobStackListener implements Listener {
                 ? spawnerManager.rollDrops(mob.getType())
                 : rollNaturalDrops(mob, attacker);
 
+        BiFunction<Player, List<ItemStack>, List<ItemStack>> router = playerDropRouter;
+        if (router != null) {
+            drops = router.apply(attacker, drops);
+        }
         for (ItemStack drop : drops) {
             mob.getWorld().dropItemNaturally(mob.getLocation(), drop);
         }

@@ -13,6 +13,9 @@ import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -81,6 +84,7 @@ public final class NametagManager {
                 task.cancel();
                 task = null;
             }
+            clearVertexTeams();
             return;
         }
         if (!wasEnabled || task == null) {
@@ -116,9 +120,44 @@ public final class NametagManager {
         task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::updateAllNametags, 20, updateIntervalTicks);
     }
 
+    /**
+     * The naive version of this is O(players^2): for every subject, push
+     * their nametag to every viewer. At real HCF player counts that's the
+     * single most expensive thing this plugin does on a tick. Two things
+     * make it cheap in practice without changing what's rendered:
+     *
+     * <p>1. A subject's own faction id/name only depends on the subject,
+     * not the viewer -- computed once per subject here, not once per
+     * (subject, viewer) pair like {@link #buildPrefix} used to.
+     *
+     * <p>2. The rendered prefix (color + rank + faction name) is fully
+     * determined by the pair (viewer's faction, subject's faction) -- every
+     * subject sharing a faction gets byte-for-byte the same prefix for a
+     * given viewer. Real servers cluster players into far fewer factions
+     * than players, so caching the built {@link Component} per subject
+     * faction id, once per viewer per cycle, turns what used to be one
+     * MiniMessage parse and one relation lookup per player pair into one
+     * per (viewer, distinct online faction) pair instead.
+     */
     private void updateAllNametags() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            updatePlayerNametag(player);
+        Collection<? extends Player> online = Bukkit.getOnlinePlayers();
+        List<SubjectInfo> subjects = new ArrayList<>(online.size());
+        for (Player subject : online) {
+            int factionId = FactionsHook.getFactionId(subject);
+            String factionName = FactionsHook.getFactionName(factionId);
+            subjects.add(new SubjectInfo(subject, teamName(subject.getUniqueId()), factionId, factionName));
+            playerStates.put(subject.getUniqueId().toString(), new PlayerNametagState(factionId, factionName));
+        }
+
+        for (Player viewer : online) {
+            int viewerFactionId = FactionsHook.getFactionId(viewer);
+            Scoreboard board = viewer.getScoreboard();
+            Map<Integer, Component> prefixCache = new HashMap<>();
+            for (SubjectInfo info : subjects) {
+                Component prefix = prefixCache.computeIfAbsent(info.factionId(),
+                        fid -> buildPrefix(viewerFactionId, fid, info.factionName()));
+                applyTeamPrefix(board, info.teamName(), info.player(), prefix);
+            }
         }
     }
 
@@ -130,6 +169,10 @@ public final class NametagManager {
      * viewer's own faction changing, or a relation between two factions
      * changing, needs the same re-apply even when the subject's faction
      * itself didn't move.
+     *
+     * <p>Called per-player on join/faction-change, not on the bulk tick --
+     * {@link #updateAllNametags()} has its own, more heavily cached path
+     * for the every-tick case.
      */
     public void updatePlayerNametag(Player subject) {
         String subjectId = subject.getUniqueId().toString();
@@ -140,6 +183,9 @@ public final class NametagManager {
             applyToViewer(viewer, subject, teamName, factionId, factionName);
         }
         playerStates.put(subjectId, new PlayerNametagState(factionId, factionName));
+    }
+
+    private record SubjectInfo(Player player, String teamName, int factionId, String factionName) {
     }
 
     /**
@@ -168,7 +214,12 @@ public final class NametagManager {
     }
 
     private void applyToViewer(Player viewer, Player subject, String teamName, int subjectFactionId, String subjectFactionName) {
-        Scoreboard board = viewer.getScoreboard();
+        applyTeamPrefix(viewer.getScoreboard(), teamName, subject,
+                buildPrefix(FactionsHook.getFactionId(viewer), subjectFactionId, subjectFactionName));
+    }
+
+    /** Registers `subject`'s team on `board` if needed and sets its prefix -- no relation lookup here. */
+    private void applyTeamPrefix(Scoreboard board, String teamName, Player subject, Component prefix) {
         Team team = board.getTeam(teamName);
         if (team == null) {
             team = board.registerNewTeam(teamName);
@@ -176,7 +227,7 @@ public final class NametagManager {
             team.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.ALWAYS);
             team.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
         }
-        team.prefix(buildPrefix(viewer, subjectFactionId, subjectFactionName));
+        team.prefix(prefix);
         team.color(NamedTextColor.WHITE);
     }
 
@@ -190,9 +241,8 @@ public final class NametagManager {
      * could) because each team lives on the *viewer's own* scoreboard
      * object -- see this class's top-level doc.
      */
-    private Component buildPrefix(Player viewer, int subjectFactionId, String subjectFactionName) {
+    private Component buildPrefix(int viewerFactionId, int subjectFactionId, String subjectFactionName) {
         String ftop = subjectFactionId == FactionsHook.NO_FACTION ? "-" : String.valueOf(FactionsHook.getFactionRank(subjectFactionId));
-        int viewerFactionId = FactionsHook.getFactionId(viewer);
         NamedTextColor relationColor;
         if (viewerFactionId != FactionsHook.NO_FACTION && viewerFactionId == subjectFactionId) {
             relationColor = sameFactionColor;
@@ -239,6 +289,11 @@ public final class NametagManager {
     }
 
     public void shutdown() {
+        clearVertexTeams();
+    }
+
+    /** Removes only Vertex relation teams, preserving teams owned by other plugins. */
+    private void clearVertexTeams() {
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             for (Team team : new ArrayList<>(viewer.getScoreboard().getTeams())) {
                 if (team.getName().startsWith(TEAM_PREFIX)) {

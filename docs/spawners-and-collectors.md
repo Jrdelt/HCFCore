@@ -150,10 +150,11 @@ in `lang/*.yml`. `collector.item-name` is the name written to the actual
 Collector item, both when `/chunkcollector give` grants one and when a
 placed Collector is broken.
 
-`max-stored-material-types` (default 64) bounds how many distinct item
-types can be written into one block's PDC. Once that cap is reached,
-already-stored materials continue collecting normally; a new material is
-left on the ground instead of risking oversized chunk metadata.
+`max-stored-material-types` is fixed at **24**, matching all 24 material
+slots in the GUI. Once that cap is reached, a tagged farm drop of a new
+material type is destroyed instead of being left on the ground; this bounds
+PDC growth and prevents item-entity lag. Already-stored materials continue
+collecting normally.
 
 Malformed Collector PDC values are normalized on read: tier, per-item
 counts, total capacity, and distinct type count are capped by the active

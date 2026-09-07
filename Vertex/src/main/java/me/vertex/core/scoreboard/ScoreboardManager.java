@@ -2,11 +2,8 @@ package me.vertex.core.scoreboard;
 
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.ability.AbilityManager;
-import me.vertex.core.economy.EconomyHook;
-import me.vertex.core.essentials.EssentialsHook;
 import me.vertex.core.lang.MessageFormatter;
-import me.vertex.core.luckperms.LuckPermsHook;
-import me.vertex.core.placeholderapi.PlaceholderApiHook;
+import me.vertex.core.lang.PlaceholderResolver;
 import me.vertex.core.staff.StaffManager;
 import me.vertex.core.user.UserManager;
 import io.papermc.paper.scoreboard.numbers.NumberFormat;
@@ -208,27 +205,7 @@ public final class ScoreboardManager {
 
     private String resolvePlaceholders(Player player, String template, int onlineCount, String factionTop) {
         Map<String, String> custom = customPlaceholders.getOrDefault(player.getUniqueId(), Map.of());
-        String rank = template.contains("{rank") ? LuckPermsHook.getPrimaryGroupDisplayName(player) : null;
-        String rankPrefix = rank == null || rank.isBlank() ? "" : "[" + rank + "] ";
-        String prefix = template.contains("{prefix}") ? LuckPermsHook.getPrefix(player) : null;
-        String resolved = template
-                .replace("{date}", LocalDate.now().format(dateFormatter))
-                .replace("{online}", String.valueOf(onlineCount))
-                .replace("{name}", EssentialsHook.resolveName(player))
-                .replace("{rank_prefix}", rankPrefix)
-                .replace("{rank}", rank == null ? "" : rank)
-                .replace("{prefix}", prefix == null ? "" : prefix)
-                .replace("{exp}", String.valueOf(player.getLevel()))
-                .replace("{balance}", EconomyHook.getBalance(player))
-                .replace("{faction}", FactionsHook.getFactionTag(player))
-                .replace("{faction_role}", FactionsHook.getRoleName(player))
-                .replace("{ftop}", factionTop == null ? "" : factionTop)
-                .replace("{power}", FactionsHook.getFactionPower(player))
-                .replace("{fplayers_online}", FactionsHook.getOnlineFactionCount(player))
-                .replace("{repair}", custom.getOrDefault("repair", ""));
-        // Applied last so a template can mix the {curly} placeholders above
-        // with any %percent% PlaceholderAPI expansion (e.g. %luckperms_prefix%).
-        return PlaceholderApiHook.apply(player, resolved);
+        return PlaceholderResolver.resolve(player, template, onlineCount, factionTop, dateFormatter, custom);
     }
 
     private static String[] buildEntryCodes() {

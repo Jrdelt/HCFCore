@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.util.concurrent.TimeUnit;
+import java.util.Comparator;
 import java.util.logging.Level;
 
 /**
@@ -63,8 +64,8 @@ public final class LuckPermsHook {
         if (user == null) {
             return null;
         }
-        String groupName = user.getPrimaryGroup();
-        Group group = api.getGroupManager().getGroup(groupName);
+        Group group = highestWeightGroup(api, user);
+        String groupName = group == null ? user.getPrimaryGroup() : group.getName();
         String displayName = group == null ? null : group.getDisplayName();
         if (displayName != null) {
             return displayName;
@@ -93,6 +94,50 @@ public final class LuckPermsHook {
         }
         String prefix = user.getCachedData().getMetaData().getPrefix();
         return prefix == null || prefix.isBlank() ? null : prefix;
+    }
+
+    /**
+     * The player's primary group's id, display name, and weight, resolved
+     * in one LuckPerms lookup -- for callers (the grouped tab list) that
+     * need all three together every render tick, rather than paying for
+     * {@link #getPrimaryGroupDisplayName} and a separate weight lookup
+     * each. Null under the same conditions as {@link #getPrimaryGroupDisplayName}:
+     * LuckPerms missing, no loaded user, or the group is LuckPerms' own
+     * unconfigured "default" base group.
+     */
+    public record GroupInfo(String id, String displayName, int weight) {
+    }
+
+    public static GroupInfo getPrimaryGroupInfo(Player player) {
+        if (!isAvailable()) {
+            return null;
+        }
+        LuckPerms api = LuckPermsProvider.get();
+        User user = api.getUserManager().getUser(player.getUniqueId());
+        if (user == null) {
+            return null;
+        }
+        Group group = highestWeightGroup(api, user);
+        String groupId = group == null ? user.getPrimaryGroup() : group.getName();
+        if ("default".equalsIgnoreCase(groupId)) {
+            return null;
+        }
+        String displayName = group == null ? null : group.getDisplayName();
+        int weight = group == null ? 0 : group.getWeight().orElse(0);
+        return new GroupInfo(groupId, displayName == null ? groupId : displayName, weight);
+    }
+
+    /**
+     * LuckPerms' primary group is administrator-selectable and need not be
+     * the rank that should win a visual sort. Vertex consistently uses the
+     * highest inherited group weight for tab ordering and rank display.
+     */
+    private static Group highestWeightGroup(LuckPerms api, User user) {
+        return user.getInheritedGroups(user.getQueryOptions()).stream()
+                .filter(group -> !"default".equalsIgnoreCase(group.getName()))
+                .max(Comparator.<Group>comparingInt(group -> group.getWeight().orElse(0))
+                        .thenComparing(Group::getName, String.CASE_INSENSITIVE_ORDER))
+                .orElse(null);
     }
 
     private static void grant(Plugin plugin, Player player, String permissionNode, long seconds) {

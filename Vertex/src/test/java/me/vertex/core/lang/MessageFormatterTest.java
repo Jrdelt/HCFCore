@@ -21,4 +21,9 @@ class MessageFormatterTest {
         String plain = PlainTextComponentSerializer.plainText().serialize(component);
         assertEquals("Vertex -> hi", plain);
     }
+
+    @Test
+    void plainRemovesMiniMessageFormattingFromAConfiguredName() {
+        assertEquals("Bunker Blueprint", MessageFormatter.plain("<red>Bunker Blueprint"));
+    }
 }

@@ -69,6 +69,10 @@ public final class MageSpellListener implements Listener {
             attacker.sendMessage(messages.get(attacker, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
             return;
         }
+        if (AbilityGate.isCaptureZoneDisabled(attacker.getLocation())) {
+            attacker.sendMessage(messages.get(attacker, "ability.region-blocked"));
+            return;
+        }
         Set<String> disabledRegions = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-regions"));
         if (WorldGuardHook.isInDisabledRegion(attacker, disabledRegions)) {
             attacker.sendMessage(messages.get(attacker, "ability.region-blocked"));

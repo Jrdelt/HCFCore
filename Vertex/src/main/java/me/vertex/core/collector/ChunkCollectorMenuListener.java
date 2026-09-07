@@ -5,9 +5,9 @@ import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.faction.RallyManager;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.staff.StaffManager;
+import me.vertex.core.util.ChatAmountPrompt;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -15,60 +15,47 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.inventory.ItemStack;
 
-/** Handles collector withdrawals, amount entry, and upgrades. */
+/**
+ * Handles collector withdrawals and upgrades.
+ *
+ * <p>The withdrawal amount is typed in chat via {@link ChatAmountPrompt},
+ * not an anvil GUI. An anvil's rename-text field was tried first, but
+ * reading it back reliably at click time turned out to depend on several
+ * pieces of vanilla anvil state (repair cost, the result item's own PDC,
+ * whether the field had just been reset by the client taking the result)
+ * that never converged on something dependably correct across clients.
+ * Chat has none of that: a message is either delivered to the listener or
+ * it isn't, with no client-side container state to fall out of sync with.
+ */
 public final class ChunkCollectorMenuListener implements Listener {
 
     private final ChunkCollectorManager manager;
     private final StaffManager staffManager;
     private final Messages messages;
     private final RallyManager rolePermissions;
+    private final ChatAmountPrompt chatAmountPrompt;
 
     public ChunkCollectorMenuListener(ChunkCollectorManager manager, StaffManager staffManager, Messages messages,
-            RallyManager rolePermissions) {
+            RallyManager rolePermissions, ChatAmountPrompt chatAmountPrompt) {
         this.manager = manager;
         this.staffManager = staffManager;
         this.messages = messages;
         this.rolePermissions = rolePermissions;
+        this.chatAmountPrompt = chatAmountPrompt;
     }
 
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
-        if (event.getInventory().getHolder() instanceof ChunkCollectorMenu.Holder
-                || event.getInventory().getHolder() instanceof CollectorWithdrawAmountMenu.Holder) {
+        if (event.getInventory().getHolder() instanceof ChunkCollectorMenu.Holder) {
             event.setCancelled(true);
         }
-    }
-
-    @EventHandler
-    public void onPrepareAnvil(PrepareAnvilEvent event) {
-        if (!(event.getInventory().getHolder() instanceof CollectorWithdrawAmountMenu.Holder holder)
-                || !(event.getView().getPlayer() instanceof Player player)) {
-            return;
-        }
-        Long amount = CollectorWithdrawAmountMenu.readAmount(event.getView(), event.getInventory());
-        holder.setLastPreparedAmount(amount);
-        event.setResult(CollectorWithdrawAmountMenu.confirmButton(player, holder.messages(), amount));
-        // Set after the result, not before: some Paper builds recompute a
-        // fresh repair cost from the new result item when setResult() runs,
-        // silently undoing an override applied earlier in the handler.
-        event.getView().setRepairCost(0);
-        event.getView().setMaximumRepairCost(CollectorWithdrawAmountMenu.FREE_ANVIL_MAX_COST);
     }
 
     @EventHandler
     public void onClick(InventoryClickEvent event) {
         Object rawHolder = event.getInventory().getHolder();
-        if (rawHolder instanceof CollectorWithdrawAmountMenu.Holder amountHolder) {
-            event.setCancelled(true);
-            if (event.getRawSlot() == CollectorWithdrawAmountMenu.SLOT_RESULT
-                    && event.getWhoClicked() instanceof Player player) {
-                completeAmountWithdrawal(player, event, amountHolder);
-            }
-            return;
-        }
         if (!(rawHolder instanceof ChunkCollectorMenu.Holder holder)) {
             return;
         }
@@ -106,46 +93,36 @@ public final class ChunkCollectorMenuListener implements Listener {
                 withdraw(player, location, data, clicked.getType(), manager.shiftWithdrawAmount());
                 refresh(player, location);
             } else {
-                CollectorWithdrawAmountMenu.open(player, messages, location, clicked.getType());
+                promptForAmount(player, location, clicked.getType(), data.stored(clicked.getType()));
             }
         }
     }
 
-    private void completeAmountWithdrawal(Player player, InventoryClickEvent event,
-                                          CollectorWithdrawAmountMenu.Holder holder) {
-        // The result item has the parsed amount embedded in its PDC. This
-        // survives the vanilla anvil clearing its rename field while the
-        // result is clicked; only use text/cache fallbacks for API mocks or
-        // another plugin that replaced the result item.
-        Long amount = CollectorWithdrawAmountMenu.confirmedAmount(event.getCurrentItem());
-        if (amount == null) {
-            amount = CollectorWithdrawAmountMenu.readAmount(event.getView(), event.getInventory());
-        }
-        if (amount == null) {
-            amount = holder.lastPreparedAmount();
-        }
-        if (amount == null) {
-            player.sendMessage(messages.get(player, "collector.withdraw-invalid"));
-            return;
-        }
-        Location location = holder.location();
+    private void promptForAmount(Player player, Location location, Material material, long stored) {
+        player.closeInventory();
+        chatAmountPrompt.request(player,
+                messages.get(player, "collector.withdraw-chat-prompt",
+                        "item", material.name(), "available", String.format("%,d", stored)),
+                amount -> handleTypedWithdrawal(player, location, material, amount),
+                () -> { });
+    }
+
+    private void handleTypedWithdrawal(Player player, Location location, Material material, long amount) {
         ChunkCollectorData data = manager.readData(location);
         if (data == null) {
-            player.closeInventory();
             return;
         }
         if (!canAccess(player, location, data)) {
-            player.closeInventory();
             return;
         }
-        long stored = data.stored(holder.material());
+        long stored = data.stored(material);
         if (amount > stored) {
             player.sendMessage(messages.get(player, "collector.withdraw-too-many",
                     "available", String.format("%,d", stored)));
             return;
         }
-        withdraw(player, location, data, holder.material(), amount);
-        Bukkit.getScheduler().runTask(manager.plugin(), () -> refresh(player, location));
+        withdraw(player, location, data, material, amount);
+        refresh(player, location);
     }
 
     private boolean canAccess(Player player, Location location, ChunkCollectorData data) {

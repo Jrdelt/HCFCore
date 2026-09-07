@@ -16,6 +16,31 @@ tagged:
 - Disconnecting while tagged counts as a combat log if
   `pvp.logout-penalty` is true.
 
+## Ghost Players (Citizens)
+
+With [Citizens](integrations.md#citizens--optional) installed, Vertex can
+replace the instant combat-log death with a killable NPC. Enable
+`pvp.ghost-players.enabled` to use it. Ghosts are created only for server
+kicks or forced disconnects; a voluntary logout always receives the normal
+combat-logout penalty. By default a forced disconnect also needs an active
+Vertex combat tag; set `combat-tagged-only: false` to allow every forced
+disconnect in the allowed worlds.
+
+The disconnected player's inventory, armor, offhand, and cursor item are
+saved to `plugins/Vertex/ghost-players.yml` and removed from their real
+player data before the NPC becomes vulnerable. If the NPC dies, those exact
+items drop once and its owner dies on their next login. If the owner returns
+while it is alive, Vertex removes the NPC and restores the saved items. The
+pending-record step also makes an interrupted save/restart resolve safely:
+the player gets their saved inventory back rather than duplicating or losing
+it.
+
+`npc-type` accepts a living Bukkit entity type, although `PLAYER` is the
+intended choice for a player-looking Citizens NPC. `allowed-worlds: []`
+means all worlds. `despawn-after-seconds: 0` keeps a ghost until it is killed
+or its owner returns; a positive value removes an untouched ghost and safely
+restores its inventory when the owner next joins.
+
 **Landing a kill** shortens the killer's *own* tag down to
 `pvp.post-kill-combat-seconds` (default 5s) instead of leaving them stuck
 out the full duration — enough time to loot the body and retreat. This
@@ -23,6 +48,20 @@ only shortens an existing tag; a kill can't start one that wasn't already
 there. Dying clears the victim's tag entirely without touching the
 killer's, so the killer's shortened cooldown always survives the death
 that caused it.
+
+## Loot protection and death messages
+
+When a player kills another player, the victim's dropped items are marked
+for the killer alone for `pvp.loot-protection.seconds` (20 seconds by
+default). Everyone else is prevented from picking them up until the timer
+ends; the killer's pickup removes the temporary marker immediately, so the
+item can be traded or dropped normally afterwards. Set
+`pvp.loot-protection.enabled: false` or `seconds: 0` to disable it.
+
+All Vertex death announcements are configurable under the `death:` section
+of `lang/en_us.yml`: player kills, lava, fire, falls, void, drowning,
+suffocation, and a generic fallback. Available placeholders are `{victim}`,
+`{killer}`, and `{cause}`.
 
 ### Action bar
 
@@ -112,7 +151,6 @@ specifically for healing potions so it doesn't feel like a coin flip.
 | `disable-sweeping-attacks` | Removes axe sweep damage entirely. |
 | `legacy-weapon-damage` + `weapon-damage` table | Overrides a weapon's base attack damage with a flat value per material (e.g. diamond sword 8.0 vs. diamond axe 6.0) instead of the modern attribute-based amount. A material left out of the table keeps its normal damage. Enchantments, potion effects, and armor still apply normally on top. |
 | `legacy-armor-calculations` | Cancels the armor toughness modern armor carries (the mechanic that gives diminishing returns against big hits), so armor reduction goes back to a flat, predictable percentage. |
-| `disable-offhand` | Blocks putting anything into the offhand slot — no dual-wielding, no shields. |
 | `projectile-knockback` (`fishing-rod`/`snowball`/`egg`) | Restores those hits pushing the target even though they deal no damage, which modern Minecraft removed. |
 | `knockback` (`horizontal`/`vertical`/`sprint-bonus`) | Overrides vanilla's own knockback on every melee hit and every enabled projectile hit above. |
 | `legacy-health-regen` | Replaces vanilla's fast, saturation-boosted regen with a flat 1 heart every 4 seconds (still gated on food level 18+, same as vanilla's own natural-regen requirement). |

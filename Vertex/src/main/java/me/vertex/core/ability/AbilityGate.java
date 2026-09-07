@@ -6,12 +6,14 @@ import me.vertex.core.user.User;
 import me.vertex.core.user.UserManager;
 import me.vertex.core.worldguard.WorldGuardHook;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Shared cooldown/global-cooldown/region gate for the right-click-triggered
@@ -22,7 +24,19 @@ import java.util.Set;
  */
 public final class AbilityGate {
 
+    /** Installed by CaptureEventManager; false until capture support starts. */
+    private static volatile Predicate<Location> captureZoneDisabled = ignored -> false;
+
     private AbilityGate() {
+    }
+
+    public static void setCaptureZoneDisabled(Predicate<Location> checker) {
+        captureZoneDisabled = checker == null ? ignored -> false : checker;
+    }
+
+    /** Used by hit-triggered abilities that do not call {@link #checkAndStart}. */
+    public static boolean isCaptureZoneDisabled(Location location) {
+        return location != null && captureZoneDisabled.test(location);
     }
 
     public static boolean isAbility(Plugin plugin, ItemStack item, String abilityId) {
@@ -60,6 +74,11 @@ public final class AbilityGate {
         if (abilityManager.isOnCooldown(user, ability)) {
             long remaining = (abilityManager.remainingCooldownMillis(user, ability) + 999) / 1000;
             player.sendMessage(messages.get(player, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
+            return false;
+        }
+
+        if (isCaptureZoneDisabled(player.getLocation())) {
+            player.sendMessage(messages.get(player, "ability.region-blocked"));
             return false;
         }
 

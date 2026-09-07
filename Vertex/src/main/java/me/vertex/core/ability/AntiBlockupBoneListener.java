@@ -67,12 +67,17 @@ public final class AntiBlockupBoneListener implements Listener {
             return;
         }
         User user = userManager.get(attacker.getUniqueId());
-        if (user == null && userManager.hasFailedLoad(attacker.getUniqueId())) {
+        // Cooldowns are persisted on User. Never consume the ability or
+        // apply its effect until the player's async profile has loaded.
+        if (user == null) {
             return;
         }
-        if (user != null && abilityManager.isOnCooldown(user, ability)) {
+        if (abilityManager.isOnCooldown(user, ability)) {
             long remaining = (abilityManager.remainingCooldownMillis(user, ability) + 999) / 1000;
             attacker.sendMessage(messages.get(attacker, "ability.on-cooldown", "seconds", String.valueOf(remaining)));
+            return;
+        }
+        if (AbilityGate.isCaptureZoneDisabled(attacker.getLocation())) {
             return;
         }
         Set<String> disabledRegions = Set.copyOf(plugin.getConfig().getStringList("abilities.disabled-regions"));
@@ -92,9 +97,7 @@ public final class AntiBlockupBoneListener implements Listener {
         }
 
         abilityManager.markGlobalCooldown(attacker.getUniqueId());
-        if (user != null) {
-            abilityManager.startCooldown(attacker, user, ability);
-        }
+        abilityManager.startCooldown(attacker, user, ability);
         ItemStack item = attacker.getInventory().getItemInMainHand();
         if (item == null || item.getType().isAir()) {
             return;

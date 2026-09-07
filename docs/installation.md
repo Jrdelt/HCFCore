@@ -91,7 +91,8 @@ other one:
    creating the target's tables first if needed. The copy runs off the main
    thread, so the server doesn't hang.
 2. It writes `storage.type` into `config.yml`, editing only that one line
-   so your comments survive.
+   so your comments survive. The change is staged in a sibling temporary
+   file and atomically replaced, so a crash cannot truncate the config.
 3. **Restart the server** to actually start using the new backend. The
    switch is not hot-swapped; until the restart, the old backend is still
    the live one, so nothing is lost if the copy went wrong.

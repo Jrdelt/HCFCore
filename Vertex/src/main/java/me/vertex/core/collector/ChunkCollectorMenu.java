@@ -18,13 +18,13 @@ import java.util.List;
 
 /**
  * Opened by right-clicking a tracked Chunk Collector. 27 slots: one per
- * stored item type, a summary icon (tier + aggregate totals), and an
- * upgrade button.
+ * stored item type (up to the fixed 24-type safety cap), a summary icon
+ * (tier + aggregate totals), and an upgrade button.
  */
 public final class ChunkCollectorMenu {
 
     public static final int SIZE = 27;
-    public static final int SUMMARY_SLOT = 22;
+    public static final int SUMMARY_SLOT = 24;
     public static final int UPGRADE_SLOT = 26;
 
     private ChunkCollectorMenu() {
