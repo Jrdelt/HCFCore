@@ -192,7 +192,7 @@ not cover several high-risk persistence and packet-race paths below.
   until the next restart, when it reverts. Serialize or version writes per
   material.
 
-- **[high] The native TNT-bank migration can permanently lose TNT.** It clears
+- **[FIXED] The native TNT-bank migration can permanently lose TNT.** It clears
   FactionsUUID's native balance before the asynchronous Vertex deposit is
   confirmed, then writes the migration marker even when a deposit returned
   `false` rather than throwing. A crash or database failure can therefore

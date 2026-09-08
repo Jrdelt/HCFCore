@@ -53,8 +53,14 @@ public final class FactionBankManager implements Listener {
      * no save hook and a ceiling read from FactionsUUID's own config, which
      * a Vertex capacity upgrade cannot influence. Without this migration the
      * switchover would read every faction's existing TNT as zero and quietly
-     * destroy it. The native value is cleared as it is copied so the two
-     * banks can never both claim the same TNT.
+     * destroy it.
+     *
+     * <p>Each faction's TNT is committed to Vertex storage <em>before</em> its
+     * native value is cleared, so the two banks can never both claim the same
+     * TNT and a failed write can never leave neither holding it. If any
+     * faction cannot be migrated the completion marker is not written, so the
+     * next start retries -- factions already moved have a zero native balance
+     * and are skipped, which makes a repeat run harmless.
      */
     public void migrateNativeTntBanks() {
         File marker = new File(plugin.getDataFolder(), ".tnt-bank-migrated");
@@ -62,25 +68,67 @@ public final class FactionBankManager implements Listener {
             return;
         }
         int migrated = 0;
+        int failed = 0;
         for (Faction faction : Factions.factions().all()) {
             int nativeTnt = faction.tntBank();
             if (nativeTnt <= 0) {
                 continue;
             }
+            // Durable in Vertex first, native value cleared only afterwards.
+            // Clearing first meant a failed or crashed write left both stores
+            // empty, and the TNT was simply gone.
+            if (!storeDurably(faction.id(), nativeTnt)) {
+                // Native value deliberately left intact so the TNT still
+                // exists somewhere and the next start can try again.
+                plugin.getLogger().severe("Could not move faction " + faction.id() + "'s " + nativeTnt
+                        + " TNT into Vertex storage. Its native balance has been left untouched;"
+                        + " the migration will retry on the next start.");
+                failed++;
+                continue;
+            }
             faction.tntBank(0);
-            depositTnt(faction.id(), nativeTnt, Long.MAX_VALUE);
             migrated++;
         }
-        awaitWrites();
+
+        if (migrated > 0) {
+            plugin.getLogger().info("Moved " + migrated + " faction TNT bank(s) from FactionsUUID into Vertex storage.");
+        }
+        if (failed > 0) {
+            // No marker: an incomplete migration must be allowed to run again,
+            // or the factions it skipped would keep a native balance Vertex
+            // never reads and nothing would ever reconcile them.
+            plugin.getLogger().severe(failed + " faction TNT bank(s) could not be migrated, so the migration"
+                    + " has NOT been marked complete and will run again next start.");
+            return;
+        }
         try {
             if (!marker.createNewFile()) {
-                plugin.getLogger().warning("Could not mark the TNT bank migration complete; it may repeat next start.");
+                plugin.getLogger().warning("Could not mark the TNT bank migration complete; it may repeat next start."
+                        + " That is safe -- already-migrated factions have a zero native balance and are skipped.");
             }
         } catch (IOException e) {
             plugin.getLogger().log(Level.WARNING, "Could not write the TNT bank migration marker.", e);
         }
-        if (migrated > 0) {
-            plugin.getLogger().info("Moved " + migrated + " faction TNT bank(s) from FactionsUUID into Vertex storage.");
+    }
+
+    /**
+     * Waits for one faction's migrated TNT to actually be committed.
+     *
+     * <p>Deliberately blocking: this runs once at startup, before players can
+     * join, and the whole point is to know the TNT is safely stored before the
+     * only other copy of it is erased. {@code depositTnt} reports true only
+     * after its database write succeeded, so a true here means durable.
+     */
+    private boolean storeDurably(int factionId, int amount) {
+        try {
+            return Boolean.TRUE.equals(
+                    depositTnt(factionId, amount, Long.MAX_VALUE).get(15, TimeUnit.SECONDS));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Failed while storing migrated TNT for faction " + factionId, e);
+            return false;
         }
     }
 

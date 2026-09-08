@@ -160,8 +160,14 @@ TNT bank. The native bank is an unsaved in-memory field whose ceiling comes
 from FactionsUUID's own config, which meant deposits could be lost on
 restart and no Vertex upgrade could raise the cap. On the first start after
 upgrading, any balance still sitting in the native bank is moved into
-Vertex's storage once and cleared from the native field, so nothing is lost
-and the two can never both claim the same TNT.
+Vertex's storage.
+
+Each faction's TNT is **committed to Vertex before its native value is
+cleared**, so the two banks can never both claim the same TNT and a failed
+write can never leave neither holding it. If any faction cannot be migrated,
+its native balance is left untouched and the migration is not marked
+complete — the next start retries it. Factions already moved have a zero
+native balance and are skipped, so a repeat run is harmless.
 
 A faction's TNT ceiling starts at `faction-upgrades.tnt-base-capacity`
 (default 1,000,000) and is raised by the **TNT Bank** faction upgrade. That

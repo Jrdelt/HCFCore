@@ -112,4 +112,28 @@ class FactionBankManagerTest {
         assertEquals(60L, reloaded.experience(FACTION));
         assertEquals(12L, reloaded.tnt(FACTION));
     }
+
+    /**
+     * The guarantee the TNT-bank migration is built on: a deposit reports
+     * true only once it is durable. The migration clears FactionsUUID's
+     * native balance on the strength of that answer, so a false here is what
+     * stops the TNT being erased from both stores.
+     */
+    @Test
+    void aDepositThatCannotBePersistedReportsFailure() throws Exception {
+        database.close();
+
+        assertFalse(manager.depositTnt(FACTION, 500L, 1_000_000L).get(),
+                "an unpersisted deposit must not claim success");
+    }
+
+    @Test
+    void aFailedDepositLeavesTheBalanceAlone() throws Exception {
+        assertTrue(manager.depositTnt(FACTION, 100L, 1_000_000L).get());
+        database.close();
+
+        assertFalse(manager.depositTnt(FACTION, 900L, 1_000_000L).get());
+        assertEquals(100L, manager.tnt(FACTION), "the in-memory value must not move without a durable write");
+    }
+
 }
