@@ -1,0 +1,95 @@
+# The /boosters screens.
+#
+# Every visual property here is yours to change: size, title, slots,
+# materials, custom model data, names, lore, and click sounds. Names and lore
+# accept MiniMessage and legacy &-codes.
+#
+# Placeholders are filled by the plugin. {sources} is a *block* placeholder:
+# a lore line containing only {sources} is replaced by one line per booster
+# source, however many that turns out to be. The small-caps styling is just
+# text in this file -- replace it with normal letters if you prefer. Values
+# substituted into a placeholder are never restyled, so a player or faction
+# name always renders exactly as it is.
+
+size: 27
+title: "ʙᴏᴏsᴛᴇʀs"
+
+# Alternate titles for the same menu's other screens.
+titles:
+  inspect: "ʙᴏᴏsᴛᴇʀs: {player}"
+  detail: "{category}"
+
+# Re-renders while open, so a bonus that expires is not left on screen.
+# Set to 0 to disable live refreshing entirely.
+refresh-ticks: 20
+
+filler:
+  enabled: false
+  material: GRAY_STAINED_GLASS_PANE
+  name: " "
+
+items:
+  # One per booster category. Rendered five times from this one template, so
+  # it has no slot or material of its own -- the plugin supplies both.
+  # Available: {category} {sources} {effective} {raw} {cap}
+  category:
+    name: "{category}"
+    lore:
+      - "{sources}"
+      - ""
+      - "<gray>ᴇꜰꜰᴇᴄᴛɪᴠᴇ: <green>+{effective}%"
+      - ""
+      - "<yellow>ᴄʟɪᴄᴋ ꜰᴏʀ ᴅᴇᴛᴀɪʟs"
+    sound: minecraft:ui.button.click
+
+  # Used instead of the above when a configured cap reduced the total, so the
+  # player can see the cap rather than just a smaller number.
+  category-capped:
+    name: "{category}"
+    lore:
+      - "{sources}"
+      - ""
+      - "<gray>ʀᴀᴡ ᴛᴏᴛᴀʟ: <yellow>+{raw}%"
+      - "<gray>ᴄᴀᴘ: <red>+{cap}%"
+      - "<gray>ᴇꜰꜰᴇᴄᴛɪᴠᴇ: <green>+{effective}%"
+      - ""
+      - "<yellow>ᴄʟɪᴄᴋ ꜰᴏʀ ᴅᴇᴛᴀɪʟs"
+    sound: minecraft:ui.button.click
+
+  # Shown on a category with nothing contributing to it.
+  no-sources:
+    name: "<dark_gray>ɴᴏ sᴏᴜʀᴄᴇs"
+
+  # One per contributing source on the detail screen.
+  # Available: {source} {percent} {reason}
+  source-active:
+    material: LIME_DYE
+    name: "{source}"
+    lore:
+      - "<gray>ᴠᴀʟᴜᴇ: <green>+{percent}%"
+      - "<gray>sᴛᴀᴛᴜs: <green>ᴀᴄᴛɪᴠᴇ"
+
+  source-inactive:
+    material: GRAY_DYE
+    name: "{source}"
+    lore:
+      - "<gray>ᴠᴀʟᴜᴇ: <dark_gray>+{percent}%"
+      - "<gray>sᴛᴀᴛᴜs: <red>ɪɴᴀᴄᴛɪᴠᴇ"
+      - "<dark_gray>{reason}"
+
+  empty:
+    material: BARRIER
+    slot: 13
+    name: "<dark_gray>ɴᴏ sᴏᴜʀᴄᴇs"
+
+  back:
+    material: ARROW
+    slot: 22
+    name: "ʙᴀᴄᴋ"
+    sound: minecraft:ui.button.click
+
+# Where things go. Category icons are centred on the middle row; detail
+# entries fill left to right from the first slot listed.
+layout:
+  category-slots: [11, 12, 13, 14, 15]
+  source-slots: [10, 11, 12, 13, 14, 15, 16]

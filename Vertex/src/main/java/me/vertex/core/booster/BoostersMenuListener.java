@@ -1,6 +1,7 @@
 package me.vertex.core.booster;
 
 import me.vertex.core.lang.Messages;
+import me.vertex.core.menu.MenuRegistry;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -13,10 +14,12 @@ public final class BoostersMenuListener implements Listener {
 
     private final BoosterService service;
     private final Messages messages;
+    private final MenuRegistry menus;
 
-    public BoostersMenuListener(BoosterService service, Messages messages) {
+    public BoostersMenuListener(BoosterService service, Messages messages, MenuRegistry menus) {
         this.service = service;
         this.messages = messages;
+        this.menus = menus;
     }
 
     @EventHandler
@@ -47,14 +50,16 @@ public final class BoostersMenuListener implements Listener {
         }
 
         if (holder.category() != null) {
-            if (event.getRawSlot() == 22) {
-                BoostersMenu.openOverview(viewer, subject, service, messages);
+            if (event.getRawSlot() == BoostersMenu.backSlot(menus)) {
+                menus.layout(BoostersMenu.MENU_ID).playSound(viewer, "back");
+                BoostersMenu.openOverview(viewer, subject, service, messages, menus);
             }
             return;
         }
         BoosterCategory clicked = holder.categoryAt(event.getRawSlot());
         if (clicked != null) {
-            BoostersMenu.openDetail(viewer, subject, service, messages, clicked);
+            menus.layout(BoostersMenu.MENU_ID).playSound(viewer, "category");
+            BoostersMenu.openDetail(viewer, subject, service, messages, menus, clicked);
         }
     }
 }

@@ -511,10 +511,29 @@ class CoinflipManagerTest {
         assertNotNull(host.nextComponentMessage(), "the result is revealed only once both animations finish");
     }
 
-    /** Flushes the atomic result write, then executes its main-thread animation start. */
+    /**
+     * Flushes the atomic result write, then executes its main-thread animation
+     * start.
+     *
+     * <p>Ticks until the animation is actually open rather than assuming a
+     * single tick is enough: the tracked write future can complete a moment
+     * before the follow-up task it schedules has been queued, which made a
+     * one-tick wait intermittently too early. The bound is far below the
+     * animation's own duration, so this can never run long enough to reveal
+     * a result that the deferral tests expect to still be hidden.
+     */
     private void beginResultAnimation() {
         manager.awaitWrites();
-        ((BukkitSchedulerMock) server.getScheduler()).performTicks(1L);
+        BukkitSchedulerMock scheduler = (BukkitSchedulerMock) server.getScheduler();
+        for (int attempt = 0; attempt < 20 && !animationOpen(host); attempt++) {
+            scheduler.performTicks(1L);
+        }
+    }
+
+    private static boolean animationOpen(PlayerMock player) {
+        return player.getOpenInventory() != null
+                && player.getOpenInventory().getTopInventory() != null
+                && player.getOpenInventory().getTopInventory().getHolder() instanceof CoinflipAnimationMenu.Holder;
     }
 
     private static final class FakeEconomy implements Economy {

@@ -63,3 +63,11 @@ upgrade not purchased yet.
 
 The subject must be online: boosters are live state, so an offline player's
 breakdown cannot be read truthfully.
+
+## Appearance
+
+Both `/boosters` screens are defined in `gui/boosters.yml` — size, title,
+slots, materials, names, lore, and sounds. See
+[GUI framework](gui-framework.md) for the format. Chat messages (usage
+errors, "that player went offline") stay in `en_us.yml`; GUI text lives with
+the GUI.

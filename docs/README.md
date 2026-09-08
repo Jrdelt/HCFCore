@@ -31,6 +31,7 @@ integration behavior.
 | [Coinflips](coinflips.md) | 50/50 money, experience, and item wagers, claim stashes, self-ban, and the staff audit log |
 | [Shop](shop.md) | Categorized, dynamic-price item trading |
 | [Boosters](boosters.md) | How every bonus stacks into one effective figure, and `/boosters` |
+| [GUI framework](gui-framework.md) | Configuring new menus: sizes, slots, materials, lore, sounds |
 | [Auction House](auctionhouse.md) | Buy-it-now listings for any item, claim stashes, expiry, fees, and the staff audit log |
 | [KOTH & Outposts](koth-and-outposts.md) | Faction capture rules, directions/focus, schedules, staff selection, holograms, rewards, and Outpost XP boosters |
 | [Tags & Cosmetics](tags-and-cosmetics.md) | The `/tags` system: unlocking, equipping, nickname-match, the GUI |

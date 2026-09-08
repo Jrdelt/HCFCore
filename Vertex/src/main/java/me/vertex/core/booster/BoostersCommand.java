@@ -1,6 +1,7 @@
 package me.vertex.core.booster;
 
 import me.vertex.core.lang.Messages;
+import me.vertex.core.menu.MenuRegistry;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -21,10 +22,12 @@ public final class BoostersCommand implements CommandExecutor, TabCompleter {
 
     private final BoosterService service;
     private final Messages messages;
+    private final MenuRegistry menus;
 
-    public BoostersCommand(BoosterService service, Messages messages) {
+    public BoostersCommand(BoosterService service, Messages messages, MenuRegistry menus) {
         this.service = service;
         this.messages = messages;
+        this.menus = menus;
     }
 
     @Override
@@ -34,7 +37,7 @@ public final class BoostersCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length == 0) {
-            BoostersMenu.openOverview(player, player, service, messages);
+            BoostersMenu.openOverview(player, player, service, messages, menus);
             return true;
         }
         if (!args[0].equalsIgnoreCase("inspect")) {
@@ -54,7 +57,7 @@ public final class BoostersCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(messages.get(player, "general.player-not-found"));
             return true;
         }
-        BoostersMenu.openOverview(player, target, service, messages);
+        BoostersMenu.openOverview(player, target, service, messages, menus);
         return true;
     }
 

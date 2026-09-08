@@ -892,9 +892,6 @@ sandbot:
       - "&7below it within range; must be in your claim."
 
 boosters:
-  gui-title: "ʙᴏᴏsᴛᴇʀs"
-  gui-title-inspect: "ʙᴏᴏsᴛᴇʀs: {player}"
-  detail-title: "{category}"
   usage: "&b&lBOOSTERS&r &7> <gray>Usage: <yellow>/boosters"
   usage-admin: "&b&lBOOSTERS&r &7> <gray>Staff: <yellow>/boosters inspect <player>"
   subject-offline: "&b&lBOOSTERS&r &7> <red>{player} went offline, so their boosters can no longer be read."
@@ -910,16 +907,8 @@ boosters:
 
   line-active: "<gray>{source}: <green>+{percent}%"
   line-inactive: "<dark_gray>{source}: <dark_gray>inactive"
-  source-value: "<gray>ᴠᴀʟᴜᴇ: <green>+{percent}%"
-  source-active: "<gray>sᴛᴀᴛᴜs: <green>ᴀᴄᴛɪᴠᴇ"
-  source-inactive: "<gray>sᴛᴀᴛᴜs: <red>ɪɴᴀᴄᴛɪᴠᴇ <dark_gray>-- {reason}"
   no-sources: "<dark_gray>ɴᴏ sᴏᴜʀᴄᴇs"
 
-  raw-total: "<gray>ʀᴀᴡ ᴛᴏᴛᴀʟ: <yellow>+{percent}%"
-  cap: "<gray>ᴄᴀᴘ: <red>+{percent}%"
-  effective: "<gray>ᴇꜰꜰᴇᴄᴛɪᴠᴇ: <green>+{percent}%"
-  click-for-detail: "<yellow>ᴄʟɪᴄᴋ ꜰᴏʀ ᴅᴇᴛᴀɪʟs"
-  back: "ʙᴀᴄᴋ"
 
   reason-no-backpack: "no Backpack equipped"
   reason-no-faction: "you are not in a faction"
