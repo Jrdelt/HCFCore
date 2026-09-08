@@ -82,6 +82,16 @@ public final class CannonListener implements Listener {
         }
 
         manager.tagCannon(tnt, startTick);
+
+        // A dispenser ejects TNT with vanilla's usual small throw velocity
+        // and spread -- exactly like it does arrows -- which scatters the
+        // payload away from the barrel before anything's actually fired
+        // it. Pin it dead still (and immune to gravity, so it can't drift
+        // or fall out of position either) right at its dispensed spot;
+        // CannonManager.clampVelocity releases it the instant a real
+        // nearby explosion (a booster charge) actually pushes it.
+        tnt.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+        tnt.setGravity(false);
     }
 
     /** Fires once this TNT's fuse reaches zero, just before it explodes. */

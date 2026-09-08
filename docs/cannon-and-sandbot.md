@@ -15,6 +15,13 @@ vanilla, so ordinary base-breaking/defense play is unaffected.
 
 For every redstone/dispenser-triggered TNT chain, the module:
 
+- Pins each cannon TNT dead still and immune to gravity the instant it
+  spawns, so a dispenser's normal throw velocity/spread (the same
+  mechanic that gives arrows their spread) can't scatter it away from
+  where it was dispensed. It stays pinned — motionless, exactly where it
+  landed — until a nearby explosion (a booster charge) actually pushes
+  it, at which point it's released back to normal physics so it arcs
+  like any other thrown TNT from there.
 - Caps ignitions per world per tick (`cannon.max-ignitions-per-tick`) and
   per exact block position (`cannon.max-simultaneous-per-location`) —
   excess ignitions are cancelled outright rather than dropped silently; a

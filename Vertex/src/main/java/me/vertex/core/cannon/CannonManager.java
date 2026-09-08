@@ -213,6 +213,16 @@ public final class CannonManager {
             return;
         }
 
+        if (entity instanceof TNTPrimed pinned && !pinned.hasGravity()) {
+            // A CannonListener-pinned payload (gravity disabled, velocity
+            // held at zero since it was dispensed) just got a genuine
+            // upward push from this explosion -- it's been boosted.
+            // Release it back to normal physics so it arcs like any other
+            // thrown TNT instead of flying in a dead-straight, drag-only
+            // line forever.
+            pinned.setGravity(true);
+        }
+
         double currentY = entity.getLocation().getY();
         double bandMultiplier = (currentY >= bandLower && currentY <= bandUpper) ? bandVelocityMultiplier : 1.0;
         double clampedY = Math.min(velocity.getY() * bandMultiplier, maxYVelocity);
