@@ -17,8 +17,13 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.Bukkit;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /** Routes clicks for both SpawnerShopMenu (buy) and SpawnerManagementMenu (withdraw/sell). */
 public final class SpawnerMenuListener implements Listener {
@@ -161,13 +166,22 @@ public final class SpawnerMenuListener implements Listener {
                 ? me.vertex.core.lang.MessageFormatter.deserialize(config.displayName())
                 : net.kyori.adventure.text.Component.text(data.mobType().name());
 
-        PlayerInventory inventory = player.getInventory();
-        for (int i = 0; i < amount; i++) {
-            for (ItemStack dropped : inventory.addItem(SpawnerManager.createSpawnerItem(data.mobType(), displayName)).values()) {
-                player.getWorld().dropItemNaturally(player.getLocation(), dropped);
-            }
+        ItemStack prototype = SpawnerManager.createSpawnerItem(data.mobType(), displayName);
+        List<ItemStack> payload = stacksFor(prototype, amount);
+        // Checked before the stack is touched. This used to hand out each
+        // spawner and drop whatever would not fit, which left withdrawn
+        // spawners on the floor for anyone to take -- so a full inventory
+        // now cancels the whole withdrawal instead of partly completing it.
+        if (!hasRoomFor(player, payload)) {
+            player.sendMessage(messages.get(player, "spawner.inventory-full"));
+            return;
         }
+
         int newSize = spawnerManager.decreaseStack(location, amount);
+        for (ItemStack leftover : player.getInventory().addItem(payload.toArray(new ItemStack[0])).values()) {
+            // Unreachable after the check above; dropping beats vanishing.
+            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        }
         clearBlockIfEmpty(location, newSize);
         player.sendMessage(messages.get(player, "spawner.withdrew", "amount", String.valueOf(amount)));
     }
@@ -211,4 +225,42 @@ public final class SpawnerMenuListener implements Listener {
             location.getBlock().setType(Material.AIR);
         }
     }
+
+    /** {@code amount} spawners split into whole stacks. */
+    private static List<ItemStack> stacksFor(ItemStack prototype, int amount) {
+        List<ItemStack> stacks = new ArrayList<>();
+        int remaining = amount;
+        int max = Math.max(1, prototype.getMaxStackSize());
+        while (remaining > 0) {
+            ItemStack stack = prototype.clone();
+            int take = Math.min(remaining, max);
+            stack.setAmount(take);
+            stacks.add(stack);
+            remaining -= take;
+        }
+        return stacks;
+    }
+
+    /**
+     * Whether the player's inventory could take all of it.
+     *
+     * <p>Tested against a throwaway copy of their storage rather than by
+     * counting empty slots, so partial stacks of the same spawner are taken
+     * into account exactly as the real insert would.
+     */
+    private static boolean hasRoomFor(Player player, List<ItemStack> payload) {
+        ItemStack[] storage = player.getInventory().getStorageContents();
+        Inventory probe = Bukkit.createInventory(null, storage.length);
+        ItemStack[] copy = new ItemStack[storage.length];
+        for (int slot = 0; slot < storage.length; slot++) {
+            copy[slot] = storage[slot] == null ? null : storage[slot].clone();
+        }
+        probe.setContents(copy);
+        List<ItemStack> clones = new ArrayList<>();
+        for (ItemStack stack : payload) {
+            clones.add(stack.clone());
+        }
+        return probe.addItem(clones.toArray(new ItemStack[0])).isEmpty();
+    }
+
 }

@@ -8,6 +8,7 @@ import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.shop.ShopManager;
 import me.vertex.core.util.Numbers;
+import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -22,6 +23,7 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -117,18 +119,19 @@ public final class WandListener implements Listener {
         }
         Map<Material, Integer> contents = container.contents(wands::isSellable);
 
+        // Priced first, without touching the container. Pricing still walks
+        // the market down unit by unit, so a full container earns exactly
+        // what selling it by hand would -- a container is not a way around
+        // dynamic pricing.
+        Map<Material, Integer> sellable = new LinkedHashMap<>();
         double payout = 0D;
         int sold = 0;
         for (Map.Entry<Material, Integer> entry : contents.entrySet()) {
             if (!shop.isTradeable(entry.getKey())) {
                 continue;
             }
-            // Priced through the shop one unit at a time, so emptying a full
-            // container walks the price down exactly as selling the same
-            // amount by hand would -- a container is not a way around dynamic
-            // pricing.
-            container.remove(entry.getKey(), entry.getValue(), wands::isSellable);
-            payout += shop.sellFromContainer(player, entry.getKey(), entry.getValue());
+            payout += shop.quoteContainerSale(player, entry.getKey(), entry.getValue());
+            sellable.put(entry.getKey(), entry.getValue());
             sold += entry.getValue();
         }
 
@@ -136,8 +139,23 @@ public final class WandListener implements Listener {
             player.sendMessage(messages.get(player, "wand.nothing-to-sell"));
             return;
         }
+
+        // Paid and confirmed before anything is removed. The response used to
+        // be ignored, which emptied the container for money that never
+        // arrived; now a failed deposit costs the player nothing at all.
+        EconomyResponse deposit = EconomyHook.getEconomy().depositPlayer(player, payout);
+        if (deposit == null || !deposit.transactionSuccess()) {
+            player.sendMessage(messages.get(player, "wand.payout-failed"));
+            plugin.getLogger().warning("Sell Wand for " + player.getName() + " was aborted: the "
+                    + Numbers.moneyFull(payout) + " payout failed, so the container was left untouched.");
+            return;
+        }
+
+        sellable.forEach((material, amount) -> {
+            container.remove(material, amount, wands::isSellable);
+            shop.recordContainerSale(material, amount);
+        });
         container.commit();
-        EconomyHook.getEconomy().depositPlayer(player, payout);
         spendUse(player, held, tier);
         player.sendMessage(messages.get(player, "wand.sold", "amount", Numbers.money(payout)));
         plugin.getLogger().info("Sell Wand: " + player.getName() + " sold " + sold + " item(s) for "

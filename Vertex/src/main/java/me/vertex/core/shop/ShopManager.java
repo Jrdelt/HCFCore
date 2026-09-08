@@ -50,6 +50,8 @@ public final class ShopManager {
     private final Map<Material, ShopEntry> entries = new LinkedHashMap<>();
     private final Map<String, ShopCategory> categories = new LinkedHashMap<>();
     private final Map<Material, Double> netVolume = new ConcurrentHashMap<>();
+    /** One serialized write chain per material, so saves cannot land out of order. */
+    private final Map<Material, CompletableFuture<Void>> writeChains = new ConcurrentHashMap<>();
     private final java.util.Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
 
     public ShopManager(Plugin plugin, ShopStorage storage, BoosterService boosters) {
@@ -88,12 +90,34 @@ public final class ShopManager {
      * @return the payout, after the seller's Sell Bonus
      */
     public double sellFromContainer(Player seller, Material material, int amount) {
+        double payout = quoteContainerSale(seller, material, amount);
+        if (payout > 0D) {
+            recordContainerSale(material, amount);
+        }
+        return payout;
+    }
+
+    /**
+     * What a container sale would pay, without moving the market.
+     *
+     * <p>Split from {@link #recordContainerSale} so a caller can be paid and
+     * confirm the payment landed before it removes anything. Pricing walks
+     * the market down unit by unit either way, so a quote is the same figure
+     * the sale will use.
+     */
+    public double quoteContainerSale(Player seller, Material material, int amount) {
         if (!enabled || !entries.containsKey(material) || amount <= 0) {
             return 0D;
         }
-        double payout = applySellBonus(seller, totalSellPayout(material, amount));
+        return applySellBonus(seller, totalSellPayout(material, amount));
+    }
+
+    /** Moves the market for a sale that has actually happened. */
+    public void recordContainerSale(Material material, int amount) {
+        if (!enabled || !entries.containsKey(material) || amount <= 0) {
+            return;
+        }
         adjustVolume(material, ShopPricing.afterSell(volumeOf(material), amount));
-        return payout;
     }
 
     public void load() {
@@ -332,7 +356,18 @@ public final class ShopManager {
         }
 
         payout = applySellBonus(player, payout);
-        EconomyHook.getEconomy().depositPlayer(player, payout);
+        EconomyResponse deposit = EconomyHook.getEconomy().depositPlayer(player, payout);
+        if (deposit == null || !deposit.transactionSuccess()) {
+            // The response was previously ignored, which deleted the items
+            // and moved the market for money that never arrived. Hand the
+            // items straight back instead; the player just had room for them.
+            for (ItemStack notPaid : player.getInventory().addItem(new ItemStack(material, amount)).values()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), notPaid);
+            }
+            plugin.getLogger().warning("Shop sale for " + player.getName() + " was reverted: the "
+                    + payout + " payout failed, so " + amount + "x " + material + " was returned.");
+            return TradeOutcome.failure(TradeResult.NO_ECONOMY);
+        }
         adjustVolume(material, ShopPricing.afterSell(volumeOf(material), amount));
         return new TradeOutcome(TradeResult.OK, payout);
     }
@@ -356,13 +391,25 @@ public final class ShopManager {
         }
         netVolume.put(material, newVolume);
         String name = material.name();
-        track(CompletableFuture.runAsync(() -> {
-            try {
-                storage.save(name, newVolume);
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to persist Shop market state for " + name, e);
-            }
-        }));
+        // Chained per material rather than fired independently. Rapid trades
+        // or a decay tick used to start overlapping saves, and whichever
+        // finished last won -- so an older volume could overwrite a newer
+        // one. The live price still looked right until a restart read the
+        // stale row back.
+        synchronized (writeChains) {
+            CompletableFuture<Void> previous =
+                    writeChains.getOrDefault(material, CompletableFuture.completedFuture(null));
+            CompletableFuture<Void> next = previous.handle((ignored, error) -> null).thenRunAsync(() -> {
+                try {
+                    storage.save(name, newVolume);
+                } catch (Exception e) {
+                    plugin.getLogger().log(Level.WARNING, "Failed to persist Shop market state for " + name, e);
+                }
+            });
+            writeChains.put(material, next);
+            next.whenComplete((ignored, error) -> writeChains.remove(material, next));
+            track(next);
+        }
     }
 
     /** Called on a repeating task every {@link #decayIntervalTicks()}; drifts every traded block back toward its base price. */

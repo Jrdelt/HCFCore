@@ -252,9 +252,15 @@ class ShopManagerTest {
 
     private static final class FakeEconomy implements Economy {
         private final Map<UUID, Double> balances = new ConcurrentHashMap<>();
+        private volatile boolean depositsFail;
 
         void set(UUID uuid, double amount) {
             balances.put(uuid, amount);
+        }
+
+        /** Simulates a broken or misconfigured economy plugin refusing payouts. */
+        void setDepositsFail(boolean depositsFail) {
+            this.depositsFail = depositsFail;
         }
 
         double get(UUID uuid) {
@@ -277,6 +283,10 @@ class ShopManagerTest {
 
         @Override
         public EconomyResponse depositPlayer(OfflinePlayer player, double amount) {
+            if (depositsFail) {
+                return new EconomyResponse(0, get(player.getUniqueId()),
+                        EconomyResponse.ResponseType.FAILURE, "deposits disabled for this test");
+            }
             balances.merge(player.getUniqueId(), amount, Double::sum);
             return new EconomyResponse(amount, get(player.getUniqueId()), EconomyResponse.ResponseType.SUCCESS, null);
         }
@@ -481,4 +491,46 @@ class ShopManagerTest {
             return true;
         }
     }
+
+    /**
+     * The failure this guards: the deposit response was ignored, so a broken
+     * economy deleted the items and moved the market for money that never
+     * arrived.
+     */
+    @Test
+    void aFailedPayoutReturnsTheItemsAndLeavesTheMarketAlone() {
+        manager.buy(player, Material.DIRT, 10);
+        double volumeBefore = manager.sellPrice(Material.DIRT);
+        int held = countInInventory(Material.DIRT);
+        economy.setDepositsFail(true);
+
+        ShopManager.TradeOutcome outcome = manager.sell(player, Material.DIRT, 10);
+
+        assertEquals(ShopManager.TradeResult.NO_ECONOMY, outcome.result());
+        assertEquals(held, countInInventory(Material.DIRT), "the items must have come back");
+        assertEquals(volumeBefore, manager.sellPrice(Material.DIRT), 0.0001,
+                "a reverted sale must not have moved the market");
+    }
+
+    /** A quote prices the sale without moving the market, so it can be paid first. */
+    @Test
+    void quotingAContainerSaleDoesNotMoveTheMarket() {
+        double before = manager.sellPrice(Material.DIRT);
+        double quoted = manager.quoteContainerSale(player, Material.DIRT, 64);
+
+        assertTrue(quoted > 0D);
+        assertEquals(before, manager.sellPrice(Material.DIRT), 0.0001);
+
+        manager.recordContainerSale(Material.DIRT, 64);
+        assertTrue(manager.sellPrice(Material.DIRT) < before, "recording it should move the market");
+    }
+
+    @Test
+    void aQuoteMatchesWhatTheSaleActuallyPays() {
+        double quoted = manager.quoteContainerSale(player, Material.DIRT, 32);
+        double sold = manager.sellFromContainer(player, Material.DIRT, 32);
+
+        assertEquals(quoted, sold, 0.0001, "a quote must be the figure the sale uses");
+    }
+
 }

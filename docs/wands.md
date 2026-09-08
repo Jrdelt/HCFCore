@@ -67,6 +67,13 @@ empty a chest by hand during the bank write; if the Gunpowder that was
 priced is no longer there, the banked TNT is withdrawn again and nothing is
 taken.
 
+## If the payout fails
+
+A Sell Wand prices the container first and **pays before it removes
+anything**. If the economy refuses the deposit, nothing is sold, the
+container is untouched, and no use is spent — a failed payout costs the
+player nothing.
+
 ## Transaction safety
 
 - A container being processed is locked for the duration, so two players

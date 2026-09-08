@@ -148,13 +148,13 @@ not cover several high-risk persistence and packet-race paths below.
   container despite the advertised all-or-nothing/full-bank behavior. Reserve
   capacity and retain the lock until one commit/rollback path finishes.
 
-- **[high] Shop and Sell-Wand sales can delete items without paying the
+- **[FIXED] Shop and Sell-Wand sales can delete items without paying the
   player.** `ShopManager.sell` and `WandListener.runSell` remove/commit items
   and ignore Vault's `depositPlayer` response. A failed economy deposit leaves
   the sold items gone and the market volume changed with no compensation.
   Check the response and implement a recoverable rollback/claim path.
 
-- **[high] Spawner-stack withdrawal drops spawners on the ground when the
+- **[FIXED] Spawner-stack withdrawal drops spawners on the ground when the
   player's inventory is full.** The management GUI gives/drops each physical
   spawner before it decrements the stack. This violates the finalized
   no-drop-on-full rule and risks loss or theft; preflight inventory capacity,
@@ -185,7 +185,7 @@ not cover several high-risk persistence and packet-race paths below.
   both escrow movements, and payout state atomically before delivering money
   or items.
 
-- **[high] Dynamic-shop state writes can land out of order.** Every price
+- **[FIXED] Dynamic-shop state writes can land out of order.** Every price
   change starts an independent async save with no per-material write chain.
   Under rapid buys/sells or a decay tick, an older write may finish last and
   overwrite the newest `net_volume` in storage; the live price looks correct
