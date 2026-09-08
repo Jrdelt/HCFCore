@@ -145,6 +145,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.wand.WandManager wandManager;
     private me.vertex.core.mine.MineManager mineManager;
     private me.vertex.core.mine.MineKothManager mineKothManager;
+    private me.vertex.core.mine.HotZoneManager hotZoneManager;
     private me.vertex.core.menu.MenuRegistry menuRegistry;
     private me.vertex.core.coinflip.CoinflipStorage coinflipStorage;
     private me.vertex.core.coinflip.CoinflipManager coinflipManager;
@@ -366,7 +367,8 @@ combatManager.start();
         // apply; it grants nothing itself, so wiring it cannot change what a
         // player receives.
         menuRegistry = new me.vertex.core.menu.MenuRegistry(this,
-                java.util.List.of(me.vertex.core.booster.BoostersMenu.MENU_ID));
+                java.util.List.of(me.vertex.core.booster.BoostersMenu.MENU_ID,
+                        me.vertex.core.mine.MinesMenu.MENU_ID));
         menuRegistry.load();
 
         boosterService = new me.vertex.core.booster.BoosterService(this);
@@ -434,10 +436,6 @@ combatManager.start();
                 new me.vertex.core.shop.ShopMenuListener(shopManager, spawnerManager, messages), this);
         mineManager = new me.vertex.core.mine.MineManager(this, messages);
         mineManager.load();
-        me.vertex.core.mine.MinesCommand minesCommand =
-                new me.vertex.core.mine.MinesCommand(mineManager, messages);
-        getCommand("mines").setExecutor(minesCommand);
-        getCommand("mines").setTabCompleter(minesCommand);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.mine.MineListener(mineManager, boosterService, messages), this);
 
@@ -450,6 +448,24 @@ combatManager.start();
         mineKothManager = new me.vertex.core.mine.MineKothManager(this, mineManager, mineKothStorage, messages);
         mineKothManager.load();
         boosterService.register(new me.vertex.core.mine.MineKothBoosterSource(mineKothManager));
+
+        me.vertex.core.mine.HotZoneStorage hotZoneStorage = new me.vertex.core.mine.HotZoneStorage(database);
+        try {
+            hotZoneStorage.init();
+        } catch (Exception e) {
+            getLogger().log(Level.SEVERE, "Failed to initialise Hot Zone storage.", e);
+        }
+        hotZoneManager = new me.vertex.core.mine.HotZoneManager(this, mineManager, hotZoneStorage, messages);
+        hotZoneManager.load();
+        mineManager.setHotZones(hotZoneManager);
+        boosterService.register(new me.vertex.core.mine.HotZoneBoosterSource(mineManager, hotZoneManager));
+
+        me.vertex.core.mine.MinesCommand minesCommand = new me.vertex.core.mine.MinesCommand(
+                mineManager, mineKothManager, hotZoneManager, boosterService, messages, menuRegistry);
+        getCommand("mines").setExecutor(minesCommand);
+        getCommand("mines").setTabCompleter(minesCommand);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.mine.MinesMenuListener(
+                mineManager, mineKothManager, hotZoneManager, boosterService, messages, menuRegistry), this);
 
         wandManager = new me.vertex.core.wand.WandManager(this);
         wandManager.load();
@@ -702,6 +718,9 @@ combatManager.start();
         if (sandBotManager != null) {
             sandBotManager.stop();
         }
+        if (hotZoneManager != null) {
+            hotZoneManager.shutdown();
+        }
         if (mineKothManager != null) {
             mineKothManager.shutdown();
         }
@@ -931,6 +950,9 @@ combatManager.start();
         }
         if (mineKothManager != null) {
             mineKothManager.load();
+        }
+        if (hotZoneManager != null) {
+            hotZoneManager.load();
         }
         if (boosterService != null) {
             boosterService.reloadConfig();

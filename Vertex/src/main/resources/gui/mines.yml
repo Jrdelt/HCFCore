@@ -1,0 +1,123 @@
+# The /mines screens.
+#
+# The overview stays deliberately small: the two worlds and enough status to
+# decide where to go. Everything else lives behind a click.
+#
+# Placeholders are filled by the plugin. {koth_*} and {hotzone_*} read live
+# state, so they change as you watch.
+
+size: 27
+title: "ᴍɪɴᴇꜱ"
+
+titles:
+  detail: "{mine}"
+
+# Live state is on screen, so it is re-rendered while open.
+refresh-ticks: 40
+
+filler:
+  enabled: false
+  material: GRAY_STAINED_GLASS_PANE
+  name: " "
+
+items:
+  # One per mining world, rendered from this template. The icon comes from
+  # each mine's own `icon` in mines.yml.
+  # Available: {mine} {world} {pvp} {ores} {koth_owner} {koth_held}
+  #            {koth_booster} {koth_next} {hotzone} {eligible}
+  mine:
+    name: "{mine}"
+    lore:
+      - "<dark_gray>{world}"
+      - ""
+      - "<gray>ᴘᴠᴘ: <white>{pvp}"
+      - "<gray>ᴏʀᴇꜱ: <white>{ores}"
+      - ""
+      - "<gray>ᴋᴏᴛʜ ᴏᴡɴᴇʀ: <white>{koth_owner}"
+      - "<gray>ʜᴇʟᴅ ꜰᴏʀ: <white>{koth_held}"
+      - "<gray>ᴋᴏᴛʜ ʙᴏɴᴜꜱ: <green>{koth_booster}"
+      - "<gray>ɴᴇxᴛ ᴛɪᴇʀ: <white>{koth_next}"
+      - ""
+      - "<gray>ʜᴏᴛ ᴢᴏɴᴇ: {hotzone}"
+      - "<gray>ʏᴏᴜʀ ᴋᴏᴛʜ ʙᴏɴᴜꜱ: {eligible}"
+      - ""
+      - "<yellow>ᴄʟɪᴄᴋ ꜰᴏʀ ᴅᴇᴛᴀɪʟꜱ"
+    sound: minecraft:ui.button.click
+
+  # Shown on a mine whose region has not been placed yet.
+  mine-unplaced:
+    material: BARRIER
+    name: "{mine}"
+    lore:
+      - "<red>ɴᴏᴛ ᴘʟᴀᴄᴇᴅ ʏᴇᴛ"
+      - "<dark_gray>A staff member must select its region."
+
+  # --- Detail screen ---
+
+  # Available: {mine} {world} {pvp} {players} {inside} {regen}
+  world-info:
+    material: COMPASS
+    slot: 10
+    name: "<yellow>ᴡᴏʀʟᴅ"
+    lore:
+      - "<gray>ɴᴀᴍᴇ: <white>{world}"
+      - "<gray>ᴘᴠᴘ: <white>{pvp}"
+      - "<gray>ᴘʟᴀʏᴇʀꜱ ʜᴇʀᴇ: <white>{players}"
+      - "<gray>ʏᴏᴜ ᴀʀᴇ ɪɴꜱɪᴅᴇ: <white>{inside}"
+      - "<gray>ʀᴇɢᴇɴ ᴅᴇʟᴀʏ: <white>{regen}s"
+
+  # {generation} expands to one line per configured block, read from
+  # mines.yml rather than written here.
+  generation:
+    material: STONE
+    slot: 12
+    name: "<yellow>ᴏʀᴇ ɢᴇɴᴇʀᴀᴛɪᴏɴ"
+    lore:
+      - "{generation}"
+      - ""
+      - "<dark_gray>Percentages are live from mines.yml."
+
+  # Available: {koth_owner} {koth_control} {koth_held} {koth_booster} {koth_next}
+  koth:
+    material: BEACON
+    slot: 14
+    name: "<yellow>ᴍɪɴᴇ ᴋᴏᴛʜ"
+    lore:
+      - "<gray>ᴏᴡɴᴇʀ: <white>{koth_owner}"
+      - "<gray>ᴄᴏɴᴛʀᴏʟ: <white>{koth_control}%"
+      - "<gray>ʜᴇʟᴅ ꜰᴏʀ: <white>{koth_held}"
+      - "<gray>ʙᴏɴᴜꜱ: <green>{koth_booster}"
+      - "<gray>ɴᴇxᴛ ᴛɪᴇʀ: <white>{koth_next}"
+
+  # Available: {hotzone} {hotzone_remaining} {hotzone_next} {hotzone_percent}
+  hotzone:
+    material: BLAZE_POWDER
+    slot: 16
+    name: "<yellow>ʜᴏᴛ ᴢᴏɴᴇ"
+    lore:
+      - "<gray>ꜱᴛᴀᴛᴜꜱ: {hotzone}"
+      - "<gray>ʙᴏɴᴜꜱ: <green>+{hotzone_percent}%"
+      - "<gray>ʀᴇᴍᴀɪɴɪɴɢ: <white>{hotzone_remaining}"
+      - "<gray>ɴᴇxᴛ: <white>{hotzone_next}"
+
+  # The player's real Ore Drop breakdown for this world, from the same
+  # booster service /boosters uses, so the two can never disagree.
+  # {breakdown} expands to one line per source.
+  your-bonus:
+    material: PLAYER_HEAD
+    slot: 22
+    name: "<yellow>ʏᴏᴜʀ ᴍɪɴɪɴɢ ʙᴏɴᴜꜱ"
+    lore:
+      - "{breakdown}"
+      - ""
+      - "<gray>ᴇꜰꜰᴇᴄᴛɪᴠᴇ: <green>+{effective}%"
+
+  back:
+    material: ARROW
+    slot: 18
+    name: "ʙᴀᴄᴋ"
+    sound: minecraft:ui.button.click
+
+layout:
+  # Two mines, centred.
+  mine-slots: [12, 14]

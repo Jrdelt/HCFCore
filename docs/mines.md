@@ -139,7 +139,56 @@ held it — so elapsed time is derived from the clock and a reboot cannot hand
 anyone a fresh ladder. State is written on every ownership change and
 threshold crossing, and flushed on shutdown.
 
+## Hot Zones
+
+A Hot Zone turns an **entire mining world** hot for a while — there is no
+sub-region to stand in, so being in that world is the only condition.
+
+While one runs:
+
+- Qualifying ores gain an extra **Ore Drop bonus** (+20% by default), which
+  stacks with Backpack, faction upgrade, and Mine KOTH bonuses.
+- The world's generation table is reweighted so **rarer ores gain
+  proportionally more** than common ones:
+
+  ```
+  hotWeight = weight × (1 + intensity × (maxWeight / weight) ^ rarity-exponent)
+  ```
+
+  The table is always renormalised afterwards, so probabilities stay valid
+  whatever the settings are. Per-ore multipliers can override the curve
+  outright when a table needs balancing by hand.
+
+Scheduling is a random interval within a configured range (60–120 minutes by
+default) so players cannot set a timer by it, with an optional
+pre-announcement that need not reveal which world. A world is not picked
+twice in a row while there is an alternative.
+
+Start and end are stored as **absolute timestamps**, so a restart resumes one
+mid-flight with the correct time left — and one that expired while the server
+was down is simply over, never resuming with its full duration.
+
+Everything is configured in `hotzones.yml`.
+
+## `/mines`
+
+A 27-slot overview of the two worlds, with detail behind a click. Both
+screens are defined in `gui/mines.yml` — size, slots, materials, names,
+lore, and sounds — see [GUI framework](gui-framework.md).
+
+The overview shows PvP rules, ores, current KOTH owner and how long they
+have held it, the KOTH bonus and next tier, Hot Zone status, and whether
+*you* are eligible for the KOTH bonus.
+
+The detail page adds live player count, regeneration delay, the **actual
+configured** ore-generation percentages (read from `mines.yml`, not written
+into the GUI), full KOTH state including control percentage, Hot Zone timing,
+and **your effective mining bonus**.
+
+That last panel reads the same `BoosterService` that `/boosters` reads, so
+the two screens cannot disagree about what you are actually getting.
+
 ## Not yet built
 
-Hot Zones and the `/mines` GUI. `/mines` currently prints a text overview of
-the placed mines.
+The `/events` GUI that would list Mine KOTHs and Hot Zones alongside other
+server events.

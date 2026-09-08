@@ -907,6 +907,7 @@ boosters:
   source-backpack: "ʙᴀᴄᴋᴘᴀᴄᴋ"
   source-faction-upgrade: "ꜰᴀᴄᴛɪᴏɴ ᴜᴘɢʀᴀᴅᴇ"
   source-mine-koth: "ᴍɪɴᴇ ᴋᴏᴛʜ"
+  source-hot-zone: "ʜᴏᴛ ᴢᴏɴᴇ"
 
   line-active: "<gray>{source}: <green>+{percent}%"
   line-inactive: "<dark_gray>{source}: <dark_gray>inactive"
@@ -917,6 +918,7 @@ boosters:
   reason-no-faction: "you are not in a faction"
   reason-not-upgraded: "not upgraded yet"
   reason-koth-not-held: "your faction does not control this Mine KOTH"
+  reason-no-hot-zone: "no Hot Zone is running here"
 
 wand:
   usage: "&d&lWANDS&r &7> <gray>Usage: <yellow>/wand give <player> <tier> [uses]"
@@ -964,4 +966,15 @@ mines:
   koth-selection-started: "&b&lMINES&r &7> <yellow>Selecting the <white>KOTH capture zone<yellow> for <white>{mine}<yellow>. Left-click one corner, right-click the other, then sneak and click air."
   koth-created: "&b&lMINES&r &7> <green>Placed the KOTH zone for <yellow>{mine}<green> ({volume} blocks)."
   koth-captured: "&b&lMINE KOTH&r &7> <yellow>{faction}<green> now controls the <yellow>{mine}<green> KOTH!"
+  hotzone-active: "<gold>ᴀᴄᴛɪᴠᴇ"
+  hotzone-active-short: "<gold>ᴀᴄᴛɪᴠᴇ <green>(+{percent}%)"
+  hotzone-inactive: "<dark_gray>ɪɴᴀᴄᴛɪᴠᴇ"
+  koth-unclaimed: "<dark_gray>ᴜɴᴄʟᴀɪᴍᴇᴅ"
+  pvp-everywhere: "<red>ᴇɴᴀʙʟᴇᴅ ᴇᴠᴇʀʏᴡʜᴇʀᴇ"
+  pvp-koth-only: "<yellow>ᴋᴏᴛʜ ᴢᴏɴᴇ ᴏɴʟʏ"
+  eligible-yes: "<green>ʏᴇꜱ"
+  eligible-no: "<red>ɴᴏ"
+  hotzone-soon: "&6&lHOT ZONE&r &7> <yellow>A Hot Zone begins in <white>{minutes}<yellow> minutes! <gray>({world})"
+  hotzone-started: "&6&lHOT ZONE&r &7> <gold>{world}<yellow> is HOT for <white>{minutes}<yellow> minutes -- <green>+{percent}%<yellow> ore drops!"
+  hotzone-ended: "&6&lHOT ZONE&r &7> <gray>The Hot Zone in {world} has ended."
   koth-contested: "&b&lMINE KOTH&r &7> <red>Your faction's {mine} KOTH is being taken -- control is at <yellow>{control}%<red>!"

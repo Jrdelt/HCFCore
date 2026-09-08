@@ -1,6 +1,8 @@
 package me.vertex.core.mine;
 
+import me.vertex.core.booster.BoosterService;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.menu.MenuRegistry;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -18,11 +20,20 @@ public final class MinesCommand implements CommandExecutor, TabCompleter {
     private static final List<String> ADMIN_ACTIONS = List.of("wand", "cancel", "list");
 
     private final MineManager mines;
+    private final MineKothManager koths;
+    private final HotZoneManager hotZones;
+    private final BoosterService boosters;
     private final Messages messages;
+    private final MenuRegistry menus;
 
-    public MinesCommand(MineManager mines, Messages messages) {
+    public MinesCommand(MineManager mines, MineKothManager koths, HotZoneManager hotZones,
+            BoosterService boosters, Messages messages, MenuRegistry menus) {
         this.mines = mines;
+        this.koths = koths;
+        this.hotZones = hotZones;
+        this.boosters = boosters;
         this.messages = messages;
+        this.menus = menus;
     }
 
     @Override
@@ -69,22 +80,8 @@ public final class MinesCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    /** Placeholder until the /mines GUI lands; still useful for confirming a mine is placed. */
     private void sendOverview(Player player) {
-        List<MineRegion> defined = mines.regions().stream().filter(MineRegion::isDefined).toList();
-        if (defined.isEmpty()) {
-            player.sendMessage(messages.get(player, "mines.none-defined"));
-            return;
-        }
-        for (MineRegion region : defined) {
-            player.sendMessage(messages.get(player, "mines.overview-entry",
-                    "mine", region.displayName(),
-                    "world", region.world(),
-                    "ores", String.join(", ", region.ores().materials().stream()
-                            .filter(region::isOre)
-                            .map(material -> material.name().toLowerCase(Locale.ROOT))
-                            .toList())));
-        }
+        MinesMenu.openOverview(player, mines, koths, hotZones, boosters, messages, menus);
     }
 
     @Override

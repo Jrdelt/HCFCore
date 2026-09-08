@@ -59,6 +59,7 @@ public final class StorageMigrator {
         TABLES.put("faction_upgrade_levels", List.of("faction_id", "upgrade_key", "level"));
         TABLES.put("faction_banks", List.of("faction_id", "money", "experience", "tnt"));
         TABLES.put("mine_koths", List.of("mine_id", "owner_faction", "control", "owned_since"));
+        TABLES.put("mine_hot_zones", List.of("mine_id", "started_at", "ends_at"));
         TABLES.put("coinflips", List.of("id", "host_uuid", "target_uuid", "type", "amount", "items", "created_at"));
         TABLES.put("coinflip_claims", List.of("id", "winner_uuid", "items", "won_at"));
         TABLES.put("coinflip_bans", List.of("uuid", "banned_until"));
@@ -186,6 +187,7 @@ public final class StorageMigrator {
         new FactionUpgradeStorage(database).init();
         new FactionBankStorage(database).init();
         new me.vertex.core.mine.MineKothStorage(database).init();
+        new me.vertex.core.mine.HotZoneStorage(database).init();
         new CoinflipStorage(database).init();
         new ShopStorage(database).init();
         new AuctionStorage(database).init();

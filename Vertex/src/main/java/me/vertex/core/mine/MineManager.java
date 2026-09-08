@@ -60,6 +60,7 @@ public final class MineManager {
     private volatile int maxRegenPerPass;
     private volatile long kothTickIntervalTicks;
     private BukkitTask regenTask;
+    private volatile HotZoneManager hotZones;
 
     public MineManager(Plugin plugin, Messages messages) {
         this.plugin = plugin;
@@ -339,9 +340,18 @@ public final class MineManager {
 
     // ---- Generation and regeneration ----
 
-    /** Rolls this mine's table for whatever should appear at a regenerated spot. */
+    /**
+     * Rolls this mine's table for whatever should appear at a regenerated
+     * spot, using the Hot Zone's reweighted table while one is running.
+     */
     public Material rollBlock(MineRegion region) {
-        return region.ores().pick(ThreadLocalRandom.current().nextDouble());
+        MineOreTable table = hotZones == null ? region.ores() : hotZones.tableFor(region);
+        return table.pick(ThreadLocalRandom.current().nextDouble());
+    }
+
+    /** Wired after construction because the Hot Zone manager reads mines back. */
+    public void setHotZones(HotZoneManager hotZones) {
+        this.hotZones = hotZones;
     }
 
     /** Queues a mined location, and clears it to a base block in the meantime. */

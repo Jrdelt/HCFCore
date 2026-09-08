@@ -1,0 +1,46 @@
+# Mining Hot Zones.
+#
+# A Hot Zone turns an entire mining world hot for a while: qualifying ores
+# gain an extra Ore Drop bonus, and the world's generation table temporarily
+# favours its rarer ores.
+#
+# Nothing here grants a bonus outside a mining world, and only blocks the
+# mine itself generated ever qualify.
+
+enabled: true
+
+schedule:
+  # Time between Hot Zones, picked at random in this range so players cannot
+  # simply set a timer by it. Set both to the same value for a fixed interval.
+  minimum-minutes: 60
+  maximum-minutes: 120
+  duration-minutes: 20
+  # Warning before one starts. 0 disables the pre-announcement.
+  pre-announce-minutes: 5
+  # Whether the pre-announcement names the world, or keeps it a surprise.
+  reveal-world-early: false
+  # Avoid running in the same world twice in a row while more than one mine
+  # is available to choose from.
+  prevent-immediate-repeat: true
+
+booster:
+  # Added to the Ore Drop category for anyone mining in the hot world. Stacks
+  # with Backpack, faction upgrade, and Mine KOTH bonuses.
+  ore-drop-percent: 20.0
+
+generation:
+  # While hot, the world's ore table is reweighted so rarer ores gain
+  # proportionally more than common ones:
+  #
+  #   hotWeight = weight * (1 + intensity * (maxWeight / weight) ^ rarity-exponent)
+  #
+  # The table is always renormalised afterwards, so probabilities stay valid
+  # whatever these are set to.
+  enabled: true
+  intensity: 0.20
+  rarity-exponent: 0.5
+  # Explicit per-ore multipliers, which win over the formula above. Use these
+  # when a table needs balancing by hand rather than by curve.
+  overrides: {}
+  #  DIAMOND_ORE: 1.25
+  #  NETHERITE_BLOCK: 1.50
