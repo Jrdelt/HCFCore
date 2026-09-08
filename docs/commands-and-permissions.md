@@ -160,6 +160,7 @@ rewards, and the `capture-events.yml` reference.
 | `/invsee <player>` | `vertex.staff.invsee` | Opens the target's storage/armor/offhand GUI. |
 | `/endersee <player>` | `vertex.staff.endersee` | Opens the target's live ender chest. |
 | `/rollback <player>` | `vertex.staff.rollback` | Opens the death-history GUI. |
+| _(any configured kick/ban)_ | `vertex.staff.punish.bypasscombat` | Kicks/bans are refused while the target is combat-tagged — see [PvP & Combat](pvp-and-combat.md#staff-punishments-during-combat). This node overrides that; every use is logged. Mutes are never guarded. |
 
 ## Language
 

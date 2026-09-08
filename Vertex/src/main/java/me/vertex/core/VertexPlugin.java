@@ -294,6 +294,8 @@ combatManager.start();
         Bukkit.getPluginManager().registerEvents(new StaffChatListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new StaffBuildListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new FreezeListener(staffManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.staff.PunishmentCombatListener(this, combatManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new InvseeMenuListener(this), this);
         getCommand("staff").setExecutor(new StaffCommand(staffManager, messages));
         getCommand("vanish").setExecutor(new VanishCommand(staffManager, messages));

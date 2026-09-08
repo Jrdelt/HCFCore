@@ -210,3 +210,28 @@ Every ability and PvP mechanic respects faction relationships:
 - Melee combat itself is unaffected — it always works normally,
   regardless of relation (FactionsUUID's own claim/friendly-fire rules
   still apply as usual).
+
+## Staff punishments during combat
+
+A staff kick or ban is refused while its target is still combat-tagged. The
+tag dies with the session, so kicking someone mid-fight hands them exactly
+the escape they were after: they keep their inventory and their opponent
+loses the kill. Staff are told how many seconds remain and can re-run the
+command once the tag expires. Because the check happens at dispatch time it
+is always a check at the moment of execution, never a stale snapshot.
+
+Mutes are deliberately never guarded -- silencing someone does not let them
+leave a fight.
+
+Vertex owns neither `/kick` nor `/ban`, so it intercepts the aliases listed
+under `staff.punishment-combat-guard.commands` in `config.yml` before the
+owning punishment plugin sees them. List whichever aliases your setup
+actually registers. Set `staff.punishment-combat-guard.enabled: false` to
+turn the guard off entirely.
+
+An offline target is never blocked: there is no live tag to protect, and
+their logout is already covered by the combat-logging penalty.
+
+For emergencies, `vertex.staff.punish.bypasscombat` lets a punishment
+through anyway. Every bypass is written to console with the staff member,
+the target, the full command, and the tag time that was overridden.

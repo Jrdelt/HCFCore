@@ -224,6 +224,9 @@ permissions:
   vertex.staff.rollback:
     description: View and restore items from a player's death history.
     default: op
+  vertex.staff.punish.bypasscombat:
+    description: Kick or ban a combat-tagged player anyway. Every use is logged.
+    default: op
   vertex.staff.mode:
     description: Toggle full staff mode (vanish + staff-build).
     default: op

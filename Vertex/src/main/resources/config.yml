@@ -471,6 +471,29 @@ tntfill:
 # ============================================
 # REBOOT SYSTEM
 # ============================================
+staff:
+  # Refuses a staff kick/ban while its target is still combat-tagged, since
+  # the tag dies with the session -- the target would escape the fight with
+  # their inventory and their opponent would lose the kill. Staff are told
+  # how long is left and can re-run the command once it expires.
+  #
+  # Mutes are deliberately absent: silencing someone does not let them leave
+  # a fight, so muting mid-combat is always allowed.
+  #
+  # Vertex owns none of these commands, so list whichever aliases your
+  # punishment plugin actually registers.
+  punishment-combat-guard:
+    enabled: true
+    commands:
+      - kick
+      - ban
+      - tempban
+      - banip
+      - tempbanip
+      # Holders of vertex.staff.punish.bypasscombat skip this check for
+      # emergencies. Every bypass is logged to console with the staff member,
+      # the target, the command, and the tag time that was overridden.
+
 reboot:
   # Default countdown length for /reboot
   default-delay-minutes: 10

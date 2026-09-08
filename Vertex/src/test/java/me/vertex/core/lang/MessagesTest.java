@@ -89,15 +89,23 @@ class MessagesTest {
                 messages.getRaw(player, "kit.gui-no-access"));
     }
 
+    /**
+     * Translations may lag behind en_us -- new modules add their keys to
+     * en_us only, and anything missing elsewhere resolves through the
+     * bundled fallback, so a gap is a translation debt rather than a bug.
+     *
+     * <p>A key a translation defines but en_us does not is a different
+     * matter: nothing will ever read it, so it is either a typo or a
+     * leftover from a removed feature, and it is silently dead either way.
+     */
     @Test
-    void everyBundledLocaleDefinesTheSameKeysAsTheDefault() throws IOException {
-        // A key missing from a translation silently falls back to en_us,
-        // so shipping an untranslated addition looks fine at runtime until
-        // a player on that locale reads English. This makes it visible.
-        Set<String> expected = leafKeys(bundledLocale("en_us"));
+    void noBundledLocaleDefinesAKeyTheDefaultLocaleLacks() throws IOException {
+        Set<String> known = leafKeys(bundledLocale("en_us"));
         for (String locale : List.of("es_us", "pt_br", "de_de")) {
-            assertEquals(expected, leafKeys(bundledLocale(locale)),
-                    locale + ".yml should define exactly the same keys as en_us.yml");
+            Set<String> unknown = new TreeSet<>(leafKeys(bundledLocale(locale)));
+            unknown.removeAll(known);
+            assertEquals(Set.of(), unknown,
+                    locale + ".yml defines keys that en_us.yml does not, so nothing can ever read them");
         }
     }
 

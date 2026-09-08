@@ -325,6 +325,8 @@ faction-bank:
 staff:
   players-only: "&c&lSTAFF&r &7> <gray>Only players can use this command."
   rollback-usage: "&c&lSTAFF&r &7> <gray>Usage: <yellow>/rollback <player>"
+  punish-combat-blocked: "&c&lSTAFF&r &7> <red>{player} is in combat for another <yellow>{seconds}s<red>. Kicking or banning now would let them escape the fight -- run it again once the tag expires."
+  punish-combat-bypassed: "&c&lSTAFF&r &7> <yellow>Overrode the combat guard on {player} (<red>{seconds}s<yellow> left). This has been logged."
   rollback-opened: "&c&lSTAFF&r &7> <yellow>Opening death history for {player}"
   no-deaths-found: "&c&lSTAFF&r &7> <red>No deaths found for this player."
   death-lookup-failed: "&c&lSTAFF&r &7> <red>Failed to look up that player's death history -- check console."
