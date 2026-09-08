@@ -1,0 +1,98 @@
+# Mining worlds.
+#
+# The two mines ship fully configured except for WHERE they are. Define that
+# in-game rather than by typing coordinates:
+#
+#   /mines wand stonewake     gives the blaze rod and starts a selection
+#   left-click                first corner
+#   right-click               second corner
+#   sneak + click air         saves it
+#
+# Saving writes the world and both corners into this file for you, exactly
+# like /koth create. Until a mine has been defined that way its `world` stays
+# blank and the mine is simply inactive -- nothing else here needs changing.
+#
+# The worlds themselves are yours to create/import (Multiverse or otherwise);
+# Vertex only controls what happens inside the region you select.
+
+enabled: true
+
+selection:
+  # A 700x700 floor 100 deep is 49,000,000 blocks, so this is deliberately
+  # generous. It exists to catch a mis-click that would select half a world.
+  maximum-volume: 60000000
+
+regeneration:
+  # One shared worker drains the queue of mined locations. There is never a
+  # scheduled task per block, and the region is never scanned -- only blocks
+  # that were actually mined are ever visited.
+  worker-interval-ticks: 5
+  max-per-pass: 100
+
+# Players inside a mine region may only break blocks the mine generates.
+# Structure, walls, floor, and decoration are therefore safe without listing
+# them. Placing blocks inside a region is denied outright, which is also what
+# makes "is this ore plugin-generated?" answerable without tracking half a
+# million positions: nothing inside the region can be player-placed.
+protection:
+  deny-block-place: true
+  deny-non-mine-block-break: true
+
+mines:
+  stonewake:
+    display-name: "ꜱᴛᴏɴᴇᴡᴀᴋᴇ"
+    # Filled in by /mines wand stonewake -- leave blank.
+    world: ''
+    pvp: koth-zone-only
+    icon: IRON_BLOCK
+    regen-delay-seconds: 30
+    # Ore replaces only these, so generation can never overwrite structure.
+    base-blocks:
+      - STONE
+      - DEEPSLATE
+    # weight is relative; it does not have to total 100. drop is the base
+    # amount mined before any booster.
+    ores:
+      STONE:
+        weight: 90.0
+        drop: 1
+      COAL_ORE:
+        weight: 4.5
+        drop: 1
+      IRON_ORE:
+        weight: 3.5
+        drop: 1
+      REDSTONE_ORE:
+        weight: 2.0
+        drop: 1
+
+  bloodvein:
+    display-name: "ʙʟᴏᴏᴅᴠᴇɪɴ"
+    world: ''
+    pvp: enabled
+    icon: NETHERITE_BLOCK
+    regen-delay-seconds: 30
+    base-blocks:
+      - STONE
+      - DEEPSLATE
+      - BLACKSTONE
+    ores:
+      STONE:
+        weight: 96.195
+        drop: 1
+      GOLD_ORE:
+        weight: 1.5
+        drop: 1
+      LAPIS_ORE:
+        weight: 1.0
+        drop: 1
+      DIAMOND_ORE:
+        weight: 0.8
+        drop: 1
+      EMERALD_ORE:
+        weight: 0.5
+        drop: 1
+      # Intentionally extreme: roughly one in twenty thousand blocks.
+      NETHERITE_BLOCK:
+        weight: 0.005
+        drop: 1

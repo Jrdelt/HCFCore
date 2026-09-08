@@ -135,6 +135,9 @@ commands:
   sandbot:
     description: Give a Sand Bot item, or stop an active Sand Bot.
     usage: /<command> give <player>|stop [player]
+  mines:
+    description: View the mining worlds, or place their regions as staff.
+    usage: /<command> [wand <mine>|cancel|list]
   wand:
     description: Give Sell Wands and TNT Wands.
     usage: /<command> give <player> <tier> [uses]
@@ -232,6 +235,9 @@ permissions:
     default: op
   vertex.staff.punish.bypasscombat:
     description: Kick or ban a combat-tagged player anyway. Every use is logged.
+    default: op
+  vertex.mines.admin:
+    description: Place and manage mining world regions.
     default: op
   vertex.wand.give:
     description: Give a player a Sell Wand or TNT Wand.

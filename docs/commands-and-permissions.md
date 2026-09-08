@@ -87,6 +87,14 @@ are available for staff testing. See [Player Trading](trading.md).
 | `/cf cancel <id>` | `vertex.coinflip.remove` for someone else's; open to the host for their own | Cancels an unplayed coinflip and refunds its wager. |
 | `/cf logs [player] [page]` | `vertex.coinflip.logs` | Reads the permanent staff audit log. |
 
+## Mining Worlds
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/mines` | Open to all | Overview of the placed mining worlds — see [Mining Worlds](mines.md). |
+| `/mines wand <mine>` | `vertex.mines.admin` | Blaze-rod corner selection; saving writes the world and bounds into `mines.yml`. |
+| `/mines cancel` / `/mines list` | `vertex.mines.admin` | Abandon a selection, or show which mines are placed. Staff subcommands are never named to players who lack the permission. |
+
 ## Wands
 
 | Command | Permission | Notes |

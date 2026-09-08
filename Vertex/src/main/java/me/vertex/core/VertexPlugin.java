@@ -143,6 +143,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.backpack.BackpackManager backpackManager;
     private me.vertex.core.booster.BoosterService boosterService;
     private me.vertex.core.wand.WandManager wandManager;
+    private me.vertex.core.mine.MineManager mineManager;
     private me.vertex.core.menu.MenuRegistry menuRegistry;
     private me.vertex.core.coinflip.CoinflipStorage coinflipStorage;
     private me.vertex.core.coinflip.CoinflipManager coinflipManager;
@@ -430,6 +431,15 @@ combatManager.start();
         shopManager.loadState();
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.shop.ShopMenuListener(shopManager, spawnerManager, messages), this);
+        mineManager = new me.vertex.core.mine.MineManager(this, messages);
+        mineManager.load();
+        me.vertex.core.mine.MinesCommand minesCommand =
+                new me.vertex.core.mine.MinesCommand(mineManager, messages);
+        getCommand("mines").setExecutor(minesCommand);
+        getCommand("mines").setTabCompleter(minesCommand);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.mine.MineListener(mineManager, boosterService, messages), this);
+
         wandManager = new me.vertex.core.wand.WandManager(this);
         wandManager.load();
         me.vertex.core.wand.WandCommand wandCommand =
@@ -681,6 +691,9 @@ combatManager.start();
         if (sandBotManager != null) {
             sandBotManager.stop();
         }
+        if (mineManager != null) {
+            mineManager.shutdown();
+        }
         if (combatManager != null) {
             combatManager.stop();
         }
@@ -898,6 +911,9 @@ combatManager.start();
         }
         if (wandManager != null) {
             wandManager.load();
+        }
+        if (mineManager != null) {
+            mineManager.load();
         }
         if (boosterService != null) {
             boosterService.reloadConfig();
