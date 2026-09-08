@@ -4,7 +4,7 @@
 
 **An HCF gameplay layer for Paper, built on FactionsUUID.**
 
-[Documentation](docs/README.md) · [Installation](docs/installation.md) · [Commands](docs/commands-and-permissions.md) · [Configuration](docs/configuration.md)
+[Player Guide](docs/player-guide.md) · [Documentation](docs/README.md) · [Installation](docs/installation.md) · [Commands](docs/commands-and-permissions.md) · [Configuration](docs/configuration.md)
 
 </div>
 
@@ -18,9 +18,17 @@
   faction KOTHs, and reward Outposts.
 - **Automation:** stackable spawners that work in daylight, mob stacking,
   upgradeable Chunk Collectors, and progressive `.schem` Blueprint builds.
+- **Economy:** a live-price shop, a buy-it-now Auction House, secure player
+  trading, money/experience/item Coinflips, and Sell/TNT Wands that empty a
+  chest or Chunk Collector through the same market one item at a time.
+- **Mining worlds:** two permanent worlds with server-controlled ore
+  generation and regeneration, 24/7 capturable Mine KOTHs whose holder earns
+  a growing ore bonus, and rotating Hot Zones that favour the rarer ores.
+- **Boosters:** one service that answers what bonus a player actually has and
+  why, so every screen quoting a number quotes the same number.
 - **Server tools:** cosmetic tags, four languages, vanish/staff tools,
-  inventory inspection, death rollback, scheduled reboots, tiered
-  custom-model-data Backpacks, and money/experience/item Coinflips.
+  inventory inspection with stale-view anti-dupe, death rollback, scheduled
+  reboots, and tiered custom-model-data Backpacks.
 
 Feature messages, labels, and lore are configured in the language files.
 See the [documentation index](docs/README.md) for exact behavior,
@@ -66,6 +74,10 @@ cd Vertex
 | [Coinflips](docs/coinflips.md) | 50/50 money, experience, and item wagers, self-ban, and staff audit log |
 | [Shop](docs/shop.md) | Categorized, dynamic-price item trading |
 | [Auction House](docs/auctionhouse.md) | Buy-it-now listings for any item, claim stashes, and staff audit log |
+| [Wands](docs/wands.md) | Sell Wands and TNT Wands: container selling through the live market, Gunpowder banking |
+| [Mining Worlds](docs/mines.md) | Stonewake and Bloodvein: ore generation, regeneration, Mine KOTHs, Hot Zones |
+| [Boosters](docs/boosters.md) | How every bonus stacks into one effective figure, and `/boosters` |
+| [GUI framework](docs/gui-framework.md) | Configuring new menus: sizes, slots, materials, lore, sounds |
 | [KOTH & Outposts](docs/koth-and-outposts.md) | Faction captures, schedules, navigation, holograms, rewards, and Outpost XP boosts |
 | [Commands & permissions](docs/commands-and-permissions.md) | Every command and permission node |
 | [Configuration](docs/configuration.md) | `config.yml` and reload behavior |

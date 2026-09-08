@@ -18,6 +18,7 @@ integration behavior.
 
 | Guide | Covers |
 |---|---|
+| [**Player Guide**](player-guide.md) | **Start here** — every feature and command a player can use |
 | [Installation](installation.md) | Requirements, building from source, first deploy, upgrading, database migrations |
 | [Configuration](configuration.md) | Full walkthrough of `config.yml`: database, chat, factions/upgrades, nametags, reboot, and reload semantics |
 | [PvP & Combat](pvp-and-combat.md) | Combat tag, action bar, item cooldowns, no-pearl zones, Legacy Combat (1.8 PvP), Archer Tag |

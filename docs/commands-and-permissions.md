@@ -101,6 +101,15 @@ are available for staff testing. See [Player Trading](trading.md).
 |---|---|---|
 | `/wand give <player> <tier> [uses]` | `vertex.wand.give` | Gives a Sell Wand or TNT Wand — see [Wands](wands.md). Right-click a chest or Chunk Collector to use one. |
 
+### Notification-only nodes
+
+Two permissions grant no command; they only decide who receives an alert.
+
+| Permission | Effect |
+|---|---|
+| `vertex.trade.staff.alerts` | Receives suspicious player-trade alerts. |
+| `vertex.sandbot.debug` | Receives Sand Bot placement diagnostics in chat. |
+
 ## Boosters
 
 | Command | Permission | Notes |
