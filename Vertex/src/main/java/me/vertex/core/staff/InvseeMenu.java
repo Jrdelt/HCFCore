@@ -90,12 +90,30 @@ public final class InvseeMenu {
      * current live value, so a concurrent change on their end survives.
      * Updates `holder.lastKnownSnapshot` to the result either way.
      */
-    static void writeBack(Inventory inventory, Player target, Holder holder) {
+    static int writeBack(Inventory inventory, Player target, Holder holder) {
         ItemStack[] previous = holder.lastKnownSnapshot;
         ItemStack[] current = snapshot(inventory);
         boolean[] changed = new boolean[TRACKED_SLOTS];
         for (int slot = 0; slot < TRACKED_SLOTS; slot++) {
             changed[slot] = !itemsEqual(previous == null ? null : previous[slot], current[slot]);
+        }
+
+        // An edit is only safe if every slot it touches still holds what the
+        // menu was showing when the staff member acted.
+        int conflicts = 0;
+        for (int slot = 0; slot < TRACKED_SLOTS; slot++) {
+            if (changed[slot] && !itemsEqual(previous == null ? null : previous[slot], liveSlot(target, slot))) {
+                conflicts++;
+            }
+        }
+        if (conflicts > 0) {
+            // Reject the whole edit, not just the stale slots. Moving an item
+            // is two slot changes, and only the source of the move goes stale
+            // -- the destination still looks perfectly fresh. Applying that
+            // "fresh" half alone is exactly how the target ends up holding
+            // two of something they only moved once. All or nothing.
+            refresh(inventory, target, holder);
+            return conflicts;
         }
 
         for (int slot = 0; slot < TRACKED_SLOTS; slot++) {
@@ -110,6 +128,25 @@ public final class InvseeMenu {
                 setLiveSlot(target, slot, current[slot]);
             }
         }
+        holder.lastKnownSnapshot = snapshot(inventory);
+        return 0;
+    }
+
+    /**
+     * Whether the target's live slot still matches what the menu is showing.
+     * Checked before a click is allowed to resolve, so a stale item never
+     * reaches the staff member's cursor in the first place.
+     */
+    static boolean isSlotFresh(Player target, Holder holder, int slot) {
+        if (slot < 0 || slot >= TRACKED_SLOTS || holder.lastKnownSnapshot == null) {
+            return true;
+        }
+        return itemsEqual(holder.lastKnownSnapshot[slot], liveSlot(target, slot));
+    }
+
+    /** Re-reads every tracked slot from the target and resets the diff baseline. */
+    static void refresh(Inventory inventory, Player target, Holder holder) {
+        populate(inventory, target);
         holder.lastKnownSnapshot = snapshot(inventory);
     }
 
@@ -184,7 +221,7 @@ public final class InvseeMenu {
 
     public static final class Holder implements InventoryHolder {
         private final UUID targetId;
-        private Inventory inventory;
+        Inventory inventory;
         /** The tracked slots as of the last populate/writeBack, for diffing the next sync against. */
         ItemStack[] lastKnownSnapshot;
 

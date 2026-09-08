@@ -235,3 +235,24 @@ their logout is already covered by the combat-logging penalty.
 For emergencies, `vertex.staff.punish.bypasscombat` lets a punishment
 through anyway. Every bypass is written to console with the staff member,
 the target, the full command, and the tag time that was overridden.
+
+## Staff inventory edits and stale views
+
+`/invsee` shows a snapshot of a player who is still playing, so the menu can
+be displaying an item they no longer hold. Acting on that stale view
+duplicates items in both directions: staff pick up a copy of something
+already dropped, or a stale item is written back into an inventory that has
+since moved the real one elsewhere.
+
+Every slot an edit touches is therefore checked against the target's live
+contents twice — before the click resolves, and again before the write-back
+applies. If anything has moved underneath, the **entire** edit is discarded
+and the menu is refreshed.
+
+Rejecting the whole edit rather than the stale slots is deliberate. Moving
+an item is two slot changes, and only the *source* of the move goes stale —
+the destination still looks fresh. Applying that half alone is exactly how a
+player ends up holding two of something they only moved once.
+
+Staff are told when this happens, and every rejection is logged with the
+staff member, the target, and the reason.
