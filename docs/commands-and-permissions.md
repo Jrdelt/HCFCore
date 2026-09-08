@@ -101,15 +101,6 @@ are available for staff testing. See [Player Trading](trading.md).
 |---|---|---|
 | `/wand give <player> <tier> [uses]` | `vertex.wand.give` | Gives a Sell Wand or TNT Wand — see [Wands](wands.md). Right-click a chest or Chunk Collector to use one. |
 
-### Notification-only nodes
-
-Two permissions grant no command; they only decide who receives an alert.
-
-| Permission | Effect |
-|---|---|
-| `vertex.trade.staff.alerts` | Receives suspicious player-trade alerts. |
-| `vertex.sandbot.debug` | Receives Sand Bot placement diagnostics in chat. |
-
 ## Boosters
 
 | Command | Permission | Notes |
@@ -221,6 +212,21 @@ nodes:
 Plus two bypass nodes for staff testing kits: `vertex.kit.bypasscooldown`
 and `vertex.kit.bypasscost`. `vertex.admin` also covers reload/
 clearmobstacks as shown above.
+
+### Notification-only nodes
+
+Two nodes grant no command at all — they only decide **who receives an
+alert**. That is why they are easy to miss when auditing permissions against
+the command list: nothing in `plugin.yml`'s `commands:` block points at
+them, and a player holding one sees no new command appear.
+
+| Permission | Who holds it receives | Default |
+|---|---|---|
+| `vertex.trade.staff.alerts` | Suspicious player-trade alerts — see [Player Trading](trading.md) | op |
+| `vertex.sandbot.debug` | Sand Bot placement diagnostics in chat — see [Sand Bots](sandbots.md) | op |
+
+Grant these to the staff who should be *notified*, which is usually a
+narrower group than those who can run the related commands.
 
 ## Tab-completion
 
