@@ -2,6 +2,7 @@ package me.vertex.core.shop;
 
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.spawner.SpawnerManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
@@ -32,6 +33,16 @@ public final class ShopMenu {
     public static final int SLOT_NEXT_PAGE = 53;
     public static final int STACK_AMOUNT = 64;
 
+    /**
+     * Sentinel category id for the Spawners button -- spawners aren't a real
+     * {@code shop.yml} category (they're priced per mob type, not per
+     * Material, so they don't fit {@link ShopEntry}'s model) and clicking it
+     * opens {@link me.vertex.core.spawner.SpawnerShopMenu} directly instead
+     * of the normal item-browsing view. Never collides with a real category
+     * id, since those come from {@code shop.yml} map keys.
+     */
+    public static final String SPAWNERS_CATEGORY_ID = "__spawners__";
+
     public enum Mode {
         CATEGORIES, ITEMS
     }
@@ -39,25 +50,41 @@ public final class ShopMenu {
     private ShopMenu() {
     }
 
-    public static void openCategories(Player player, ShopManager manager, Messages messages) {
+    public static void openCategories(Player player, ShopManager manager, SpawnerManager spawnerManager,
+                                       Messages messages) {
         Holder holder = new Holder(Mode.CATEGORIES, null, 0);
         Inventory inventory = Bukkit.createInventory(holder, 9, messages.get(player, "shop.gui-title"));
         holder.inventory = inventory;
 
         List<ShopCategory> categories = manager.categories();
-        for (int i = 0; i < categories.size() && i < 9; i++) {
-            ShopCategory category = categories.get(i);
-            inventory.setItem(i, categoryIcon(player, messages, category));
-            holder.slotCategoryIds.put(i, category.id());
+        int slot = 0;
+        for (; slot < categories.size() && slot < 9; slot++) {
+            ShopCategory category = categories.get(slot);
+            inventory.setItem(slot, categoryIcon(player, messages, category));
+            holder.slotCategoryIds.put(slot, category.id());
+        }
+        if (slot < 9 && spawnerManager != null && !spawnerManager.getMobConfigs().isEmpty()) {
+            inventory.setItem(slot, spawnersCategoryIcon(player, messages));
+            holder.slotCategoryIds.put(slot, SPAWNERS_CATEGORY_ID);
         }
 
         player.openInventory(inventory);
     }
 
-    public static void openCategory(Player player, ShopManager manager, Messages messages, String categoryId, int requestedPage) {
+    private static ItemStack spawnersCategoryIcon(Player player, Messages messages) {
+        ItemStack icon = new ItemStack(Material.SPAWNER);
+        ItemMeta meta = icon.getItemMeta();
+        meta.displayName(noItalic(messages.get(player, "shop.spawners-category-title")));
+        meta.lore(List.of(noItalic(messages.get(player, "shop.category-open-lore"))));
+        icon.setItemMeta(meta);
+        return icon;
+    }
+
+    public static void openCategory(Player player, ShopManager manager, SpawnerManager spawnerManager,
+                                     Messages messages, String categoryId, int requestedPage) {
         ShopCategory category = manager.category(categoryId);
         if (category == null) {
-            openCategories(player, manager, messages);
+            openCategories(player, manager, spawnerManager, messages);
             return;
         }
         List<ShopEntry> entries = category.entries();

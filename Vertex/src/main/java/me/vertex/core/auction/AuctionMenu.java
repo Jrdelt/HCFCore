@@ -71,15 +71,15 @@ public final class AuctionMenu {
     }
 
     public static void openBrowse(Player player, AuctionManager manager, Messages messages, int requestedPage) {
-        open(player, manager, messages, requestedPage, ViewFilter.ALL, SortMode.DATE_POSTED, SortDirection.DESCENDING, null);
+        open(player, manager, messages, requestedPage, ViewFilter.ALL, SortMode.DATE_POSTED, SortDirection.ASCENDING, null);
     }
 
     public static void openMyListings(Player player, AuctionManager manager, Messages messages, int requestedPage) {
-        open(player, manager, messages, requestedPage, ViewFilter.MINE, SortMode.DATE_POSTED, SortDirection.DESCENDING, null);
+        open(player, manager, messages, requestedPage, ViewFilter.MINE, SortMode.DATE_POSTED, SortDirection.ASCENDING, null);
     }
 
     public static void openWatchlist(Player player, AuctionManager manager, Messages messages, int requestedPage) {
-        open(player, manager, messages, requestedPage, ViewFilter.WATCHLIST, SortMode.DATE_POSTED, SortDirection.DESCENDING, null);
+        open(player, manager, messages, requestedPage, ViewFilter.WATCHLIST, SortMode.DATE_POSTED, SortDirection.ASCENDING, null);
     }
 
     private static void open(Player player, AuctionManager manager, Messages messages, int requestedPage,
@@ -118,14 +118,26 @@ public final class AuctionMenu {
         if (holder.currencyFilter != null) {
             stream = stream.filter(listing -> listing.currency() == holder.currencyFilter);
         }
-        Comparator<AuctionListing> comparator = switch (holder.sortMode) {
-            case DATE_POSTED -> Comparator.comparingLong(AuctionListing::listedAtMillis);
-            case PRICE -> Comparator.comparingDouble(AuctionListing::price);
+        return stream.sorted(listingComparator(holder.sortMode, holder.sortDirection)).toList();
+    }
+
+    /**
+     * A listing's id is the final stable tie-breaker so pages never shuffle
+     * when two listings share a price and millisecond timestamp. Price ties
+     * always favour the oldest listing, in either price direction.
+     */
+    static Comparator<AuctionListing> listingComparator(SortMode mode, SortDirection direction) {
+        return switch (mode) {
+            case DATE_POSTED -> (direction == SortDirection.ASCENDING
+                    ? Comparator.comparingLong(AuctionListing::listedAtMillis)
+                    : Comparator.comparingLong(AuctionListing::listedAtMillis).reversed())
+                    .thenComparingInt(AuctionListing::id);
+            case PRICE -> (direction == SortDirection.DESCENDING
+                    ? Comparator.comparingDouble(AuctionListing::price).reversed()
+                    : Comparator.comparingDouble(AuctionListing::price))
+                    .thenComparingLong(AuctionListing::listedAtMillis)
+                    .thenComparingInt(AuctionListing::id);
         };
-        if (holder.sortDirection == SortDirection.DESCENDING) {
-            comparator = comparator.reversed();
-        }
-        return stream.sorted(comparator).toList();
     }
 
     private static void renderBrowse(Inventory inventory, Holder holder, Player player, AuctionManager manager, Messages messages) {
@@ -172,7 +184,7 @@ public final class AuctionMenu {
     }
 
     private static void openClaimLoaded(Player player, Messages messages, List<ItemStack> items) {
-        Holder holder = new Holder(Mode.CLAIM, 0, ViewFilter.ALL, SortMode.DATE_POSTED, SortDirection.DESCENDING, null);
+        Holder holder = new Holder(Mode.CLAIM, 0, ViewFilter.ALL, SortMode.DATE_POSTED, SortDirection.ASCENDING, null);
         holder.setClaimItems(items);
         Inventory inventory = Bukkit.createInventory(holder, 54, messages.get(player, "auction.claim-title"));
         holder.inventory = inventory;

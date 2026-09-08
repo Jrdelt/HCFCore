@@ -18,8 +18,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * The "Active Coinflips" browser: row 0 is controls (animation toggle,
- * claim stash, self-ban, help), rows 1-4 are the paginated coinflip
+ * The "Active Coinflips" browser: row 0 is controls (claim stash, self-ban,
+ * help), rows 1-4 are the paginated coinflip
  * listing, row 5 is pagination. A separate {@link Holder} identifies each
  * of this menu's three modes ({@code BROWSE}/{@code CLAIM}/{@code VIEW_ITEMS})
  * so {@link CoinflipMenuListener} can route clicks correctly.
@@ -30,7 +30,6 @@ public final class CoinflipMenu {
     public static final int GRID_COLUMNS = 9;
     public static final int PAGE_SIZE = GRID_ROWS * GRID_COLUMNS;
 
-    public static final int SLOT_ANIMATIONS = 0;
     public static final int SLOT_CLAIM = 49;
     public static final int SLOT_SELF_BAN = 8;
     public static final int SLOT_HELP = 4;
@@ -119,7 +118,6 @@ public final class CoinflipMenu {
         for (int slot = 45; slot < 54; slot++) {
             inventory.setItem(slot, border());
         }
-        inventory.setItem(SLOT_ANIMATIONS, animationsButton(player, manager, messages));
         inventory.setItem(SLOT_CLAIM, claimButton(player, messages, holder.hasClaims));
         inventory.setItem(SLOT_SELF_BAN, selfBanButton(player, manager, messages));
         inventory.setItem(SLOT_HELP, helpButton(player, messages));
@@ -246,16 +244,6 @@ public final class CoinflipMenu {
             return minutes + " minutes " + (TimeUnit.MILLISECONDS.toSeconds(elapsedMillis) % 60) + " seconds ago";
         }
         return TimeUnit.MILLISECONDS.toSeconds(elapsedMillis) + " seconds ago";
-    }
-
-    private static ItemStack animationsButton(Player player, CoinflipManager manager, Messages messages) {
-        boolean on = manager.animationsEnabled(player.getUniqueId());
-        ItemStack item = new ItemStack(Material.ITEM_FRAME);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "coinflip.animations-title")));
-        meta.lore(List.of(noItalic(messages.get(player, on ? "coinflip.toggle-on" : "coinflip.toggle-off"))));
-        item.setItemMeta(meta);
-        return item;
     }
 
     private static ItemStack claimButton(Player player, Messages messages, boolean hasClaims) {

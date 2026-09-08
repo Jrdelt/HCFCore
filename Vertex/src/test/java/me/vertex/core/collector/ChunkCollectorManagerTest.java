@@ -5,6 +5,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.plugin.PluginMock;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -71,5 +73,22 @@ class ChunkCollectorManagerTest {
             }
         }
         assertTrue(!manager.canStore(data, newMaterial));
+    }
+
+    @Test
+    void unplacedCollectorItemShowsPortableStatsButNeverFactionOrOwner() {
+        ChunkCollectorData data = new ChunkCollectorData(2, java.util.UUID.randomUUID(), "secret-faction");
+        data.setStored(org.bukkit.Material.DIAMOND, 42);
+        org.bukkit.inventory.ItemStack item = manager.createCollectorItem(Component.text("Chunk Collector"), data);
+
+        String lore = item.getItemMeta().lore().stream()
+                .map(PlainTextComponentSerializer.plainText()::serialize)
+                .reduce("", (left, right) -> left + "\n" + right);
+
+        assertTrue(lore.contains("Level: 2"));
+        assertTrue(lore.contains("42 items"));
+        assertTrue(lore.contains("Capacity:"));
+        assertTrue(!lore.contains("secret-faction"));
+        assertTrue(!lore.contains(data.ownerUuid().toString()));
     }
 }

@@ -125,18 +125,16 @@ pvp:
   # Logout penalty: if true, disconnecting while tagged counts as combat logout
   logout-penalty: true
 
-  # Optional Citizens ghost NPCs. When enabled, an eligible player who is
-  # kicked or force-disconnected is represented by a killable Citizens NPC
+  # Optional combat-log villagers. When enabled, an eligible player who is
+  # kicked or force-disconnected is represented by a killable Villager
   # instead of being killed immediately. Voluntary logouts are never given
-  # an NPC and receive the normal combat-logout penalty. Citizens must be
-  # installed; Vertex safely disables this feature when it is absent.
+  # and receive the normal combat-logout penalty. This is a native Vertex
+  # feature and does not require an NPC plugin.
   ghost-players:
     enabled: false
     # If true, only players with an active Vertex combat tag leave a ghost.
     # Set false to allow every forced disconnect in allowed worlds.
     combat-tagged-only: true
-    # Bukkit/Citizens entity type used for the NPC (normally PLAYER).
-    npc-type: PLAYER
     # Empty means every world. World names are case-insensitive.
     allowed-worlds: []
     # Remove an untouched ghost after this many seconds. 0 means never.
@@ -326,6 +324,9 @@ faction-upgrades:
   enabled: true
   # With the native UPGRADE action allowed, members may view and buy upgrades.
   leader-only: false
+  # TNT bank size for a faction that has not bought the tnt-bank upgrade.
+  # Each purchased level below replaces this with its own absolute capacity.
+  tnt-base-capacity: 1000000
   upgrades:
     claim-damage:
       enabled: true
@@ -357,8 +358,17 @@ faction-upgrades:
     mob-xp:
       enabled: true
       levels: {1: {price: 750000.0, bonus: 20.0}, 2: {price: 2550000.0, bonus: 40.0}, 3: {price: 8670000.0, bonus: 60.0}, 4: {price: 29478000.0, bonus: 80.0}, 5: {price: 100225200.0, bonus: 100.0}}
+    # Unlike every other upgrade here, "bonus" is an absolute TNT capacity
+    # rather than a percentage -- each level states the faction's full TNT
+    # bank size outright, so capacities are read straight off this file
+    # instead of being derived from a multiplier.
+    tnt-bank:
+      enabled: true
+      levels: {1: {price: 25000000.0, bonus: 2000000.0}, 2: {price: 75000000.0, bonus: 4000000.0}, 3: {price: 200000000.0, bonus: 6000000.0}, 4: {price: 500000000.0, bonus: 8000000.0}, 5: {price: 1000000000.0, bonus: 10000000.0}}
 
 rally:
+  # Live player position/yaw interval for the faction-rally direction bar.
+  direction-update-ticks: 10
   # Faction leaders open the complete permission matrix with /f permissions
   # or /f perms. Left-click allows and right-click denies. FactionsUUID saves
   # its built-in actions; this section supplies Vertex-specific actions.
@@ -417,83 +427,13 @@ abilities:
     - safezone
 
 # ============================================
-# TNT CANNONS
-# Applies only to TNT that ignites without a player's hand directly
-# lighting it -- i.e. redstone- or dispenser-triggered chains, which in
-# practice means a built cannon mechanism. A player manually lighting TNT
-# with flint and steel (or TNT chain-reacting off THAT explosion) is left
-# completely vanilla, so normal base-breaking/defense play is unaffected.
-# ============================================
-cannon:
-  enabled: true
-
-  # Redstone/dispenser TNT ignitions allowed per world per tick. Extra
-  # ignitions are cancelled outright rather than queued -- a real redstone
-  # clock retries on its very next pulse anyway, so this reads as a brief
-  # stutter in the clock rather than a dropped shot.
-  max-ignitions-per-tick: 12
-
-  # Ignitions allowed at the exact same block position within one tick.
-  # Note: vanilla does not actually merge TNT entities the way it merges
-  # dropped items -- a "compact" cannon's extra power instead comes from
-  # several separate TNT explosions resolving simultaneously at the same
-  # spot, with their knockback summing. This caps that stacking directly.
-  max-simultaneous-per-location: 4
-
-  # Hard ceiling on the upward velocity component this module leaves in
-  # place after a cannon explosion.
-  max-y-velocity: 3.6
-
-  # A tighter multiplier applied only while the payload's current Y is
-  # inside this band -- keeps shots built for the 256-320 range from
-  # rocketing straight to the build-height ceiling.
-  height-band:
-    lower: 256
-    upper: 320
-    velocity-multiplier: 0.6
-
-  # How far around a cannon explosion to look for entities (TNT, falling
-  # blocks, players) whose velocity needs clamping.
-  velocity-scan-radius-blocks: 8
-
-  # How many ticks after a sequence's first ignition its explosions still
-  # count as "launch structure" (block damage suppressed) rather than a
-  # payload "landing" (claim-gated real damage). Real cannon barrels
-  # finish firing well within a second; raise this if yours doesn't.
-  launch-window-ticks: 20
-
-  damage-control:
-    # Clear block damage from launch-stage explosions so a cannon doesn't
-    # blow up its own barrel/platform every shot.
-    protect-launch-structure: true
-    # Don't let launch-stage explosions ignite the platform.
-    suppress-fire-spread: true
-
-  # Locations a cannon sequence is blocked from starting in, and where a
-  # landing payload's real damage is suppressed even if it started
-  # elsewhere -- same blocklist model as abilities.disabled-regions /
-  # abilities.disabled-claim-names above, checked independently at both
-  # ends.
-  disabled-regions:
-    - spawn
-  disabled-claim-names:
-    - safezone
-
-# ============================================
 # SAND BOTS
-# Give with /sandbot give <player>. Placed on top of andesite, sandstone,
-# red sandstone, or any color of concrete -- must be inside the placing
-# player's own faction's claim. The Citizens NPC that appears then
-# converts every matching trigger block in its flat radius (andesite ->
-# gravel, sandstone -> sand, red sandstone -> red sand, colored concrete
-# -> matching concrete powder) into a falling-block entity, which free-
-# falls under normal gravity to wherever solid ground stops it. Each
-# block is charged for individually at the Shop's price for the falling-
-# block material (SAND/GRAVEL/RED_SAND/*_CONCRETE_POWDER in shop.yml,
-# marked dynamic-pricing: false so bulk purchases don't spike the price),
-# drawn from FactionsUUID's native /f money first and Vertex's own
-# /fbank as a fallback. The bot despawns once a pass finds no more
-# trigger blocks in range, or once neither source can afford the next one.
+# Give with /sandbot give <player>. The Bot may be placed on any block in
+# its owner's faction claim. It fills columns beneath nearby anchors in its
+# flat radius: andesite -> gravel, sandstone -> sand, red sandstone -> red
+# sand, and colored concrete -> matching concrete powder. Anchors remain;
+# each column can receive multiple falling blocks per tick until its stack
+# reaches the anchor. Every block is paid from native faction money, then /fbank.
 # ============================================
 sandbot:
   enabled: true
@@ -504,7 +444,14 @@ sandbot:
   radius-blocks: 2
 
   # How often the bot attempts a conversion pass (in ticks; 20 = 1 second).
-  tick-interval-ticks: 10
+  tick-interval-ticks: 1
+
+  # Maximum new falling blocks for each anchor column in one conversion pass.
+  placements-per-column-per-tick: 2
+
+  # Global safety cap across one Sand Bot in one conversion pass. A radius of
+  # 2 has at most 25 columns, so 50 permits the two-per-column default.
+  max-placements-per-tick: 50
 
 # ============================================
 # TNT FILL
@@ -519,29 +466,7 @@ tntfill:
   enabled: true
 
   # Hard-capped at 100 in code regardless of this value.
-  max-radius: 100
-
-# ============================================
-# NAMETAGS
-# ============================================
-nametags:
-  # Enable/disable nametags above player heads
-  enabled: true
-
-  # How often to update nametags (in ticks; 20 ticks = 1 second)
-  update-interval-ticks: 15
-
-  # Nametag format is fixed: &8[&a<ftop>&8] &8[<color>faction&8] &e<player>
-  # The faction-name color below is relative to each *viewer*, not fixed --
-  # every player has their own scoreboard, and each nametag is its own team
-  # registered per-viewer, so the same subject can render green to their
-  # own faction, light purple to an allied faction, and red to everyone
-  # else, all at once.
-  colors:
-    same-faction: 'green'      # Your own faction
-    ally: 'light_purple'
-    enemy: 'red'
-    neutral: 'gray'             # Factionless subjects, and factions with no ally/enemy relation
+  max-radius: 7511
 
 # ============================================
 # REBOOT SYSTEM

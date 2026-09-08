@@ -1,3 +1,8 @@
+# Bumped whenever a bundled message changes. On startup Vertex replaces an
+# older on-disk copy of this file with the new bundled one, moving the
+# previous file into lang/backup/ first so customizations can be re-applied.
+lang-version: 2
+
 general:
   no-permission: '<red>✖ Du hast keinen Zugriff auf diesen Befehl.'
   data-unavailable: '<red>Deine Spielerdaten sind voruebergehend nicht verfuegbar. Versuche es spaeter erneut.'
@@ -28,25 +33,30 @@ admin:
   storage-requires-idle-server: '<red>Die Speichermigration erfordert keine Online-Spieler und keine aktiven Blueprints.'
   storage-login-blocked: '<red>Eine kurze Speichermigration läuft. Bitte verbinde dich gleich erneut.'
 
-cannon:
-  usage: '<red>Verwendung: /cannon reload|toggle'
-  reloaded: '<green>Cannon-Modul-Konfiguration neu geladen.'
-  enabled: '<green>Cannon-Modul aktiviert.'
-  disabled: '<red>Cannon-Modul deaktiviert.'
-
 sandbot:
   usage: '<red>Verwendung: /sandbot give <player>|stop [player]'
   given: '<green>{player} hat einen Sandbot erhalten.'
   invalid-surface: '<red>Sandbots müssen auf Andesit, Sandstein, rotem Sandstein oder Beton platziert werden.'
   not-own-claim: '<red>Sandbots können nur im Claim deiner eigenen Fraktion platziert werden.'
-  spawn-failed: '<red>Der Sandbot konnte nicht erstellt werden -- ist Citizens installiert?'
+  spawn-failed: '<red>Der Sandbot konnte nicht erstellt werden -- ist FancyNPCs installiert und aktiviert?'
   spawned: '<green>Sandbot eingesetzt.'
-  finished: '<green>Dein Sandbot ist fertig und wurde entfernt.'
   out-of-funds: '<red>Deinem Sandbot ist das Geld ausgegangen -- er wurde entfernt.'
   stopped: '<green>{amount} deiner aktiven Sandbot(s) gestoppt.'
   stopped-other: '<green>{amount} aktive(r) Sandbot(s) von {player} gestoppt.'
+  gui:
+    title: '&8Sandbot-Kontrollpanel'
+    active-status: '&aStatus: Aktiv &7(Klicken zum Pausieren)'
+    paused-status: '&cStatus: Pausiert &7(Klicken zum Fortsetzen)'
+    despawn: '&cSandbot entfernen'
+  item:
+    name: '&eSandbot'
+    lore:
+      - '&7Auf einen beliebigen Block platzieren -- sucht nach'
+      - '&7Andesit, Sandstein, rotem Sandstein oder Beton'
+      - '&7in der Nähe; muss in deinem Claim sein.'
 
 tntfill:
+  filled-partial: '&<red>✖ {filled} Werfer befüllt (&cunzureichendes Geld/TNT&7).'
   usage: '<red>Verwendung: /tntfill <radius> <amount> bank|inventory'
   disabled: '<red>TNT Fill ist derzeit deaktiviert.'
   invalid-radius: '<red>Radius muss zwischen 1 und {max} liegen.'
@@ -534,7 +544,7 @@ backpack:
   debug-disabled: '&e&lBACKPACKS &7> <gray>Backpack-Debugging deaktiviert.'
   debug-trace: '&e&lBACKPACKS &7> <gray>DEBUG: {detail}'
   filter-usage: '&e&lBACKPACKS &7> <gray>Usage: /filter <material|clear>'
-  filter-none: '<gray>none'
+  filter-none: 'none'
   filter-list: '&e&lBACKPACKS &7> <gray>Filtered: <white>{items}'
   filter-enabled: '&e&lBACKPACKS &7> <green>{item} will be discarded while a Backpack is equipped.'
   filter-disabled: '&e&lBACKPACKS &7> <gray>{item} will no longer be discarded.'
@@ -571,6 +581,7 @@ capture:
   list-entry: "<gray>- <white>{name}</white> <dark_gray>({id}) <gray>in <white>{world}</white>: <yellow>{state}</yellow>"
   focus-no-active: "<yellow>There is no active {type} in your world to focus."
   focus-not-found: "<red>✖ <gray>That active {type} could not be found."
+  focus-wrong-world: "<red>✖ <gray>That {type} is in <white>{world}</white>. You must be in that world to focus it."
   focused: "<green>✔ <gray>Now focusing {type} <white>{name}</white>. Use <white>/{type} focus off</white> to return to your rally."
   focus-cleared: "<green>✔ <gray>Capture focus cleared; your faction rally can show again."
   focus-none: "<yellow>You are not focusing a capture event."
@@ -608,9 +619,6 @@ coinflip:
   claim-title: "<dark_gray>ᴄʟᴀɪᴍ ʏᴏᴜʀ ɪᴛᴇᴍꜱ"
   view-items-title: "<dark_gray>ᴡᴀɢᴇʀᴇᴅ ɪᴛᴇᴍꜱ"
   wager-title: "<dark_gray>ᴄʜᴏᴏꜱᴇ ʏᴏᴜʀ ᴡᴀɢᴇʀ"
-  animations-title: "<yellow><bold>ᴄᴏɪɴꜰʟɪᴘ ᴀɴɪᴍᴀᴛɪᴏɴꜱ"
-  toggle-on: "<green>✔ Click to Toggle ✔"
-  toggle-off: "<red>✖ Click to Toggle ✖"
   claim-button-empty: "<gray><bold>ᴄᴏʟʟᴇᴄᴛ ꜱᴛᴀꜱʜ"
   claim-button-empty-lore: "<red>✖ No Claimable Items ✖ You do not have any pending coinflipped items to claim."
   claim-button-has-items: "<green><bold>ᴄᴏʟʟᴇᴄᴛ ꜱᴛᴀꜱʜ"
@@ -679,7 +687,6 @@ coinflip:
   listing-pending-match-other: "<gray>⧗ Someone is already waiting on the host's approval."
   item-match-requested: "&6&lCOINFLIP&r &7> <yellow>{player}<gray> wants to match your item coinflip. <click:run_command:'/cf review {id}'><yellow><underlined><bold>[ Click to Review ]</bold></underlined></yellow></click>"
   item-match-awaiting-approval: "&6&lCOINFLIP&r &7> <yellow>Your items are held until the host approves or denies your wager."
-  item-match-approved: "&6&lCOINFLIP&r &7> <green>Match approved -- the coinflip has been resolved."
   item-match-you-denied: "&6&lCOINFLIP&r &7> <yellow>You denied that wager -- their items were returned."
   item-match-denied: "&6&lCOINFLIP&r &7> <red>The host denied your wager -- your items have been returned."
   item-match-expired: "&6&lCOINFLIP&r &7> <red>The host didn't respond in time -- your items have been returned."
@@ -696,7 +703,6 @@ coinflip:
   you-won: "&6&lCOINFLIP&r &7> <green><bold>You won the coinflip!"
   you-lost: "&6&lCOINFLIP&r &7> <red>You lost the coinflip."
   pending-exp-applied: "&6&lCOINFLIP&r &7> <green>You were credited {levels} levels from a coinflip while you were offline."
-  broadcast-result: "&6&lCOINFLIP&r &7> <yellow>{winner} <gray>won a coinflip worth <yellow>{wager}<gray>!"
   logs-empty: "&6&lCOINFLIP&r &7> <gray>No log entries found."
   logs-header: "&6&lCOINFLIP&r &7> <gray>Audit log, page {page}:"
   logs-line: "<gray>#{id} <white>{host}<gray> vs <white>{opponent} <gray>[{type}] {summary} -> winner: <yellow>{winner}<gray> ({status})"
@@ -705,6 +711,7 @@ shop:
   gui-title: "<dark_gray>ꜱʜᴏᴘ"
   category-gui-title: "<dark_gray>ꜱʜᴏᴘ ➜ {category}"
   category-title: "<yellow>{category}"
+  spawners-category-title: "<yellow>Spawner"
   category-open-lore: "<green>✔ Click to Open ✔"
   back-button: "<red>← Back to Categories"
   balance-title: "<gold><bold>ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ"

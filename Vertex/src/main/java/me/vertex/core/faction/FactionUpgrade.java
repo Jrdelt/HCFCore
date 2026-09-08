@@ -15,7 +15,9 @@ public enum FactionUpgrade {
     WARPS("warps", Material.ENDER_PEARL),
     SPAWNER_RATE("spawner-rate", Material.SPAWNER),
     CROP_GROWTH("crop-growth", Material.WHEAT),
-    MOB_XP("mob-xp", Material.EXPERIENCE_BOTTLE);
+    MOB_XP("mob-xp", Material.EXPERIENCE_BOTTLE),
+    /** Its per-level "bonus" is an absolute TNT capacity, not a percentage. */
+    TNT_BANK("tnt-bank", Material.TNT);
 
     private final String configKey;
     private final Material icon;

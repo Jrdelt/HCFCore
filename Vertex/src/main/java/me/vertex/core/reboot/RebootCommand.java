@@ -21,11 +21,24 @@ public final class RebootCommand implements CommandExecutor {
             sender.sendMessage(messages.getChat(sender, "general.no-permission"));
             return true;
         }
-        if (args.length > 1 || (args.length == 1 && !args[0].equalsIgnoreCase("cancel"))) {
+        if (args.length > 1) {
             sender.sendMessage(messages.getChat(sender, "reboot.usage"));
             return true;
         }
         if (args.length == 1) {
+            if (!args[0].equalsIgnoreCase("cancel")) {
+                try {
+                    int minutes = Integer.parseInt(args[0]);
+                    if (minutes < 1) {
+                        sender.sendMessage(messages.getChat(sender, "reboot.usage"));
+                    } else if (!rebootManager.schedule(minutes)) {
+                        sender.sendMessage(messages.getChat(sender, "reboot.already-scheduled"));
+                    }
+                } catch (NumberFormatException error) {
+                    sender.sendMessage(messages.getChat(sender, "reboot.usage"));
+                }
+                return true;
+            }
             // On success, RebootManager.cancel() already broadcasts
             // reboot.cancelled to every online player and the console --
             // sending it again here would double it up for the sender.

@@ -2,6 +2,7 @@ package me.vertex.core.shop;
 
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.spawner.SpawnerManager;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -25,10 +26,12 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
     private static final int MAX_TRADE_AMOUNT = 10_000;
 
     private final ShopManager manager;
+    private final SpawnerManager spawnerManager;
     private final Messages messages;
 
-    public ShopCommand(ShopManager manager, Messages messages) {
+    public ShopCommand(ShopManager manager, SpawnerManager spawnerManager, Messages messages) {
         this.manager = manager;
+        this.spawnerManager = spawnerManager;
         this.messages = messages;
     }
 
@@ -43,7 +46,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length == 0) {
-            ShopMenu.openCategories(player, manager, messages);
+            ShopMenu.openCategories(player, manager, spawnerManager, messages);
             return true;
         }
         if (args.length < 2 || !(args[0].equalsIgnoreCase("buy") || args[0].equalsIgnoreCase("sell"))) {

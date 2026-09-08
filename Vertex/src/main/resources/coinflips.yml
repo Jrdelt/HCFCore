@@ -51,6 +51,10 @@ item-icon-cycle-ticks: 10
 # 10 ticks keeps item-wager icon cycling smooth without per-tick work.
 gui-refresh-interval-ticks: 10
 
+# Both participants see the same result animation before either receives a
+# win/loss chat line. Values outside 5-10 seconds are safely clamped.
+animation-duration-seconds: 6
+
 # How long a resolved or cancelled coinflip stays in the staff audit log
 # (/cf logs) before being pruned. 0 means never delete it.
 log-retention-days: 0

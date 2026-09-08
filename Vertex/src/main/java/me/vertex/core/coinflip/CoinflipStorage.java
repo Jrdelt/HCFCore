@@ -72,6 +72,21 @@ public final class CoinflipStorage {
                 levels INT NOT NULL
             )""";
 
+    private static final String CREATE_RESULT_NOTIFICATIONS_MYSQL = """
+            CREATE TABLE IF NOT EXISTS coinflip_result_notifications (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                recipient_uuid CHAR(36) NOT NULL,
+                won BOOLEAN NOT NULL,
+                created_at BIGINT NOT NULL
+            )""";
+    private static final String CREATE_RESULT_NOTIFICATIONS_SQLITE = """
+            CREATE TABLE IF NOT EXISTS coinflip_result_notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                recipient_uuid CHAR(36) NOT NULL,
+                won BOOLEAN NOT NULL,
+                created_at BIGINT NOT NULL
+            )""";
+
     private static final String CREATE_PENDING_MATCHES_MYSQL = """
             CREATE TABLE IF NOT EXISTS coinflip_pending_matches (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -115,12 +130,18 @@ public final class CoinflipStorage {
             )""";
     private static final String CREATE_LOG_INDEX =
             "CREATE INDEX IF NOT EXISTS idx_coinflip_log_resolved_at ON coinflip_log (resolved_at DESC)";
+    private static final String CREATE_CLAIMS_OWNER_INDEX =
+            "CREATE INDEX IF NOT EXISTS idx_coinflip_claims_winner ON coinflip_claims (winner_uuid)";
+    private static final String CREATE_NOTIFICATION_RECIPIENT_INDEX =
+            "CREATE INDEX IF NOT EXISTS idx_coinflip_result_notifications_recipient "
+                    + "ON coinflip_result_notifications (recipient_uuid)";
 
     private final Database database;
     private final String createCoinflips;
     private final String createClaims;
     private final String createLog;
     private final String createPendingMatches;
+    private final String createResultNotifications;
 
     public CoinflipStorage(Database database) {
         this.database = database;
@@ -129,14 +150,18 @@ public final class CoinflipStorage {
         this.createClaims = sqlite ? CREATE_CLAIMS_SQLITE : CREATE_CLAIMS_MYSQL;
         this.createLog = sqlite ? CREATE_LOG_SQLITE : CREATE_LOG_MYSQL;
         this.createPendingMatches = sqlite ? CREATE_PENDING_MATCHES_SQLITE : CREATE_PENDING_MATCHES_MYSQL;
+        this.createResultNotifications = sqlite ? CREATE_RESULT_NOTIFICATIONS_SQLITE : CREATE_RESULT_NOTIFICATIONS_MYSQL;
     }
 
     public void init() throws SQLException {
         try (Connection connection = database.getConnection(); Statement statement = connection.createStatement()) {
             statement.executeUpdate(createCoinflips);
             statement.executeUpdate(createClaims);
+            statement.executeUpdate(CREATE_CLAIMS_OWNER_INDEX);
             statement.executeUpdate(CREATE_BANS);
             statement.executeUpdate(CREATE_PENDING_EXP);
+            statement.executeUpdate(createResultNotifications);
+            statement.executeUpdate(CREATE_NOTIFICATION_RECIPIENT_INDEX);
             statement.executeUpdate(createLog);
             statement.executeUpdate(CREATE_LOG_INDEX);
             statement.executeUpdate(createPendingMatches);
@@ -192,6 +217,50 @@ public final class CoinflipStorage {
              PreparedStatement statement = connection.prepareStatement("DELETE FROM coinflips WHERE id = ?")) {
             statement.setInt(1, id);
             statement.executeUpdate();
+        }
+    }
+
+    /**
+     * Commits the durable result record, removes the now-unplayable listing,
+     * and queues both result messages as one database transaction. A restart
+     * during the client animation can therefore never reroll a winner or
+     * silently lose the disconnected participant's result.
+     */
+    public void resolveCoinflip(Coinflip coinflip, UUID opponentUuid, UUID winnerUuid, String summary,
+            long resolvedAt) throws SQLException {
+        String logSql = """
+                INSERT INTO coinflip_log (host_uuid, opponent_uuid, type, summary, winner_uuid, resolved_at, status, cancelled_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""";
+        String notificationSql = "INSERT INTO coinflip_result_notifications (recipient_uuid, won, created_at) "
+                + "VALUES (?, ?, ?)";
+        try (Connection connection = database.getConnection()) {
+            boolean originalAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try (PreparedStatement delete = connection.prepareStatement("DELETE FROM coinflips WHERE id = ?");
+                 PreparedStatement log = connection.prepareStatement(logSql);
+                 PreparedStatement notification = connection.prepareStatement(notificationSql)) {
+                delete.setInt(1, coinflip.id());
+                delete.executeUpdate();
+
+                log.setString(1, coinflip.hostUuid().toString());
+                setNullableUuid(log, 2, opponentUuid);
+                log.setString(3, coinflip.type().name());
+                log.setString(4, summary);
+                setNullableUuid(log, 5, winnerUuid);
+                log.setLong(6, resolvedAt);
+                log.setString(7, CoinflipLogEntry.Status.RESOLVED.name());
+                log.setNull(8, Types.CHAR);
+                log.executeUpdate();
+
+                insertResultNotification(notification, coinflip.hostUuid(), winnerUuid.equals(coinflip.hostUuid()), resolvedAt);
+                insertResultNotification(notification, opponentUuid, winnerUuid.equals(opponentUuid), resolvedAt);
+                connection.commit();
+            } catch (SQLException failure) {
+                connection.rollback();
+                throw failure;
+            } finally {
+                connection.setAutoCommit(originalAutoCommit);
+            }
         }
     }
 
@@ -307,6 +376,22 @@ public final class CoinflipStorage {
         }
     }
 
+    /** Deletes only the rendered claim rows, never claims created after a GUI opened. */
+    public void deleteClaimsById(List<Integer> ids) throws SQLException {
+        if (ids.isEmpty()) {
+            return;
+        }
+        String placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+        try (Connection connection = database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "DELETE FROM coinflip_claims WHERE id IN (" + placeholders + ")")) {
+            for (int index = 0; index < ids.size(); index++) {
+                statement.setInt(index + 1, ids.get(index));
+            }
+            statement.executeUpdate();
+        }
+    }
+
     // ---- Self-bans ----
 
     /** @return every self-ban's expiry, keyed by player, loaded once at startup. */
@@ -383,6 +468,69 @@ public final class CoinflipStorage {
         try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement("DELETE FROM coinflip_pending_exp WHERE uuid = ?")) {
             statement.setString(1, uuid.toString());
+            statement.executeUpdate();
+        }
+    }
+
+    // ---- Deferred result chat (participants who disconnect during the animation) ----
+
+    public void insertResultNotification(UUID recipientUuid, boolean won, long createdAt) throws SQLException {
+        String sql = "INSERT INTO coinflip_result_notifications (recipient_uuid, won, created_at) VALUES (?, ?, ?)";
+        try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, recipientUuid.toString());
+            statement.setBoolean(2, won);
+            statement.setLong(3, createdAt);
+            statement.executeUpdate();
+        }
+    }
+
+    private static void insertResultNotification(PreparedStatement statement, UUID recipientUuid, boolean won,
+            long createdAt) throws SQLException {
+        statement.setString(1, recipientUuid.toString());
+        statement.setBoolean(2, won);
+        statement.setLong(3, createdAt);
+        statement.executeUpdate();
+    }
+
+    public List<CoinflipResultNotification> loadResultNotifications(UUID recipientUuid) throws SQLException {
+        List<CoinflipResultNotification> notifications = new ArrayList<>();
+        String sql = "SELECT id, won, created_at FROM coinflip_result_notifications "
+                + "WHERE recipient_uuid = ? ORDER BY id ASC";
+        try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, recipientUuid.toString());
+            try (ResultSet results = statement.executeQuery()) {
+                while (results.next()) {
+                    notifications.add(new CoinflipResultNotification(
+                            results.getInt("id"), recipientUuid, results.getBoolean("won"), results.getLong("created_at")));
+                }
+            }
+        }
+        return notifications;
+    }
+
+    public void deleteResultNotificationsById(List<Integer> ids) throws SQLException {
+        if (ids.isEmpty()) {
+            return;
+        }
+        String placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+        try (Connection connection = database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "DELETE FROM coinflip_result_notifications WHERE id IN (" + placeholders + ")")) {
+            for (int index = 0; index < ids.size(); index++) {
+                statement.setInt(index + 1, ids.get(index));
+            }
+            statement.executeUpdate();
+        }
+    }
+
+    /** Removes only the result line that was just sent, never unrelated pending results. */
+    public void deleteResultNotifications(UUID recipientUuid, boolean won, long createdAt) throws SQLException {
+        String sql = "DELETE FROM coinflip_result_notifications "
+                + "WHERE recipient_uuid = ? AND won = ? AND created_at = ?";
+        try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, recipientUuid.toString());
+            statement.setBoolean(2, won);
+            statement.setLong(3, createdAt);
             statement.executeUpdate();
         }
     }

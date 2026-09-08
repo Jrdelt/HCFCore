@@ -11,7 +11,7 @@
 ## What Vertex adds
 
 - **Kits and PvP:** six armor classes, ability items, combat tags, Legacy
-  Combat, Archer Tags, optional Citizens Ghost Players, pearl restrictions,
+  Combat, Archer Tags, optional killable Villager Ghost Players, pearl restrictions,
   and persistent item cooldowns.
 - **Factions:** rally points, a role-permission GUI, per-faction upgrades,
   a shared money/XP/TNT bank, faction chat, relation-aware nametags,
@@ -34,7 +34,7 @@ configuration, permissions, and operational limits.
 | FactionsUUID 4.4+ | Vertex itself and all faction features |
 | Vault | money costs, the money bank, and upgrade purchases |
 | FastAsyncWorldEdit + DecentHolograms | Blueprint base building |
-| Citizens | optional Ghost Player NPCs for forced disconnects |
+| FancyNPCs | optional Sand Bot displays |
 
 WorldGuard, LuckPerms, PlaceholderAPI, EssentialsX,
 MySQL/MariaDB is optional. Its exact effects are

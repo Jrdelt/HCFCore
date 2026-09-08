@@ -316,6 +316,39 @@ class AuctionManagerTest {
         assertFalse(manager.isWatching(buyer.getUniqueId(), listingId), "a sold listing must not linger on anyone's watchlist");
     }
 
+    @Test
+    void priceSortIsHighestFirstWithOldestAndThenIdAsDeterministicTies() {
+        UUID sellerId = seller.getUniqueId();
+        List<AuctionListing> listings = List.of(
+                new AuctionListing(3, sellerId, new ItemStack(Material.DIAMOND), 100, AuctionCurrency.MONEY, 30, 500),
+                new AuctionListing(2, sellerId, new ItemStack(Material.EMERALD), 100, AuctionCurrency.MONEY, 20, 500),
+                new AuctionListing(1, sellerId, new ItemStack(Material.GOLD_INGOT), 200, AuctionCurrency.MONEY, 40, 500),
+                new AuctionListing(4, sellerId, new ItemStack(Material.IRON_INGOT), 100, AuctionCurrency.MONEY, 20, 500));
+
+        List<Integer> ids = listings.stream()
+                .sorted(AuctionMenu.listingComparator(AuctionMenu.SortMode.PRICE, AuctionMenu.SortDirection.DESCENDING))
+                .map(AuctionListing::id)
+                .toList();
+
+        assertEquals(List.of(1, 2, 4, 3), ids);
+    }
+
+    @Test
+    void datePostedSortIsOldestFirstWithIdAsDeterministicTieBreaker() {
+        UUID sellerId = seller.getUniqueId();
+        List<AuctionListing> listings = List.of(
+                new AuctionListing(3, sellerId, new ItemStack(Material.DIAMOND), 100, AuctionCurrency.MONEY, 20, 500),
+                new AuctionListing(1, sellerId, new ItemStack(Material.EMERALD), 100, AuctionCurrency.MONEY, 10, 500),
+                new AuctionListing(2, sellerId, new ItemStack(Material.GOLD_INGOT), 100, AuctionCurrency.MONEY, 10, 500));
+
+        List<Integer> ids = listings.stream()
+                .sorted(AuctionMenu.listingComparator(AuctionMenu.SortMode.DATE_POSTED, AuctionMenu.SortDirection.ASCENDING))
+                .map(AuctionListing::id)
+                .toList();
+
+        assertEquals(List.of(1, 2, 3), ids);
+    }
+
     private int countInInventory(PlayerMock inventoryOwner, Material material) {
         int count = 0;
         for (ItemStack item : inventoryOwner.getInventory().getStorageContents()) {

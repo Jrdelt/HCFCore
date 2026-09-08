@@ -4,7 +4,9 @@ import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -17,8 +19,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Opened by {@code /spawners} -- a catalog of every spawner type buyable from spawners.yml. */
+/**
+ * Opened as the "Spawners" category from {@code /shop} -- a catalog of
+ * every spawner type buyable from spawners.yml. Priced per mob type
+ * (spawners.yml), not per Material, so this stays its own menu rather
+ * than becoming literal {@code ShopEntry} rows.
+ */
 public final class SpawnerShopMenu {
+
+    /** Reserved slot for the "back to shop" button -- mob icons start at 1. */
+    public static final int SLOT_BACK = 0;
 
     private SpawnerShopMenu() {
     }
@@ -28,7 +38,9 @@ public final class SpawnerShopMenu {
         Inventory inventory = Bukkit.createInventory(holder, 27, messages.get(player, "spawner.shop-title"));
         holder.inventory = inventory;
 
-        int slot = 0;
+        inventory.setItem(SLOT_BACK, backButton(player, messages));
+
+        int slot = SLOT_BACK + 1;
         for (SpawnerManager.MobConfig config : manager.getMobConfigs()) {
             if (slot >= inventory.getSize()) {
                 break;
@@ -38,6 +50,15 @@ public final class SpawnerShopMenu {
             slot++;
         }
         player.openInventory(inventory);
+    }
+
+    private static ItemStack backButton(Player player, Messages messages) {
+        ItemStack item = new ItemStack(Material.ARROW);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(messages.get(player, "shop.back-button")
+                .decoration(TextDecoration.ITALIC, false));
+        item.setItemMeta(meta);
+        return item;
     }
 
     private static ItemStack buildIcon(Player player, Messages messages, SpawnerManager.MobConfig config) {

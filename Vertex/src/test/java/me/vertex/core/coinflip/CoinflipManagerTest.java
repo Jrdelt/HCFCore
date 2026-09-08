@@ -455,29 +455,18 @@ class CoinflipManagerTest {
     }
 
     @Test
-    void animationsPreferenceDefaultsOnAndToggles() {
-        UUID uuid = host.getUniqueId();
-        assertTrue(manager.animationsEnabled(uuid));
-
-        manager.toggleAnimations(uuid);
-        assertFalse(manager.animationsEnabled(uuid));
-
-        manager.toggleAnimations(uuid);
-        assertTrue(manager.animationsEnabled(uuid));
-    }
-
-    @Test
-    void resultAnimationDoesNotOpenForAParticipantInCombat() {
+    void resultAnimationAlsoOpensForAParticipantInCombat() {
         combatManager.tagAgainstServer(host);
 
         manager.createMoneyCoinflip(host, 100.0, null);
         Coinflip coinflip = manager.activeCoinflips().get(0);
         manager.play(coinflip.id(), opponent);
+        beginResultAnimation();
 
         boolean animationOpen = host.getOpenInventory() != null
                 && host.getOpenInventory().getTopInventory() != null
                 && host.getOpenInventory().getTopInventory().getHolder() instanceof CoinflipAnimationMenu.Holder;
-        assertFalse(animationOpen, "a combat-tagged participant must not have the animation GUI forced open on them");
+        assertTrue(animationOpen, "both coinflip participants must see the same animation, even while combat-tagged");
     }
 
     @Test
@@ -485,6 +474,7 @@ class CoinflipManagerTest {
         manager.createMoneyCoinflip(host, 100.0, null);
         Coinflip coinflip = manager.activeCoinflips().get(0);
         manager.play(coinflip.id(), opponent);
+        beginResultAnimation();
 
         assertTrue(host.getOpenInventory().getTopInventory().getHolder() instanceof CoinflipAnimationMenu.Holder);
         assertTrue(opponent.getOpenInventory().getTopInventory().getHolder() instanceof CoinflipAnimationMenu.Holder);
@@ -496,31 +486,35 @@ class CoinflipManagerTest {
         Coinflip coinflip = manager.activeCoinflips().get(0);
 
         manager.play(coinflip.id(), opponent);
+        beginResultAnimation();
 
-        // broadcast-results is on by default and fires immediately -- drain
-        // that one message before checking that the *personal* reveal hasn't.
-        host.nextComponentMessage();
-        opponent.nextComponentMessage();
         assertNull(host.nextComponentMessage(), "the result must not be revealed to a participant before their animation lands");
         assertNull(opponent.nextComponentMessage(), "the result must not be revealed to a participant before their animation lands");
 
-        ((BukkitSchedulerMock) server.getScheduler()).performTicks(80L);
+        ((BukkitSchedulerMock) server.getScheduler()).performTicks(manager.animationDurationTicks() + 2L);
 
         assertNotNull(host.nextComponentMessage(), "the animation must have landed and revealed the result by now");
         assertNotNull(opponent.nextComponentMessage());
     }
 
     @Test
-    void winLoseMessageIsNotDeferredForAParticipantInCombat() {
+    void winLoseMessageRemainsDeferredForAParticipantInCombat() {
         combatManager.tagAgainstServer(host);
         manager.createMoneyCoinflip(host, 100.0, null);
         Coinflip coinflip = manager.activeCoinflips().get(0);
 
         manager.play(coinflip.id(), opponent);
+        beginResultAnimation();
 
-        host.nextComponentMessage(); // the immediate broadcast
-        assertNotNull(host.nextComponentMessage(),
-                "a combat-tagged participant skips the animation, so their result must be told right away");
+        assertNull(host.nextComponentMessage(), "combat must not bypass the shared result animation");
+        ((BukkitSchedulerMock) server.getScheduler()).performTicks(manager.animationDurationTicks() + 2L);
+        assertNotNull(host.nextComponentMessage(), "the result is revealed only once both animations finish");
+    }
+
+    /** Flushes the atomic result write, then executes its main-thread animation start. */
+    private void beginResultAnimation() {
+        manager.awaitWrites();
+        ((BukkitSchedulerMock) server.getScheduler()).performTicks(1L);
     }
 
     private static final class FakeEconomy implements Economy {

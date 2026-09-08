@@ -19,9 +19,11 @@ import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
@@ -59,7 +61,7 @@ import java.util.logging.Level;
  */
 public final class CaptureEventManager implements Listener {
 
-    public enum FocusOutcome { FOCUSED, CLEARED, NO_ACTIVE, NOT_FOUND }
+    public enum FocusOutcome { FOCUSED, CLEARED, NO_ACTIVE, NOT_FOUND, WRONG_WORLD }
 
     private static final DateTimeFormatter SCHEDULE_TIME = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -90,6 +92,8 @@ public final class CaptureEventManager implements Listener {
     private String neutralDisplayName = "No Faction";
     private ZoneId scheduleZone = ZoneId.systemDefault();
     private BukkitTask tickTask;
+    private BukkitTask directionTask;
+    private long directionUpdateTicks;
 
     public CaptureEventManager(Plugin plugin, Messages messages, RallyManager rallyManager, StaffManager staffManager) {
         this.plugin = plugin;
@@ -110,6 +114,7 @@ public final class CaptureEventManager implements Listener {
         defaultCaptureSeconds = Math.max(1, config.getInt("defaults.capture-seconds", 300));
         defaultMaxDurationSeconds = Math.max(1, config.getInt("defaults.max-duration-seconds", 45 * 60));
         defaultAdditionalMemberSpeed = Math.max(0D, config.getDouble("defaults.additional-member-speed", 0.25D));
+        directionUpdateTicks = Math.max(1L, config.getLong("defaults.direction-update-ticks", 10L));
         maximumSelectionVolume = Math.max(1L, config.getLong("selection.maximum-volume", 1_000_000L));
         hologramsEnabled = config.getBoolean("hologram.enabled", true);
         hologramLines = List.copyOf(config.getStringList("hologram.lines"));
@@ -143,6 +148,7 @@ public final class CaptureEventManager implements Listener {
             Bukkit.getPluginManager().registerEvents(xpBoosters, plugin);
             tickTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
         }
+        restartDirectionTask();
         rallyManager.setExternalDirectionFocus(this::hasFocus);
         AbilityGate.setCaptureZoneDisabled(this::areAbilitiesDisabledAt);
     }
@@ -150,6 +156,9 @@ public final class CaptureEventManager implements Listener {
     public void reload() {
         stopAll(false);
         load();
+        if (tickTask != null) {
+            restartDirectionTask();
+        }
     }
 
     public boolean isEnabled() {
@@ -362,6 +371,9 @@ public final class CaptureEventManager implements Listener {
         if (!active.containsKey(requested.id())) {
             return FocusOutcome.NOT_FOUND;
         }
+        if (requested.center() == null || !player.getWorld().equals(requested.center().getWorld())) {
+            return FocusOutcome.WRONG_WORLD;
+        }
         if (Objects.equals(currentId, requested.id())) {
             focusedEvents.remove(player.getUniqueId());
             hideFocusBossBar(player);
@@ -455,10 +467,9 @@ public final class CaptureEventManager implements Listener {
 
     @EventHandler
     public void onWorldChange(PlayerChangedWorldEvent event) {
-        // A focus is deliberately world-local: its compass cannot navigate another dimension and must not hide a rally.
-        if (focusedEvents.remove(event.getPlayer().getUniqueId()) != null) {
-            hideFocusBossBar(event.getPlayer());
-        }
+        // Keep the selection for a return to its world, but never render a
+        // cross-world compass/bossbar in the meantime.
+        hideFocusBossBar(event.getPlayer());
     }
 
     @EventHandler
@@ -472,6 +483,10 @@ public final class CaptureEventManager implements Listener {
     }
 
     public void shutdown() {
+        if (directionTask != null) {
+            directionTask.cancel();
+            directionTask = null;
+        }
         if (tickTask != null) {
             tickTask.cancel();
             tickTask = null;
@@ -481,6 +496,14 @@ public final class CaptureEventManager implements Listener {
         xpBoosters.shutdown();
         AbilityGate.setCaptureZoneDisabled(null);
         rallyManager.setExternalDirectionFocus(null);
+    }
+
+    /** Keeps direction rendering responsive without running capture scoring every movement tick. */
+    private void restartDirectionTask() {
+        if (directionTask != null) {
+            directionTask.cancel();
+        }
+        directionTask = Bukkit.getScheduler().runTaskTimer(plugin, this::updateDirections, 1L, directionUpdateTicks);
     }
 
     private void completeSelection(Player player, Selection selection) {
@@ -571,7 +594,6 @@ public final class CaptureEventManager implements Listener {
         for (Completion completion : completions) {
             complete(completion);
         }
-        updateDirections();
         xpBoosters.cleanupExpired();
     }
 
@@ -643,8 +665,12 @@ public final class CaptureEventManager implements Listener {
                 continue;
             }
             int factionId = FactionsHook.getFactionId(player);
-            // Factionless players can capture, but are intentionally solo
-            // teams: unrelated neutral players cannot pool capture speed.
+            // KOTH ownership and its PvP rules are faction objectives. A
+            // factionless player cannot make solo progress there, whereas an
+            // Outpost may still use the legacy neutral-contestant behavior.
+            if (definition.type() == CaptureEventType.KOTH && factionId == FactionsHook.NO_FACTION) {
+                continue;
+            }
             String key = factionId == FactionsHook.NO_FACTION ? "player:" + player.getUniqueId() : "faction:" + factionId;
             members.computeIfAbsent(key, ignored -> new ArrayList<>()).add(player);
             factionIds.put(key, factionId);
@@ -662,6 +688,41 @@ public final class CaptureEventManager implements Listener {
     private boolean isEligibleContestant(Player player, CaptureDefinition definition) {
         return player.isOnline() && !player.isDead() && player.getGameMode() != GameMode.SPECTATOR
                 && !staffManager.isVanished(player.getUniqueId()) && definition.contains(player.getLocation());
+    }
+
+    /**
+     * Factionless players cannot use an active KOTH as a no-risk PvP area.
+     * Cancel the hit when either participant lacks a faction and either side
+     * is inside the event cuboid; projectile hits resolve to their shooter.
+     */
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onKothDamage(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof Player victim)) {
+            return;
+        }
+        Player attacker = playerDamager(event);
+        if (attacker == null || !insideActiveKoth(attacker.getLocation()) && !insideActiveKoth(victim.getLocation())) {
+            return;
+        }
+        if (FactionsHook.getFactionId(attacker) == FactionsHook.NO_FACTION
+                || FactionsHook.getFactionId(victim) == FactionsHook.NO_FACTION) {
+            event.setCancelled(true);
+        }
+    }
+
+    private Player playerDamager(EntityDamageByEntityEvent event) {
+        if (event.getDamager() instanceof Player player) {
+            return player;
+        }
+        if (event.getDamager() instanceof Projectile projectile && projectile.getShooter() instanceof Player player) {
+            return player;
+        }
+        return null;
+    }
+
+    private boolean insideActiveKoth(Location location) {
+        return active.values().stream().anyMatch(capture -> capture.definition.type() == CaptureEventType.KOTH
+                && capture.definition.contains(location));
     }
 
     private void recordContributions(ActiveCapture capture, CaptureTeam team) {
@@ -736,16 +797,10 @@ public final class CaptureEventManager implements Listener {
                 updateDirectionBossBar(player, focused, true);
                 continue;
             }
-            if (rallyManager.hasActiveRally(player)) {
-                hideFocusBossBar(player);
-                continue;
-            }
-            ActiveCapture target = nearestActive(player, null);
-            if (target == null) {
-                hideFocusBossBar(player);
-                continue;
-            }
-            updateDirectionBossBar(player, target, false);
+            // A cleared /koth focus must stay clear. Showing the nearest
+            // active event here was what made /koth focus off disappear for
+            // one tick and then immediately return.
+            hideFocusBossBar(player);
         }
     }
 
@@ -787,12 +842,15 @@ public final class CaptureEventManager implements Listener {
     private ActiveCapture focusedCapture(Player player) {
         String id = focusedEvents.get(player.getUniqueId());
         ActiveCapture capture = id == null ? null : active.get(id);
-        if (capture == null || capture.definition.center() == null
-                || !player.getWorld().equals(capture.definition.center().getWorld())) {
+        if (capture == null || capture.definition.center() == null) {
             focusedEvents.remove(player.getUniqueId());
             if (id != null) {
                 hideFocusBossBar(player);
             }
+            return null;
+        }
+        if (!player.getWorld().equals(capture.definition.center().getWorld())) {
+            hideFocusBossBar(player);
             return null;
         }
         return capture;
@@ -807,7 +865,8 @@ public final class CaptureEventManager implements Listener {
                 .orElse(null);
     }
 
-    private CaptureDefinition definition(CaptureEventType type, String eventId) {
+    /** Package-visible for the focus command's wrong-world explanation. */
+    CaptureDefinition definition(CaptureEventType type, String eventId) {
         String normalized = normalizeId(eventId);
         CaptureDefinition definition = normalized == null ? null : definitions.get(normalized);
         return definition != null && definition.type() == type ? definition : null;
@@ -954,8 +1013,13 @@ public final class CaptureEventManager implements Listener {
         double dx = target.getX() - from.getX();
         double dz = target.getZ() - from.getZ();
         int distance = (int) Math.round(Math.sqrt(dx * dx + dz * dz));
-        float bearing = (float) Math.toDegrees(Math.atan2(dx, -dz));
-        return new Direction(arrow(bearing), distance);
+        float targetBearing = (float) Math.toDegrees(Math.atan2(dx, -dz));
+        // Bukkit yaw is 0=south and grows counter-clockwise, while the
+        // bearing above is 0=north and grows clockwise. Convert it before
+        // taking the difference so ↑ always means straight ahead of the
+        // moving player, not permanently north on their screen.
+        float playerBearing = player.getLocation().getYaw() + 180F;
+        return new Direction(arrow(targetBearing - playerBearing), distance);
     }
 
     private static String arrow(float bearing) {

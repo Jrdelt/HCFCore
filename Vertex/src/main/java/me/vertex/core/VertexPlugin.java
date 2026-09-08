@@ -62,8 +62,6 @@ import me.vertex.core.storage.Database;
 import me.vertex.core.storage.SqlStorage;
 import me.vertex.core.storage.Storage;
 import me.vertex.core.user.UserManager;
-import me.vertex.core.nametag.NametagManager;
-import me.vertex.core.nametag.NametagListener;
 import me.vertex.core.staff.EndseeCommand;
 import me.vertex.core.staff.FreezeCommand;
 import me.vertex.core.staff.FreezeListener;
@@ -80,6 +78,7 @@ import me.vertex.core.staff.VanishListener;
 import me.vertex.core.tag.TagManager;
 import me.vertex.core.tag.TagsCommand;
 import me.vertex.core.tag.TagMenuListener;
+import me.vertex.core.util.NumberFormatConfig;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -108,10 +107,10 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private KitManager kitManager;
     private AbilityManager abilityManager;
     private CombatManager combatManager;
-    private me.vertex.core.cannon.CannonManager cannonManager;
     private LegacyCombatManager legacyCombatManager;
     private me.vertex.core.spawner.SpawnerStorage spawnerStorage;
     private me.vertex.core.spawner.SpawnerManager spawnerManager;
+    private me.vertex.core.spawner.SpawnerMenuListener spawnerMenuListener;
     private me.vertex.core.spawner.MobStackListener mobStackListener;
     private me.vertex.core.collector.ChunkCollectorStorage chunkCollectorStorage;
     private me.vertex.core.collector.ChunkCollectorManager chunkCollectorManager;
@@ -140,7 +139,6 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.pvp.LootProtectionListener lootProtectionListener;
     private HungerManagementListener hungerManagementListener;
     private me.vertex.core.listener.ItemRestrictionListener itemRestrictionListener;
-    private NametagManager nametagManager;
     private StaffManager staffManager;
     private me.vertex.core.backpack.BackpackManager backpackManager;
     private me.vertex.core.coinflip.CoinflipStorage coinflipStorage;
@@ -174,6 +172,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(this, this);
 
         saveDefaultConfig();
+        NumberFormatConfig.load(this);
 
         if (!validateRuntimeDependencies()) {
             Bukkit.getPluginManager().disablePlugin(this);
@@ -237,7 +236,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 getConfig().getString("pvp.actionbar.vs-server", ""),
                 getConfig().getString("pvp.actionbar.vs-player", ""),
                 getConfig().getString("pvp.actionbar.vs-unknown", ""));
-        combatManager.start();
+combatManager.start();
 
         legacyCombatManager = new LegacyCombatManager(this);
         Bukkit.getPluginManager().registerEvents(legacyCombatManager, this);
@@ -256,13 +255,9 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         rallyCommand = new RallyCommand(this, rallyManager, messages);
         getCommand("frally").setExecutor(rallyCommand);
         Bukkit.getPluginManager().registerEvents(rallyCommand, this);
-        me.vertex.core.faction.RallyPermissionMenu rallyPermissionMenu =
-                new me.vertex.core.faction.RallyPermissionMenu(this, rallyManager, messages);
+        me.vertex.core.faction.RallyPermissionMenu rallyPermissionMenu = new me.vertex.core.faction.RallyPermissionMenu(
+                this, rallyManager, messages);
         Bukkit.getPluginManager().registerEvents(rallyPermissionMenu, this);
-
-        me.vertex.core.faction.TntFillCommand tntFillCommand = new me.vertex.core.faction.TntFillCommand(this, messages);
-        getCommand("tntfill").setExecutor(tntFillCommand);
-        getCommand("tntfill").setTabCompleter(tntFillCommand);
 
         factionUpgradeManager = new FactionUpgradeManager(this, factionUpgradeStorage);
         factionUpgradeManager.load();
@@ -273,18 +268,15 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 new me.vertex.core.faction.FactionUpgradeEffectsListener(this, factionUpgradeManager), this);
         factionBankManager = new me.vertex.core.faction.FactionBankManager(this, factionBankStorage);
         factionBankManager.load();
-        factionBankMenu = new me.vertex.core.faction.FactionBankMenu(this, factionBankManager, rallyManager, messages,
-                chatAmountPrompt);
+        factionBankManager.migrateNativeTntBanks();
+        factionBankMenu = new me.vertex.core.faction.FactionBankMenu(this, factionBankManager, factionUpgradeManager,
+                rallyManager, messages, chatAmountPrompt);
+        me.vertex.core.faction.TntFillCommand tntFillCommand =
+                new me.vertex.core.faction.TntFillCommand(this, messages, factionBankManager);
+        getCommand("tntfill").setExecutor(tntFillCommand);
+        getCommand("tntfill").setTabCompleter(tntFillCommand);
         Bukkit.getPluginManager().registerEvents(factionBankManager, this);
         Bukkit.getPluginManager().registerEvents(factionBankMenu, this);
-
-        nametagManager = new NametagManager(this);
-        Bukkit.getPluginManager().registerEvents(new NametagListener(nametagManager), this);
-
-        cannonManager = loadCannonManager();
-        cannonManager.start();
-        Bukkit.getPluginManager().registerEvents(new me.vertex.core.cannon.CannonListener(cannonManager), this);
-        getCommand("cannon").setExecutor(new me.vertex.core.cannon.CannonCommand(this, cannonManager, messages));
 
         staffManager = new StaffManager(this);
 
@@ -329,15 +321,16 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 new me.vertex.core.spawner.SpawnerMobListener(this, spawnerManager), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.spawner.SpawnerClaimListener(spawnerManager, messages), this);
-        Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.spawner.SpawnerMenuListener(spawnerManager, staffManager, messages, rallyManager), this);
-        getCommand("spawners").setExecutor(new me.vertex.core.spawner.SpawnerCommand(spawnerManager, messages));
+        spawnerMenuListener = new me.vertex.core.spawner.SpawnerMenuListener(spawnerManager, staffManager, messages,
+                rallyManager);
+        Bukkit.getPluginManager().registerEvents(spawnerMenuListener, this);
         Bukkit.getScheduler().runTaskTimer(this, spawnerManager::manualSpawnTick, 100L, 100L);
         mobStackListener = new me.vertex.core.spawner.MobStackListener(this, spawnerManager);
         Bukkit.getPluginManager().registerEvents(mobStackListener, this);
         Bukkit.getScheduler().runTaskTimer(this, mobStackListener::consolidateStacks, 40L, 40L);
 
-        chunkCollectorManager = new me.vertex.core.collector.ChunkCollectorManager(this, chunkCollectorStorage, messages);
+        chunkCollectorManager = new me.vertex.core.collector.ChunkCollectorManager(this, chunkCollectorStorage,
+                messages);
         chunkCollectorManager.load();
         chunkCollectorManager.loadIndexFromDatabase();
         reconcileLoadedManagedBlocks();
@@ -350,34 +343,35 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 new me.vertex.core.faction.FactionRenameListener(spawnerManager, chunkCollectorManager), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.collector.ChunkCollectorMenuListener(chunkCollectorManager, staffManager, messages,
-                        rallyManager, chatAmountPrompt), this);
+                        rallyManager, chatAmountPrompt),
+                this);
         Bukkit.getScheduler().runTaskTimer(this, chunkCollectorListener::scanForMissedItems,
                 chunkCollectorManager.scanIntervalTicks(), chunkCollectorManager.scanIntervalTicks());
-        me.vertex.core.collector.ChunkCollectorCommand chunkCollectorCommand =
-                new me.vertex.core.collector.ChunkCollectorCommand(chunkCollectorManager, messages);
+        me.vertex.core.collector.ChunkCollectorCommand chunkCollectorCommand = new me.vertex.core.collector.ChunkCollectorCommand(
+                chunkCollectorManager, messages);
         getCommand("chunkcollector").setExecutor(chunkCollectorCommand);
         getCommand("chunkcollector").setTabCompleter(chunkCollectorCommand);
 
         backpackManager = new me.vertex.core.backpack.BackpackManager(this, messages);
         backpackManager.load();
-        me.vertex.core.backpack.BackpackFilterManager backpackFilterManager =
-                new me.vertex.core.backpack.BackpackFilterManager(this);
+        me.vertex.core.backpack.BackpackFilterManager backpackFilterManager = new me.vertex.core.backpack.BackpackFilterManager(
+                this);
         backpackFilterManager.load();
-        me.vertex.core.backpack.BackpackInteractListener backpackInteractListener =
-                new me.vertex.core.backpack.BackpackInteractListener(backpackManager, messages);
+        me.vertex.core.backpack.BackpackInteractListener backpackInteractListener = new me.vertex.core.backpack.BackpackInteractListener(
+                backpackManager, messages);
         Bukkit.getPluginManager().registerEvents(backpackInteractListener, this);
-        me.vertex.core.backpack.BackpackAutoStoreListener backpackAutoStoreListener =
-                new me.vertex.core.backpack.BackpackAutoStoreListener(backpackManager, backpackFilterManager, messages);
+        me.vertex.core.backpack.BackpackAutoStoreListener backpackAutoStoreListener = new me.vertex.core.backpack.BackpackAutoStoreListener(
+                backpackManager, backpackFilterManager, messages);
         Bukkit.getPluginManager().registerEvents(backpackAutoStoreListener, this);
         mobStackListener.setPlayerDropRouter(backpackAutoStoreListener::routePlayerMobDrops);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.backpack.BackpackMenuListener(backpackManager, messages), this);
-        me.vertex.core.backpack.BackpackCommand backpackCommand =
-                new me.vertex.core.backpack.BackpackCommand(backpackManager, messages, backpackInteractListener);
+        me.vertex.core.backpack.BackpackCommand backpackCommand = new me.vertex.core.backpack.BackpackCommand(
+                backpackManager, messages, backpackInteractListener);
         getCommand("backpack").setExecutor(backpackCommand);
         getCommand("backpack").setTabCompleter(backpackCommand);
-        me.vertex.core.backpack.BackpackFilterCommand backpackFilterCommand =
-                new me.vertex.core.backpack.BackpackFilterCommand(backpackFilterManager, messages);
+        me.vertex.core.backpack.BackpackFilterCommand backpackFilterCommand = new me.vertex.core.backpack.BackpackFilterCommand(
+                backpackFilterManager, messages);
         getCommand("filter").setExecutor(backpackFilterCommand);
         getCommand("filter").setTabCompleter(backpackFilterCommand);
 
@@ -388,16 +382,19 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 new me.vertex.core.coinflip.CoinflipMenuListener(coinflipManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.coinflip.CoinflipWagerMenuListener(coinflipManager, messages), this);
-        Bukkit.getPluginManager().registerEvents(new me.vertex.core.coinflip.CoinflipJoinListener(coinflipManager), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.coinflip.CoinflipJoinListener(coinflipManager),
+                this);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.coinflip.CoinflipAnimationMenuListener(), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.coinflip.CoinflipMatchReviewMenuListener(coinflipManager, messages), this);
-        me.vertex.core.coinflip.CoinflipCommand coinflipCommand =
-                new me.vertex.core.coinflip.CoinflipCommand(coinflipManager, messages);
+        me.vertex.core.coinflip.CoinflipCommand coinflipCommand = new me.vertex.core.coinflip.CoinflipCommand(
+                coinflipManager, messages);
         getCommand("cf").setExecutor(coinflipCommand);
         getCommand("cf").setTabCompleter(coinflipCommand);
-        // Bukkit cancels this along with every other of this plugin's tasks on disable --
-        // no explicit cancel()/reschedule needed, same as every other fixed-cadence task here.
+        // Bukkit cancels this along with every other of this plugin's tasks on disable
+        // --
+        // no explicit cancel()/reschedule needed, same as every other fixed-cadence
+        // task here.
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             coinflipManager.sweepExpiredItemMatches();
             coinflipManager.pruneLog();
@@ -409,18 +406,30 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         shopManager.load();
         shopManager.loadState();
         Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.shop.ShopMenuListener(shopManager, messages), this);
-        me.vertex.core.shop.ShopCommand shopCommand = new me.vertex.core.shop.ShopCommand(shopManager, messages);
+                new me.vertex.core.shop.ShopMenuListener(shopManager, spawnerManager, messages), this);
+        me.vertex.core.shop.ShopCommand shopCommand =
+                new me.vertex.core.shop.ShopCommand(shopManager, spawnerManager, messages);
         getCommand("shop").setExecutor(shopCommand);
         getCommand("shop").setTabCompleter(shopCommand);
+        // SpawnerMenuListener needs a way back to the shop's category picker
+        // now that /spawners no longer exists as its own entry point -- shop
+        // isn't constructed yet at spawner-setup time above, so it's wired in
+        // here instead of the constructor.
+        spawnerMenuListener.setShopManager(shopManager);
         shopDecayTask = Bukkit.getScheduler().runTaskTimer(this, shopManager::decayTick,
                 shopManager.decayIntervalTicks(), shopManager.decayIntervalTicks());
 
         sandBotManager = loadSandBotManager();
         sandBotManager.start();
-        Bukkit.getPluginManager().registerEvents(new me.vertex.core.sandbot.SandBotListener(sandBotManager, messages), this);
-        me.vertex.core.sandbot.SandBotCommand sandBotCommand =
-                new me.vertex.core.sandbot.SandBotCommand(sandBotManager, messages);
+        Plugin fancyNpcs = Bukkit.getPluginManager().getPlugin("FancyNpcs");
+        if (fancyNpcs != null && fancyNpcs.isEnabled()) {
+            Bukkit.getPluginManager().registerEvents(new me.vertex.core.sandbot.SandBotListener(sandBotManager, messages),
+                    this);
+        } else {
+            getLogger().warning("FancyNPCs is not enabled; Sand Bots cannot be placed until it is installed.");
+        }
+        me.vertex.core.sandbot.SandBotCommand sandBotCommand = new me.vertex.core.sandbot.SandBotCommand(sandBotManager,
+                messages);
         getCommand("sandbot").setExecutor(sandBotCommand);
         getCommand("sandbot").setTabCompleter(sandBotCommand);
 
@@ -434,8 +443,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.auction.AuctionHistoryMenuListener(auctionManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.auction.AuctionJoinListener(auctionManager), this);
-        me.vertex.core.auction.AuctionCommand auctionCommand =
-                new me.vertex.core.auction.AuctionCommand(auctionManager, messages);
+        me.vertex.core.auction.AuctionCommand auctionCommand = new me.vertex.core.auction.AuctionCommand(auctionManager,
+                messages);
         getCommand("ah").setExecutor(auctionCommand);
         getCommand("ah").setTabCompleter(auctionCommand);
         auctionSweepTask = Bukkit.getScheduler().runTaskTimer(this, auctionManager::sweepExpired,
@@ -444,18 +453,21 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         tradeManager = new me.vertex.core.trade.TradeManager(this, tradeStorage, messages);
         tradeManager.load();
         tradeManager.restoreEscrow();
-        Bukkit.getPluginManager().registerEvents(new me.vertex.core.trade.TradeListener(this, tradeManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.trade.TradeListener(this, tradeManager, messages),
+                this);
         me.vertex.core.trade.TradeCommand tradeCommand = new me.vertex.core.trade.TradeCommand(tradeManager, messages);
         getCommand("trade").setExecutor(tradeCommand);
         getCommand("trade").setTabCompleter(tradeCommand);
         getCommand("tradetoggle").setExecutor(new me.vertex.core.trade.TradeToggleCommand(tradeManager, messages));
         getCommand("tradeadmin").setExecutor(new me.vertex.core.trade.TradeAdminCommand(tradeManager, messages));
-        me.vertex.core.trade.TradeHistoryCommand tradeHistoryCommand = new me.vertex.core.trade.TradeHistoryCommand(tradeManager, messages);
+        me.vertex.core.trade.TradeHistoryCommand tradeHistoryCommand = new me.vertex.core.trade.TradeHistoryCommand(
+                tradeManager, messages);
         getCommand("tradehistory").setExecutor(tradeHistoryCommand);
         getCommand("tradehistory").setTabCompleter(tradeHistoryCommand);
         getCommand("tradelogs").setExecutor(tradeHistoryCommand);
         getCommand("tradelogs").setTabCompleter(tradeHistoryCommand);
-        Bukkit.getPluginManager().registerEvents(new me.vertex.core.trade.TradeHistoryListener(tradeManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.trade.TradeHistoryListener(tradeManager, messages),
+                this);
         Bukkit.getScheduler().runTaskTimer(this, tradeManager::sweep, 20L, 20L);
 
         initializeBlueprintFeature();
@@ -472,9 +484,9 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(
                 new AntiBlockupBoneListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
-            new MageSpellListener(this, abilityManager, userManager, messages), this);
+                new MageSpellListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
-            new RogueBackstabListener(this, abilityManager, userManager, messages), this);
+                new RogueBackstabListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new FakePearlListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
@@ -498,14 +510,19 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 new NinjaStarListener(this, abilityManager, userManager, combatManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new FallDamageImmunityListener(), this);
         Bukkit.getPluginManager().registerEvents(new FullHealSplashListener(), this);
-        Bukkit.getPluginManager().registerEvents(new VanillaCooldownListener(this, messages, vanillaCooldownManager), this);
+        Bukkit.getPluginManager().registerEvents(new VanillaCooldownListener(this, messages, vanillaCooldownManager),
+                this);
         archerTagListener = new ArcherTagListener(this, archerTagManager);
         Bukkit.getPluginManager().registerEvents(archerTagListener, this);
-        // Periodic cleanup of expired archer tag entries to prevent unbounded map growth
+        // Periodic cleanup of expired archer tag entries to prevent unbounded map
+        // growth
         Bukkit.getScheduler().runTaskTimer(this, archerTagManager::cleanupExpired, 300L, 300L);
-        Bukkit.getPluginManager().registerEvents(new PearlStunnerListener(this, abilityManager, userManager, messages), this);
-        Bukkit.getPluginManager().registerEvents(new RabbitsFeedListener(this, abilityManager, userManager, messages), this);
-        Bukkit.getPluginManager().registerEvents(new JumpBoostFeatherListener(this, abilityManager, userManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new PearlStunnerListener(this, abilityManager, userManager, messages),
+                this);
+        Bukkit.getPluginManager().registerEvents(new RabbitsFeedListener(this, abilityManager, userManager, messages),
+                this);
+        Bukkit.getPluginManager()
+                .registerEvents(new JumpBoostFeatherListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new TagMenuListener(this), this);
         Bukkit.getPluginManager().registerEvents(new ChatFormatterListener(tagManager, this), this);
         Bukkit.getPluginManager().registerEvents(new FactionCommandListener(this, messages), this);
@@ -562,7 +579,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             placeholderExpansion = new me.vertex.core.placeholderapi.VertexPlaceholderExpansion(this, userManager,
                     kitManager, abilityManager, combatManager, factionBankManager, staffManager, rebootManager,
                     backpackManager, tagManager, blueprintManager, coinflipManager, auctionManager, tradeManager,
-                    rallyManager, factionUpgradeManager, cannonManager, sandBotManager);
+                    rallyManager, factionUpgradeManager, sandBotManager);
             placeholderExpansion.register();
         }
     }
@@ -584,74 +601,30 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 } catch (Exception e) {
                     getLogger().log(java.util.logging.Level.WARNING,
                             "Failed to reconcile managed blocks in loaded chunk " + world.getName() + ","
-                                    + chunk.getX() + "," + chunk.getZ(), e);
+                                    + chunk.getX() + "," + chunk.getZ(),
+                            e);
                 }
             }
         }
     }
 
-    /** Re-renders the Active Coinflips browser in place for every online player who currently has it open. */
+    /**
+     * Re-renders the Active Coinflips browser in place for every online player who
+     * currently has it open.
+     */
     private void refreshOpenCoinflipBrowsers() {
         for (org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
             me.vertex.core.coinflip.CoinflipMenu.refreshOpenBrowse(player, coinflipManager, messages);
         }
     }
 
-    private me.vertex.core.cannon.CannonManager loadCannonManager() {
-        java.util.Set<String> disabledRegions =
-                java.util.Set.copyOf(getConfig().getStringList("cannon.disabled-regions"));
-        java.util.Set<String> disabledClaimNames =
-                java.util.Set.copyOf(getConfig().getStringList("cannon.disabled-claim-names"));
-        return new me.vertex.core.cannon.CannonManager(this,
-                getConfig().getBoolean("cannon.enabled", true),
-                getConfig().getInt("cannon.max-ignitions-per-tick", 12),
-                getConfig().getInt("cannon.max-simultaneous-per-location", 4),
-                getConfig().getDouble("cannon.max-y-velocity", 3.6),
-                getConfig().getDouble("cannon.height-band.lower", 256),
-                getConfig().getDouble("cannon.height-band.upper", 320),
-                getConfig().getDouble("cannon.height-band.velocity-multiplier", 0.6),
-                getConfig().getDouble("cannon.velocity-scan-radius-blocks", 8),
-                getConfig().getInt("cannon.launch-window-ticks", 20),
-                getConfig().getBoolean("cannon.damage-control.protect-launch-structure", true),
-                getConfig().getBoolean("cannon.damage-control.suppress-fire-spread", true),
-                disabledRegions, disabledClaimNames);
-    }
-
-    /** Applies the current cannon.* config values to the running manager, in place. */
-    private void applyCannonConfig() {
-        if (cannonManager == null) {
-            return;
-        }
-        java.util.Set<String> disabledRegions =
-                java.util.Set.copyOf(getConfig().getStringList("cannon.disabled-regions"));
-        java.util.Set<String> disabledClaimNames =
-                java.util.Set.copyOf(getConfig().getStringList("cannon.disabled-claim-names"));
-        cannonManager.reconfigure(
-                getConfig().getBoolean("cannon.enabled", true),
-                getConfig().getInt("cannon.max-ignitions-per-tick", 12),
-                getConfig().getInt("cannon.max-simultaneous-per-location", 4),
-                getConfig().getDouble("cannon.max-y-velocity", 3.6),
-                getConfig().getDouble("cannon.height-band.lower", 256),
-                getConfig().getDouble("cannon.height-band.upper", 320),
-                getConfig().getDouble("cannon.height-band.velocity-multiplier", 0.6),
-                getConfig().getDouble("cannon.velocity-scan-radius-blocks", 8),
-                getConfig().getInt("cannon.launch-window-ticks", 20),
-                getConfig().getBoolean("cannon.damage-control.protect-launch-structure", true),
-                getConfig().getBoolean("cannon.damage-control.suppress-fire-spread", true),
-                disabledRegions, disabledClaimNames);
-    }
-
-    /** Reloads config.yml and applies cannon.* in place -- called by /cannon reload. */
-    public void reloadCannonModule() {
-        reloadConfig();
-        applyCannonConfig();
-    }
-
     private me.vertex.core.sandbot.SandBotManager loadSandBotManager() {
         return new me.vertex.core.sandbot.SandBotManager(this, factionBankManager, shopManager, messages,
                 getConfig().getBoolean("sandbot.enabled", true),
                 getConfig().getInt("sandbot.radius-blocks", 2),
-                getConfig().getLong("sandbot.tick-interval-ticks", 10L),
+                getConfig().getLong("sandbot.tick-interval-ticks", 1L),
+                getConfig().getInt("sandbot.placements-per-column-per-tick", 2),
+                getConfig().getInt("sandbot.max-placements-per-tick", 50),
                 org.bukkit.entity.EntityType.PLAYER);
     }
 
@@ -662,7 +635,9 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         sandBotManager.reconfigure(
                 getConfig().getBoolean("sandbot.enabled", true),
                 getConfig().getInt("sandbot.radius-blocks", 2),
-                getConfig().getLong("sandbot.tick-interval-ticks", 10L),
+                getConfig().getLong("sandbot.tick-interval-ticks", 1L),
+                getConfig().getInt("sandbot.placements-per-column-per-tick", 2),
+                getConfig().getInt("sandbot.max-placements-per-tick", 50),
                 org.bukkit.entity.EntityType.PLAYER);
     }
 
@@ -673,9 +648,6 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         }
         if (sandBotManager != null) {
             sandBotManager.stop();
-        }
-        if (cannonManager != null) {
-            cannonManager.stop();
         }
         if (combatManager != null) {
             combatManager.stop();
@@ -735,9 +707,6 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         if (tradeManager != null) {
             tradeManager.shutdown();
         }
-        if (nametagManager != null) {
-            nametagManager.shutdown();
-        }
         FakePearlListener.clearAll();
         if (storage != null) {
             storage.close();
@@ -779,7 +748,9 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         console.sendMessage(Component.empty());
     }
 
-    /** Wires Blueprints only while both optional runtime dependencies are enabled. */
+    /**
+     * Wires Blueprints only while both optional runtime dependencies are enabled.
+     */
     private void initializeBlueprintFeature() {
         if (blueprintManager != null) {
             return;
@@ -787,7 +758,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         Plugin fawe = Bukkit.getPluginManager().getPlugin("FastAsyncWorldEdit");
         Plugin holograms = Bukkit.getPluginManager().getPlugin("DecentHolograms");
         if (fawe == null || !fawe.isEnabled() || holograms == null || !holograms.isEnabled()) {
-            getLogger().info("Blueprint Base Builder disabled -- requires enabled FastAsyncWorldEdit and DecentHolograms.");
+            getLogger().info(
+                    "Blueprint Base Builder disabled -- requires enabled FastAsyncWorldEdit and DecentHolograms.");
             return;
         }
 
@@ -796,28 +768,24 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         blueprintListener = new me.vertex.core.blueprint.BlueprintListener(this, blueprintManager, messages);
         Bukkit.getPluginManager().registerEvents(blueprintListener, this);
         Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.blueprint.BlueprintMenuListener(blueprintManager, blueprintListener, messages), this);
+                new me.vertex.core.blueprint.BlueprintMenuListener(blueprintManager, blueprintListener, messages),
+                this);
         Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.blueprint.BlueprintActivationMenuListener(blueprintListener, blueprintManager, messages), this);
+                new me.vertex.core.blueprint.BlueprintActivationMenuListener(blueprintListener, blueprintManager,
+                        messages),
+                this);
         blueprintListener.resumeAll();
         Bukkit.getScheduler().runTaskTimer(this, blueprintListener::tickBuilds, 1L, 1L);
-        me.vertex.core.blueprint.BlueprintCommand blueprintCommand =
-                new me.vertex.core.blueprint.BlueprintCommand(this, blueprintManager, messages);
+        me.vertex.core.blueprint.BlueprintCommand blueprintCommand = new me.vertex.core.blueprint.BlueprintCommand(this,
+                blueprintManager, messages);
         getCommand("blueprint").setExecutor(blueprintCommand);
         getCommand("blueprint").setTabCompleter(blueprintCommand);
         getLogger().info("Blueprint Base Builder enabled.");
     }
 
-    /** Enables Ghost Players if Citizens is presently available, including after a live reload. */
+    /** Enables the native Villager-based Ghost Player feature. */
     private void initializeGhostPlayerFeature() {
         if (ghostPlayerManager != null) {
-            return;
-        }
-        Plugin citizens = Bukkit.getPluginManager().getPlugin("Citizens");
-        if (citizens == null || !citizens.isEnabled()) {
-            if (getConfig().getBoolean("pvp.ghost-players.enabled", false)) {
-                getLogger().warning("Ghost Players are enabled in config.yml but Citizens is not enabled; feature disabled.");
-            }
             return;
         }
         ghostPlayerManager = new GhostPlayerManager(this, combatManager, messages);
@@ -825,7 +793,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         if (playerConnectionListener != null) {
             playerConnectionListener.setGhostPlayerManager(ghostPlayerManager);
         }
-        getLogger().info("Ghost Players integration enabled.");
+        getLogger().info("Ghost Players integration enabled (native Villagers).");
     }
 
     public static boolean hasRequiredDependency(PluginManager pluginManager) {
@@ -840,11 +808,12 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         }
 
         List<String> optionalDependencies = List.of("Vault", "WorldGuard", "LuckPerms",
-                "FastAsyncWorldEdit", "DecentHolograms", "Citizens");
+                "FastAsyncWorldEdit", "DecentHolograms", "FancyNpcs");
         for (String dependency : optionalDependencies) {
             Plugin present = Bukkit.getPluginManager().getPlugin(dependency);
             if (present == null || !present.isEnabled()) {
-                getLogger().warning("Optional dependency not detected: " + dependency + ". Related features will be disabled.");
+                getLogger().warning(
+                        "Optional dependency not detected: " + dependency + ". Related features will be disabled.");
             }
         }
 
@@ -853,15 +822,18 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
 
     public void reload() {
         reloadConfig();
+        NumberFormatConfig.load(this);
         validateRuntimeDependencies();
 
         if (messages != null) {
             messages.load();
         }
+        if (rallyManager != null) {
+            rallyManager.reloadConfig();
+        }
         if (itemRestrictionListener != null) {
             itemRestrictionListener.reload();
         }
-        applyCannonConfig();
         applySandBotConfig();
         if (abilityManager != null) {
             abilityManager.load();
@@ -892,7 +864,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         if (coinflipManager != null) {
             long previousGuiRefreshInterval = coinflipManager.guiRefreshIntervalTicks();
             coinflipManager.load();
-            if (coinflipGuiRefreshTask != null && previousGuiRefreshInterval != coinflipManager.guiRefreshIntervalTicks()) {
+            if (coinflipGuiRefreshTask != null
+                    && previousGuiRefreshInterval != coinflipManager.guiRefreshIntervalTicks()) {
                 coinflipGuiRefreshTask.cancel();
                 coinflipGuiRefreshTask = Bukkit.getScheduler().runTaskTimer(this, this::refreshOpenCoinflipBrowsers,
                         coinflipManager.guiRefreshIntervalTicks(), coinflipManager.guiRefreshIntervalTicks());
@@ -924,9 +897,6 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         }
         if (tagManager != null) {
             tagManager.load();
-        }
-        if (nametagManager != null) {
-            nametagManager.reload();
         }
 
         if (combatManager != null) {
@@ -992,22 +962,39 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         return storageMigrationRunning.compareAndSet(false, true);
     }
 
-    /** Called off-thread after {@link #beginStorageMigration()} to drain source writes. */
+    /**
+     * Called off-thread after {@link #beginStorageMigration()} to drain source
+     * writes.
+     */
     public void awaitStorageWritesForMigration() {
-        if (kitManager != null) kitManager.awaitWrites();
-        if (abilityManager != null) abilityManager.awaitWrites();
-        if (languageCommand != null) languageCommand.awaitWrites();
-        if (deathManager != null) deathManager.awaitWrites();
-        if (tagManager != null) tagManager.awaitWrites();
-        if (spawnerManager != null) spawnerManager.awaitWrites();
-        if (chunkCollectorManager != null) chunkCollectorManager.awaitWrites();
-        if (blueprintManager != null) blueprintManager.awaitWrites();
-        if (factionUpgradeManager != null) factionUpgradeManager.awaitWrites();
-        if (factionBankManager != null) factionBankManager.awaitWrites();
-        if (coinflipManager != null) coinflipManager.awaitWrites();
-        if (shopManager != null) shopManager.awaitWrites();
-        if (auctionManager != null) auctionManager.awaitWrites();
-        if (tradeManager != null) tradeManager.awaitWrites();
+        if (kitManager != null)
+            kitManager.awaitWrites();
+        if (abilityManager != null)
+            abilityManager.awaitWrites();
+        if (languageCommand != null)
+            languageCommand.awaitWrites();
+        if (deathManager != null)
+            deathManager.awaitWrites();
+        if (tagManager != null)
+            tagManager.awaitWrites();
+        if (spawnerManager != null)
+            spawnerManager.awaitWrites();
+        if (chunkCollectorManager != null)
+            chunkCollectorManager.awaitWrites();
+        if (blueprintManager != null)
+            blueprintManager.awaitWrites();
+        if (factionUpgradeManager != null)
+            factionUpgradeManager.awaitWrites();
+        if (factionBankManager != null)
+            factionBankManager.awaitWrites();
+        if (coinflipManager != null)
+            coinflipManager.awaitWrites();
+        if (shopManager != null)
+            shopManager.awaitWrites();
+        if (auctionManager != null)
+            auctionManager.awaitWrites();
+        if (tradeManager != null)
+            tradeManager.awaitWrites();
     }
 
     public void finishStorageMigration() {

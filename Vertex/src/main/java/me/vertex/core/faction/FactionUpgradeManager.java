@@ -48,6 +48,7 @@ public final class FactionUpgradeManager implements Listener {
     private volatile Map<FactionUpgrade, Definition> definitions = Map.of();
     private volatile boolean enabled;
     private volatile boolean leaderOnly;
+    private volatile long tntBaseCapacity;
     private volatile Runnable spawnerRetune = () -> { };
 
     public FactionUpgradeManager(Plugin plugin, FactionUpgradeStorage storage) {
@@ -74,6 +75,7 @@ public final class FactionUpgradeManager implements Listener {
     public void reloadConfig() {
         enabled = plugin.getConfig().getBoolean("faction-upgrades.enabled", true);
         leaderOnly = plugin.getConfig().getBoolean("faction-upgrades.leader-only", true);
+        tntBaseCapacity = Math.max(0L, plugin.getConfig().getLong("faction-upgrades.tnt-base-capacity", 1_000_000L));
         EnumMap<FactionUpgrade, Definition> loaded = new EnumMap<>(FactionUpgrade.class);
         for (FactionUpgrade upgrade : FactionUpgrade.values()) {
             String path = "faction-upgrades.upgrades." + upgrade.configKey();
@@ -133,6 +135,20 @@ public final class FactionUpgradeManager implements Listener {
 
     public double bonusAtLevel(FactionUpgrade upgrade, int level) {
         return definition(upgrade).atLevel(level).bonus();
+    }
+
+    /**
+     * A faction's TNT bank ceiling. Unlike the percentage upgrades, each
+     * TNT_BANK level's configured "bonus" is the absolute capacity at that
+     * level, so an unupgraded faction falls back to the configured base
+     * rather than to zero.
+     */
+    public long tntCapacity(int factionId) {
+        int level = level(factionId, FactionUpgrade.TNT_BANK);
+        if (!enabled || !definition(FactionUpgrade.TNT_BANK).enabled() || level <= 0) {
+            return tntBaseCapacity;
+        }
+        return Math.max(tntBaseCapacity, (long) bonusAtLevel(FactionUpgrade.TNT_BANK, level));
     }
 
     /** The amount charged for the next level, or -1 once maxed/disabled. */

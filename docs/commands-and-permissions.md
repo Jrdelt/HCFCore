@@ -37,9 +37,13 @@ permission is checked — anyone can run it.
 
 ## Spawners & Chunk Collectors
 
+Spawners no longer have their own command — they're a category inside
+`/shop` now (see [Shop](#shop) below). Buying one opens the same
+per-mob-type catalog `/spawners` used to, just reached through the
+shop's category picker instead of its own top-level command.
+
 | Command | Permission | Notes |
 |---|---|---|
-| `/spawners` | Open to all | Opens the spawner shop GUI. |
 | `/chunkcollector give <player>` | `vertex.collector.give` | Gives a Chunk Collector — no in-game shop for these. |
 
 ## Blueprint Base Builder
@@ -91,6 +95,11 @@ are available for staff testing. See [Player Trading](trading.md).
 | `/shop buy <item> [amount]` | — | Buys at the current dynamic price, regardless of category. |
 | `/shop sell <item> [amount]` | — | Sells at the current dynamic price, regardless of category. |
 
+The category picker's last icon is **Spawners** — a separate catalog
+(one flat price per mob type, from `spawners.yml`, not part of the
+dynamic-price system the rest of the shop uses) with its own Back
+button. This replaces the old standalone `/spawners` command.
+
 ## Auction House
 
 | Command | Permission | Notes |
@@ -109,7 +118,7 @@ are available for staff testing. See [Player Trading](trading.md).
 | `/f permissions` / `/f perms` | Faction leader only (checked in-code, not a permission node) | Opens the faction permission matrix GUI. |
 | `/f upgrades` / `/f upgrade` | Faction role needs FactionsUUID's native `UPGRADE` action allowed | Opens Vertex's persistent faction-upgrades GUI. Set `faction-upgrades.leader-only: true` to restrict purchases further. FactionsUUID's native upgrade administration remains separate. |
 | `/f bank` | Faction member; role permissions apply to deposits/withdrawals | Opens the six-row faction bank for money, experience, and TNT. |
-| `/tntfill <radius> <amount> bank\|inventory` | `vertex.tntfill.use` (default: everyone) | Fills every dispenser within `radius` blocks (max 100) of you, inside your own faction's claim, with up to `amount` TNT — drawn from FactionsUUID's native TNT bank (the same one `/f bank` manages) or your own inventory. |
+| `/tntfill <radius> <amount> bank\|inventory` | `vertex.tntfill.use` (default: everyone) | Fills every dispenser within `radius` blocks (max 100) of you, inside your own faction's claim, with up to `amount` TNT — drawn from the faction's Vertex TNT bank (the same one `/f bank` manages) or your own inventory. The bank is debited before any dispenser is filled, and anything the dispensers cannot take is returned immediately. |
 
 ## KOTH & Outposts
 
@@ -123,12 +132,10 @@ are available for staff testing. See [Player Trading](trading.md).
 See [KOTH & Outposts](koth-and-outposts.md) for capture rules, schedules,
 rewards, and the `capture-events.yml` reference.
 
-## TNT Cannons & Sand Bots
+## Sand Bots
 
 | Command | Permission | Notes |
 |---|---|---|
-| `/cannon reload` | `vertex.cannon.admin` | Reloads `cannon.*` config in place. |
-| `/cannon toggle` | `vertex.cannon.admin` | Global on/off switch, without a config edit + reload. |
 | `/sandbot give <player>` | `vertex.sandbot.give` | Gives a Sand Bot item. |
 | `/sandbot stop` | Open to all | Stops your own active Sand Bot(s). |
 | `/sandbot stop <player>` | `vertex.sandbot.admin` | Stops another player's active Sand Bot(s). |

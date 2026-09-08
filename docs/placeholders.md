@@ -146,11 +146,10 @@ Not player-specific — the same value for anyone who reads it.
 | `%vertex_coinflip_active%` | Currently-listed, unresolved coinflips |
 | `%vertex_auction_active%` | Currently-active Auction House listings |
 
-## TNT Cannons and Sand Bots
+## Sand Bots
 
 | Placeholder | Value |
 |---|---|
-| `%vertex_cannon_enabled%` | `Yes` / `No` — the [cannon module's](configuration.md) current on/off state, including a live `/cannon toggle` |
 | `%vertex_sandbot_active%` | How many Sand Bots the player currently has active |
 
 ## What isn't covered yet

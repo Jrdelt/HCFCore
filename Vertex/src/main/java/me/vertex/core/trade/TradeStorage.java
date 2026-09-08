@@ -50,6 +50,8 @@ public final class TradeStorage {
                     ? "CREATE TABLE IF NOT EXISTS trade_claims (id BIGINT AUTO_INCREMENT PRIMARY KEY, owner_uuid CHAR(36) NOT NULL, item MEDIUMBLOB NOT NULL)"
                     : "CREATE TABLE IF NOT EXISTS trade_claims (id INTEGER PRIMARY KEY AUTOINCREMENT, owner_uuid CHAR(36) NOT NULL, item BLOB NOT NULL)");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS trade_pending_exp (uuid CHAR(36) PRIMARY KEY, levels INT NOT NULL)");
+            // Only used to return legacy pre-item-only-trade escrow safely.
+            s.executeUpdate("CREATE TABLE IF NOT EXISTS trade_pending_money (uuid CHAR(36) PRIMARY KEY, amount DOUBLE NOT NULL)");
             s.executeUpdate(escrowTable);
             s.executeUpdate(historyTable);
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_trade_history_requester ON trade_history (requester_uuid, created_at DESC)");
@@ -107,6 +109,60 @@ public final class TradeStorage {
             s.setString(1, session.toString()); s.executeUpdate();
         }
     }
+
+    /**
+     * Moves one abandoned escrow row into durable player claims in one SQL
+     * transaction. It deletes the source only after the replacement records
+     * exist, so a restart cannot pay the same escrow over and over.
+     */
+    public void recoverEscrow(TradeEscrow escrow) throws SQLException {
+        try (Connection c = database.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                try (PreparedStatement item = c.prepareStatement(
+                        "INSERT INTO trade_claims (owner_uuid, item) VALUES (?, ?)");
+                     PreparedStatement delete = c.prepareStatement(
+                        "DELETE FROM trade_escrow WHERE session_id = ? AND owner_uuid = ?")) {
+                    for (ItemStack stack : escrow.items()) {
+                        if (stack == null || stack.isEmpty()) continue;
+                        item.setString(1, escrow.owner().toString()); item.setBytes(2, stack.serializeAsBytes()); item.addBatch();
+                    }
+                    item.executeBatch();
+                    if (escrow.experience() > 0) {
+                        addPendingExperience(c, escrow.owner(), escrow.experience());
+                    }
+                    if (escrow.money() > 0) {
+                        addPendingMoney(c, escrow.owner(), escrow.money());
+                    }
+                    delete.setString(1, escrow.sessionId().toString()); delete.setString(2, escrow.owner().toString()); delete.executeUpdate();
+                }
+                c.commit();
+            } catch (SQLException sqliteUpsertUnsupported) {
+                c.rollback();
+                throw sqliteUpsertUnsupported;
+            }
+        }
+    }
+
+    private static void addPendingExperience(Connection c, UUID owner, int levels) throws SQLException {
+        try (PreparedStatement update = c.prepareStatement("UPDATE trade_pending_exp SET levels = levels + ? WHERE uuid = ?")) {
+            update.setInt(1, levels); update.setString(2, owner.toString());
+            if (update.executeUpdate() != 0) return;
+        }
+        try (PreparedStatement insert = c.prepareStatement("INSERT INTO trade_pending_exp (uuid, levels) VALUES (?, ?)")) {
+            insert.setString(1, owner.toString()); insert.setInt(2, levels); insert.executeUpdate();
+        }
+    }
+
+    private static void addPendingMoney(Connection c, UUID owner, double amount) throws SQLException {
+        try (PreparedStatement update = c.prepareStatement("UPDATE trade_pending_money SET amount = amount + ? WHERE uuid = ?")) {
+            update.setDouble(1, amount); update.setString(2, owner.toString());
+            if (update.executeUpdate() != 0) return;
+        }
+        try (PreparedStatement insert = c.prepareStatement("INSERT INTO trade_pending_money (uuid, amount) VALUES (?, ?)")) {
+            insert.setString(1, owner.toString()); insert.setDouble(2, amount); insert.executeUpdate();
+        }
+    }
     public void insertClaim(UUID owner, ItemStack item) throws SQLException {
         try (Connection c = database.getConnection(); PreparedStatement s = c.prepareStatement("INSERT INTO trade_claims (owner_uuid, item) VALUES (?, ?)")) {
             s.setString(1, owner.toString()); s.setBytes(2, item.serializeAsBytes()); s.executeUpdate();
@@ -140,6 +196,14 @@ public final class TradeStorage {
             try (PreparedStatement read = c.prepareStatement("SELECT levels FROM trade_pending_exp WHERE uuid = ?")) { read.setString(1, owner.toString()); try (ResultSet r = read.executeQuery()) { if (r.next()) levels = r.getInt(1); } }
             try (PreparedStatement delete = c.prepareStatement("DELETE FROM trade_pending_exp WHERE uuid = ?")) { delete.setString(1, owner.toString()); delete.executeUpdate(); }
             c.commit(); return levels;
+        }
+    }
+    public double takePendingMoney(UUID owner) throws SQLException {
+        try (Connection c = database.getConnection()) {
+            c.setAutoCommit(false); double amount = 0;
+            try (PreparedStatement read = c.prepareStatement("SELECT amount FROM trade_pending_money WHERE uuid = ?")) { read.setString(1, owner.toString()); try (ResultSet r = read.executeQuery()) { if (r.next()) amount = r.getDouble(1); } }
+            try (PreparedStatement delete = c.prepareStatement("DELETE FROM trade_pending_money WHERE uuid = ?")) { delete.setString(1, owner.toString()); delete.executeUpdate(); }
+            c.commit(); return amount;
         }
     }
     public void insertHistory(TradeSnapshot snapshot, String requesterName, String targetName, String status) throws SQLException {

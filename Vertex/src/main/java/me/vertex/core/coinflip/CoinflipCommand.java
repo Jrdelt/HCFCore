@@ -143,9 +143,7 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
         CoinflipManager.ApproveOutcome outcome = manager.approveItemMatch(id, player);
         if (outcome.result() != CoinflipManager.ApprovalResult.OK) {
             player.sendMessage(messages.get(player, approvalFailureKey(outcome.result())));
-            return;
         }
-        player.sendMessage(messages.get(player, "coinflip.item-match-approved"));
     }
 
     private void handleDeny(Player player, String[] args) {
@@ -260,6 +258,12 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
         try {
             amount = Double.parseDouble(args[0]);
         } catch (NumberFormatException e) {
+            sendUsage(player);
+            return;
+        }
+        // Double.parseDouble accepts NaN and infinity. Neither is a real
+        // currency wager and comparisons alone do not reject NaN.
+        if (!Double.isFinite(amount) || amount <= 0) {
             sendUsage(player);
             return;
         }
@@ -415,8 +419,7 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
 
     private static boolean isNumeric(String value) {
         try {
-            Double.parseDouble(value);
-            return true;
+            return Double.isFinite(Double.parseDouble(value));
         } catch (NumberFormatException e) {
             return false;
         }

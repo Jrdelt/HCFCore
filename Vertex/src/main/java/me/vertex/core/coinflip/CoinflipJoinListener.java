@@ -4,7 +4,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 
-/** Applies any experience a player is owed from a coinflip that was refunded/won while they were offline. */
+/** Applies any experience and result notification a player is owed from a coinflip while they were offline. */
 public final class CoinflipJoinListener implements Listener {
 
     private final CoinflipManager manager;
@@ -16,5 +16,6 @@ public final class CoinflipJoinListener implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         manager.applyPendingExp(event.getPlayer());
+        manager.applyPendingResultNotifications(event.getPlayer());
     }
 }

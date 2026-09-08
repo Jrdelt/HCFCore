@@ -147,19 +147,34 @@ stored **money** (Gold Block), **experience** (Experience Bottle), and
 **TNT**, followed by deposit and withdraw controls that open an amount
 prompt.
 
-Money and experience are stored by Vertex in the selected database and
-survive a restart; money moves through Vault. TNT uses FactionsUUID's native
-TNT bank and its configured maximum. Deposit/withdraw opens a free anvil
-prompt: type a positive whole number, then click the green confirm result.
-Vertex accepts a number typed after the displayed prompt as well as a
-replaced prompt.
+Money, experience, **and TNT** are all stored by Vertex in the selected
+database and survive a restart; money moves through Vault. Deposit/withdraw
+opens a free anvil prompt: type a positive whole number, then click the
+green confirm result. Vertex accepts a number typed after the displayed
+prompt as well as a replaced prompt. Amounts accept shorthand — `10k`,
+`1.5m`, `2b` — through the shared parser described in
+[Configuration](configuration.md#number-formatting).
+
+Vertex owns the TNT balance rather than delegating to FactionsUUID's native
+TNT bank. The native bank is an unsaved in-memory field whose ceiling comes
+from FactionsUUID's own config, which meant deposits could be lost on
+restart and no Vertex upgrade could raise the cap. On the first start after
+upgrading, any balance still sitting in the native bank is moved into
+Vertex's storage once and cleared from the native field, so nothing is lost
+and the two can never both claim the same TNT.
+
+A faction's TNT ceiling starts at `faction-upgrades.tnt-base-capacity`
+(default 1,000,000) and is raised by the **TNT Bank** faction upgrade. That
+upgrade is unusual: each level's `bonus` is the absolute capacity at that
+level rather than a percentage, so capacities are read straight off
+`config.yml` instead of being derived from a multiplier. The shipped levels
+run 2M → 10M.
 
 `/tntfill <radius> <amount> bank|inventory` (see
 [Commands & Permissions](commands-and-permissions.md#factions--rally))
-draws from this same native TNT bank (or the player's own inventory
-instead) to top up every dispenser within range inside the player's own
-claim — a faster way to stock a cannon's dispensers than manually
-depositing/withdrawing and hand-filling each one.
+draws from this same TNT bank (or the player's own inventory instead) to top
+up every dispenser within range inside the player's own claim, without
+manually depositing/withdrawing and hand-filling each one.
 
 Vertex serializes each faction's money/XP write before it changes the cached
 balance. If a money/XP deposit cannot be saved, it returns the resources;

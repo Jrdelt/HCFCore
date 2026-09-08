@@ -9,9 +9,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -58,6 +63,8 @@ public final class Messages {
                 } catch (IllegalArgumentException e) {
                     plugin.getLogger().warning("Bundled locale resource lang/" + locale + ".yml is missing, skipping.");
                 }
+            } else {
+                refreshOutdatedLocale(langFolder, locale);
             }
         }
 
@@ -84,6 +91,58 @@ public final class Messages {
 
         defaultLocale = plugin.getConfig().getString("language.default", "en_us").toLowerCase(Locale.ROOT);
         cachedAvailableLocales = new TreeSet<>(locales.keySet());
+    }
+
+    /**
+     * Replaces an on-disk locale whose {@code lang-version} is older than the
+     * bundled one, keeping the admin's copy as a timestamped backup first.
+     *
+     * <p>Without this, a corrected default can never reach a server that
+     * already has the file: {@code saveResource(.., false)} won't overwrite
+     * it, and an existing on-disk key always wins over the bundled fallback.
+     * A message fixed in a release would silently keep rendering its old
+     * broken text forever. Refreshing wholesale (rather than merging
+     * key-by-key) keeps this predictable, and nothing is lost because the
+     * previous file is backed up next to it.
+     */
+    private void refreshOutdatedLocale(File langFolder, String locale) {
+        File file = new File(langFolder, locale + ".yml");
+        int bundledVersion;
+        try (InputStream resource = plugin.getResource("lang/" + locale + ".yml")) {
+            if (resource == null) {
+                return;
+            }
+            bundledVersion = YamlConfiguration
+                    .loadConfiguration(new InputStreamReader(resource, StandardCharsets.UTF_8))
+                    .getInt("lang-version", 0);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Could not read bundled lang/" + locale + ".yml to check its version.");
+            return;
+        }
+
+        int diskVersion = YamlConfiguration.loadConfiguration(file).getInt("lang-version", 0);
+        if (diskVersion >= bundledVersion) {
+            return;
+        }
+
+        File backupFolder = new File(langFolder, "backup");
+        if (!backupFolder.exists() && !backupFolder.mkdirs()) {
+            plugin.getLogger().warning("Could not create lang/backup, leaving " + locale + ".yml at version "
+                    + diskVersion + ". Its messages may be out of date.");
+            return;
+        }
+        File backup = new File(backupFolder, locale + "-v" + diskVersion + "-"
+                + DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(LocalDateTime.now()) + ".yml");
+        try {
+            Files.move(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            plugin.getLogger().warning("Could not back up lang/" + locale + ".yml, leaving it untouched.");
+            return;
+        }
+        plugin.saveResource("lang/" + locale + ".yml", false);
+        plugin.getLogger().info("Updated lang/" + locale + ".yml from version " + diskVersion + " to "
+                + bundledVersion + ". Your previous file is at lang/backup/" + backup.getName()
+                + " -- re-apply any customizations from it.");
     }
 
     /**

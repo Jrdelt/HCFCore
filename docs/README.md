@@ -27,7 +27,7 @@ integration behavior.
 | [Blueprint Base Builder](blueprints.md) | Automated `.schem` base building with FastAsyncWorldEdit + DecentHolograms |
 | [Backpacks](backpacks.md) | Tiered offhand auto-storage: drop bonuses, filters, leveling, and custom models |
 | [Player Trading](trading.md) | Secure two-player item, money, and XP escrow trades |
-| [TNT Cannons & Sand Bots](cannon-and-sandbot.md) | Controlled redstone TNT cannons, and automated falling-block conversion |
+| [Sand Bots](sandbots.md) | Automated falling-block column filling |
 | [Coinflips](coinflips.md) | 50/50 money, experience, and item wagers, claim stashes, self-ban, and the staff audit log |
 | [Shop](shop.md) | Categorized, dynamic-price item trading |
 | [Auction House](auctionhouse.md) | Buy-it-now listings for any item, claim stashes, expiry, fees, and the staff audit log |

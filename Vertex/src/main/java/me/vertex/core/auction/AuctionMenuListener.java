@@ -55,7 +55,14 @@ public final class AuctionMenuListener implements Listener {
             if (event.isShiftClick()) {
                 holder.setSortDirection(holder.sortDirection().flip());
             } else {
-                holder.setSortMode(holder.sortMode().next());
+                AuctionMenu.SortMode nextMode = holder.sortMode().next();
+                holder.setSortMode(nextMode);
+                // Each selected sort starts in the server's documented
+                // default, rather than inheriting a direction chosen for a
+                // different field.
+                holder.setSortDirection(nextMode == AuctionMenu.SortMode.PRICE
+                        ? AuctionMenu.SortDirection.DESCENDING
+                        : AuctionMenu.SortDirection.ASCENDING);
             }
             AuctionMenu.refresh(player, manager, messages, holder, holder.page());
             return;

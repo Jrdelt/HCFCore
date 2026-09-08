@@ -128,7 +128,6 @@ pvp:
   ghost-players:
     enabled: false
     combat-tagged-only: true
-    npc-type: PLAYER
     allowed-worlds: []
     despawn-after-seconds: 300
   actionbar-update-interval-ticks: 2
@@ -160,8 +159,7 @@ config shape. A quick summary of what lives here:
 - **`actionbar`** — three MiniMessage templates for the three ways a
   player can be tagged (against a real opponent, against "the server",
   or against an opponent who went offline).
-- **`ghost-players`** — optional Citizens combat-log NPCs. It is ignored
-  safely unless Citizens is installed; see [PvP & Combat](pvp-and-combat.md#ghost-players-citizens)
+- **`ghost-players`** — native Villager combat-log ghosts; see [PvP & Combat](pvp-and-combat.md#ghost-players-villagers)
   for the inventory-safety behavior and every setting.
 - **`legacy-combat`** — the full 1.8-style PvP overhaul; see
   [PvP & Combat](pvp-and-combat.md#legacy-combat-18-pvp-style).

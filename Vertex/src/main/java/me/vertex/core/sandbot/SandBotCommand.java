@@ -54,6 +54,19 @@ public final class SandBotCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if (args.length == 1 && args[0].equalsIgnoreCase("debug")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage(messages.get(sender, "general.players-only"));
+                return true;
+            }
+            if (!player.hasPermission("vertex.sandbot.debug")) {
+                player.sendMessage(messages.get(player, "general.no-permission"));
+                return true;
+            }
+            manager.toggleDebug(player);
+            return true;
+        }
+
         if (args.length == 2 && args[0].equalsIgnoreCase("stop")) {
             if (!sender.hasPermission("vertex.sandbot.admin")) {
                 sender.sendMessage(messages.get(sender, "general.no-permission"));
@@ -78,7 +91,7 @@ public final class SandBotCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String partial = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("give", "stop")
+            return Stream.of("give", "stop", "debug")
                     .filter(sub -> sub.startsWith(partial))
                     .collect(Collectors.toList());
         }

@@ -16,10 +16,10 @@ tagged:
 - Disconnecting while tagged counts as a combat log if
   `pvp.logout-penalty` is true.
 
-## Ghost Players (Citizens)
+## Ghost Players (Villagers)
 
-With [Citizens](integrations.md#citizens--optional) installed, Vertex can
-replace the instant combat-log death with a killable NPC. Enable
+Vertex can replace the instant combat-log death with a killable Villager.
+Enable
 `pvp.ghost-players.enabled` to use it. Ghosts are created only for server
 kicks or forced disconnects; a voluntary logout always receives the normal
 combat-logout penalty. By default a forced disconnect also needs an active
@@ -35,8 +35,7 @@ pending-record step also makes an interrupted save/restart resolve safely:
 the player gets their saved inventory back rather than duplicating or losing
 it.
 
-`npc-type` accepts a living Bukkit entity type, although `PLAYER` is the
-intended choice for a player-looking Citizens NPC. `allowed-worlds: []`
+`allowed-worlds: []`
 means all worlds. `despawn-after-seconds: 0` keeps a ghost until it is killed
 or its owner returns; a positive value removes an untouched ghost and safely
 restores its inventory when the owner next joins.

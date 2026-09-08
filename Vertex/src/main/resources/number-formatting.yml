@@ -1,0 +1,46 @@
+# Shared number parsing and display for every Vertex economy, EXP, TNT, and
+# leaderboard surface. Everything that accepts a typed amount ("/cf 1.5m",
+# "/f bank deposit 10k", an Auction House price) and everything that prints
+# one routes through this file, so a value can never mean two different
+# things in two different commands.
+#
+# Logs and audit records always keep the exact value regardless of what the
+# player-facing display does here.
+
+# Shorthand suffixes players may type, smallest multiplier first. Parsing is
+# case-insensitive ("10k" and "10K" both work); the label here is what gets
+# printed in abbreviated output. Add an entry to support a larger unit.
+suffixes:
+  - label: 'K'
+    multiplier: 1000
+  - label: 'M'
+    multiplier: 1000000
+  - label: 'B'
+    multiplier: 1000000000
+  - label: 'T'
+    multiplier: 1000000000000
+
+# Prefix for money output. Not hardcoded anywhere in code -- change it here
+# if the server's economy uses a different currency symbol.
+currency-symbol: '$'
+
+# Decimal places kept in abbreviated output. Trailing zeros are always
+# stripped afterward, so 1.00M prints as 1M and 1.50M prints as 1.5M.
+max-decimals: 2
+
+# Applied whenever a value has to collapse to a whole unit -- for example
+# "1.0005k" becoming an integer item count. Any java.math.RoundingMode name.
+rounding-mode: HALF_UP
+
+# Whether grouped input like "1,500,000" is accepted. Grouping is validated,
+# so "1,00,000" is rejected rather than silently reinterpreted.
+accept-commas: true
+
+# Values below this print in full rather than abbreviated, so small amounts
+# stay readable ("999" instead of "0.99K").
+abbreviation-threshold: 1000
+
+# Hard ceiling on any parsed amount. This is overflow protection: an input
+# above this is rejected before it can reach a transaction, rather than
+# wrapping negative or saturating a column.
+max-value: 1000000000000000000

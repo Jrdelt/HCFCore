@@ -19,7 +19,6 @@ import java.util.UUID;
 /** Shared six-row, two-sided trade inventory. */
 final class TradeMenu {
     static final int SIZE = 54;
-    static final int REQUESTER_XP = 1, REQUESTER_MONEY = 2, TARGET_MONEY = 6, TARGET_XP = 7;
     static final int REQUESTER_LOCK = 47, TARGET_LOCK = 51;
     static final int[] LEFT_SLOTS = grid(0);
     static final int[] RIGHT_SLOTS = grid(5);
@@ -48,10 +47,6 @@ final class TradeMenu {
         for (int row = 0; row < 6; row++) inventory.setItem(row * 9 + 4, named(manager.dividerMaterial(), Component.empty()));
         inventory.setItem(0, head(requester, messages, "trade.requester-head", requester.getName()));
         inventory.setItem(8, head(target, messages, "trade.target-head", target.getName()));
-        inventory.setItem(REQUESTER_XP, value(manager, messages, requester.getPlayer(), TradeValueType.EXPERIENCE, session.requesterExperience, session.requesterLocked));
-        inventory.setItem(REQUESTER_MONEY, value(manager, messages, requester.getPlayer(), TradeValueType.MONEY, session.requesterMoney, session.requesterLocked));
-        inventory.setItem(TARGET_MONEY, value(manager, messages, target.getPlayer(), TradeValueType.MONEY, session.targetMoney, session.targetLocked));
-        inventory.setItem(TARGET_XP, value(manager, messages, target.getPlayer(), TradeValueType.EXPERIENCE, session.targetExperience, session.targetLocked));
         inventory.setItem(REQUESTER_LOCK, button(manager, messages, requester.getPlayer(), session, session.requester));
         inventory.setItem(TARGET_LOCK, button(manager, messages, target.getPlayer(), session, session.target));
     }

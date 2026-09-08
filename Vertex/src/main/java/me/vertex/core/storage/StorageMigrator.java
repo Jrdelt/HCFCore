@@ -57,11 +57,12 @@ public final class StorageMigrator {
                 "owner_faction", "current_index", "started_at"));
         TABLES.put("blueprint_cooldowns", List.of("uuid", "available_at"));
         TABLES.put("faction_upgrade_levels", List.of("faction_id", "upgrade_key", "level"));
-        TABLES.put("faction_banks", List.of("faction_id", "money", "experience"));
+        TABLES.put("faction_banks", List.of("faction_id", "money", "experience", "tnt"));
         TABLES.put("coinflips", List.of("id", "host_uuid", "target_uuid", "type", "amount", "items", "created_at"));
         TABLES.put("coinflip_claims", List.of("id", "winner_uuid", "items", "won_at"));
         TABLES.put("coinflip_bans", List.of("uuid", "banned_until"));
         TABLES.put("coinflip_pending_exp", List.of("uuid", "levels"));
+        TABLES.put("coinflip_result_notifications", List.of("id", "recipient_uuid", "won", "created_at"));
         TABLES.put("coinflip_log", List.of("id", "host_uuid", "opponent_uuid", "type", "summary",
                 "winner_uuid", "resolved_at", "status", "cancelled_by"));
         TABLES.put("coinflip_pending_matches", List.of("id", "coinflip_id", "opponent_uuid", "items", "requested_at"));

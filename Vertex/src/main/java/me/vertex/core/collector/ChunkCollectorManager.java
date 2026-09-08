@@ -2,6 +2,8 @@ package me.vertex.core.collector;
 
 import me.vertex.core.lang.Messages;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -545,6 +547,7 @@ public final class ChunkCollectorManager {
         ItemMeta meta = item.getItemMeta();
         meta.getPersistentDataContainer().set(markerKey, PersistentDataType.BYTE, (byte) 1);
         meta.displayName(displayName);
+        meta.lore(itemLore(data));
         item.setItemMeta(meta);
         if (item.getItemMeta() instanceof BlockStateMeta blockStateMeta) {
             BlockState state = blockStateMeta.getBlockState();
@@ -552,10 +555,38 @@ public final class ChunkCollectorManager {
                 writeData(shulkerBox.getPersistentDataContainer(), data);
                 blockStateMeta.setBlockState(shulkerBox);
                 blockStateMeta.displayName(displayName);
+                blockStateMeta.lore(itemLore(data));
                 item.setItemMeta(blockStateMeta);
             }
         }
         return item;
+    }
+
+    /**
+     * An item has no placed-world owner or faction. Its lore therefore shows
+     * only portable collector state: level, stored contents, capacity, and
+     * upgrade headroom. The placed collector GUI remains the detailed view.
+     */
+    private List<Component> itemLore(ChunkCollectorData data) {
+        int tier = Math.max(0, Math.min(maxUpgradeTier, data.upgradeTier()));
+        long capacity = capacityFor(tier);
+        long stored = data.totalStored();
+        int types = data.stored().size();
+        double usedPercent = capacity <= 0 ? 0.0 : Math.min(100.0, (stored * 100.0) / capacity);
+        return List.of(
+                loreLine("Level: ", String.valueOf(tier)),
+                loreLine("Stored: ", String.format(Locale.ROOT, "%,d items across %d type%s", stored, types,
+                        types == 1 ? "" : "s")),
+                loreLine("Capacity: ", String.format(Locale.ROOT, "%,d / %,d (%.1f%%)", stored, capacity, usedPercent)),
+                loreLine("Upgrade: ", tier >= maxUpgradeTier
+                        ? "Max level reached"
+                        : "Can upgrade to level " + (tier + 1)));
+    }
+
+    private static Component loreLine(String label, String value) {
+        return Component.text(label, NamedTextColor.GRAY)
+                .append(Component.text(value, NamedTextColor.YELLOW))
+                .decoration(TextDecoration.ITALIC, false);
     }
 
     private static String key(Location location) {

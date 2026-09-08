@@ -6,13 +6,13 @@ control for what they produce, and automatic loot collection.
 
 ## Spawner shop & stacking
 
-`/spawners` opens a shop GUI listing every mob type configured under
-`spawners.yml`'s `mobs` section, each with its own price and death-drop
-table (`drops` replaces the mob's vanilla drops entirely; leave it empty
-to keep vanilla drops). Buy one, place it inside your own faction's
-claimed land, and right-click it with a matching spawner item to stack
-(shift-right-click deposits every matching spawner in your inventory at
-once).
+The **Spawners** category in [`/shop`](shop.md) — not a standalone
+command — lists every mob type configured under `spawners.yml`'s `mobs`
+section, each with its own price and death-drop table (`drops` replaces
+the mob's vanilla drops entirely; leave it empty to keep vanilla drops).
+Buy one, place it inside your own faction's claimed land, and right-click
+it with a matching spawner item to stack (shift-right-click deposits
+every matching spawner in your inventory at once).
 
 Right-clicking a spawner with an empty or non-matching hand opens a
 management GUI to withdraw or sell spawners from the stack for

@@ -2,6 +2,8 @@ package me.vertex.core.shop;
 
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.spawner.SpawnerManager;
+import me.vertex.core.spawner.SpawnerShopMenu;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -13,10 +15,12 @@ import org.bukkit.event.inventory.InventoryDragEvent;
 public final class ShopMenuListener implements Listener {
 
     private final ShopManager manager;
+    private final SpawnerManager spawnerManager;
     private final Messages messages;
 
-    public ShopMenuListener(ShopManager manager, Messages messages) {
+    public ShopMenuListener(ShopManager manager, SpawnerManager spawnerManager, Messages messages) {
         this.manager = manager;
+        this.spawnerManager = spawnerManager;
         this.messages = messages;
     }
 
@@ -43,22 +47,24 @@ public final class ShopMenuListener implements Listener {
         int slot = event.getRawSlot();
         if (holder.mode() == ShopMenu.Mode.CATEGORIES) {
             String categoryId = holder.categoryIdAtSlot(slot);
-            if (categoryId != null) {
-                ShopMenu.openCategory(player, manager, messages, categoryId, 0);
+            if (ShopMenu.SPAWNERS_CATEGORY_ID.equals(categoryId)) {
+                SpawnerShopMenu.open(player, spawnerManager, messages);
+            } else if (categoryId != null) {
+                ShopMenu.openCategory(player, manager, spawnerManager, messages, categoryId, 0);
             }
             return;
         }
 
         if (slot == ShopMenu.SLOT_BACK) {
-            ShopMenu.openCategories(player, manager, messages);
+            ShopMenu.openCategories(player, manager, spawnerManager, messages);
             return;
         }
         if (slot == ShopMenu.SLOT_PREV_PAGE) {
-            ShopMenu.openCategory(player, manager, messages, holder.categoryId(), holder.page() - 1);
+            ShopMenu.openCategory(player, manager, spawnerManager, messages, holder.categoryId(), holder.page() - 1);
             return;
         }
         if (slot == ShopMenu.SLOT_NEXT_PAGE) {
-            ShopMenu.openCategory(player, manager, messages, holder.categoryId(), holder.page() + 1);
+            ShopMenu.openCategory(player, manager, spawnerManager, messages, holder.categoryId(), holder.page() + 1);
             return;
         }
 
@@ -88,7 +94,7 @@ public final class ShopMenuListener implements Listener {
         } else {
             return;
         }
-        ShopMenu.openCategory(player, manager, messages, holder.categoryId(), holder.page());
+        ShopMenu.openCategory(player, manager, spawnerManager, messages, holder.categoryId(), holder.page());
     }
 
     private static String buyFailureKey(ShopManager.TradeResult result) {

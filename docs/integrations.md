@@ -9,7 +9,7 @@ rather than causing an error.
 
 The one hard dependency (`depend` in `plugin.yml`). Vertex refuses to
 enable if it isn't present and enabled. Vertex reads faction identity,
-claims, relations, power, roles, native permissions, the TNT bank, and
+claims, relations, power, roles, native permissions, and
 the native Warp upgrade through FactionsUUID's API. Vertex stores its own
 upgrade levels, money/XP bank balances, rally permissions, and managed
 block ownership in its selected database/configuration. It is built against
@@ -22,7 +22,7 @@ methods Vertex uses. See
 Enables money costs. Specifically:
 
 - A kit's `cost.money` requirement (see [Kits & Abilities](kits-and-abilities.md#cost)).
-- Buying spawners from `/spawners` and selling them back.
+- Buying spawners from the Spawners category in `/shop` and selling them back.
 - Buying Chunk Collector upgrade tiers.
 - Buying faction-upgrade levels through `/f upgrades`.
 - Depositing to or withdrawing from the faction **money** bank.
@@ -96,15 +96,11 @@ the required build-progress display. If either is missing, the feature
 is never wired up (logged once at startup, no errors); it isn't a
 partial/degraded mode, it's fully off until both are present.
 
-## Citizens — optional
+## FancyNPCs — optional
 
-Powers `pvp.ghost-players`: a player who is kicked or force-disconnected can
-leave behind a killable Citizens NPC. Voluntary logouts use the normal
-combat-log penalty. Vertex does not enable the feature merely because
-Citizens is present; set `pvp.ghost-players.enabled: true` after Citizens
-has been installed. Without Citizens, Vertex logs one clear warning if that
-setting is enabled and continues normally with the existing combat-log
-penalty.
+Powers Sand Bot visual displays and their click-to-manage control panel.
+FancyNPCs must be installed and enabled before a Sand Bot can be placed.
+Ghost Players are native killable Villagers and do not require an NPC plugin.
 
 ## Summary table
 
@@ -118,4 +114,4 @@ penalty.
 | EssentialsX | No | Nickname display everywhere a player's name appears |
 | FastAsyncWorldEdit | No (paired with DecentHolograms) | Loading/pasting Blueprint `.schem` files |
 | DecentHolograms | No (paired with FastAsyncWorldEdit) | Blueprint build-progress display |
-| Citizens | No | Configurable Ghost Player NPCs for forced disconnects |
+| FancyNPCs | No | Sand Bot displays and controls |

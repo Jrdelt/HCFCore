@@ -41,6 +41,12 @@ public final class CoinflipWagerMenuListener implements Listener {
         boolean clickedTop = event.getClickedInventory() != null
                 && event.getClickedInventory().getHolder() instanceof CoinflipWagerMenu.Holder;
         if (!clickedTop) {
+            // An ordinary gray pane can otherwise merge into an identical
+            // border stack. Shift-clicks are routed only to wager slots.
+            if (event.isShiftClick()) {
+                event.setCancelled(true);
+                moveToGrid(event.getInventory(), event.getCurrentItem());
+            }
             return;
         }
         if (!isGridSlot(event.getRawSlot())) {
@@ -71,6 +77,37 @@ public final class CoinflipWagerMenuListener implements Listener {
 
     private static boolean isGridSlot(int slot) {
         return slot >= CoinflipWagerMenu.GRID_START && slot < CoinflipWagerMenu.GRID_START + CoinflipWagerMenu.GRID_SLOTS;
+    }
+
+    private static void moveToGrid(Inventory inventory, ItemStack source) {
+        if (source == null || source.isEmpty()) {
+            return;
+        }
+        ItemStack remaining = source.clone();
+        for (int slot = CoinflipWagerMenu.GRID_START;
+                slot < CoinflipWagerMenu.GRID_START + CoinflipWagerMenu.GRID_SLOTS && remaining.getAmount() > 0; slot++) {
+            ItemStack current = inventory.getItem(slot);
+            if (current == null || current.isEmpty() || !current.isSimilar(remaining)) {
+                continue;
+            }
+            int moved = Math.min(current.getMaxStackSize() - current.getAmount(), remaining.getAmount());
+            if (moved > 0) {
+                current.setAmount(current.getAmount() + moved);
+                remaining.setAmount(remaining.getAmount() - moved);
+            }
+        }
+        for (int slot = CoinflipWagerMenu.GRID_START;
+                slot < CoinflipWagerMenu.GRID_START + CoinflipWagerMenu.GRID_SLOTS && remaining.getAmount() > 0; slot++) {
+            if (inventory.getItem(slot) != null && !inventory.getItem(slot).isEmpty()) {
+                continue;
+            }
+            int moved = Math.min(remaining.getMaxStackSize(), remaining.getAmount());
+            ItemStack placed = remaining.clone();
+            placed.setAmount(moved);
+            inventory.setItem(slot, placed);
+            remaining.setAmount(remaining.getAmount() - moved);
+        }
+        source.setAmount(remaining.getAmount());
     }
 
     private void confirm(Player player, CoinflipWagerMenu.Holder holder, Inventory inventory) {

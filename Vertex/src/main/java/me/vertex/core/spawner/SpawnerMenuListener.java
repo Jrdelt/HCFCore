@@ -4,6 +4,8 @@ import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.faction.RallyManager;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.shop.ShopManager;
+import me.vertex.core.shop.ShopMenu;
 import me.vertex.core.staff.StaffManager;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
@@ -25,12 +27,22 @@ public final class SpawnerMenuListener implements Listener {
     private final StaffManager staffManager;
     private final Messages messages;
     private final RallyManager rolePermissions;
+    private volatile ShopManager shopManager;
 
     public SpawnerMenuListener(SpawnerManager spawnerManager, StaffManager staffManager, Messages messages, RallyManager rolePermissions) {
         this.spawnerManager = spawnerManager;
         this.staffManager = staffManager;
         this.messages = messages;
         this.rolePermissions = rolePermissions;
+    }
+
+    /**
+     * Wired in after both managers exist -- {@code /spawners} no longer
+     * exists as its own command, so the shop's category picker (this
+     * menu's "back" button) is only reachable through here.
+     */
+    public void setShopManager(ShopManager shopManager) {
+        this.shopManager = shopManager;
     }
 
     @EventHandler
@@ -56,6 +68,13 @@ public final class SpawnerMenuListener implements Listener {
             return;
         }
         if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        if (event.getSlot() == SpawnerShopMenu.SLOT_BACK) {
+            ShopManager currentShopManager = shopManager;
+            if (currentShopManager != null) {
+                ShopMenu.openCategories(player, currentShopManager, spawnerManager, messages);
+            }
             return;
         }
         EntityType mobType = holder.mobTypeAt(event.getSlot());

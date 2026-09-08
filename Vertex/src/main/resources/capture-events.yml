@@ -15,6 +15,8 @@ defaults:
   # Each extra same-faction member adds this fraction of the one-player speed.
   # 0.25 means two members capture at 1.25x, three at 1.50x, etc.
   additional-member-speed: 0.25
+  # Direction bossbars recalculate from the live player position/yaw at this interval.
+  direction-update-ticks: 10
 
 # Text used in holograms, broadcasts, and reward commands for a solo player
 # who is not in a faction. Factionless players capture individually; they do

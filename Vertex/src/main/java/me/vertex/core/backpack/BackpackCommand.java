@@ -72,7 +72,7 @@ public final class BackpackCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(messages.get(sender, "backpack.invalid-level"));
                 return true;
             }
-            if (level < 1) {
+            if (level < 1 || level > 10) {
                 sender.sendMessage(messages.get(sender, "backpack.invalid-level"));
                 return true;
             }
@@ -126,7 +126,8 @@ public final class BackpackCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 4 && args[0].equalsIgnoreCase("give")) {
             BackpackTier tier = manager.getTier(args[2]);
-            return tier == null ? List.of() : List.of("1");
+            return tier == null ? List.of() : java.util.stream.IntStream.rangeClosed(1, 10)
+                    .mapToObj(String::valueOf).toList();
         }
         return List.of();
     }

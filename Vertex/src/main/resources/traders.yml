@@ -1,4 +1,4 @@
-# Two-player item, money and experience trading. All offer state is held in
+# Two-player item trading. All offer state is held in
 # a single shared session and mirrored to SQL escrow snapshots for recovery.
 enabled: true
 trade:
@@ -6,19 +6,11 @@ trade:
   request-timeout-seconds: 30
   idle-timeout-seconds: 60
   cooldown-seconds: 15
-features:
-  enable-money: true
-  enable-exp: true
 gui:
   divider-material: BLACK_STAINED_GLASS_PANE
   filler-material: GRAY_STAINED_GLASS_PANE
   confirm-item: LIME_DYE
   locked-item: GRAY_DYE
-  xp-item: EXPERIENCE_BOTTLE
-  currency-item: GOLD_INGOT
-limits:
-  max-money-per-trade: 1000000000
-  max-xp-levels-per-trade: 1000
 number-formatting:
   style: compact
   decimal-places: 1

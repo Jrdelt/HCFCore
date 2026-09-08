@@ -43,7 +43,7 @@ public final class TradeManager {
     private final Set<UUID> programmaticClose = ConcurrentHashMap.newKeySet();
     private final Map<UUID, CompletableFuture<Void>> escrowChains = new ConcurrentHashMap<>();
     private final Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
-    private volatile boolean enabled, moneyEnabled, experienceEnabled, compact; private volatile int decimalPlaces;
+    private volatile boolean enabled, compact; private volatile int decimalPlaces;
     private volatile double maxDistance, maxMoney; private volatile int maxExperience; private volatile long requestTimeout, idleTimeout, cooldown;
     private volatile Material divider = Material.BLACK_STAINED_GLASS_PANE, filler = Material.GRAY_STAINED_GLASS_PANE, confirm = Material.LIME_DYE, locked = Material.GRAY_DYE, xp = Material.EXPERIENCE_BOTTLE, currency = Material.GOLD_INGOT;
     private volatile Set<String> worlds = Set.of(); private volatile Set<GameMode> gameModes = Set.of(); private volatile Set<Material> blockedItems = Set.of();
@@ -53,7 +53,9 @@ public final class TradeManager {
         if (!file.exists()) plugin.saveResource("traders.yml", false);
         YamlConfiguration c = YamlConfiguration.loadConfiguration(file);
         enabled = c.getBoolean("enabled", true); maxDistance = positive(c, "trade.max-distance", 10); requestTimeout = seconds(c, "trade.request-timeout-seconds", 30); idleTimeout = seconds(c, "trade.idle-timeout-seconds", 60); cooldown = seconds(c, "trade.cooldown-seconds", 15);
-        moneyEnabled = c.getBoolean("features.enable-money", true); experienceEnabled = c.getBoolean("features.enable-exp", true); maxMoney = positive(c, "limits.max-money-per-trade", 1_000_000_000D); maxExperience = (int) positive(c, "limits.max-xp-levels-per-trade", 1000);
+        // Trades are item-only. The legacy money/XP fields remain in the SQL
+        // schema solely to return any escrow created before this update.
+        maxMoney = 0; maxExperience = 0;
         compact = !"full".equalsIgnoreCase(c.getString("number-formatting.style", "compact")); decimalPlaces = Math.max(0, Math.min(4, c.getInt("number-formatting.decimal-places", 1)));
         divider = material(c, "gui.divider-material", Material.BLACK_STAINED_GLASS_PANE); filler = material(c, "gui.filler-material", Material.GRAY_STAINED_GLASS_PANE); confirm = material(c, "gui.confirm-item", Material.LIME_DYE); locked = material(c, "gui.locked-item", Material.GRAY_DYE); xp = material(c, "gui.xp-item", Material.EXPERIENCE_BOTTLE); currency = material(c, "gui.currency-item", Material.GOLD_INGOT);
         worlds = lower(c.getStringList("blacklist.worlds")); blockedItems = materials(c.getStringList("blacklist.items")); Set<GameMode> modes = new HashSet<>(); for (String raw : c.getStringList("blacklist.gamemodes")) try { modes.add(GameMode.valueOf(raw.toUpperCase(Locale.ROOT))); } catch (IllegalArgumentException e) { warn("blacklist.gamemodes", raw); } gameModes = Set.copyOf(modes);
@@ -64,7 +66,7 @@ public final class TradeManager {
     private Set<Material> materials(Collection<String> values) { Set<Material> out = new HashSet<>(); for (String raw : values) { Material m = Material.matchMaterial(raw); if (m == null) warn("blacklist.items", raw); else out.add(m); } return Set.copyOf(out); }
     private Set<String> lower(Collection<String> values) { return values.stream().filter(s -> s != null && !s.isBlank()).map(s -> s.toLowerCase(Locale.ROOT)).collect(java.util.stream.Collectors.toUnmodifiableSet()); }
     private void warn(String key, String value) { plugin.getLogger().warning("Invalid traders.yml " + key + " (" + value + "); using a safe fallback."); }
-    public boolean isEnabled() { return enabled; } public boolean moneyEnabled() { return moneyEnabled; } public boolean experienceEnabled() { return experienceEnabled; }
+    public boolean isEnabled() { return enabled; } public boolean moneyEnabled() { return false; } public boolean experienceEnabled() { return false; }
     public Material dividerMaterial() { return divider; } public Material fillerMaterial() { return filler; } public Material confirmMaterial() { return confirm; } public Material lockedMaterial() { return locked; } public Material experienceMaterial() { return xp; } public Material currencyMaterial() { return currency; }
     public double maxDistance() { return maxDistance; }
     public boolean isProgrammaticClose(UUID id) { return programmaticClose.remove(id); }
@@ -86,7 +88,7 @@ public final class TradeManager {
     public boolean isAccepting(UUID uuid) { return accepting.getOrDefault(uuid, true); }
 
     public boolean toggle(Player player) { boolean value = !accepting.getOrDefault(player.getUniqueId(), true); accepting.put(player.getUniqueId(), value); track(CompletableFuture.runAsync(() -> { try { storage.saveAccepting(player.getUniqueId(), value); } catch (Exception e) { plugin.getLogger().log(Level.WARNING, "Could not save trade preference", e); } })); return value; }
-    public void loadPlayer(Player player) { track(CompletableFuture.runAsync(() -> { try { accepting.put(player.getUniqueId(), storage.loadAccepting(player.getUniqueId())); applyClaims(player); int levels = storage.takePendingExperience(player.getUniqueId()); if (levels > 0) Bukkit.getScheduler().runTask(plugin, () -> player.setLevel(player.getLevel() + levels)); } catch (Exception e) { plugin.getLogger().log(Level.WARNING, "Could not load trade preferences", e); } })); }
+    public void loadPlayer(Player player) { track(CompletableFuture.runAsync(() -> { try { accepting.put(player.getUniqueId(), storage.loadAccepting(player.getUniqueId())); applyClaims(player); int levels = storage.takePendingExperience(player.getUniqueId()); double money = storage.takePendingMoney(player.getUniqueId()); if (levels > 0 || money > 0) Bukkit.getScheduler().runTask(plugin, () -> { if (!player.isOnline()) return; if (levels > 0) player.setLevel(player.getLevel() + levels); if (money > 0 && EconomyHook.isAvailable()) EconomyHook.getEconomy().depositPlayer(player, money); }); } catch (Exception e) { plugin.getLogger().log(Level.WARNING, "Could not load trade preferences", e); } })); }
     public boolean allowed(Player player) { if (player.hasPermission("vertex.trade.staff.bypassblacklist")) return true; return !worlds.contains(player.getWorld().getName().toLowerCase(Locale.ROOT)) && !gameModes.contains(player.getGameMode()); }
     public boolean canTradeItem(Player player, ItemStack item) { return player.hasPermission("vertex.trade.staff.bypassblacklist") || item == null || !blockedItems.contains(item.getType()); }
     private boolean near(Player a, Player b) { return a.hasPermission("vertex.trade.staff.bypassdistance") || a.getWorld().equals(b.getWorld()) && a.getLocation().distanceSquared(b.getLocation()) <= maxDistance * maxDistance; }
@@ -95,26 +97,24 @@ public final class TradeManager {
     private void endRequest(Request request) { requests.remove(request.target, request); cooldowns.put(request.sender, System.currentTimeMillis() + cooldown); cooldowns.put(request.target, System.currentTimeMillis() + cooldown); }
     public Result setValue(Player player, TradeSession session, TradeValueType type, String raw) {
         if (session == null || session.locked(player.getUniqueId())) return Result.LOCKED; Long parsed = AmountParser.parse(raw); if (parsed == null) return Result.INVALID_AMOUNT;
-        if (type == TradeValueType.MONEY) { if (!moneyEnabled || parsed > maxMoney) return Result.INVALID_AMOUNT; if (!EconomyHook.isAvailable()) return Result.NO_ECONOMY; if (EconomyHook.getEconomy().getBalance(player) + 1.0E-8 < parsed) return Result.CANNOT_AFFORD; if (session.isRequester(player.getUniqueId())) session.requesterMoney = parsed; else session.targetMoney = parsed; }
-        else { if (!experienceEnabled || parsed > maxExperience) return Result.INVALID_AMOUNT; if (player.getLevel() < parsed) return Result.CANNOT_AFFORD; if (session.isRequester(player.getUniqueId())) session.requesterExperience = parsed.intValue(); else session.targetExperience = parsed.intValue(); }
+        if (type == TradeValueType.MONEY) { if (!moneyEnabled() || parsed > maxMoney) return Result.INVALID_AMOUNT; if (!EconomyHook.isAvailable()) return Result.NO_ECONOMY; if (EconomyHook.getEconomy().getBalance(player) + 1.0E-8 < parsed) return Result.CANNOT_AFFORD; if (session.isRequester(player.getUniqueId())) session.requesterMoney = parsed; else session.targetMoney = parsed; }
+        else { if (!experienceEnabled() || parsed > maxExperience) return Result.INVALID_AMOUNT; if (player.getLevel() < parsed) return Result.CANNOT_AFFORD; if (session.isRequester(player.getUniqueId())) session.requesterExperience = parsed.intValue(); else session.targetExperience = parsed.intValue(); }
         touch(session); return Result.OK;
     }
     public Result lock(Player player, TradeSession session) {
-        if (session == null || session.locked(player.getUniqueId())) return Result.LOCKED; double money = session.isRequester(player.getUniqueId()) ? session.requesterMoney : session.targetMoney; int exp = session.isRequester(player.getUniqueId()) ? session.requesterExperience : session.targetExperience;
-        if (money > 0) { if (!EconomyHook.isAvailable()) return Result.NO_ECONOMY; EconomyResponse response = EconomyHook.getEconomy().withdrawPlayer(player, money); if (!response.transactionSuccess()) return Result.CANNOT_AFFORD; if (session.isRequester(player.getUniqueId())) session.requesterHeldMoney = money; else session.targetHeldMoney = money; }
-        if (exp > 0) { if (player.getLevel() < exp) { refundMoney(player, money); return Result.CANNOT_AFFORD; } player.setLevel(player.getLevel() - exp); if (session.isRequester(player.getUniqueId())) session.requesterHeldExperience = exp; else session.targetHeldExperience = exp; }
+        if (session == null || session.locked(player.getUniqueId())) return Result.LOCKED;
         session.lock(player.getUniqueId()); touch(session); return Result.OK;
     }
     public Result complete(Player actor, TradeSession session) {
         if (session == null || !session.bothLocked() || !actor.getUniqueId().equals(session.firstLocked)) return Result.NOT_FIRST_LOCKED; if (session.finishing) return Result.LOCKED;
-        Player requester = Bukkit.getPlayer(session.requester); Player target = Bukkit.getPlayer(session.target); if (requester == null || target == null || !canFit(requester, session.itemsFor(session.target)) || !canFit(target, session.itemsFor(session.requester))) { cancel(session, "trade-cancelled"); return Result.FULL; }
-        session.finishing = true; ItemStack[] left = session.itemsFor(session.requester), right = session.itemsFor(session.target); give(requester, right); give(target, left); if (session.requesterHeldMoney > 0) EconomyHook.getEconomy().depositPlayer(target, session.requesterHeldMoney); if (session.targetHeldMoney > 0) EconomyHook.getEconomy().depositPlayer(requester, session.targetHeldMoney); requester.setLevel(requester.getLevel() + session.targetHeldExperience); target.setLevel(target.getLevel() + session.requesterHeldExperience);
+        Player requester = Bukkit.getPlayer(session.requester); Player target = Bukkit.getPlayer(session.target); if (requester == null || target == null || !near(requester, target) || !allowed(requester) || !allowed(target) || !canFit(requester, session.itemsFor(session.target)) || !canFit(target, session.itemsFor(session.requester))) { cancel(session, "trade-cancelled"); return Result.FULL; }
+        session.finishing = true; ItemStack[] left = session.itemsFor(session.requester), right = session.itemsFor(session.target); give(requester, right); give(target, left);
         finish(session, "COMPLETED", requester, target); return Result.OK;
     }
     public void cancel(TradeSession session, String messageKey) {
         if (session == null || session.finishing) return; session.finishing = true; Player requester = Bukkit.getPlayer(session.requester); Player target = Bukkit.getPlayer(session.target);
-        if (requester != null) { give(requester, session.itemsFor(session.requester)); refundMoney(requester, session.requesterHeldMoney); requester.setLevel(requester.getLevel() + session.requesterHeldExperience); }
-        if (target != null) { give(target, session.itemsFor(session.target)); refundMoney(target, session.targetHeldMoney); target.setLevel(target.getLevel() + session.targetHeldExperience); }
+        if (requester != null) { give(requester, session.itemsFor(session.requester)); }
+        if (target != null) { give(target, session.itemsFor(session.target)); }
         finish(session, "CANCELLED", requester, target); if (requester != null) requester.sendMessage(messages.get(requester, "trade." + messageKey, "player", target == null ? "player" : target.getName())); if (target != null) target.sendMessage(messages.get(target, "trade." + messageKey, "player", requester == null ? "player" : requester.getName()));
     }
     private void finish(TradeSession s, String status, Player requester, Player target) {
@@ -153,16 +153,10 @@ public final class TradeManager {
             catch (Exception e) { throw new java.util.concurrent.CompletionException(e); }
         }).thenAccept(escrows -> Bukkit.getScheduler().runTask(plugin, () -> {
             for (TradeEscrow escrow : escrows) {
-                // Vault and Bukkit player lookups are main-thread only. The durable
-                // claim/escrow cleanup remains asynchronous below.
-                if (escrow.money() > 0 && EconomyHook.isAvailable()) {
-                    EconomyHook.getEconomy().depositPlayer(Bukkit.getOfflinePlayer(escrow.owner()), escrow.money());
-                }
                 track(CompletableFuture.runAsync(() -> {
-                    try {
-                        for (ItemStack item : escrow.items()) if (item != null && !item.isEmpty()) storage.insertClaim(escrow.owner(), item);
-                        storage.addPendingExperience(escrow.owner(), escrow.experience());
-                        storage.deleteEscrow(escrow.sessionId());
+                    try { storage.recoverEscrow(escrow);
+                        Player owner = Bukkit.getPlayer(escrow.owner());
+                        if (owner != null) Bukkit.getScheduler().runTask(plugin, () -> loadPlayer(owner));
                     } catch (Exception e) { plugin.getLogger().log(Level.SEVERE, "Failed to restore trade escrow " + escrow.sessionId(), e); }
                 }));
             }
@@ -171,7 +165,6 @@ public final class TradeManager {
     private void applyClaims(Player player) { try { List<ItemStack> claims = storage.loadClaims(player.getUniqueId()); if (claims.isEmpty()) return; Bukkit.getScheduler().runTask(plugin, () -> { for (ItemStack item : claims) give(player, new ItemStack[]{item}); track(CompletableFuture.runAsync(() -> { try { storage.deleteClaims(player.getUniqueId()); } catch (Exception ignored) { } })); }); } catch (Exception e) { plugin.getLogger().log(Level.WARNING, "Failed to load trade item claims", e); } }
     private static boolean canFit(Player player, ItemStack[] items) { ItemStack[] contents = player.getInventory().getStorageContents().clone(); for (ItemStack need : items) { if (need == null || need.isEmpty()) continue; int remaining = need.getAmount(); for (int i=0;i<contents.length && remaining>0;i++) { ItemStack have=contents[i]; if (have != null && have.isSimilar(need)) { int room=have.getMaxStackSize()-have.getAmount(); if(room>0){int move=Math.min(room,remaining);have=have.clone();have.setAmount(have.getAmount()+move);contents[i]=have;remaining-=move;}} } for(int i=0;i<contents.length&&remaining>0;i++) if(contents[i]==null||contents[i].isEmpty()){int move=Math.min(need.getMaxStackSize(),remaining);ItemStack placed=need.clone();placed.setAmount(move);contents[i]=placed;remaining-=move;} if(remaining>0)return false; } return true; }
     private void give(Player player, ItemStack[] items) { for (ItemStack item : items) if (item != null && !item.isEmpty()) player.getInventory().addItem(item.clone()).values().forEach(left -> player.getWorld().dropItemNaturally(player.getLocation(), left)); }
-    private static void refundMoney(Player player, double amount) { if (amount > 0 && EconomyHook.isAvailable()) EconomyHook.getEconomy().depositPlayer(player, amount); }
     private void track(CompletableFuture<?> future) { pendingWrites.add(future); future.whenComplete((v,e)->pendingWrites.remove(future)); }
     public void awaitWrites() { for (CompletableFuture<?> write : List.copyOf(pendingWrites)) try { write.get(5, TimeUnit.SECONDS); } catch (Exception ignored) { } }
     public void openHistory(Player viewer, UUID filter, String label, int page) {

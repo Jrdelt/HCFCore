@@ -16,33 +16,25 @@ import org.bukkit.plugin.Plugin;
 
 /**
  * A one-row "slot machine" result animation, shown once per resolved
- * coinflip to whichever of the two players has animations enabled and is
- * online: a single reel slot alternates between the host's and the
- * opponent's head, slowing down each flip, and finally lands on the
- * winner's head. Purely cosmetic -- the flip already resolved (money,
- * levels, or items already moved) before this ever opens, so closing it
- * early, or not seeing it at all, changes nothing about the outcome.
+ * coinflip to each online participant at the same time: a single reel slot
+ * alternates between the host's and the opponent's head, slowing down before
+ * it lands on the winner's head. Purely cosmetic -- the server has already
+ * chosen and durably recorded the result before this ever opens, so closing
+ * it early changes neither the result nor the payout.
  */
 public final class CoinflipAnimationMenu {
 
     private static final int SIZE = 9;
     private static final int SLOT_REEL = 4;
-    /** Ticks between each flip, front-loaded fast then slowing down before landing on the last entry. */
-    private static final long[] FLIP_DELAYS = {2L, 2L, 3L, 3L, 4L, 5L, 6L, 8L, 10L, 12L};
+    /** Relative frame weights: rapid at first, then slower near the landing. */
+    private static final int[] FLIP_WEIGHTS = {1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 5, 6};
     private static final long HOLD_TICKS_BEFORE_CLOSE = 30L;
 
     private CoinflipAnimationMenu() {
     }
 
-    /**
-     * {@code onResultShown} fires the instant the reel lands on the final
-     * head -- not before, and not only once the GUI later auto-closes --
-     * so a caller can defer revealing the winner (e.g. a chat message)
-     * until the animation has actually shown it, instead of spoiling it
-     * up front.
-     */
     public static void play(Plugin plugin, Player viewer, Messages messages, OfflinePlayer host, OfflinePlayer opponent,
-            boolean hostWon, Runnable onResultShown) {
+            boolean hostWon, long durationTicks) {
         Holder holder = new Holder();
         Inventory inventory = Bukkit.createInventory(holder, SIZE, messages.get(viewer, "coinflip.animation-gui-title"));
         holder.inventory = inventory;
@@ -58,22 +50,19 @@ public final class CoinflipAnimationMenu {
         inventory.setItem(SLOT_REEL, hostHead);
         viewer.openInventory(inventory);
 
-        runFlip(plugin, viewer, inventory, hostHead, opponentHead, hostWon, 0, onResultShown);
+        runFlip(plugin, viewer, inventory, hostHead, opponentHead, hostWon, 0, flipDelays(durationTicks));
     }
 
     private static void runFlip(Plugin plugin, Player viewer, Inventory inventory, ItemStack hostHead,
-            ItemStack opponentHead, boolean hostWon, int flipIndex, Runnable onResultShown) {
+            ItemStack opponentHead, boolean hostWon, int flipIndex, long[] flipDelays) {
         if (!viewer.isOnline() || !isStillShowing(viewer, inventory)) {
-            // Closed early (or logged off) before landing -- reveal now rather than never.
-            onResultShown.run();
             return;
         }
-        boolean isLast = flipIndex >= FLIP_DELAYS.length;
+        boolean isLast = flipIndex >= flipDelays.length;
         inventory.setItem(SLOT_REEL, isLast ? (hostWon ? hostHead : opponentHead)
                 : (flipIndex % 2 == 0 ? opponentHead : hostHead));
 
         if (isLast) {
-            onResultShown.run();
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (viewer.isOnline() && isStillShowing(viewer, inventory)) {
                     viewer.closeInventory();
@@ -82,8 +71,37 @@ public final class CoinflipAnimationMenu {
             return;
         }
         Bukkit.getScheduler().runTaskLater(plugin,
-                () -> runFlip(plugin, viewer, inventory, hostHead, opponentHead, hostWon, flipIndex + 1, onResultShown),
-                FLIP_DELAYS[flipIndex]);
+                () -> runFlip(plugin, viewer, inventory, hostHead, opponentHead, hostWon, flipIndex + 1, flipDelays),
+                flipDelays[flipIndex]);
+    }
+
+    /**
+     * Produces delays that always sum to the server-selected duration, rather
+     * than relying on a hard-coded reel which can drift away from the config.
+     */
+    private static long[] flipDelays(long durationTicks) {
+        long totalWeight = 0;
+        for (int weight : FLIP_WEIGHTS) {
+            totalWeight += weight;
+        }
+        long[] delays = new long[FLIP_WEIGHTS.length];
+        long previousOffset = 0;
+        long accumulatedWeight = 0;
+        for (int index = 0; index < FLIP_WEIGHTS.length; index++) {
+            accumulatedWeight += FLIP_WEIGHTS[index];
+            long offset = Math.round(durationTicks * (accumulatedWeight / (double) totalWeight));
+            delays[index] = Math.max(1L, offset - previousOffset);
+            previousOffset = offset;
+        }
+        // Rounding each boundary can leave the schedule one or two ticks off.
+        // Put the adjustment on the final, slowest frame so the visual rhythm
+        // remains natural and the server-wide reveal remains synchronized.
+        long scheduled = 0;
+        for (long delay : delays) {
+            scheduled += delay;
+        }
+        delays[delays.length - 1] = Math.max(1L, delays[delays.length - 1] + (durationTicks - scheduled));
+        return delays;
     }
 
     private static boolean isStillShowing(Player viewer, Inventory inventory) {

@@ -1,3 +1,8 @@
+# Bumped whenever a bundled message changes. On startup Vertex replaces an
+# older on-disk copy of this file with the new bundled one, moving the
+# previous file into lang/backup/ first so customizations can be re-applied.
+lang-version: 2
+
 general:
   no-permission: "<red>✖ You do not have access to that command."
   data-unavailable: "<red>✖ <gray>Your player data is temporarily unavailable. Please try again shortly."
@@ -28,25 +33,8 @@ admin:
   storage-requires-idle-server: "&c&lSTAFF&r &7> <red>Storage migration requires no online players and no active Blueprints."
   storage-login-blocked: "<red>A brief storage migration is in progress. Please reconnect shortly."
 
-cannon:
-  usage: "&c&lSTAFF&r &7> <yellow>Usage: <gray>/<red>cannon reload<gray>|<red>toggle"
-  reloaded: "<green>✔ <green>Cannon module config reloaded."
-  enabled: "<green>✔ <green>Cannon module enabled."
-  disabled: "<red>✘ <red>Cannon module disabled."
-
-sandbot:
-  usage: "&c&lSTAFF&r &7> <yellow>Usage: <gray>/<red>sandbot give <player><gray>|<red>stop [player]"
-  given: "<green>✔ <green>Gave {player} a Sand Bot."
-  invalid-surface: "<red>✖ Sand Bots must be placed on andesite, sandstone, red sandstone, or concrete."
-  not-own-claim: "<red>✖ Sand Bots can only be placed in your own faction's claim."
-  spawn-failed: "<red>✖ Failed to spawn the Sand Bot -- is Citizens installed?"
-  spawned: "<green>✔ Sand Bot deployed."
-  finished: "<green>✔ Your Sand Bot finished and despawned."
-  out-of-funds: "<red>✖ Your Sand Bot ran out of funds and despawned."
-  stopped: "<green>✔ Stopped {amount} of your active Sand Bot(s)."
-  stopped-other: "<green>✔ Stopped {amount} of {player}'s active Sand Bot(s)."
-
 tntfill:
+  filled-partial: "&<red>✖ Filled &e{filled} &7dispensers (&cinsufficient funds/TNT&7)."
   usage: "<red>✖ <gray>Usage: /tntfill <radius> <amount> bank|inventory"
   disabled: "<red>✖ <gray>TNT Fill is currently disabled."
   invalid-radius: "<red>✖ <gray>Radius must be between 1 and {max}."
@@ -538,7 +526,9 @@ backpack:
   debug-disabled: "&e&lBACKPACKS &7>&r <gray>Backpack interaction debugging disabled."
   debug-trace: "&e&lBACKPACKS &7>&r <gray>DEBUG: {detail}"
   filter-usage: "&e&lBACKPACKS &7>&r <gray>Usage: /<yellow>filter <material|clear>"
-  filter-none: "<gray>none"
+  # Placeholder values are inserted after MiniMessage parsing, so this must
+  # be plain text rather than a nested formatting tag.
+  filter-none: "none"
   filter-list: "&e&lBACKPACKS &7>&r <gray>Filtered: <white>{items}"
   filter-enabled: "&e&lBACKPACKS &7>&r <green>{item} will be discarded while a Backpack is equipped."
   filter-disabled: "&e&lBACKPACKS &7>&r <gray>{item} will no longer be discarded."
@@ -578,6 +568,7 @@ capture:
   list-entry: "<gray>- <white>{name}</white> <dark_gray>({id}) <gray>in <white>{world}</white>: <yellow>{state}</yellow>"
   focus-no-active: "<yellow>There is no active {type} in your world to focus."
   focus-not-found: "<red>✖ <gray>That active {type} could not be found."
+  focus-wrong-world: "<red>✖ <gray>That {type} is in <white>{world}</white>. You must be in that world to focus it."
   focused: "<green>✔ <gray>Now focusing {type} <white>{name}</white>. Use <white>/{type} focus off</white> to return to your rally."
   focus-cleared: "<green>✔ <gray>Capture focus cleared; your faction rally can show again."
   focus-none: "<yellow>You are not focusing a capture event."
@@ -615,9 +606,6 @@ coinflip:
   claim-title: "<dark_gray>ᴄʟᴀɪᴍ ʏᴏᴜʀ ɪᴛᴇᴍꜱ"
   view-items-title: "<dark_gray>ᴡᴀɢᴇʀᴇᴅ ɪᴛᴇᴍꜱ"
   wager-title: "<dark_gray>ᴄʜᴏᴏꜱᴇ ʏᴏᴜʀ ᴡᴀɢᴇʀ"
-  animations-title: "<yellow><bold>ᴄᴏɪɴꜰʟɪᴘ ᴀɴɪᴍᴀᴛɪᴏɴꜱ"
-  toggle-on: "<green>✔ Click to Toggle ✔"
-  toggle-off: "<red>✖ Click to Toggle ✖"
   claim-button-empty: "<gray><bold>ᴄᴏʟʟᴇᴄᴛ ꜱᴛᴀꜱʜ"
   claim-button-empty-lore: "<red>✖ No Claimable Items ✖ You do not have any pending coinflipped items to claim."
   claim-button-has-items: "<green><bold>ᴄᴏʟʟᴇᴄᴛ ꜱᴛᴀꜱʜ"
@@ -686,7 +674,6 @@ coinflip:
   listing-pending-match-other: "<gray>⧗ Someone is already waiting on the host's approval."
   item-match-requested: "&6&lCOINFLIP&r &7> <yellow>{player}<gray> wants to match your item coinflip. <click:run_command:'/cf review {id}'><yellow><underlined><bold>[ Click to Review ]</bold></underlined></yellow></click>"
   item-match-awaiting-approval: "&6&lCOINFLIP&r &7> <yellow>Your items are held until the host approves or denies your wager."
-  item-match-approved: "&6&lCOINFLIP&r &7> <green>Match approved -- the coinflip has been resolved."
   item-match-you-denied: "&6&lCOINFLIP&r &7> <yellow>You denied that wager -- their items were returned."
   item-match-denied: "&6&lCOINFLIP&r &7> <red>The host denied your wager -- your items have been returned."
   item-match-expired: "&6&lCOINFLIP&r &7> <red>The host didn't respond in time -- your items have been returned."
@@ -703,7 +690,6 @@ coinflip:
   you-won: "&6&lCOINFLIP&r &7> <green><bold>You won the coinflip!"
   you-lost: "&6&lCOINFLIP&r &7> <red>You lost the coinflip."
   pending-exp-applied: "&6&lCOINFLIP&r &7> <green>You were credited {levels} levels from a coinflip while you were offline."
-  broadcast-result: "&6&lCOINFLIP&r &7> <yellow>{winner} <gray>won a coinflip worth <yellow>{wager}<gray>!"
   logs-empty: "&6&lCOINFLIP&r &7> <gray>No log entries found."
   logs-header: "&6&lCOINFLIP&r &7> <gray>Audit log, page {page}:"
   logs-line: "<gray>#{id} <white>{host}<gray> vs <white>{opponent} <gray>[{type}] {summary} -> winner: <yellow>{winner}<gray> ({status})"
@@ -712,6 +698,7 @@ shop:
   gui-title: "<dark_gray>ꜱʜᴏᴘ"
   category-gui-title: "<dark_gray>ꜱʜᴏᴘ ➜ {category}"
   category-title: "<yellow>{category}"
+  spawners-category-title: "<yellow>Spawners"
   category-open-lore: "<green>✔ Click to Open ✔"
   back-button: "<red>← Back to Categories"
   balance-title: "<gold><bold>ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ"
@@ -879,3 +866,25 @@ auction:
   logs-empty: "&6&lAUCTION HOUSE&r &7> <gray>No log entries found."
   logs-header: "&6&lAUCTION HOUSE&r &7> <gray>Audit log, page {page}:"
   logs-line: "<gray>#{id} <white>{seller}<gray> -> <white>{buyer} <gray>[{summary}] {price} ({status})"
+
+sandbot:
+  usage: "&c&lSTAFF&r &7> <yellow>Usage: <gray>/<red>sandbot give <player><gray>|<red>stop [player]"
+  given: "<green>✔ <green>Gave {player} a Sand Bot."
+  invalid-surface: "<red>✖ Sand Bots must be placed on andesite, sandstone, red sandstone, or concrete."
+  not-own-claim: "<red>✖ Sand Bots can only be placed in your own faction's claim."
+  spawn-failed: "<red>✖ Failed to spawn the Sand Bot -- is FancyNPCs installed and enabled?"
+  spawned: "<green>✔ Sand Bot deployed."
+  out-of-funds: "<red>✖ Your Sand Bot ran out of funds and despawned."
+  stopped: "<green>✔ Stopped {amount} of your active Sand Bot(s)."
+  stopped-other: "<green>✔ Stopped {amount} of {player}'s active Sand Bot(s)."
+  gui:
+    title: "&8Sand Bot Control Panel"
+    active-status: "&aStatus: Active &7(Click to Pause)"
+    paused-status: "&cStatus: Paused &7(Click to Resume)"
+    despawn: "&cDespawn Sand Bot"
+  item:
+    name: "&eSand Bot"
+    lore:
+      - "&7Place on any block -- scans for andesite,"
+      - "&7sandstone, red sandstone, or concrete"
+      - "&7below it within range; must be in your claim."

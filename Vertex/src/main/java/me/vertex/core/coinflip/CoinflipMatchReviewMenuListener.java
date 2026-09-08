@@ -50,9 +50,7 @@ public final class CoinflipMatchReviewMenuListener implements Listener {
             player.closeInventory();
             if (outcome.result() != CoinflipManager.ApprovalResult.OK) {
                 player.sendMessage(messages.get(player, approvalFailureKey(outcome.result())));
-                return;
             }
-            player.sendMessage(messages.get(player, "coinflip.item-match-approved"));
         } else if (slot == CoinflipMatchReviewMenu.SLOT_DENY) {
             holder.markResolved();
             denyAndNotify(holder, player);

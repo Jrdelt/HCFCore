@@ -1,3 +1,8 @@
+# Bumped whenever a bundled message changes. On startup Vertex replaces an
+# older on-disk copy of this file with the new bundled one, moving the
+# previous file into lang/backup/ first so customizations can be re-applied.
+lang-version: 2
+
 general:
   no-permission: '<red>✖ Voce nao tem acesso a esse comando.'
   data-unavailable: '<red>Seus dados estao temporariamente indisponiveis. Tente novamente em breve.'
@@ -28,25 +33,30 @@ admin:
   storage-requires-idle-server: '<red>A migração exige nenhum jogador online e nenhum Blueprint ativo.'
   storage-login-blocked: '<red>Uma breve migração de armazenamento está em andamento. Reconecte-se em breve.'
 
-cannon:
-  usage: '<red>Uso: /cannon reload|toggle'
-  reloaded: '<green>Configuração do módulo de canhões recarregada.'
-  enabled: '<green>Módulo de canhões ativado.'
-  disabled: '<red>Módulo de canhões desativado.'
-
 sandbot:
   usage: '<red>Uso: /sandbot give <player>|stop [player]'
   given: '<green>Você deu um Sand Bot para {player}.'
   invalid-surface: '<red>Sand Bots devem ser colocados sobre andesito, arenito, arenito vermelho ou concreto.'
   not-own-claim: '<red>Sand Bots só podem ser colocados no claim da sua própria facção.'
-  spawn-failed: '<red>Falha ao criar o Sand Bot -- o Citizens está instalado?'
+  spawn-failed: '<red>Falha ao criar o Sand Bot -- FancyNPCs está instalado e ativado?'
   spawned: '<green>Sand Bot implantado.'
-  finished: '<green>Seu Sand Bot terminou e desapareceu.'
   out-of-funds: '<red>Seu Sand Bot ficou sem fundos e desapareceu.'
   stopped: '<green>{amount} do(s) seu(s) Sand Bot(s) ativo(s) foram parados.'
   stopped-other: '<green>{amount} Sand Bot(s) ativo(s) de {player} foram parados.'
+  gui:
+    title: '&8Painel de Controle do Sand Bot'
+    active-status: '&aStatus: Ativo &7(Clique para Pausar)'
+    paused-status: '&cStatus: Pausado &7(Clique para Retomar)'
+    despawn: '&cRemover Sand Bot'
+  item:
+    name: '&eSand Bot'
+    lore:
+      - '&7Coloque sobre qualquer bloco -- procura por andesito,'
+      - '&7arenito, arenito vermelho ou concreto'
+      - '&7próximo; deve estar no seu claim.'
 
 tntfill:
+  filled-partial: '&<red>✖ {filled} dispensers preenchidos (&cfundos/TNT insuficientes&7).'
   usage: '<red>Uso: /tntfill <radius> <amount> bank|inventory'
   disabled: '<red>O TNT Fill está desativado no momento.'
   invalid-radius: '<red>O raio deve estar entre 1 e {max}.'
@@ -534,7 +544,7 @@ backpack:
   debug-disabled: '&e&lBACKPACKS &7> <gray>Depuracao da Backpack desativada.'
   debug-trace: '&e&lBACKPACKS &7> <gray>DEBUG: {detail}'
   filter-usage: '&e&lBACKPACKS &7> <gray>Usage: /filter <material|clear>'
-  filter-none: '<gray>none'
+  filter-none: 'none'
   filter-list: '&e&lBACKPACKS &7> <gray>Filtered: <white>{items}'
   filter-enabled: '&e&lBACKPACKS &7> <green>{item} will be discarded while a Backpack is equipped.'
   filter-disabled: '&e&lBACKPACKS &7> <gray>{item} will no longer be discarded.'
@@ -571,6 +581,7 @@ capture:
   list-entry: "<gray>- <white>{name}</white> <dark_gray>({id}) <gray>in <white>{world}</white>: <yellow>{state}</yellow>"
   focus-no-active: "<yellow>There is no active {type} in your world to focus."
   focus-not-found: "<red>✖ <gray>That active {type} could not be found."
+  focus-wrong-world: "<red>✖ <gray>That {type} is in <white>{world}</white>. You must be in that world to focus it."
   focused: "<green>✔ <gray>Now focusing {type} <white>{name}</white>. Use <white>/{type} focus off</white> to return to your rally."
   focus-cleared: "<green>✔ <gray>Capture focus cleared; your faction rally can show again."
   focus-none: "<yellow>You are not focusing a capture event."
@@ -608,9 +619,6 @@ coinflip:
   claim-title: "<dark_gray>ᴄʟᴀɪᴍ ʏᴏᴜʀ ɪᴛᴇᴍꜱ"
   view-items-title: "<dark_gray>ᴡᴀɢᴇʀᴇᴅ ɪᴛᴇᴍꜱ"
   wager-title: "<dark_gray>ᴄʜᴏᴏꜱᴇ ʏᴏᴜʀ ᴡᴀɢᴇʀ"
-  animations-title: "<yellow><bold>ᴄᴏɪɴꜰʟɪᴘ ᴀɴɪᴍᴀᴛɪᴏɴꜱ"
-  toggle-on: "<green>✔ Click to Toggle ✔"
-  toggle-off: "<red>✖ Click to Toggle ✖"
   claim-button-empty: "<gray><bold>ᴄᴏʟʟᴇᴄᴛ ꜱᴛᴀꜱʜ"
   claim-button-empty-lore: "<red>✖ No Claimable Items ✖ You do not have any pending coinflipped items to claim."
   claim-button-has-items: "<green><bold>ᴄᴏʟʟᴇᴄᴛ ꜱᴛᴀꜱʜ"
@@ -679,7 +687,6 @@ coinflip:
   listing-pending-match-other: "<gray>⧗ Someone is already waiting on the host's approval."
   item-match-requested: "&6&lCOINFLIP&r &7> <yellow>{player}<gray> wants to match your item coinflip. <click:run_command:'/cf review {id}'><yellow><underlined><bold>[ Click to Review ]</bold></underlined></yellow></click>"
   item-match-awaiting-approval: "&6&lCOINFLIP&r &7> <yellow>Your items are held until the host approves or denies your wager."
-  item-match-approved: "&6&lCOINFLIP&r &7> <green>Match approved -- the coinflip has been resolved."
   item-match-you-denied: "&6&lCOINFLIP&r &7> <yellow>You denied that wager -- their items were returned."
   item-match-denied: "&6&lCOINFLIP&r &7> <red>The host denied your wager -- your items have been returned."
   item-match-expired: "&6&lCOINFLIP&r &7> <red>The host didn't respond in time -- your items have been returned."
@@ -696,7 +703,6 @@ coinflip:
   you-won: "&6&lCOINFLIP&r &7> <green><bold>You won the coinflip!"
   you-lost: "&6&lCOINFLIP&r &7> <red>You lost the coinflip."
   pending-exp-applied: "&6&lCOINFLIP&r &7> <green>You were credited {levels} levels from a coinflip while you were offline."
-  broadcast-result: "&6&lCOINFLIP&r &7> <yellow>{winner} <gray>won a coinflip worth <yellow>{wager}<gray>!"
   logs-empty: "&6&lCOINFLIP&r &7> <gray>No log entries found."
   logs-header: "&6&lCOINFLIP&r &7> <gray>Audit log, page {page}:"
   logs-line: "<gray>#{id} <white>{host}<gray> vs <white>{opponent} <gray>[{type}] {summary} -> winner: <yellow>{winner}<gray> ({status})"
@@ -705,6 +711,7 @@ shop:
   gui-title: "<dark_gray>ꜱʜᴏᴘ"
   category-gui-title: "<dark_gray>ꜱʜᴏᴘ ➜ {category}"
   category-title: "<yellow>{category}"
+  spawners-category-title: "<yellow>Spawners"
   category-open-lore: "<green>✔ Click to Open ✔"
   back-button: "<red>← Back to Categories"
   balance-title: "<gold><bold>ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ"

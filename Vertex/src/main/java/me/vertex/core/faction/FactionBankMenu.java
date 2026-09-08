@@ -7,6 +7,7 @@ import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.util.ChatAmountPrompt;
+import me.vertex.core.util.Numbers;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.milkbowl.vault.economy.Economy;
@@ -55,16 +56,18 @@ public final class FactionBankMenu implements Listener {
 
     private final Plugin plugin;
     private final FactionBankManager manager;
+    private final FactionUpgradeManager upgrades;
     private final RallyManager rolePermissions;
     private final Messages messages;
     private final ChatAmountPrompt chatAmountPrompt;
     private final NamespacedKey resourceKey;
     private final NamespacedKey operationKey;
 
-    public FactionBankMenu(Plugin plugin, FactionBankManager manager, RallyManager rolePermissions, Messages messages,
-            ChatAmountPrompt chatAmountPrompt) {
+    public FactionBankMenu(Plugin plugin, FactionBankManager manager, FactionUpgradeManager upgrades,
+            RallyManager rolePermissions, Messages messages, ChatAmountPrompt chatAmountPrompt) {
         this.plugin = plugin;
         this.manager = manager;
+        this.upgrades = upgrades;
         this.rolePermissions = rolePermissions;
         this.messages = messages;
         this.chatAmountPrompt = chatAmountPrompt;
@@ -205,7 +208,7 @@ public final class FactionBankMenu implements Listener {
         ItemMeta meta = item.getItemMeta();
         meta.displayName(noItalic(messages.get(player, "faction-bank." + resource.key + "-name")));
         meta.lore(messages.getList(player, "faction-bank.balance-lore",
-                "value", resource.value(this, faction), "max", resource.max(faction),
+                "value", resource.value(this, faction), "max", resource.max(this, faction),
                 "resource", resource.label(messages, player)));
         item.setItemMeta(meta);
         return item;
@@ -279,7 +282,7 @@ public final class FactionBankMenu implements Listener {
                     result.complete(true);
                 }));
             }
-            case TNT -> result.complete(depositTnt(player, faction, amount));
+            case TNT -> depositTnt(player, faction, amount, result);
         }
     }
 
@@ -297,7 +300,7 @@ public final class FactionBankMenu implements Listener {
                     result.complete(true);
                 }));
             }
-            case TNT -> result.complete(withdrawTnt(player, faction, amount));
+            case TNT -> withdrawTnt(player, faction, amount, result);
         }
     }
 
@@ -360,25 +363,45 @@ public final class FactionBankMenu implements Listener {
         Bukkit.getScheduler().runTask(plugin, task);
     }
 
-    private boolean depositTnt(Player player, Faction faction, long amount) {
-        if (faction.tntBankMax() > 0 && (long) faction.tntBank() + amount > faction.tntBankMax()) {
-            player.sendMessage(messages.get(player, "faction-bank.tnt-full", "max", String.format("%,d", faction.tntBankMax())));
-            return false;
+    private void depositTnt(Player player, Faction faction, long amount, OperationResult result) {
+        long capacity = upgrades.tntCapacity(faction.id());
+        if (manager.tnt(faction.id()) + amount > capacity) {
+            player.sendMessage(messages.get(player, "faction-bank.tnt-full", "max", Numbers.formatFull(capacity)));
+            result.complete(false);
+            return;
         }
+        // Items leave the inventory only after the capacity check, and the
+        // credit is applied only after the database write succeeds -- so a
+        // failed write hands the TNT straight back instead of consuming it.
         if (!removeItems(player, Material.TNT, amount)) {
             player.sendMessage(messages.get(player, "faction-bank.not-enough"));
-            return false;
+            result.complete(false);
+            return;
         }
-        faction.tntBank(Math.toIntExact((long) faction.tntBank() + amount));
-        return true;
+        manager.depositTnt(faction.id(), amount, capacity).whenComplete((saved, error) -> onMain(() -> {
+            if (error != null || !Boolean.TRUE.equals(saved)) {
+                giveTnt(player, amount);
+                player.sendMessage(messages.get(player, "faction-bank.transaction-failed"));
+                result.complete(false);
+                return;
+            }
+            result.complete(true);
+        }));
     }
 
-    private boolean withdrawTnt(Player player, Faction faction, long amount) {
-        if (faction.tntBank() < amount) {
-            player.sendMessage(messages.get(player, "faction-bank.not-enough"));
-            return false;
-        }
-        faction.tntBank(Math.toIntExact((long) faction.tntBank() - amount));
+    private void withdrawTnt(Player player, Faction faction, long amount, OperationResult result) {
+        manager.withdrawTnt(faction.id(), amount).whenComplete((saved, error) -> onMain(() -> {
+            if (error != null || !Boolean.TRUE.equals(saved)) {
+                player.sendMessage(messages.get(player, "faction-bank.not-enough"));
+                result.complete(false);
+                return;
+            }
+            giveTnt(player, amount);
+            result.complete(true);
+        }));
+    }
+
+    private void giveTnt(Player player, long amount) {
         long remaining = amount;
         while (remaining > 0) {
             int stack = (int) Math.min(remaining, Material.TNT.getMaxStackSize());
@@ -386,7 +409,6 @@ public final class FactionBankMenu implements Listener {
                     .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
             remaining -= stack;
         }
-        return true;
     }
 
     private boolean removeItems(Player player, Material material, long amount) {
@@ -430,11 +452,13 @@ public final class FactionBankMenu implements Listener {
         String value(FactionBankMenu menu, Faction faction) {
             return switch (this) {
                 case MONEY -> EconomyHook.format(menu.manager.money(faction.id()));
-                case EXPERIENCE -> String.format("%,d", menu.manager.experience(faction.id()));
-                case TNT -> String.format("%,d", faction.tntBank());
+                case EXPERIENCE -> Numbers.formatFull(menu.manager.experience(faction.id()));
+                case TNT -> Numbers.formatFull(menu.manager.tnt(faction.id()));
             };
         }
-        String max(Faction faction) { return this == TNT && faction.tntBankMax() > 0 ? String.format("%,d", faction.tntBankMax()) : "∞"; }
+        String max(FactionBankMenu menu, Faction faction) {
+            return this == TNT ? Numbers.formatFull(menu.upgrades.tntCapacity(faction.id())) : "∞";
+        }
     }
 
     private enum Operation {

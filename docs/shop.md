@@ -84,6 +84,15 @@ category's `items` map, or add a whole new category by adding another
 key under `categories:` (up to the 9-category cap). `/shop buy|sell
 <item>` works regardless of which category an item is filed under.
 
+One extra icon appears after your `shop.yml` categories (still within
+the 9-slot cap) — **Spawners**. It isn't a `shop.yml` category and
+doesn't count toward the cap accounting above; it opens a separate
+catalog priced per mob type from `spawners.yml` instead of the
+Material/dynamic-price model every other category uses, since a
+spawner's mob type isn't representable as a single `Material`. See
+[Spawners & Collectors](spawners-and-collectors.md) for its pricing and
+placement rules. Only shown if at least one mob type is configured.
+
 ## Other configuration (`shop.yml`)
 
 | Key | Purpose |

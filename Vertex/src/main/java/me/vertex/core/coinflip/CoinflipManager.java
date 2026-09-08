@@ -3,7 +3,6 @@ package me.vertex.core.coinflip;
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.pvp.CombatManager;
-import net.kyori.adventure.text.Component;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
@@ -59,7 +58,8 @@ public final class CoinflipManager {
     private volatile long itemIconCycleTicks;
     private volatile long guiRefreshIntervalTicks;
     private volatile long logRetentionDays;
-    private volatile boolean broadcastResults;
+    /** Result animation length, clamped to the player-facing 5-10 second contract. */
+    private volatile long animationDurationTicks;
     private volatile long itemMatchApprovalTimeoutMillis;
 
     private final Map<Integer, Coinflip> activeCoinflips = new ConcurrentHashMap<>();
@@ -67,10 +67,12 @@ public final class CoinflipManager {
     private final Map<UUID, Integer> pendingExp = new ConcurrentHashMap<>();
     /** uuid -> the deadline for a "/cf ban confirm" to actually apply. */
     private final Map<UUID, Long> pendingBanConfirmations = new ConcurrentHashMap<>();
-    /** uuid -> whether that player wants the coin-flip result animation. Defaults to on. */
-    private final Map<UUID, Boolean> animationsEnabled = new ConcurrentHashMap<>();
     /** coinflip id -> the one opponent item-wager awaiting that coinflip's host to approve or deny. */
     private final Map<Integer, CoinflipPendingMatch> pendingItemMatches = new ConcurrentHashMap<>();
+    /** Prevents a double-click from claiming the same database rows twice. */
+    private final java.util.Set<UUID> claimsInProgress = ConcurrentHashMap.newKeySet();
+    /** Suppresses a join-time notification read racing the scheduled in-session reveal. */
+    private final java.util.Set<ResultNotificationKey> resultNotificationsInFlight = ConcurrentHashMap.newKeySet();
 
     private final java.util.Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
     private final AtomicInteger localIdCounter = new AtomicInteger(-1);
@@ -106,7 +108,8 @@ public final class CoinflipManager {
         // not retain their old full-server polling cost after an update.
         guiRefreshIntervalTicks = Math.max(10, config.getLong("gui-refresh-interval-ticks", 20));
         logRetentionDays = Math.max(0, config.getLong("log-retention-days", 0));
-        broadcastResults = config.getBoolean("broadcast-results", true);
+        int animationSeconds = Math.max(5, Math.min(10, config.getInt("animation-duration-seconds", 6)));
+        animationDurationTicks = TimeUnit.SECONDS.toSeconds(animationSeconds) * 20L;
         itemMatchApprovalTimeoutMillis = Duration.ofSeconds(
                 Math.max(30, config.getInt("item-match-approval-timeout-seconds", 300))).toMillis();
     }
@@ -167,6 +170,10 @@ public final class CoinflipManager {
 
     public long guiRefreshIntervalTicks() {
         return guiRefreshIntervalTicks;
+    }
+
+    public long animationDurationTicks() {
+        return animationDurationTicks;
     }
 
     public long browserVersion() {
@@ -258,16 +265,6 @@ public final class CoinflipManager {
             }
         }));
         return true;
-    }
-
-    // ---- Animation preference ----
-
-    public boolean animationsEnabled(UUID uuid) {
-        return animationsEnabled.getOrDefault(uuid, true);
-    }
-
-    public void toggleAnimations(UUID uuid) {
-        animationsEnabled.put(uuid, !animationsEnabled(uuid));
     }
 
     // ---- Creation ----
@@ -390,8 +387,8 @@ public final class CoinflipManager {
             browserChanged();
             if (error != null || id == null || id < 0) {
                 plugin.getLogger().log(Level.SEVERE, "Failed to persist a new Coinflip -- refunding the host.", error);
+                refundIfPersistFails.run();
                 if (host.isOnline()) {
-                    refundIfPersistFails.run();
                     host.sendMessage(messages.get(host, "coinflip.create-failed"));
                 }
                 return;
@@ -713,49 +710,126 @@ public final class CoinflipManager {
         boolean hostWon = winnerUuid.equals(coinflip.hostUuid());
         OfflinePlayer hostOffline = Bukkit.getOfflinePlayer(coinflip.hostUuid());
         OfflinePlayer opponentOffline = Bukkit.getOfflinePlayer(opponentUuid);
-        Player host = Bukkit.getPlayer(coinflip.hostUuid());
-        Player opponentPlayer = Bukkit.getPlayer(opponentUuid);
-
-        revealResult(host, hostWon, hostWon, hostOffline, opponentOffline);
-        revealResult(opponentPlayer, !hostWon, hostWon, hostOffline, opponentOffline);
-
-        if (broadcastResults) {
-            String winnerName = Bukkit.getOfflinePlayer(winnerUuid).getName();
-            Component broadcast = messages.get(Bukkit.getConsoleSender(), "coinflip.broadcast-result",
-                    "winner", winnerName == null ? "?" : winnerName, "wager", summarize(coinflip));
-            Bukkit.broadcast(broadcast);
-        }
-
         String summary = summarize(coinflip);
+        long resolvedAt = System.currentTimeMillis();
+        CompletableFuture<Void> persist = CompletableFuture.runAsync(() -> {
+            try {
+                storage.resolveCoinflip(coinflip, opponentUuid, winnerUuid, summary, resolvedAt);
+            } catch (Exception e) {
+                throw new java.util.concurrent.CompletionException(e);
+            }
+        });
+        track(persist);
+        persist.whenComplete((ignored, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+            if (error != null) {
+                plugin.getLogger().log(Level.SEVERE,
+                        "Failed to persist resolved Coinflip " + coinflip.id() + "; result chat was withheld.", error);
+                return;
+            }
+            presentResolvedCoinflip(coinflip.hostUuid(), opponentUuid, hostWon, hostOffline, opponentOffline, resolvedAt);
+        }));
+    }
+
+    /**
+     * Opens the same animation for both connected participants in this tick,
+     * then reveals both chat results from one shared server timer. The timer
+     * remains authoritative if a player closes the GUI, changes inventory,
+     * or disconnects while the reel is running.
+     */
+    private void presentResolvedCoinflip(UUID hostUuid, UUID opponentUuid, boolean hostWon, OfflinePlayer host,
+            OfflinePlayer opponent, long resolvedAt) {
+        Player hostPlayer = Bukkit.getPlayer(hostUuid);
+        Player opponentPlayer = Bukkit.getPlayer(opponentUuid);
+        if (hostPlayer != null) {
+            CoinflipAnimationMenu.play(plugin, hostPlayer, messages, host, opponent, hostWon, animationDurationTicks);
+        }
+        if (opponentPlayer != null) {
+            CoinflipAnimationMenu.play(plugin, opponentPlayer, messages, host, opponent, hostWon, animationDurationTicks);
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            deliverResultIfOnline(hostUuid, hostWon, resolvedAt);
+            deliverResultIfOnline(opponentUuid, !hostWon, resolvedAt);
+        }, animationDurationTicks);
+    }
+
+    private void deliverResultIfOnline(UUID uuid, boolean won, long resolvedAt) {
+        Player player = Bukkit.getPlayer(uuid);
+        ResultNotificationKey key = new ResultNotificationKey(uuid, won, resolvedAt);
+        if (player == null || !resultNotificationsInFlight.add(key)) {
+            return;
+        }
+        player.sendMessage(messages.get(player, won ? "coinflip.you-won" : "coinflip.you-lost"));
         track(CompletableFuture.runAsync(() -> {
             try {
-                storage.deleteCoinflip(coinflip.id());
-                storage.insertLogEntry(coinflip.hostUuid(), opponentUuid, coinflip.type(), summary, winnerUuid,
-                        System.currentTimeMillis(), CoinflipLogEntry.Status.RESOLVED, null);
+                storage.deleteResultNotifications(uuid, won, resolvedAt);
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to persist resolved Coinflip " + coinflip.id(), e);
+                plugin.getLogger().log(Level.WARNING, "Failed to clear delivered Coinflip result notification for " + uuid, e);
             }
         }));
     }
 
     /**
-     * Sends the win/lose message immediately, unless {@code player} is
-     * about to see the result animation -- in that case the message
-     * waits for the animation to actually land on the result instead of
-     * spoiling it up front. A player who's offline, has animations off,
-     * or is in combat just gets the message right away, same as before.
+     * Delivers a result held for a player who was offline when the shared
+     * animation ended. If they reconnect before that time, this intentionally
+     * waits out the remaining duration instead of spoiling the coinflip.
      */
-    private void revealResult(Player player, boolean playerWon, boolean hostWon, OfflinePlayer host, OfflinePlayer opponent) {
-        if (player == null) {
-            return;
-        }
-        String messageKey = playerWon ? "coinflip.you-won" : "coinflip.you-lost";
-        if (animationsEnabled(player.getUniqueId()) && !combatManager.isTagged(player.getUniqueId())) {
-            CoinflipAnimationMenu.play(plugin, player, messages, host, opponent, hostWon,
-                    () -> player.sendMessage(messages.get(player, messageKey)));
-        } else {
-            player.sendMessage(messages.get(player, messageKey));
-        }
+    public void applyPendingResultNotifications(Player player) {
+        UUID uuid = player.getUniqueId();
+        CompletableFuture<List<CoinflipResultNotification>> read = CompletableFuture.supplyAsync(() -> {
+            try {
+                return storage.loadResultNotifications(uuid);
+            } catch (Exception e) {
+                throw new java.util.concurrent.CompletionException(e);
+            }
+        });
+        track(read);
+        read.whenComplete((notifications, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+            if (error != null) {
+                plugin.getLogger().log(Level.WARNING, "Failed to load pending Coinflip results for " + uuid, error);
+                return;
+            }
+            if (!player.isOnline() || notifications == null || notifications.isEmpty()) {
+                return;
+            }
+            long now = System.currentTimeMillis();
+            long earliestFuture = Long.MAX_VALUE;
+            List<Integer> deliveredIds = new ArrayList<>();
+            for (CoinflipResultNotification notification : notifications) {
+                long revealAt = notification.createdAtMillis() + (animationDurationTicks * 50L);
+                if (revealAt > now) {
+                    earliestFuture = Math.min(earliestFuture, revealAt);
+                    continue;
+                }
+                ResultNotificationKey key = new ResultNotificationKey(notification.recipientUuid(), notification.won(),
+                        notification.createdAtMillis());
+                if (!resultNotificationsInFlight.add(key)) {
+                    continue;
+                }
+                player.sendMessage(messages.get(player, notification.won() ? "coinflip.you-won" : "coinflip.you-lost"));
+                deliveredIds.add(notification.id());
+            }
+            if (!deliveredIds.isEmpty()) {
+                track(CompletableFuture.runAsync(() -> {
+                    try {
+                        storage.deleteResultNotificationsById(deliveredIds);
+                    } catch (Exception e) {
+                        plugin.getLogger().log(Level.WARNING,
+                                "Failed to clear delivered offline Coinflip result notifications for " + uuid, e);
+                    }
+                }));
+            }
+            if (earliestFuture != Long.MAX_VALUE) {
+                long delayTicks = Math.max(1L, (earliestFuture - now + 49L) / 50L);
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (player.isOnline()) {
+                        applyPendingResultNotifications(player);
+                    }
+                }, delayTicks);
+            }
+        }));
+    }
+
+    private record ResultNotificationKey(UUID recipientUuid, boolean won, long createdAtMillis) {
     }
 
     private String summarize(Coinflip coinflip) {
@@ -821,6 +895,71 @@ public final class CoinflipManager {
                 plugin.getLogger().log(Level.WARNING, "Failed to clear Coinflip claims for " + uuid, e);
             }
         }));
+    }
+
+    public record ClaimBatch(List<Integer> ids, List<ItemStack> items) {
+        static ClaimBatch empty() {
+            return new ClaimBatch(List.of(), List.of());
+        }
+    }
+
+    /** Reads a fresh claim snapshot and locks repeated clicks until it is cleared. */
+    public CompletableFuture<ClaimBatch> beginClaimAll(UUID uuid) {
+        if (!claimsInProgress.add(uuid)) {
+            return CompletableFuture.completedFuture(ClaimBatch.empty());
+        }
+        CompletableFuture<ClaimBatch> read = CompletableFuture.supplyAsync(() -> {
+            try {
+                List<CoinflipClaim> claims = storage.loadClaims(uuid);
+                List<Integer> ids = new ArrayList<>(claims.size());
+                List<ItemStack> items = new ArrayList<>();
+                for (CoinflipClaim claim : claims) {
+                    ids.add(claim.id());
+                    for (ItemStack item : claim.items()) {
+                        if (item != null && !item.isEmpty()) {
+                            items.add(item.clone());
+                        }
+                    }
+                }
+                return new ClaimBatch(List.copyOf(ids), List.copyOf(items));
+            } catch (Exception error) {
+                throw new java.util.concurrent.CompletionException(error);
+            }
+        });
+        track(read);
+        read.whenComplete((ignored, error) -> {
+            if (error != null) {
+                claimsInProgress.remove(uuid);
+            }
+        });
+        return read;
+    }
+
+    /** Clears exactly the rows delivered by {@link #beginClaimAll(UUID)}. */
+    public void finishClaimAll(UUID uuid, ClaimBatch batch) {
+        if (batch.ids().isEmpty()) {
+            claimsInProgress.remove(uuid);
+            return;
+        }
+        CompletableFuture<Void> delete = CompletableFuture.runAsync(() -> {
+            try {
+                storage.deleteClaimsById(batch.ids());
+            } catch (Exception error) {
+                throw new java.util.concurrent.CompletionException(error);
+            }
+        });
+        track(delete);
+        delete.whenComplete((ignored, error) -> {
+            claimsInProgress.remove(uuid);
+            if (error != null) {
+                plugin.getLogger().log(Level.SEVERE, "Failed to clear delivered Coinflip claims for " + uuid, error);
+            }
+        });
+    }
+
+    /** Releases a claim click that could not deliver items (for example a disconnect). */
+    public void abortClaimAll(UUID uuid) {
+        claimsInProgress.remove(uuid);
     }
 
     private void queueClaim(UUID winnerUuid, ItemStack[] items) {

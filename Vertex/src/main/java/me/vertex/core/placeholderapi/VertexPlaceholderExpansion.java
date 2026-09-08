@@ -8,7 +8,6 @@ import me.vertex.core.ability.AbilityManager;
 import me.vertex.core.auction.AuctionManager;
 import me.vertex.core.backpack.BackpackManager;
 import me.vertex.core.blueprint.BlueprintManager;
-import me.vertex.core.cannon.CannonManager;
 import me.vertex.core.coinflip.CoinflipManager;
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.essentials.EssentialsHook;
@@ -66,7 +65,6 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
     private final TradeManager tradeManager;
     private final RallyManager rallyManager;
     private final FactionUpgradeManager factionUpgradeManager;
-    private final CannonManager cannonManager;
     private final SandBotManager sandBotManager;
 
     public VertexPlaceholderExpansion(VertexPlugin plugin, UserManager userManager, KitManager kitManager,
@@ -76,8 +74,7 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
                                        TagManager tagManager, BlueprintManager blueprintManager,
                                        CoinflipManager coinflipManager, AuctionManager auctionManager,
                                        TradeManager tradeManager, RallyManager rallyManager,
-                                       FactionUpgradeManager factionUpgradeManager, CannonManager cannonManager,
-                                       SandBotManager sandBotManager) {
+                                       FactionUpgradeManager factionUpgradeManager, SandBotManager sandBotManager) {
         this.plugin = plugin;
         this.userManager = userManager;
         this.kitManager = kitManager;
@@ -94,7 +91,6 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
         this.tradeManager = tradeManager;
         this.rallyManager = rallyManager;
         this.factionUpgradeManager = factionUpgradeManager;
-        this.cannonManager = cannonManager;
         this.sandBotManager = sandBotManager;
     }
 
@@ -182,7 +178,6 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
 
             case "rally_active" -> yesNo(rallyManager != null && rallyManager.hasActiveRally(player));
 
-            case "cannon_enabled" -> yesNo(cannonManager != null && cannonManager.isEnabled());
             case "sandbot_active" -> sandBotManager == null ? "0"
                     : String.valueOf(sandBotManager.activeSessionsOwnedBy(player.getUniqueId()));
 

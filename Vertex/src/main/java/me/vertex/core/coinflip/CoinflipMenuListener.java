@@ -50,11 +50,6 @@ public final class CoinflipMenuListener implements Listener {
 
     private void handleBrowseClick(Player player, CoinflipMenu.Holder holder, InventoryClickEvent event) {
         int slot = event.getRawSlot();
-        if (slot == CoinflipMenu.SLOT_ANIMATIONS) {
-            manager.toggleAnimations(player.getUniqueId());
-            CoinflipMenu.openBrowse(player, manager, messages, holder.page());
-            return;
-        }
         if (slot == CoinflipMenu.SLOT_CLAIM) {
             CoinflipMenu.openClaim(player, manager, messages);
             return;
@@ -149,17 +144,25 @@ public final class CoinflipMenuListener implements Listener {
         if (event.getRawSlot() != CoinflipMenu.SLOT_CLAIM_ALL) {
             return;
         }
-        java.util.List<ItemStack> items = holder.claimItems();
-        if (items.isEmpty()) {
-            return;
-        }
-        for (ItemStack item : items) {
-            player.getInventory().addItem(item).values()
-                    .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
-        }
-        manager.clearClaims(player.getUniqueId());
-        player.sendMessage(messages.get(player, "coinflip.claim-all-claimed"));
-        player.closeInventory();
+        manager.beginClaimAll(player.getUniqueId()).whenComplete((batch, error) ->
+                org.bukkit.Bukkit.getScheduler().runTask(
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(CoinflipMenuListener.class), () -> {
+                            if (!player.isOnline() || error != null || batch == null) {
+                                manager.abortClaimAll(player.getUniqueId());
+                                return;
+                            }
+                            if (batch.items().isEmpty()) {
+                                manager.finishClaimAll(player.getUniqueId(), batch);
+                                return;
+                            }
+                            for (ItemStack item : batch.items()) {
+                                player.getInventory().addItem(item).values().forEach(leftover ->
+                                        player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+                            }
+                            manager.finishClaimAll(player.getUniqueId(), batch);
+                            player.sendMessage(messages.get(player, "coinflip.claim-all-claimed"));
+                            player.closeInventory();
+                        }));
     }
 
     private static String playFailureKey(CoinflipManager.PlayResult result) {

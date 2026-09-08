@@ -1,11 +1,15 @@
 package me.vertex.core.faction;
 
+import dev.kitteh.factions.Faction;
+import dev.kitteh.factions.Factions;
 import dev.kitteh.factions.event.FactionDisbandEvent;
 import dev.kitteh.factions.event.FactionAutoDisbandEvent;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,10 +38,49 @@ public final class FactionBankManager implements Listener {
         try {
             for (FactionBankStorage.StoredBank stored : storage.loadAll()) {
                 balances.put(stored.factionId(), new Balance(Math.max(0D, stored.money()),
-                        Math.max(0L, stored.experience())));
+                        Math.max(0L, stored.experience()), Math.max(0L, stored.tnt())));
             }
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to load faction bank balances from the database.", e);
+        }
+    }
+
+    /**
+     * Moves any balance held in FactionsUUID's native TNT bank into Vertex's
+     * own, once, the first time a server runs a build where Vertex owns TNT.
+     *
+     * <p>Vertex took ownership because the native bank is a bare field with
+     * no save hook and a ceiling read from FactionsUUID's own config, which
+     * a Vertex capacity upgrade cannot influence. Without this migration the
+     * switchover would read every faction's existing TNT as zero and quietly
+     * destroy it. The native value is cleared as it is copied so the two
+     * banks can never both claim the same TNT.
+     */
+    public void migrateNativeTntBanks() {
+        File marker = new File(plugin.getDataFolder(), ".tnt-bank-migrated");
+        if (marker.exists()) {
+            return;
+        }
+        int migrated = 0;
+        for (Faction faction : Factions.factions().all()) {
+            int nativeTnt = faction.tntBank();
+            if (nativeTnt <= 0) {
+                continue;
+            }
+            faction.tntBank(0);
+            depositTnt(faction.id(), nativeTnt, Long.MAX_VALUE);
+            migrated++;
+        }
+        awaitWrites();
+        try {
+            if (!marker.createNewFile()) {
+                plugin.getLogger().warning("Could not mark the TNT bank migration complete; it may repeat next start.");
+            }
+        } catch (IOException e) {
+            plugin.getLogger().log(Level.WARNING, "Could not write the TNT bank migration marker.", e);
+        }
+        if (migrated > 0) {
+            plugin.getLogger().info("Moved " + migrated + " faction TNT bank(s) from FactionsUUID into Vertex storage.");
         }
     }
 
@@ -49,11 +92,15 @@ public final class FactionBankManager implements Listener {
         return balance(factionId).experience();
     }
 
+    public long tnt(int factionId) {
+        return balance(factionId).tnt();
+    }
+
     public CompletableFuture<Boolean> depositMoney(int factionId, double amount) {
         if (!Double.isFinite(amount) || amount <= 0D) {
             return CompletableFuture.completedFuture(false);
         }
-        return mutate(factionId, previous -> new Balance(previous.money() + amount, previous.experience()));
+        return mutate(factionId, previous -> new Balance(previous.money() + amount, previous.experience(), previous.tnt()));
     }
 
     public CompletableFuture<Boolean> withdrawMoney(int factionId, double amount) {
@@ -61,7 +108,7 @@ public final class FactionBankManager implements Listener {
             return CompletableFuture.completedFuture(false);
         }
         return mutate(factionId, previous -> previous.money() + 0.000001D < amount ? null
-                : new Balance(Math.max(0D, previous.money() - amount), previous.experience()));
+                : new Balance(Math.max(0D, previous.money() - amount), previous.experience(), previous.tnt()));
     }
 
     public CompletableFuture<Boolean> depositExperience(int factionId, long amount) {
@@ -69,7 +116,7 @@ public final class FactionBankManager implements Listener {
             return CompletableFuture.completedFuture(false);
         }
         return mutate(factionId, previous -> new Balance(previous.money(), previous.experience() > Long.MAX_VALUE - amount
-                ? Long.MAX_VALUE : previous.experience() + amount));
+                ? Long.MAX_VALUE : previous.experience() + amount, previous.tnt()));
     }
 
     public CompletableFuture<Boolean> withdrawExperience(int factionId, long amount) {
@@ -77,7 +124,28 @@ public final class FactionBankManager implements Listener {
             return CompletableFuture.completedFuture(false);
         }
         return mutate(factionId, previous -> previous.experience() < amount ? null
-                : new Balance(previous.money(), previous.experience() - amount));
+                : new Balance(previous.money(), previous.experience() - amount, previous.tnt()));
+    }
+
+    /**
+     * @param capacity the faction's TNT ceiling; the deposit is refused
+     *                 outright rather than partially filled when it would
+     *                 exceed this, so the caller never has to hand items back.
+     */
+    public CompletableFuture<Boolean> depositTnt(int factionId, long amount, long capacity) {
+        if (amount <= 0L) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return mutate(factionId, previous -> previous.tnt() > capacity - amount ? null
+                : new Balance(previous.money(), previous.experience(), previous.tnt() + amount));
+    }
+
+    public CompletableFuture<Boolean> withdrawTnt(int factionId, long amount) {
+        if (amount <= 0L) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return mutate(factionId, previous -> previous.tnt() < amount ? null
+                : new Balance(previous.money(), previous.experience(), previous.tnt() - amount));
     }
 
     private Balance balance(int factionId) {
@@ -94,7 +162,7 @@ public final class FactionBankManager implements Listener {
                     return false;
                 }
                 try {
-                    storage.save(factionId, next.money(), next.experience());
+                    storage.save(factionId, next.money(), next.experience(), next.tnt());
                     balances.put(factionId, next);
                     return true;
                 } catch (Exception e) {
@@ -152,7 +220,7 @@ public final class FactionBankManager implements Listener {
         }
     }
 
-    private record Balance(double money, long experience) {
-        private static final Balance EMPTY = new Balance(0D, 0L);
+    private record Balance(double money, long experience, long tnt) {
+        private static final Balance EMPTY = new Balance(0D, 0L, 0L);
     }
 }

@@ -53,8 +53,6 @@ public final class TradeListener implements Listener {
             ItemStack offered = event.getCurrentItem();
             if (event.isRightClick() && TradeMenu.isTradeSlot(slot) && isPeekable(offered)) { event.setCancelled(true); openPeek(player, session, offered); return; }
             if (slot == (session.isRequester(player.getUniqueId()) ? TradeMenu.REQUESTER_LOCK : TradeMenu.TARGET_LOCK)) { event.setCancelled(true); lockOrComplete(player, session); return; }
-            if (slot == (session.isRequester(player.getUniqueId()) ? TradeMenu.REQUESTER_MONEY : TradeMenu.TARGET_MONEY) && manager.moneyEnabled()) { event.setCancelled(true); openAnvil(player, session, TradeValueType.MONEY); return; }
-            if (slot == (session.isRequester(player.getUniqueId()) ? TradeMenu.REQUESTER_XP : TradeMenu.TARGET_XP) && manager.experienceEnabled()) { event.setCancelled(true); openAnvil(player, session, TradeValueType.EXPERIENCE); return; }
             if (!TradeMenu.ownTradeSlot(session, player.getUniqueId(), slot) || session.locked(player.getUniqueId()) || event.isShiftClick() || event.getAction().name().contains("DROP")) { event.setCancelled(true); return; }
             ItemStack cursor = event.getCursor(); if (cursor != null && !cursor.isEmpty() && !manager.canTradeItem(player, cursor)) { event.setCancelled(true); player.sendMessage(messages.get(player, "trade.item-blocked")); return; }
             Bukkit.getScheduler().runTask(plugin, () -> manager.touch(session));

@@ -108,8 +108,15 @@ public final class CaptureCommand implements CommandExecutor, TabCompleter {
             case CLEARED -> "capture.focus-cleared";
             case NO_ACTIVE -> "capture.focus-no-active";
             case NOT_FOUND -> "capture.focus-not-found";
+            case WRONG_WORLD -> "capture.focus-wrong-world";
         };
-        player.sendMessage(messages.get(player, key, "type", type.display(), "name", requested == null ? "" : requested));
+        String world = "";
+        if (outcome == CaptureEventManager.FocusOutcome.WRONG_WORLD && requested != null) {
+            CaptureDefinition definition = manager.definition(type, requested);
+            world = definition == null ? "" : definition.worldName();
+        }
+        player.sendMessage(messages.get(player, key, "type", type.display(), "name", requested == null ? "" : requested,
+                "world", world));
         return true;
     }
 

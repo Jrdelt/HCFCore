@@ -16,7 +16,7 @@ softdepend:
   - Essentials
   - FastAsyncWorldEdit
   - DecentHolograms
-  - Citizens
+  - FancyNpcs
 
 commands:
   kit:
@@ -43,9 +43,6 @@ commands:
   abilities:
     description: Browse abilities in a GUI.
     usage: /<command>
-  spawners:
-    description: Browse the spawner shop in a GUI.
-    usage: /<command>
   chunkcollector:
     description: Give a player a Chunk Collector (Green Shulker Box).
     usage: /<command> give <player>
@@ -63,7 +60,7 @@ commands:
     usage: /<command>
   reboot:
     description: Start or cancel a server reboot countdown.
-    usage: /<command> [cancel]
+    usage: /<command> [minutes|cancel]
   nextreboot:
     description: Show the next scheduled server reboot.
     usage: /<command>
@@ -96,7 +93,7 @@ commands:
     usage: /<command> <player>
   backpack:
     description: Give a player a Backpack.
-    usage: /<command> give <player> <tier>
+    usage: /<command> give <player> <tier> [level 1-10]
   filter:
     description: Configure which auto-collected Backpack items are discarded.
     usage: /<command> <material|clear>
@@ -132,9 +129,6 @@ commands:
   tradelogs:
     description: View all or one player's trade history as staff.
     usage: /<command> [all|player]
-  cannon:
-    description: Toggle or reload the TNT cannon module.
-    usage: /<command> reload|toggle
   sandbot:
     description: Give a Sand Bot item, or stop an active Sand Bot.
     usage: /<command> give <player>|stop [player]
@@ -251,14 +245,14 @@ permissions:
   vertex.staff.endersee:
     description: View a player's live ender chest.
     default: op
-  vertex.cannon.admin:
-    description: Toggle the TNT cannon module and reload its config.
-    default: op
   vertex.sandbot.give:
     description: Give a player a Sand Bot item.
     default: op
   vertex.sandbot.admin:
     description: Stop another player's active Sand Bot.
+    default: op
+  vertex.sandbot.debug:
+    description: View personal Sand Bot diagnostics.
     default: op
   vertex.combat.safezone.bypass:
     description: Move into a protected zone while combat-tagged.

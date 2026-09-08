@@ -34,11 +34,13 @@ public final class RallyManager implements Listener {
     /** A personal Capture focus intentionally takes over the direction bar from a faction rally. */
     private volatile Predicate<Player> externalDirectionFocus = player -> false;
     private BukkitTask updateTask;
+    private volatile long directionUpdateTicks;
     private static final long RALLY_DURATION_MILLIS = 4 * 60 * 1000; // 4 minutes
 
     public RallyManager(Plugin plugin, Messages messages) {
         this.plugin = plugin;
         this.messages = messages;
+        this.directionUpdateTicks = Math.max(1L, plugin.getConfig().getLong("rally.direction-update-ticks", 10L));
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         startUpdateTask();
     }
@@ -153,7 +155,21 @@ public final class RallyManager implements Listener {
     }
 
     private void startUpdateTask() {
-        updateTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::updateRallyDisplay, 0L, 10L);
+        updateTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::updateRallyDisplay, 0L,
+                directionUpdateTicks);
+    }
+
+    /** Applies the live direction interval after /vertex reload. */
+    public void reloadConfig() {
+        long nextInterval = Math.max(1L, plugin.getConfig().getLong("rally.direction-update-ticks", 10L));
+        if (nextInterval == directionUpdateTicks) {
+            return;
+        }
+        directionUpdateTicks = nextInterval;
+        if (updateTask != null) {
+            updateTask.cancel();
+            startUpdateTask();
+        }
     }
 
     private void updateRallyDisplay() {
@@ -193,7 +209,9 @@ public final class RallyManager implements Listener {
         double distance = rally.getDistance(player);
         int distanceInt = (int) Math.round(distance);
 
-        // Calculate absolute direction towards rally (where player needs to run)
+        // Calculate a direction relative to the player's current yaw. This is
+        // recomputed on the configurable live interval, so ↑ means forward
+        // and the side arrows adjust as the player turns or moves.
         float directionToRally = getDirectionToRally(player, rally);
 
         // Normalize to -180 to 180
@@ -228,14 +246,9 @@ public final class RallyManager implements Listener {
     }
 
     /**
-     * A compass bearing to the rally (0=north, 90=east, 180=south,
-     * 270/-90=west), matching the labels {@link #getArrowForDirection}
-     * checks against. Minecraft's +Z axis is south, the opposite of the
-     * standard "+Z is north" convention most atan2-bearing formulas
-     * assume -- atan2(dx, dz) without negating dz had north and south
-     * (and every diagonal) swapped; east/west happened to still come out
-     * right since they don't involve dz at all, which is what made the
-     * arrow look correct some of the time and backwards the rest.
+     * Returns the rally bearing relative to the player's view. The atan2
+     * bearing is 0=north and clockwise; Bukkit yaw is 0=south and
+     * counter-clockwise, hence the 180-degree conversion before subtraction.
      */
     private float getDirectionToRally(Player player, RallyPoint rally) {
         org.bukkit.Location from = player.getLocation();
@@ -246,8 +259,9 @@ public final class RallyManager implements Listener {
         double dx = to.getX() - from.getX();
         double dz = to.getZ() - from.getZ();
 
-        float yaw = (float) Math.toDegrees(Math.atan2(dx, -dz));
-        return yaw;
+        float targetBearing = (float) Math.toDegrees(Math.atan2(dx, -dz));
+        float playerBearing = player.getLocation().getYaw() + 180F;
+        return targetBearing - playerBearing;
     }
 
     private String getArrowForDirection(float direction) {

@@ -84,6 +84,8 @@ public final class AuctionStorage {
             )""";
     private static final String CREATE_LOG_INDEX =
             "CREATE INDEX IF NOT EXISTS idx_auction_log_resolved_at ON auction_log (resolved_at DESC)";
+    private static final String CREATE_CLAIMS_OWNER_INDEX =
+            "CREATE INDEX IF NOT EXISTS idx_auction_claims_owner ON auction_claims (owner_uuid)";
 
     private static final String CREATE_WATCHLIST_MYSQL = """
             CREATE TABLE IF NOT EXISTS auction_watchlist (
@@ -119,6 +121,7 @@ public final class AuctionStorage {
         try (Connection connection = database.getConnection(); Statement statement = connection.createStatement()) {
             statement.executeUpdate(createListings);
             statement.executeUpdate(createClaims);
+            statement.executeUpdate(CREATE_CLAIMS_OWNER_INDEX);
             statement.executeUpdate(createLog);
             statement.executeUpdate(CREATE_LOG_INDEX);
             statement.executeUpdate(createWatchlist);

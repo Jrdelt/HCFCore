@@ -1,16 +1,16 @@
 package me.vertex.core.pvp;
 
 import me.vertex.core.lang.Messages;
-import net.citizensnpcs.api.CitizensAPI;
-import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
@@ -22,24 +22,11 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.logging.Level;
 
-/**
- * Makes a disconnected player leave behind a killable Citizens NPC without
- * duplicating their items. The original inventory is persisted immediately,
- * then either restored on a safe return or dropped exactly once with the NPC.
- */
+/** Native killable Villager combat-log ghosts; packet NPCs cannot receive damage. */
 public final class GhostPlayerManager implements Listener {
-
     private final Plugin plugin;
     private final CombatManager combatManager;
     private final Messages messages;
@@ -49,7 +36,6 @@ public final class GhostPlayerManager implements Listener {
     private BukkitTask expiryTask;
     private boolean enabled;
     private boolean combatTaggedOnly;
-    private EntityType npcType;
     private Set<String> allowedWorlds = Set.of();
     private long despawnMillis;
 
@@ -57,98 +43,61 @@ public final class GhostPlayerManager implements Listener {
         this.plugin = plugin;
         this.combatManager = combatManager;
         this.messages = messages;
-        this.dataFile = new File(plugin.getDataFolder(), "ghost-players.yml");
+        dataFile = new File(plugin.getDataFolder(), "ghost-players.yml");
         reload();
         loadRecords();
         expiryTask = Bukkit.getScheduler().runTaskTimer(plugin, this::expireGhosts, 20L, 20L);
-        // Citizens has already enabled (it is a soft dependency), but defer
-        // one tick so persisted NPC entities have a chance to spawn.
-        Bukkit.getScheduler().runTask(plugin, this::bindPersistedNpcs);
+        Bukkit.getScheduler().runTask(plugin, this::bindPersistedVillagers);
     }
 
     public void reload() {
         enabled = plugin.getConfig().getBoolean("pvp.ghost-players.enabled", false);
         combatTaggedOnly = plugin.getConfig().getBoolean("pvp.ghost-players.combat-tagged-only", true);
-        despawnMillis = Math.max(0L,
-                plugin.getConfig().getLong("pvp.ghost-players.despawn-after-seconds", 300)) * 1000L;
+        despawnMillis = Math.max(0L, plugin.getConfig().getLong("pvp.ghost-players.despawn-after-seconds", 300)) * 1000L;
         Set<String> worlds = new HashSet<>();
         for (String world : plugin.getConfig().getStringList("pvp.ghost-players.allowed-worlds")) {
-            if (world != null && !world.isBlank()) {
-                worlds.add(world.toLowerCase(Locale.ROOT));
-            }
+            if (world != null && !world.isBlank()) worlds.add(world.toLowerCase(Locale.ROOT));
         }
         allowedWorlds = Set.copyOf(worlds);
-        try {
-            npcType = EntityType.valueOf(plugin.getConfig().getString("pvp.ghost-players.npc-type", "PLAYER")
-                    .trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            npcType = EntityType.PLAYER;
-            plugin.getLogger().warning("Invalid pvp.ghost-players.npc-type; using PLAYER.");
-        }
-        if (!npcType.isAlive()) {
-            plugin.getLogger().warning("pvp.ghost-players.npc-type must be a living entity; using PLAYER.");
-            npcType = EntityType.PLAYER;
-        }
     }
 
-    /**
-     * Called by the connection listener before the normal instant combat-log
-     * penalty. A successful spawn means the caller must not kill the real
-     * player -- their inventory is now held by the NPC instead.
-     */
     public boolean handleForcedDisconnect(Player player) {
         if (!enabled || !isAllowedWorld(player.getLocation())
-                || (combatTaggedOnly && (combatManager == null || !combatManager.isTagged(player.getUniqueId())))) {
-            return false;
-        }
-        if (!CitizensAPI.hasImplementation()) {
-            return false;
-        }
-
+                || (combatTaggedOnly && (combatManager == null || !combatManager.isTagged(player.getUniqueId())))) return false;
         UUID ownerId = player.getUniqueId();
         removeExistingGhost(ownerId, true);
         GhostRecord record = GhostRecord.capture(player, System.currentTimeMillis());
-        NPC npc = null;
+        ghosts.put(ownerId, record);
+        if (!saveRecords()) {
+            ghosts.remove(ownerId);
+            return false;
+        }
         try {
-            npc = CitizensAPI.getNPCRegistry().createNPC(npcType, player.getName());
-            // Persist a protected pending record before clearing the live
-            // inventory. A reboot in this transition restores it safely.
-            npc.setProtected(true);
-            record.npcId = npc.getId();
-            ghosts.put(ownerId, record);
+            Villager villager = player.getWorld().spawn(player.getLocation(), Villager.class, ghost -> {
+                ghost.customName(net.kyori.adventure.text.Component.text(player.getName() + "'s Ghost"));
+                ghost.setCustomNameVisible(true);
+                ghost.setAI(false);
+                ghost.setCanPickupItems(false);
+                ghost.setRemoveWhenFarAway(false);
+                ghost.setPersistent(true);
+                if (ghost.getAttribute(Attribute.MAX_HEALTH) != null) ghost.getAttribute(Attribute.MAX_HEALTH).setBaseValue(20.0);
+                ghost.setHealth(20.0);
+            });
+            record.entityId = villager.getUniqueId();
+            record.location = villager.getLocation();
             if (!saveRecords()) {
+                villager.remove();
                 ghosts.remove(ownerId);
-                npc.destroy();
                 return false;
             }
-            if (!npc.spawn(player.getLocation())) {
-                ghosts.remove(ownerId);
-                saveRecords();
-                npc.destroy();
-                return false;
-            }
-            Entity entity = npc.getEntity();
-            if (!(entity instanceof LivingEntity living)) {
-                npc.destroy();
-                ghosts.remove(ownerId);
-                saveRecords();
-                return false;
-            }
-            equipNpc(living, record);
-            record.location = living.getLocation();
+            equipVillager(villager, record);
             clearPlayerInventory(player);
             record.armed = true;
-            npc.setProtected(false);
-            entityOwners.put(living.getUniqueId(), ownerId);
+            entityOwners.put(villager.getUniqueId(), ownerId);
             saveRecords();
             return true;
         } catch (RuntimeException exception) {
-            if (npc != null) {
-                npc.destroy();
-            }
-            // The record is created before clearing the live inventory for
-            // crash safety. If spawn/equip then fails, remove it again so a
-            // later login cannot restore an inventory the player never lost.
+            destroyVillager(record);
             ghosts.remove(ownerId);
             saveRecords();
             plugin.getLogger().log(Level.WARNING, "Could not create Ghost Player for " + player.getName() + ".", exception);
@@ -156,15 +105,11 @@ public final class GhostPlayerManager implements Listener {
         }
     }
 
-    /** Restores a safe ghost or applies the configured death consequence. */
     public void handleJoin(Player player) {
-        UUID ownerId = player.getUniqueId();
-        GhostRecord record = ghosts.get(ownerId);
-        if (record == null) {
-            return;
-        }
+        GhostRecord record = ghosts.get(player.getUniqueId());
+        if (record == null) return;
         if (record.dead) {
-            removeRecord(ownerId, false);
+            removeRecord(player.getUniqueId());
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (player.isOnline() && !player.isDead()) {
                     player.sendMessage(messages.get(player, "ghost-players.killed-on-login"));
@@ -173,38 +118,27 @@ public final class GhostPlayerManager implements Listener {
             });
             return;
         }
-
-        destroyNpc(record);
+        destroyVillager(record);
         restorePlayerInventory(player, record);
-        removeRecord(ownerId, false);
+        removeRecord(player.getUniqueId());
         player.sendMessage(messages.get(player, "ghost-players.restored"));
     }
 
     @EventHandler
     public void onGhostDeath(EntityDeathEvent event) {
         UUID ownerId = entityOwners.remove(event.getEntity().getUniqueId());
-        if (ownerId == null) {
-            return;
-        }
+        if (ownerId == null) return;
         GhostRecord record = ghosts.get(ownerId);
-        if (record == null || record.dead || !record.armed) {
-            return;
-        }
-        // Citizens may expose worn equipment as ordinary drops. Clear those
-        // first, then add our persisted snapshot exactly once.
+        if (record == null || record.dead || !record.armed) return;
         event.getDrops().clear();
         event.getDrops().addAll(record.allItems());
         record.dead = true;
-        record.npcId = -1;
+        record.entityId = null;
         saveRecords();
     }
 
-    /** Keep active ghosts on plugin/server reload; their item records are persisted. */
     public void shutdown() {
-        if (expiryTask != null) {
-            expiryTask.cancel();
-            expiryTask = null;
-        }
+        if (expiryTask != null) expiryTask.cancel();
         saveRecords();
     }
 
@@ -213,106 +147,77 @@ public final class GhostPlayerManager implements Listener {
     }
 
     private void expireGhosts() {
-        if (despawnMillis <= 0L) {
-            return;
-        }
+        if (despawnMillis <= 0L) return;
         long now = System.currentTimeMillis();
         boolean changed = false;
         for (GhostRecord record : ghosts.values()) {
-            if (record.armed && !record.dead && record.npcId >= 0 && now - record.createdAt >= despawnMillis) {
-                destroyNpc(record);
-                record.npcId = -1;
+            if (record.armed && !record.dead && record.entityId != null && now - record.createdAt >= despawnMillis) {
+                destroyVillager(record);
                 changed = true;
             }
         }
-        if (changed) {
-            saveRecords();
-        }
+        if (changed) saveRecords();
     }
 
-    private void bindPersistedNpcs() {
-        if (!CitizensAPI.hasImplementation()) {
-            return;
-        }
+    private void bindPersistedVillagers() {
         for (Map.Entry<UUID, GhostRecord> entry : ghosts.entrySet()) {
             GhostRecord record = entry.getValue();
-            if (record.dead || record.npcId < 0) {
-                continue;
-            }
-            NPC npc = CitizensAPI.getNPCRegistry().getById(record.npcId);
-            if (!record.armed) {
-                if (npc != null) {
-                    npc.destroy();
-                }
-                record.npcId = -1;
-                continue;
-            }
-            if (npc != null && npc.isSpawned() && npc.getEntity() != null) {
-                entityOwners.put(npc.getEntity().getUniqueId(), entry.getKey());
-            } else {
-                // Never strand an inventory if Citizens did not restore an
-                // NPC (for example, its world is disabled). A later join
-                // safely restores this record to its owner.
-                record.npcId = -1;
-            }
+            LivingEntity entity = findVillager(record);
+            if (record.armed && !record.dead && entity instanceof Villager) entityOwners.put(entity.getUniqueId(), entry.getKey());
         }
-        saveRecords();
     }
 
     private void removeExistingGhost(UUID ownerId, boolean restoreIfOnline) {
-        GhostRecord existing = ghosts.get(ownerId);
-        if (existing == null) {
-            return;
-        }
+        GhostRecord record = ghosts.get(ownerId);
+        if (record == null) return;
         Player player = Bukkit.getPlayer(ownerId);
-        if (restoreIfOnline && player != null && player.isOnline() && !existing.dead) {
-            restorePlayerInventory(player, existing);
-        }
-        destroyNpc(existing);
-        removeRecord(ownerId, false);
+        if (restoreIfOnline && player != null && player.isOnline() && !record.dead) restorePlayerInventory(player, record);
+        destroyVillager(record);
+        removeRecord(ownerId);
     }
 
-    private void destroyNpc(GhostRecord record) {
-        if (record.npcId < 0 || !CitizensAPI.hasImplementation()) {
-            return;
+    private LivingEntity findVillager(GhostRecord record) {
+        if (record.entityId == null) return null;
+        Entity entity = Bukkit.getEntity(record.entityId);
+        if (entity instanceof LivingEntity living) return living;
+        if (record.location == null || record.location.getWorld() == null) return null;
+        World world = record.location.getWorld();
+        for (Entity candidate : world.getChunkAt(record.location).getEntities()) {
+            if (record.entityId.equals(candidate.getUniqueId()) && candidate instanceof LivingEntity living) return living;
         }
-        NPC npc = CitizensAPI.getNPCRegistry().getById(record.npcId);
-        if (npc != null) {
-            Entity entity = npc.getEntity();
-            if (entity != null) {
-                entityOwners.remove(entity.getUniqueId());
-            }
-            npc.destroy();
-        }
+        return null;
     }
 
-    private void removeRecord(UUID ownerId, boolean ignored) {
+    private void destroyVillager(GhostRecord record) {
+        LivingEntity entity = findVillager(record);
+        if (entity != null) {
+            entityOwners.remove(entity.getUniqueId());
+            entity.remove();
+        }
+        record.entityId = null;
+    }
+
+    private void removeRecord(UUID ownerId) {
         ghosts.remove(ownerId);
         saveRecords();
     }
 
-    private static void equipNpc(LivingEntity npc, GhostRecord record) {
-        if (npc instanceof Player playerNpc) {
-            PlayerInventory inventory = playerNpc.getInventory();
-            inventory.setStorageContents(copy(record.storage));
-            inventory.setArmorContents(copy(record.armor));
-            inventory.setItemInOffHand(copy(record.offHand));
-            return;
-        }
-        EntityEquipment equipment = npc.getEquipment();
-        if (equipment != null) {
-            equipment.setArmorContents(copy(record.armor));
-            equipment.setItemInMainHand(firstNonEmpty(record.storage));
-            equipment.setItemInOffHand(copy(record.offHand));
-        }
+    private static void equipVillager(Villager villager, GhostRecord record) {
+        EntityEquipment equipment = villager.getEquipment();
+        if (equipment == null) return;
+        equipment.setArmorContents(copy(record.armor));
+        equipment.setItemInMainHand(firstNonEmpty(record.storage));
+        equipment.setItemInOffHand(copy(record.offHand));
+        equipment.setHelmetDropChance(0);
+        equipment.setChestplateDropChance(0);
+        equipment.setLeggingsDropChance(0);
+        equipment.setBootsDropChance(0);
+        equipment.setItemInMainHandDropChance(0);
+        equipment.setItemInOffHandDropChance(0);
     }
 
     private static ItemStack firstNonEmpty(ItemStack[] items) {
-        for (ItemStack item : items) {
-            if (item != null && !item.getType().isAir()) {
-                return item.clone();
-            }
-        }
+        for (ItemStack item : items) if (item != null && !item.getType().isAir()) return item.clone();
         return null;
     }
 
@@ -333,32 +238,19 @@ public final class GhostPlayerManager implements Listener {
     }
 
     private void loadRecords() {
-        if (!dataFile.exists()) {
-            return;
-        }
-        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(dataFile);
-        ConfigurationSection root = yaml.getConfigurationSection("ghosts");
-        if (root == null) {
-            return;
-        }
+        if (!dataFile.exists()) return;
+        ConfigurationSection root = YamlConfiguration.loadConfiguration(dataFile).getConfigurationSection("ghosts");
+        if (root == null) return;
         for (String id : root.getKeys(false)) {
             try {
-                UUID ownerId = UUID.fromString(id);
                 ConfigurationSection section = root.getConfigurationSection(id);
-                if (section == null) {
-                    continue;
-                }
-                GhostRecord record = new GhostRecord(
-                        itemArray(section.getList("storage"), 36),
-                        itemArray(section.getList("armor"), 4),
-                        section.getItemStack("offhand"),
-                        section.getItemStack("cursor"),
-                        section.getLong("created-at"),
-                        section.getInt("npc-id", -1),
-                        section.getBoolean("armed", false),
-                        section.getBoolean("dead", false),
-                        section.getLocation("location"));
-                ghosts.put(ownerId, record);
+                if (section == null) continue;
+                String entityText = section.getString("entity-uuid");
+                UUID entityId = entityText == null || entityText.isBlank() ? null : UUID.fromString(entityText);
+                ghosts.put(UUID.fromString(id), new GhostRecord(itemArray(section.getList("storage"), 36),
+                        itemArray(section.getList("armor"), 4), section.getItemStack("offhand"),
+                        section.getItemStack("cursor"), section.getLong("created-at"), entityId,
+                        section.getBoolean("armed", false), section.getBoolean("dead", false), section.getLocation("location")));
             } catch (IllegalArgumentException exception) {
                 plugin.getLogger().warning("Ignoring invalid Ghost Player record '" + id + "'.");
             }
@@ -375,7 +267,7 @@ public final class GhostPlayerManager implements Listener {
             yaml.set(path + ".offhand", copy(record.offHand));
             yaml.set(path + ".cursor", copy(record.cursor));
             yaml.set(path + ".created-at", record.createdAt);
-            yaml.set(path + ".npc-id", record.npcId);
+            yaml.set(path + ".entity-uuid", record.entityId == null ? null : record.entityId.toString());
             yaml.set(path + ".armed", record.armed);
             yaml.set(path + ".dead", record.dead);
             yaml.set(path + ".location", record.location);
@@ -391,14 +283,8 @@ public final class GhostPlayerManager implements Listener {
 
     private static ItemStack[] itemArray(List<?> values, int expectedSize) {
         ItemStack[] items = new ItemStack[Math.max(expectedSize, values == null ? 0 : values.size())];
-        if (values == null) {
-            return items;
-        }
-        for (int index = 0; index < values.size(); index++) {
-            Object value = values.get(index);
-            if (value instanceof ItemStack item) {
-                items[index] = item.clone();
-            }
+        if (values != null) for (int index = 0; index < values.size(); index++) {
+            if (values.get(index) instanceof ItemStack item) items[index] = item.clone();
         }
         return items;
     }
@@ -412,55 +298,43 @@ public final class GhostPlayerManager implements Listener {
     }
 
     private static final class GhostRecord {
-        private final ItemStack[] storage;
-        private final ItemStack[] armor;
-        private final ItemStack offHand;
-        private final ItemStack cursor;
-        private final long createdAt;
-        private int npcId;
-        private boolean armed;
-        private boolean dead;
-        private Location location;
+        final ItemStack[] storage, armor;
+        final ItemStack offHand, cursor;
+        final long createdAt;
+        UUID entityId;
+        boolean armed, dead;
+        Location location;
 
-        private GhostRecord(ItemStack[] storage, ItemStack[] armor, ItemStack offHand, ItemStack cursor,
-                            long createdAt, int npcId, boolean armed, boolean dead, Location location) {
+        GhostRecord(ItemStack[] storage, ItemStack[] armor, ItemStack offHand, ItemStack cursor, long createdAt,
+                UUID entityId, boolean armed, boolean dead, Location location) {
             this.storage = copy(storage);
             this.armor = copy(armor);
             this.offHand = copy(offHand);
             this.cursor = copy(cursor);
             this.createdAt = createdAt;
-            this.npcId = npcId;
+            this.entityId = entityId;
             this.armed = armed;
             this.dead = dead;
             this.location = location;
         }
 
-        private static GhostRecord capture(Player player, long now) {
+        static GhostRecord capture(Player player, long now) {
             PlayerInventory inventory = player.getInventory();
-            return new GhostRecord(inventory.getStorageContents(), inventory.getArmorContents(),
-                    inventory.getItemInOffHand(), player.getItemOnCursor(), now, -1, false, false,
-                    player.getLocation());
+            return new GhostRecord(inventory.getStorageContents(), inventory.getArmorContents(), inventory.getItemInOffHand(),
+                    player.getItemOnCursor(), now, null, false, false, player.getLocation());
         }
 
-        private List<ItemStack> allItems() {
-            List<ItemStack> result = new ArrayList<>();
-            addNonEmpty(result, storage);
-            addNonEmpty(result, armor);
-            if (offHand != null && !offHand.getType().isAir()) {
-                result.add(offHand.clone());
-            }
-            if (cursor != null && !cursor.getType().isAir()) {
-                result.add(cursor.clone());
-            }
-            return result;
+        List<ItemStack> allItems() {
+            List<ItemStack> items = new ArrayList<>();
+            addNonEmpty(items, storage);
+            addNonEmpty(items, armor);
+            if (offHand != null && !offHand.getType().isAir()) items.add(offHand.clone());
+            if (cursor != null && !cursor.getType().isAir()) items.add(cursor.clone());
+            return items;
         }
 
-        private static void addNonEmpty(List<ItemStack> target, ItemStack[] source) {
-            for (ItemStack item : source) {
-                if (item != null && !item.getType().isAir()) {
-                    target.add(item.clone());
-                }
-            }
+        static void addNonEmpty(List<ItemStack> target, ItemStack[] source) {
+            for (ItemStack item : source) if (item != null && !item.getType().isAir()) target.add(item.clone());
         }
     }
 }
