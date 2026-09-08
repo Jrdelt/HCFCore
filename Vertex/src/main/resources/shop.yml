@@ -1,0 +1,376 @@
+# ============================================
+# SHOP
+# ============================================
+# /shop -- a categorized market. Every item below has a dynamic price:
+# buying pushes it up, selling pushes it down, and it drifts back toward
+# its base price over time on its own. /shop opens a one-row category
+# picker; clicking a category opens its own paginated browse/trade GUI.
+enabled: true
+
+# How strongly one unit bought/sold moves the price -- the buy price is
+# base-price * (1 + price-change-per-unit) ^ net-volume, where net-volume
+# is "units bought minus units sold" since it last fully recovered.
+price-change-per-unit: 0.001
+
+# The first this-many units of net volume (in either direction) don't move
+# the price at all -- only volume beyond this threshold counts. A handful
+# of trades leaves the price untouched; it only actually starts moving once
+# a real amount has been bought or sold.
+price-change-threshold-units: 50
+
+# The price can never drift further than this from an item's base-price,
+# in either direction (0.25 = as low as 25% of base, 4.0 = as high as 400%).
+min-price-multiplier: 0.25
+max-price-multiplier: 4.0
+
+# Selling always pays this fraction of the *current* buy price -- not the
+# base price -- so the spread follows the market instead of staying fixed.
+sell-price-ratio: 0.75
+
+# Every item's price drifts back toward its base price on its own: every
+# decay-interval-ticks, its net-volume shrinks by this fraction (0.05 = 5%
+# closer to equilibrium each tick of recovery).
+decay-interval-ticks: 6000
+decay-fraction: 0.05
+
+# Left-click buys this many, shift-left-click buys a full stack. Same for
+# selling on the right-click side.
+default-buy-amount: 1
+
+# Each top-level key is one category shown in the /shop picker (max 9 --
+# it's a single row). display-name and icon are yours to change; items is
+# a map of Material -> base-price, same as before. A material must only
+# appear once across every category -- a duplicate is ignored (with a
+# startup warning) rather than silently overwriting the first one.
+categories:
+  building_blocks:
+    display-name: "Building Blocks"
+    icon: GRASS_BLOCK
+    items:
+      DIRT: { base-price: 2.0 }
+      COARSE_DIRT: { base-price: 2.0 }
+      GRASS_BLOCK: { base-price: 2.0 }
+      MYCELIUM: { base-price: 3.0 }
+      PODZOL: { base-price: 2.5 }
+      STONE: { base-price: 3.0 }
+      COBBLESTONE: { base-price: 2.0 }
+      MOSSY_COBBLESTONE: { base-price: 3.0 }
+      ANDESITE: { base-price: 2.5 }
+      DIORITE: { base-price: 2.5 }
+      GRANITE: { base-price: 2.5 }
+      POLISHED_ANDESITE: { base-price: 3.0 }
+      POLISHED_DIORITE: { base-price: 3.0 }
+      POLISHED_GRANITE: { base-price: 3.0 }
+      DEEPSLATE: { base-price: 3.0 }
+      COBBLED_DEEPSLATE: { base-price: 2.5 }
+      POLISHED_DEEPSLATE: { base-price: 3.0 }
+      TUFF: { base-price: 2.5 }
+      CALCITE: { base-price: 2.5 }
+      # Flat-priced (dynamic-pricing: false) -- these are the falling-block
+      # materials a Sand Bot bulk-purchases, so their cost needs to stay
+      # predictable rather than spike with demand.
+      SAND: { base-price: 2.0, dynamic-pricing: false }
+      RED_SAND: { base-price: 2.5, dynamic-pricing: false }
+      GRAVEL: { base-price: 2.0, dynamic-pricing: false }
+      CLAY: { base-price: 4.0 }
+      SANDSTONE: { base-price: 3.0 }
+      RED_SANDSTONE: { base-price: 3.0 }
+      NETHERRACK: { base-price: 2.0 }
+      BLACKSTONE: { base-price: 3.0 }
+      BASALT: { base-price: 3.0 }
+      END_STONE: { base-price: 4.0 }
+      PURPUR_BLOCK: { base-price: 5.0 }
+      ICE: { base-price: 5.0 }
+      PACKED_ICE: { base-price: 6.0 }
+      BLUE_ICE: { base-price: 8.0 }
+      SNOW_BLOCK: { base-price: 2.0 }
+      GLASS: { base-price: 4.0 }
+      OAK_LOG: { base-price: 4.0 }
+      SPRUCE_LOG: { base-price: 4.0 }
+      BIRCH_LOG: { base-price: 4.0 }
+      JUNGLE_LOG: { base-price: 4.0 }
+      ACACIA_LOG: { base-price: 4.0 }
+      DARK_OAK_LOG: { base-price: 4.0 }
+      MANGROVE_LOG: { base-price: 4.0 }
+      CHERRY_LOG: { base-price: 4.0 }
+      CRIMSON_STEM: { base-price: 4.5 }
+      WARPED_STEM: { base-price: 4.5 }
+      OAK_PLANKS: { base-price: 3.0 }
+      SPRUCE_PLANKS: { base-price: 3.0 }
+      BIRCH_PLANKS: { base-price: 3.0 }
+      JUNGLE_PLANKS: { base-price: 3.0 }
+      ACACIA_PLANKS: { base-price: 3.0 }
+      DARK_OAK_PLANKS: { base-price: 3.0 }
+      TERRACOTTA: { base-price: 4.0 }
+      BRICKS: { base-price: 4.0 }
+      STONE_BRICKS: { base-price: 3.5 }
+      MUD: { base-price: 2.5 }
+      PACKED_MUD: { base-price: 3.0 }
+      MUD_BRICKS: { base-price: 3.5 }
+      PRISMARINE: { base-price: 6.0 }
+      NETHER_BRICKS: { base-price: 4.0 }
+
+  decorative:
+    display-name: "Decorative"
+    icon: POPPY
+    items:
+      POPPY: { base-price: 2.0 }
+      DANDELION: { base-price: 2.0 }
+      BLUE_ORCHID: { base-price: 3.0 }
+      ALLIUM: { base-price: 3.0 }
+      AZURE_BLUET: { base-price: 2.5 }
+      RED_TULIP: { base-price: 2.5 }
+      ORANGE_TULIP: { base-price: 2.5 }
+      WHITE_TULIP: { base-price: 2.5 }
+      PINK_TULIP: { base-price: 2.5 }
+      OXEYE_DAISY: { base-price: 2.5 }
+      CORNFLOWER: { base-price: 2.5 }
+      LILY_OF_THE_VALLEY: { base-price: 3.0 }
+      SUNFLOWER: { base-price: 3.5 }
+      LILAC: { base-price: 3.5 }
+      ROSE_BUSH: { base-price: 3.5 }
+      PEONY: { base-price: 3.5 }
+      OAK_SAPLING: { base-price: 2.0 }
+      SPRUCE_SAPLING: { base-price: 2.0 }
+      BIRCH_SAPLING: { base-price: 2.0 }
+      JUNGLE_SAPLING: { base-price: 2.0 }
+      ACACIA_SAPLING: { base-price: 2.0 }
+      DARK_OAK_SAPLING: { base-price: 2.0 }
+      MANGROVE_PROPAGULE: { base-price: 2.5 }
+      CHERRY_SAPLING: { base-price: 2.5 }
+      RED_MUSHROOM: { base-price: 2.5 }
+      BROWN_MUSHROOM: { base-price: 2.5 }
+      VINE: { base-price: 2.0 }
+      GLOW_LICHEN: { base-price: 3.0 }
+      MOSS_BLOCK: { base-price: 3.5 }
+      AZALEA: { base-price: 3.5 }
+      SEA_PICKLE: { base-price: 4.0 }
+      KELP: { base-price: 2.0 }
+      TUBE_CORAL_BLOCK: { base-price: 6.0 }
+      BRAIN_CORAL_BLOCK: { base-price: 6.0 }
+      BUBBLE_CORAL_BLOCK: { base-price: 6.0 }
+      FIRE_CORAL_BLOCK: { base-price: 6.0 }
+      HORN_CORAL_BLOCK: { base-price: 6.0 }
+      LANTERN: { base-price: 5.0 }
+      SOUL_LANTERN: { base-price: 6.0 }
+      END_ROD: { base-price: 5.0 }
+
+  raiding:
+    display-name: "Raiding Materials"
+    icon: TNT
+    items:
+      TNT: { base-price: 15.0 }
+      TNT_MINECART: { base-price: 25.0 }
+      OBSIDIAN: { base-price: 25.0 }
+      CRYING_OBSIDIAN: { base-price: 30.0 }
+      RESPAWN_ANCHOR: { base-price: 40.0 }
+      GLOWSTONE: { base-price: 6.0 }
+      FLINT_AND_STEEL: { base-price: 10.0 }
+      FIRE_CHARGE: { base-price: 8.0 }
+      LADDER: { base-price: 2.0 }
+      SCAFFOLDING: { base-price: 3.0 }
+      CHORUS_FRUIT: { base-price: 4.0 }
+      WATER_BUCKET: { base-price: 6.0 }
+      LAVA_BUCKET: { base-price: 8.0 }
+      ARROW: { base-price: 1.5 }
+      SPECTRAL_ARROW: { base-price: 3.0 }
+      BOW: { base-price: 20.0 }
+      CROSSBOW: { base-price: 22.0 }
+      SHIELD: { base-price: 15.0 }
+      IRON_BARS: { base-price: 3.0 }
+      # Flat-priced -- see the SAND/RED_SAND/GRAVEL note above; same reason.
+      WHITE_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      ORANGE_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      MAGENTA_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      LIGHT_BLUE_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      YELLOW_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      LIME_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      PINK_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      GRAY_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      LIGHT_GRAY_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      CYAN_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      PURPLE_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      BLUE_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      BROWN_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      GREEN_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      RED_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+      BLACK_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
+
+  spawners_and_mob_drops:
+    display-name: "Spawners and Mob Drops"
+    icon: SPAWNER
+    items:
+      COW_SPAWN_EGG: { base-price: 50.0 }
+      PIG_SPAWN_EGG: { base-price: 50.0 }
+      SHEEP_SPAWN_EGG: { base-price: 50.0 }
+      CHICKEN_SPAWN_EGG: { base-price: 40.0 }
+      HORSE_SPAWN_EGG: { base-price: 60.0 }
+      RABBIT_SPAWN_EGG: { base-price: 45.0 }
+      WOLF_SPAWN_EGG: { base-price: 60.0 }
+      CAT_SPAWN_EGG: { base-price: 55.0 }
+      VILLAGER_SPAWN_EGG: { base-price: 80.0 }
+      IRON_GOLEM_SPAWN_EGG: { base-price: 120.0 }
+      ZOMBIE_SPAWN_EGG: { base-price: 40.0 }
+      SKELETON_SPAWN_EGG: { base-price: 45.0 }
+      CREEPER_SPAWN_EGG: { base-price: 55.0 }
+      SPIDER_SPAWN_EGG: { base-price: 45.0 }
+      ENDERMAN_SPAWN_EGG: { base-price: 90.0 }
+      WITCH_SPAWN_EGG: { base-price: 90.0 }
+      BLAZE_SPAWN_EGG: { base-price: 100.0 }
+      GHAST_SPAWN_EGG: { base-price: 110.0 }
+      SLIME_SPAWN_EGG: { base-price: 45.0 }
+      MAGMA_CUBE_SPAWN_EGG: { base-price: 45.0 }
+      GUARDIAN_SPAWN_EGG: { base-price: 100.0 }
+      ELDER_GUARDIAN_SPAWN_EGG: { base-price: 200.0 }
+      SHULKER_SPAWN_EGG: { base-price: 150.0 }
+      PHANTOM_SPAWN_EGG: { base-price: 70.0 }
+      DROWNED_SPAWN_EGG: { base-price: 50.0 }
+      PILLAGER_SPAWN_EGG: { base-price: 60.0 }
+      RAVAGER_SPAWN_EGG: { base-price: 130.0 }
+      VINDICATOR_SPAWN_EGG: { base-price: 70.0 }
+      EVOKER_SPAWN_EGG: { base-price: 130.0 }
+      PANDA_SPAWN_EGG: { base-price: 60.0 }
+      FOX_SPAWN_EGG: { base-price: 55.0 }
+      BEE_SPAWN_EGG: { base-price: 55.0 }
+      TURTLE_SPAWN_EGG: { base-price: 50.0 }
+      DOLPHIN_SPAWN_EGG: { base-price: 60.0 }
+      SQUID_SPAWN_EGG: { base-price: 35.0 }
+      WITHER_SKELETON_SPAWN_EGG: { base-price: 110.0 }
+      STRAY_SPAWN_EGG: { base-price: 50.0 }
+      HUSK_SPAWN_EGG: { base-price: 45.0 }
+      BONE: { base-price: 1.5 }
+      STRING: { base-price: 1.5 }
+      GUNPOWDER: { base-price: 2.0 }
+      ROTTEN_FLESH: { base-price: 0.5 }
+      SPIDER_EYE: { base-price: 2.0 }
+      ENDER_PEARL: { base-price: 10.0 }
+      BLAZE_ROD: { base-price: 12.0 }
+      GHAST_TEAR: { base-price: 15.0 }
+      SLIME_BALL: { base-price: 2.0 }
+      MAGMA_CREAM: { base-price: 4.0 }
+      RABBIT_HIDE: { base-price: 1.5 }
+      RABBIT_FOOT: { base-price: 6.0 }
+      PHANTOM_MEMBRANE: { base-price: 5.0 }
+      NAUTILUS_SHELL: { base-price: 10.0 }
+      PRISMARINE_SHARD: { base-price: 2.0 }
+      PRISMARINE_CRYSTALS: { base-price: 3.0 }
+      SHULKER_SHELL: { base-price: 25.0 }
+      TOTEM_OF_UNDYING: { base-price: 150.0 }
+      FEATHER: { base-price: 1.0 }
+      LEATHER: { base-price: 2.0 }
+      INK_SAC: { base-price: 1.5 }
+      GLOW_INK_SAC: { base-price: 3.0 }
+
+  minerals:
+    display-name: "Minerals"
+    icon: GOLD_INGOT
+    items:
+      COAL: { base-price: 3.0 }
+      COAL_BLOCK: { base-price: 25.0 }
+      CHARCOAL: { base-price: 2.5 }
+      RAW_IRON: { base-price: 5.0 }
+      RAW_IRON_BLOCK: { base-price: 45.0 }
+      IRON_INGOT: { base-price: 6.0 }
+      IRON_BLOCK: { base-price: 50.0 }
+      RAW_COPPER: { base-price: 2.5 }
+      RAW_COPPER_BLOCK: { base-price: 22.0 }
+      COPPER_INGOT: { base-price: 3.0 }
+      COPPER_BLOCK: { base-price: 26.0 }
+      RAW_GOLD: { base-price: 8.0 }
+      RAW_GOLD_BLOCK: { base-price: 70.0 }
+      GOLD_INGOT: { base-price: 9.0 }
+      GOLD_BLOCK: { base-price: 78.0 }
+      GOLD_NUGGET: { base-price: 1.0 }
+      REDSTONE: { base-price: 2.0 }
+      REDSTONE_BLOCK: { base-price: 17.0 }
+      LAPIS_LAZULI: { base-price: 2.5 }
+      LAPIS_BLOCK: { base-price: 21.0 }
+      DIAMOND: { base-price: 40.0 }
+      DIAMOND_BLOCK: { base-price: 350.0 }
+      EMERALD: { base-price: 35.0 }
+      EMERALD_BLOCK: { base-price: 310.0 }
+      NETHERITE_SCRAP: { base-price: 120.0 }
+      NETHERITE_INGOT: { base-price: 400.0 }
+      NETHERITE_BLOCK: { base-price: 3500.0 }
+      ANCIENT_DEBRIS: { base-price: 130.0 }
+      QUARTZ: { base-price: 4.0 }
+      QUARTZ_BLOCK: { base-price: 34.0 }
+      AMETHYST_SHARD: { base-price: 5.0 }
+      AMETHYST_BLOCK: { base-price: 40.0 }
+
+  farming_and_food:
+    display-name: "Farming and Food"
+    icon: WHEAT
+    items:
+      WHEAT: { base-price: 1.5 }
+      WHEAT_SEEDS: { base-price: 0.5 }
+      CARROT: { base-price: 1.5 }
+      POTATO: { base-price: 1.5 }
+      BEETROOT: { base-price: 1.5 }
+      BEETROOT_SEEDS: { base-price: 0.5 }
+      MELON_SLICE: { base-price: 1.0 }
+      MELON_SEEDS: { base-price: 0.5 }
+      MELON: { base-price: 5.0 }
+      PUMPKIN_SEEDS: { base-price: 0.5 }
+      PUMPKIN: { base-price: 4.0 }
+      SUGAR_CANE: { base-price: 1.5 }
+      BAMBOO: { base-price: 1.0 }
+      COCOA_BEANS: { base-price: 2.0 }
+      NETHER_WART: { base-price: 2.5 }
+      SWEET_BERRIES: { base-price: 1.5 }
+      GLOW_BERRIES: { base-price: 2.0 }
+      APPLE: { base-price: 3.0 }
+      GOLDEN_APPLE: { base-price: 60.0 }
+      BREAD: { base-price: 3.0 }
+      CAKE: { base-price: 12.0 }
+      COOKIE: { base-price: 1.5 }
+      BAKED_POTATO: { base-price: 2.5 }
+      PUMPKIN_PIE: { base-price: 6.0 }
+      COOKED_BEEF: { base-price: 4.0 }
+      COOKED_PORKCHOP: { base-price: 4.0 }
+      COOKED_CHICKEN: { base-price: 3.0 }
+      COOKED_MUTTON: { base-price: 3.5 }
+      COOKED_RABBIT: { base-price: 3.5 }
+      COOKED_COD: { base-price: 3.0 }
+      COOKED_SALMON: { base-price: 3.5 }
+      BEEF: { base-price: 2.5 }
+      PORKCHOP: { base-price: 2.5 }
+      CHICKEN: { base-price: 2.0 }
+      MUTTON: { base-price: 2.0 }
+      RABBIT: { base-price: 2.0 }
+      EGG: { base-price: 1.5 }
+      MILK_BUCKET: { base-price: 4.0 }
+      HONEY_BOTTLE: { base-price: 4.0 }
+      HONEYCOMB: { base-price: 3.0 }
+
+  miscellaneous:
+    display-name: "Miscellaneous"
+    icon: CHEST
+    items:
+      BUCKET: { base-price: 4.0 }
+      COMPASS: { base-price: 6.0 }
+      CLOCK: { base-price: 6.0 }
+      NAME_TAG: { base-price: 20.0 }
+      LEAD: { base-price: 5.0 }
+      SADDLE: { base-price: 15.0 }
+      SPYGLASS: { base-price: 25.0 }
+      BOOK: { base-price: 4.0 }
+      PAPER: { base-price: 0.5 }
+      FLINT: { base-price: 1.5 }
+      STICK: { base-price: 0.5 }
+      BOWL: { base-price: 1.0 }
+      FISHING_ROD: { base-price: 15.0 }
+      BONE_MEAL: { base-price: 1.0 }
+      GLASS_BOTTLE: { base-price: 1.0 }
+      EXPERIENCE_BOTTLE: { base-price: 10.0 }
+      FIREWORK_ROCKET: { base-price: 3.0 }
+      TORCH: { base-price: 0.5 }
+      CAMPFIRE: { base-price: 6.0 }
+      SOUL_CAMPFIRE: { base-price: 7.0 }
+      OAK_SIGN: { base-price: 2.0 }
+      CHEST: { base-price: 5.0 }
+      BARREL: { base-price: 6.0 }
+      ENDER_CHEST: { base-price: 40.0 }
+      ANVIL: { base-price: 60.0 }
+      GRINDSTONE: { base-price: 12.0 }
+      SHEARS: { base-price: 10.0 }

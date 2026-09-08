@@ -1,0 +1,34 @@
+# ============================================
+# AUCTION HOUSE
+# ============================================
+# /ah (alias /auctionhouse) -- a buy-it-now marketplace for any item.
+# List whatever you're holding at a fixed price; the first player to buy
+# it gets it immediately, no bidding, no waiting for an auction to end.
+enabled: true
+
+# Bounds on a listing's buy-it-now price.
+min-price: 1.0
+max-price: 10000000.0
+
+# How many listings one player can have active (not yet sold/expired) at once.
+max-active-listings-per-player: 10
+
+# How long a listing stays up before it expires unsold and is returned to
+# the seller.
+listing-duration-hours: 48
+
+# Taken from the seller upfront when a listing is created, regardless of
+# whether it ever sells. Deleted, not paid to anyone. 0 disables it.
+listing-fee-percent: 0.0
+
+# Taken out of the seller's proceeds when a listing actually sells.
+# Deleted, not paid to anyone. 0 disables it.
+sale-tax-percent: 0.0
+
+# How long a resolved (sold/expired/cancelled) listing stays in the staff
+# audit log (/ah logs) before being pruned. 0 means never delete it.
+log-retention-days: 0
+
+# How often the GUI's active-listing pages refresh, and how often expired
+# listings are swept and returned to their sellers.
+sweep-interval-ticks: 1200

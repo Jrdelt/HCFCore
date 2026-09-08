@@ -1,0 +1,56 @@
+# ============================================
+# COINFLIPS
+# ============================================
+# /cf (alias /coinflip) lets a player host a 50/50 wager against anyone,
+# or a specific player, for money, experience levels, or items. Winner
+# takes both sides' wager. Every open coinflip, self-ban, and item payout
+# is stored in Vertex's own database -- not on any item or in memory --
+# so nothing is lost across a restart, and switching storage backends
+# with /vertex storage carries all of it over.
+enabled: true
+
+# Money wagers (/cf <amount>), via Vault.
+min-money-wager: 1.0
+max-money-wager: 1000000.0
+
+# Experience-level wagers (/cf <amount> exp). Levels, not raw XP points --
+# levels are what's actually shown to the player and are not subject to
+# Bukkit's well-known inconsistent raw-experience-point tracking.
+min-exp-wager: 1
+max-exp-wager: 500
+
+# Item wagers (/cf hand), built in the wager GUI. Caps how many distinct
+# item stacks one coinflip can carry.
+max-item-stacks-per-wager: 9
+
+# A host's item wager can hide cheap junk behind valuable-looking bait, so
+# an opponent joining an item coinflip never resolves it immediately --
+# their chosen items are held (persisted, not just in memory) until the
+# host runs /cf approve <id> or /cf deny <id>. If the host never answers,
+# the match auto-denies and the opponent's items are returned after this
+# many seconds. Minimum 30.
+item-match-approval-timeout-seconds: 300
+
+# Winner keeps this percentage of the loser's wager; the rest is deleted
+# (not given to anyone). 0 means the winner gets the loser's wager in full.
+house-fee-percent: 0.0
+
+# How long a self-ban lasts once activated. A player cannot lift their own
+# ban before this elapses, no matter what -- see the docs for why this is
+# deliberately not an admin-overridable safety valve.
+self-ban-days: 30
+
+# How often an open coinflip's GUI icon cycles to the next item, for a
+# multi-item wager.
+item-icon-cycle-ticks: 10
+
+# How often the "Active Coinflips" GUI re-renders in place for everyone who
+# currently has it open -- new listings, cancellations, and pending-match
+# state all become visible on this cadence rather than only after the
+# viewer's own next click. The menu skips its rebuild when nothing changed;
+# 10 ticks keeps item-wager icon cycling smooth without per-tick work.
+gui-refresh-interval-ticks: 10
+
+# How long a resolved or cancelled coinflip stays in the staff audit log
+# (/cf logs) before being pruned. 0 means never delete it.
+log-retention-days: 0
