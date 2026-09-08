@@ -87,6 +87,12 @@ are available for staff testing. See [Player Trading](trading.md).
 | `/cf cancel <id>` | `vertex.coinflip.remove` for someone else's; open to the host for their own | Cancels an unplayed coinflip and refunds its wager. |
 | `/cf logs [player] [page]` | `vertex.coinflip.logs` | Reads the permanent staff audit log. |
 
+## Wands
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/wand give <player> <tier> [uses]` | `vertex.wand.give` | Gives a Sell Wand or TNT Wand — see [Wands](wands.md). Right-click a chest or Chunk Collector to use one. |
+
 ## Boosters
 
 | Command | Permission | Notes |

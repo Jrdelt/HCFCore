@@ -1,5 +1,7 @@
 package me.vertex.core.shop;
 
+import me.vertex.core.booster.BoosterCategory;
+import me.vertex.core.booster.BoosterService;
 import me.vertex.core.economy.EconomyHook;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
@@ -32,6 +34,7 @@ public final class ShopManager {
 
     private final Plugin plugin;
     private final ShopStorage storage;
+    private final BoosterService boosters;
     private final File file;
 
     private volatile boolean enabled;
@@ -49,10 +52,48 @@ public final class ShopManager {
     private final Map<Material, Double> netVolume = new ConcurrentHashMap<>();
     private final java.util.Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
 
-    public ShopManager(Plugin plugin, ShopStorage storage) {
+    public ShopManager(Plugin plugin, ShopStorage storage, BoosterService boosters) {
         this.plugin = plugin;
         this.storage = storage;
+        this.boosters = boosters;
         this.file = new File(plugin.getDataFolder(), "shop.yml");
+    }
+
+    /**
+     * The seller's combined Sell Bonus applied to a payout.
+     *
+     * <p>Every Vertex selling path routes through here -- the shop, Sell
+     * Wands, and Chunk Collectors -- so one of them can never quietly pay a
+     * different rate than another. Nothing contributes to the Sell category
+     * yet, so this is currently an exact 1.0x; it is wired now so that when
+     * Resource Rush and event boosters arrive they apply everywhere at once
+     * rather than needing each caller to remember them.
+     */
+    public double applySellBonus(Player seller, double payout) {
+        if (boosters == null) {
+            return payout;
+        }
+        return payout * boosters.multiplier(seller, BoosterCategory.SELL);
+    }
+
+    /**
+     * Records a sale of items that were never in the player's inventory --
+     * a Sell Wand emptying a container.
+     *
+     * <p>The payout walks the price down unit by unit exactly as the shop
+     * does, so emptying a full container cannot dodge dynamic repricing the
+     * way a single flat-rate calculation would. The caller must have already
+     * removed the items; this only prices the sale and moves the market.
+     *
+     * @return the payout, after the seller's Sell Bonus
+     */
+    public double sellFromContainer(Player seller, Material material, int amount) {
+        if (!enabled || !entries.containsKey(material) || amount <= 0) {
+            return 0D;
+        }
+        double payout = applySellBonus(seller, totalSellPayout(material, amount));
+        adjustVolume(material, ShopPricing.afterSell(volumeOf(material), amount));
+        return payout;
     }
 
     public void load() {
@@ -290,6 +331,7 @@ public final class ShopManager {
             return TradeOutcome.failure(TradeResult.NOT_ENOUGH_ITEMS);
         }
 
+        payout = applySellBonus(player, payout);
         EconomyHook.getEconomy().depositPlayer(player, payout);
         adjustVolume(material, ShopPricing.afterSell(volumeOf(material), amount));
         return new TradeOutcome(TradeResult.OK, payout);

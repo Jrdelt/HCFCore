@@ -1,0 +1,75 @@
+# Sell Wands and TNT Wands.
+#
+# A wand is used by right-clicking a Chest or a Chunk Collector. Each wand
+# carries its own remaining uses on the item itself, so the count survives
+# restarts, trades, and storage without any server-side bookkeeping.
+#
+# Wands work in your own claims, neutral claims, and enemy claims alike.
+
+enabled: true
+
+sell-wands:
+  # Money goes straight to the user's personal balance.
+  #
+  # Selling runs through the normal dynamic shop economy one unit at a time,
+  # so emptying a full container walks the price down exactly as selling the
+  # same amount by hand would. A container cannot be used to dodge dynamic
+  # pricing.
+  enabled: true
+
+  # Materials a Sell Wand will never sell, whatever the shop says. Use this
+  # for anything players should have to sell deliberately.
+  never-sell:
+    - SPAWNER
+    - BEDROCK
+
+  tiers:
+    iron:
+      material: IRON_HOE
+      # custom-model-data: 1001
+      name: "<gray>ɪʀᴏɴ sᴇʟʟ ᴡᴀɴᴅ"
+      lore:
+        - "<dark_gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴀ ᴄʜᴇsᴛ ᴏʀ ᴄᴏʟʟᴇᴄᴛᴏʀ"
+        - ""
+        - "<gray>ᴜsᴇs ʟᴇꜰᴛ: <yellow>{uses}"
+      uses: 50
+
+    gold:
+      material: GOLDEN_HOE
+      name: "<yellow>ɢᴏʟᴅ sᴇʟʟ ᴡᴀɴᴅ"
+      lore:
+        - "<dark_gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴀ ᴄʜᴇsᴛ ᴏʀ ᴄᴏʟʟᴇᴄᴛᴏʀ"
+        - ""
+        - "<gray>ᴜsᴇs ʟᴇꜰᴛ: <yellow>{uses}"
+      uses: 150
+
+    diamond:
+      material: DIAMOND_HOE
+      name: "<aqua>ᴅɪᴀᴍᴏɴᴅ sᴇʟʟ ᴡᴀɴᴅ"
+      lore:
+        - "<dark_gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴀ ᴄʜᴇsᴛ ᴏʀ ᴄᴏʟʟᴇᴄᴛᴏʀ"
+        - ""
+        - "<gray>ᴜsᴇs ʟᴇꜰᴛ: <yellow>{uses}"
+      uses: 500
+
+tnt-wands:
+  # Converts Gunpowder in the container into TNT and banks it straight into
+  # the faction TNT bank.
+  enabled: true
+
+  # Gunpowder consumed per TNT produced. The vanilla recipe is 5 Gunpowder
+  # plus 4 Sand; set require-sand to true to consume the Sand as well.
+  gunpowder-per-tnt: 5
+  require-sand: false
+  sand-per-tnt: 4
+
+  tiers:
+    tnt:
+      material: BLAZE_ROD
+      name: "<red>ᴛɴᴛ ᴡᴀɴᴅ"
+      lore:
+        - "<dark_gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴀ ᴄʜᴇsᴛ ᴏʀ ᴄᴏʟʟᴇᴄᴛᴏʀ"
+        - "<dark_gray>ᴄᴏɴᴠᴇʀᴛs ɢᴜɴᴘᴏᴡᴅᴇʀ ɪɴᴛᴏ ʙᴀɴᴋᴇᴅ ᴛɴᴛ"
+        - ""
+        - "<gray>ᴜsᴇs ʟᴇꜰᴛ: <yellow>{uses}"
+      uses: 100

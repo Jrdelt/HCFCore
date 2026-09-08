@@ -142,6 +142,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private StaffManager staffManager;
     private me.vertex.core.backpack.BackpackManager backpackManager;
     private me.vertex.core.booster.BoosterService boosterService;
+    private me.vertex.core.wand.WandManager wandManager;
     private me.vertex.core.menu.MenuRegistry menuRegistry;
     private me.vertex.core.coinflip.CoinflipStorage coinflipStorage;
     private me.vertex.core.coinflip.CoinflipManager coinflipManager;
@@ -424,11 +425,20 @@ combatManager.start();
         coinflipGuiRefreshTask = Bukkit.getScheduler().runTaskTimer(this, this::refreshOpenCoinflipBrowsers,
                 coinflipManager.guiRefreshIntervalTicks(), coinflipManager.guiRefreshIntervalTicks());
 
-        shopManager = new me.vertex.core.shop.ShopManager(this, shopStorage);
+        shopManager = new me.vertex.core.shop.ShopManager(this, shopStorage, boosterService);
         shopManager.load();
         shopManager.loadState();
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.shop.ShopMenuListener(shopManager, spawnerManager, messages), this);
+        wandManager = new me.vertex.core.wand.WandManager(this);
+        wandManager.load();
+        me.vertex.core.wand.WandCommand wandCommand =
+                new me.vertex.core.wand.WandCommand(wandManager, messages);
+        getCommand("wand").setExecutor(wandCommand);
+        getCommand("wand").setTabCompleter(wandCommand);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.wand.WandListener(this, wandManager,
+                shopManager, chunkCollectorManager, factionBankManager, factionUpgradeManager, messages), this);
+
         me.vertex.core.shop.ShopCommand shopCommand =
                 new me.vertex.core.shop.ShopCommand(shopManager, spawnerManager, messages);
         getCommand("shop").setExecutor(shopCommand);
@@ -885,6 +895,9 @@ combatManager.start();
         }
         if (menuRegistry != null) {
             menuRegistry.load();
+        }
+        if (wandManager != null) {
+            wandManager.load();
         }
         if (boosterService != null) {
             boosterService.reloadConfig();

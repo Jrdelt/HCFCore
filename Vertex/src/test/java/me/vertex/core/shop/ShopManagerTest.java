@@ -49,7 +49,7 @@ class ShopManagerTest {
         ShopStorage storage = new ShopStorage(database);
         storage.init();
 
-        manager = new ShopManager(plugin, storage);
+        manager = new ShopManager(plugin, storage, null);
         manager.load();
         manager.loadState();
 
@@ -232,7 +232,7 @@ class ShopManagerTest {
         manager.awaitWrites();
 
         ShopStorage sameStorage = new ShopStorage(database);
-        ShopManager reloaded = new ShopManager(plugin, sameStorage);
+        ShopManager reloaded = new ShopManager(plugin, sameStorage, null);
         reloaded.load();
         reloaded.loadState();
 
