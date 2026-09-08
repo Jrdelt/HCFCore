@@ -689,6 +689,7 @@ coinflip:
   review-whose-wager: "<yellow>{player}'s Wager"
   review-confirm-button: "<green><bold>✔ ᴀᴄᴄᴇᴘᴛ ᴛʜɪꜱ ᴍᴀᴛᴄʜ"
   review-deny-button: "<red><bold>✖ ᴅᴇɴʏ ᴛʜɪꜱ ᴍᴀᴛᴄʜ"
+  claim-failed: "&6&lAUCTION&r &7> <red>Could not open your collection box -- nothing was taken. Try again."
   claim-all-claimed: "&6&lCOINFLIP&r &7> <green>Claimed everything in your stash."
   you-won: "&6&lCOINFLIP&r &7> <green><bold>You won the coinflip!"
   you-lost: "&6&lCOINFLIP&r &7> <red>You lost the coinflip."

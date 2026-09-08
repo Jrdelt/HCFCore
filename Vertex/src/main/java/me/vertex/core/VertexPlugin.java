@@ -479,7 +479,7 @@ combatManager.start();
         auctionManager.load();
         auctionManager.loadState();
         Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.auction.AuctionMenuListener(auctionManager, messages), this);
+                new me.vertex.core.auction.AuctionMenuListener(this, auctionManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.auction.AuctionHubMenuListener(auctionManager, messages), this);
         Bukkit.getPluginManager().registerEvents(

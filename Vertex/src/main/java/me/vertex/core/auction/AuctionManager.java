@@ -218,7 +218,9 @@ public final class AuctionManager {
 
     public BuyResult buy(int listingId, Player buyer) {
         AuctionListing listing = activeListings.get(listingId);
-        if (listing == null) {
+        // A pending listing is not durable yet: buying it would let the
+        // still-running insert re-add the same item for sale afterwards.
+        if (listing == null || listing.isPending()) {
             return BuyResult.GONE;
         }
         if (listing.sellerUuid().equals(buyer.getUniqueId())) {
@@ -310,7 +312,7 @@ public final class AuctionManager {
 
     /** @return false if the listing was already sold/gone by the time this ran. */
     public boolean cancel(AuctionListing listing, Player actor) {
-        if (!activeListings.remove(listing.id(), listing)) {
+        if (listing.isPending() || !activeListings.remove(listing.id(), listing)) {
             return false;
         }
         giveOrClaim(listing.sellerUuid(), listing.item());
@@ -325,7 +327,7 @@ public final class AuctionManager {
     public void sweepExpired() {
         long now = System.currentTimeMillis();
         for (AuctionListing listing : List.copyOf(activeListings.values())) {
-            if (!listing.isExpired(now)) {
+            if (listing.isPending() || !listing.isExpired(now)) {
                 continue;
             }
             if (!activeListings.remove(listing.id(), listing)) {
@@ -378,14 +380,25 @@ public final class AuctionManager {
         return CompletableFuture.supplyAsync(() -> loadClaimItems(uuid));
     }
 
-    public void clearClaims(UUID uuid) {
-        track(CompletableFuture.runAsync(() -> {
+    /**
+     * Takes everything in the collection box, deleting the rows first and
+     * returning only what was actually removed.
+     *
+     * <p>The delete is what authorises the payout, so a repeated click cannot
+     * grant the same items twice and a claim queued while this runs is never
+     * silently destroyed. An empty list means someone else already took them.
+     */
+    public CompletableFuture<List<ItemStack>> takeClaims(UUID uuid) {
+        CompletableFuture<List<ItemStack>> taken = CompletableFuture.supplyAsync(() -> {
             try {
-                storage.deleteClaims(uuid);
+                return storage.takeClaims(uuid).stream().map(AuctionClaim::item).toList();
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to clear Auction House claims for " + uuid, e);
+                plugin.getLogger().log(Level.WARNING, "Failed to take Auction House claims for " + uuid, e);
+                throw new java.util.concurrent.CompletionException(e);
             }
-        }));
+        });
+        track(taken);
+        return taken;
     }
 
     private void queueClaim(UUID ownerUuid, ItemStack item) {

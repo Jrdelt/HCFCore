@@ -1,6 +1,7 @@
 package me.vertex.core.auction;
 
 import me.vertex.core.lang.Messages;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -11,10 +12,14 @@ import org.bukkit.inventory.ItemStack;
 /** Handles clicks in {@link AuctionMenu}'s browse and claim modes. */
 public final class AuctionMenuListener implements Listener {
 
+    private final org.bukkit.plugin.Plugin plugin;
     private final AuctionManager manager;
     private final Messages messages;
+    /** Players with a collection-box payout in flight, so a click repeat cannot start a second. */
+    private final java.util.Set<java.util.UUID> claiming = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    public AuctionMenuListener(AuctionManager manager, Messages messages) {
+    public AuctionMenuListener(org.bukkit.plugin.Plugin plugin, AuctionManager manager, Messages messages) {
+        this.plugin = plugin;
         this.manager = manager;
         this.messages = messages;
     }
@@ -125,17 +130,34 @@ public final class AuctionMenuListener implements Listener {
         if (event.getRawSlot() != AuctionMenu.SLOT_CLAIM_ALL) {
             return;
         }
-        java.util.List<ItemStack> items = holder.claimItems();
-        if (items.isEmpty()) {
+        if (holder.claimItems().isEmpty() || !claiming.add(player.getUniqueId())) {
+            // Already handing this player's claims over; a repeated click must
+            // not start a second payout while the first is still in flight.
             return;
         }
-        for (ItemStack item : items) {
-            player.getInventory().addItem(item).values()
-                    .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
-        }
-        manager.clearClaims(player.getUniqueId());
-        player.sendMessage(messages.get(player, "auction.claim-all-claimed"));
         player.closeInventory();
+        // The database delete decides what is paid out, not the snapshot this
+        // menu was drawn from -- so nothing is granted twice, and a claim
+        // queued while this runs is left alone rather than destroyed.
+        manager.takeClaims(player.getUniqueId()).whenComplete((items, error) ->
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    try {
+                        if (error != null) {
+                            player.sendMessage(messages.get(player, "auction.claim-failed"));
+                            return;
+                        }
+                        if (items.isEmpty()) {
+                            return;
+                        }
+                        for (ItemStack item : items) {
+                            player.getInventory().addItem(item).values().forEach(leftover ->
+                                    player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+                        }
+                        player.sendMessage(messages.get(player, "auction.claim-all-claimed"));
+                    } finally {
+                        claiming.remove(player.getUniqueId());
+                    }
+                }));
     }
 
     private static String buyFailureKey(AuctionManager.BuyResult result) {

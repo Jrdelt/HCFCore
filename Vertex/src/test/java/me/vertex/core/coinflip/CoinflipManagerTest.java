@@ -89,7 +89,7 @@ class CoinflipManagerTest {
         if (manager != null) {
             // Mirrors VertexPlugin#onDisable's ordering: drain in-flight
             // async writes before the connection pool underneath them closes.
-            manager.awaitWrites();
+            settle();
         }
         if (database != null) {
             database.close();
@@ -100,6 +100,7 @@ class CoinflipManagerTest {
     @Test
     void createMoneyCoinflipWithdrawsFromHostAndListsIt() {
         CoinflipManager.CreateOutcome outcome = manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
 
         assertEquals(CoinflipManager.CreateResult.OK, outcome.result());
         assertEquals(900.0, economy.get(host.getUniqueId()));
@@ -109,6 +110,7 @@ class CoinflipManagerTest {
     @Test
     void createMoneyCoinflipFailsWithoutEnoughBalance() {
         CoinflipManager.CreateOutcome outcome = manager.createMoneyCoinflip(host, 5000.0, null);
+        settle();
 
         assertEquals(CoinflipManager.CreateResult.CANNOT_AFFORD, outcome.result());
         assertEquals(1000.0, economy.get(host.getUniqueId()), "a failed create must not touch the balance");
@@ -118,7 +120,9 @@ class CoinflipManagerTest {
     @Test
     void createMoneyCoinflipRejectsAWagerOutsideConfiguredBounds() {
         CoinflipManager.CreateOutcome tooSmall = manager.createMoneyCoinflip(host, 0.01, null);
+        settle();
         CoinflipManager.CreateOutcome tooLarge = manager.createMoneyCoinflip(host, 10_000_000.0, null);
+        settle();
 
         assertEquals(CoinflipManager.CreateResult.OUT_OF_RANGE, tooSmall.result());
         assertEquals(CoinflipManager.CreateResult.OUT_OF_RANGE, tooLarge.result());
@@ -128,8 +132,10 @@ class CoinflipManagerTest {
     @Test
     void hostingASecondCoinflipWhileTheFirstIsStillOpenIsRefused() {
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
 
         CoinflipManager.CreateOutcome second = manager.createMoneyCoinflip(host, 50.0, null);
+        settle();
 
         assertEquals(CoinflipManager.CreateResult.ALREADY_HOSTING, second.result());
         assertEquals(900.0, economy.get(host.getUniqueId()), "the refused second wager must not touch the balance");
@@ -139,10 +145,12 @@ class CoinflipManagerTest {
     @Test
     void hostingAgainSucceedsOnceThePreviousCoinflipIsGone() {
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         Coinflip first = manager.activeCoinflips().get(0);
         manager.cancel(first, host);
 
         CoinflipManager.CreateOutcome second = manager.createMoneyCoinflip(host, 50.0, null);
+        settle();
 
         assertEquals(CoinflipManager.CreateResult.OK, second.result());
     }
@@ -150,6 +158,7 @@ class CoinflipManagerTest {
     @Test
     void playMoneyCoinflipConservesTotalMoneyAndPaysExactlyOneWinner() {
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
 
         CoinflipManager.PlayOutcome outcome = manager.play(coinflip.id(), opponent);
@@ -169,6 +178,7 @@ class CoinflipManagerTest {
     @Test
     void playMoneyCoinflipFailsAndStaysActiveIfOpponentCannotAfford() {
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
         economy.set(opponent.getUniqueId(), 10.0);
 
@@ -182,6 +192,7 @@ class CoinflipManagerTest {
     @Test
     void hostCannotPlayTheirOwnCoinflip() {
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
 
         CoinflipManager.PlayOutcome outcome = manager.play(coinflip.id(), host);
@@ -195,6 +206,7 @@ class CoinflipManagerTest {
         PlayerMock stranger = server.addPlayer("Stranger");
         economy.set(stranger.getUniqueId(), 1000.0);
         manager.createMoneyCoinflip(host, 100.0, opponent.getUniqueId());
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
 
         CoinflipManager.PlayOutcome outcome = manager.play(coinflip.id(), stranger);
@@ -205,6 +217,7 @@ class CoinflipManagerTest {
     @Test
     void playingAnAlreadyResolvedCoinflipReportsGone() {
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
         manager.play(coinflip.id(), opponent);
 
@@ -216,6 +229,7 @@ class CoinflipManagerTest {
     @Test
     void cancelRefundsTheHostAndRemovesTheListing() {
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
 
         boolean cancelled = manager.cancel(coinflip, host);
@@ -228,6 +242,7 @@ class CoinflipManagerTest {
     @Test
     void cancelFailsIfTheCoinflipWasAlreadyPlayed() {
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
         manager.play(coinflip.id(), opponent);
 
@@ -239,6 +254,7 @@ class CoinflipManagerTest {
     @Test
     void onlyHostOrPermittedStaffCanCancel() {
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
         PlayerMock stranger = server.addPlayer("Stranger");
 
@@ -252,6 +268,7 @@ class CoinflipManagerTest {
         opponent.setLevel(50);
 
         CoinflipManager.CreateOutcome outcome = manager.createExpCoinflip(host, 10, null);
+        settle();
         assertEquals(CoinflipManager.CreateResult.OK, outcome.result());
         assertEquals(40, host.getLevel());
 
@@ -270,6 +287,7 @@ class CoinflipManagerTest {
         host.setLevel(5);
 
         CoinflipManager.CreateOutcome outcome = manager.createExpCoinflip(host, 10, null);
+        settle();
 
         assertEquals(CoinflipManager.CreateResult.CANNOT_AFFORD, outcome.result());
         assertEquals(5, host.getLevel());
@@ -279,6 +297,7 @@ class CoinflipManagerTest {
     void itemCoinflipRequiresHostApprovalBeforeItResolves() {
         ItemStack[] hostItems = { new ItemStack(Material.DIAMOND, 3) };
         manager.createItemsCoinflip(host, hostItems, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
 
         ItemStack[] opponentItems = { new ItemStack(Material.EMERALD, 2) };
@@ -294,6 +313,7 @@ class CoinflipManagerTest {
     @Test
     void secondOpponentCannotProposeAMatchWhileOneIsAlreadyPending() {
         manager.createItemsCoinflip(host, new ItemStack[] { new ItemStack(Material.DIAMOND) }, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
         manager.requestItemMatch(coinflip.id(), opponent, new ItemStack[] { new ItemStack(Material.EMERALD) });
 
@@ -307,11 +327,13 @@ class CoinflipManagerTest {
     @Test
     void anOpponentCannotProposeASecondMatchOnADifferentCoinflipWhileWaitingOnTheFirst() {
         manager.createItemsCoinflip(host, new ItemStack[] { new ItemStack(Material.DIAMOND) }, null);
+        settle();
         Coinflip first = manager.activeCoinflips().get(0);
         manager.requestItemMatch(first.id(), opponent, new ItemStack[] { new ItemStack(Material.EMERALD) });
 
         PlayerMock secondHost = server.addPlayer("SecondHost");
         manager.createItemsCoinflip(secondHost, new ItemStack[] { new ItemStack(Material.NETHERITE_INGOT) }, null);
+        settle();
         Coinflip second = manager.activeCoinflips().stream().filter(c -> c.id() != first.id()).findFirst().orElseThrow();
 
         CoinflipManager.PlayResult result =
@@ -324,12 +346,13 @@ class CoinflipManagerTest {
     void approvingAnItemMatchResolvesItAndTheWinnerReceivesBothSidesViaTheClaimStash() {
         ItemStack[] hostItems = { new ItemStack(Material.DIAMOND, 3) };
         manager.createItemsCoinflip(host, hostItems, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
         ItemStack[] opponentItems = { new ItemStack(Material.EMERALD, 2) };
         manager.requestItemMatch(coinflip.id(), opponent, opponentItems);
 
         CoinflipManager.ApproveOutcome outcome = manager.approveItemMatch(coinflip.id(), host);
-        manager.awaitWrites();
+        settle();
 
         assertEquals(CoinflipManager.ApprovalResult.OK, outcome.result());
         assertFalse(manager.hasPendingItemMatch(coinflip.id()));
@@ -348,6 +371,7 @@ class CoinflipManagerTest {
     @Test
     void onlyTheHostCanApproveOrDenyAMatch() {
         manager.createItemsCoinflip(host, new ItemStack[] { new ItemStack(Material.DIAMOND) }, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
         manager.requestItemMatch(coinflip.id(), opponent, new ItemStack[] { new ItemStack(Material.EMERALD) });
 
@@ -360,11 +384,12 @@ class CoinflipManagerTest {
     @Test
     void denyingAnItemMatchReturnsTheOpponentsItemsAndLeavesTheCoinflipOpen() {
         manager.createItemsCoinflip(host, new ItemStack[] { new ItemStack(Material.DIAMOND) }, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
         manager.requestItemMatch(coinflip.id(), opponent, new ItemStack[] { new ItemStack(Material.EMERALD, 2) });
 
         CoinflipManager.ApprovalResult result = manager.denyItemMatch(coinflip.id(), host);
-        manager.awaitWrites();
+        settle();
 
         assertEquals(CoinflipManager.ApprovalResult.OK, result);
         assertFalse(manager.hasPendingItemMatch(coinflip.id()));
@@ -381,9 +406,10 @@ class CoinflipManagerTest {
     @Test
     void sweepExpiredItemMatchesAutoDeniesAndRefundsAfterTheTimeout() throws Exception {
         manager.createItemsCoinflip(host, new ItemStack[] { new ItemStack(Material.DIAMOND) }, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
         manager.requestItemMatch(coinflip.id(), opponent, new ItemStack[] { new ItemStack(Material.EMERALD, 4) });
-        manager.awaitWrites();
+        settle();
 
         // Force the in-memory match to look old enough to have expired,
         // the same way a real clock eventually would.
@@ -396,7 +422,7 @@ class CoinflipManagerTest {
                 live.items(), System.currentTimeMillis() - java.time.Duration.ofHours(1).toMillis()));
 
         manager.sweepExpiredItemMatches();
-        manager.awaitWrites();
+        settle();
 
         assertFalse(manager.hasPendingItemMatch(coinflip.id()));
         assertTrue(manager.hasClaims(opponent.getUniqueId()));
@@ -408,6 +434,7 @@ class CoinflipManagerTest {
     @Test
     void itemCoinflipCreationRejectsAnEmptyWager() {
         CoinflipManager.CreateOutcome outcome = manager.createItemsCoinflip(host, new ItemStack[0], null);
+        settle();
 
         assertEquals(CoinflipManager.CreateResult.EMPTY_WAGER, outcome.result());
     }
@@ -425,6 +452,7 @@ class CoinflipManagerTest {
         assertTrue(manager.isBanned(hostId));
 
         CoinflipManager.CreateOutcome outcome = manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         assertEquals(CoinflipManager.CreateResult.BANNED, outcome.result());
     }
 
@@ -444,6 +472,7 @@ class CoinflipManagerTest {
     @Test
     void bannedOpponentCannotPlayEitherSide() {
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
         manager.requestBanConfirmation(opponent.getUniqueId());
         manager.applyBan(opponent.getUniqueId());
@@ -459,6 +488,7 @@ class CoinflipManagerTest {
         combatManager.tagAgainstServer(host);
 
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
         manager.play(coinflip.id(), opponent);
         beginResultAnimation();
@@ -472,6 +502,7 @@ class CoinflipManagerTest {
     @Test
     void resultAnimationOpensForAParticipantNotInCombat() {
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
         manager.play(coinflip.id(), opponent);
         beginResultAnimation();
@@ -483,6 +514,7 @@ class CoinflipManagerTest {
     @Test
     void winLoseMessageIsDeferredUntilTheAnimationActuallyLands() {
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
 
         manager.play(coinflip.id(), opponent);
@@ -501,6 +533,7 @@ class CoinflipManagerTest {
     void winLoseMessageRemainsDeferredForAParticipantInCombat() {
         combatManager.tagAgainstServer(host);
         manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
         Coinflip coinflip = manager.activeCoinflips().get(0);
 
         manager.play(coinflip.id(), opponent);
@@ -523,7 +556,7 @@ class CoinflipManagerTest {
      * a result that the deferral tests expect to still be hidden.
      */
     private void beginResultAnimation() {
-        manager.awaitWrites();
+        settle();
         BukkitSchedulerMock scheduler = (BukkitSchedulerMock) server.getScheduler();
         for (int attempt = 0; attempt < 20 && !animationOpen(host); attempt++) {
             scheduler.performTicks(1L);
@@ -813,4 +846,30 @@ class CoinflipManagerTest {
         public void close() {
         }
     }
+
+    /**
+     * Waits for the insert AND runs the main-thread task that swaps the
+     * in-memory placeholder for its real database id. Until that task runs the
+     * entry is still pending, and pending entries deliberately refuse every
+     * action -- exactly as a player would find them.
+     */
+    private void settle() {
+        manager.awaitWrites();
+        BukkitSchedulerMock scheduler = (BukkitSchedulerMock) server.getScheduler();
+        // awaitWrites returns once the insert itself completes, which can be
+        // a moment before its callback has even been queued onto the main
+        // thread -- so wait for the placeholder to actually be gone rather
+        // than assuming a fixed number of ticks is enough.
+        for (int attempt = 0; attempt < 100 && manager.activeCoinflips().stream().anyMatch(Coinflip::isPending); attempt++) {
+            scheduler.performTicks(1L);
+            try {
+                Thread.sleep(2L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+        scheduler.performTicks(1L);
+    }
+
 }

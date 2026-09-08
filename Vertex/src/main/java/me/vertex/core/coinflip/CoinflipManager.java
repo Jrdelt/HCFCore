@@ -414,7 +414,7 @@ public final class CoinflipManager {
      *         else in the same instant) -- nothing was refunded twice.
      */
     public boolean cancel(Coinflip coinflip, Player actor) {
-        if (!activeCoinflips.remove(coinflip.id(), coinflip)) {
+        if (coinflip.isPending() || !activeCoinflips.remove(coinflip.id(), coinflip)) {
             return false;
         }
         browserChanged();
@@ -475,7 +475,9 @@ public final class CoinflipManager {
     /** For MONEY/EXP coinflips: the opponent's matching wager is taken from their live balance/levels. */
     public PlayOutcome play(int coinflipId, Player opponent) {
         Coinflip coinflip = activeCoinflips.get(coinflipId);
-        if (coinflip == null) {
+        // Not durable yet: playing it would let the still-running insert
+        // reopen the same wager once it lands.
+        if (coinflip == null || coinflip.isPending()) {
             return PlayOutcome.failure(PlayResult.GONE);
         }
         PlayResult validation = validatePlay(coinflip, opponent);
@@ -539,7 +541,7 @@ public final class CoinflipManager {
      */
     public PlayResult requestItemMatch(int coinflipId, Player opponent, ItemStack[] opponentItems) {
         Coinflip coinflip = activeCoinflips.get(coinflipId);
-        if (coinflip == null) {
+        if (coinflip == null || coinflip.isPending()) {
             return PlayResult.GONE;
         }
         PlayResult validation = validatePlay(coinflip, opponent);
@@ -608,7 +610,7 @@ public final class CoinflipManager {
     /** The host accepts the opponent's proposed item wager; the coinflip resolves immediately. */
     public ApproveOutcome approveItemMatch(int coinflipId, Player host) {
         Coinflip coinflip = activeCoinflips.get(coinflipId);
-        if (coinflip == null) {
+        if (coinflip == null || coinflip.isPending()) {
             discardOrphanedMatch(coinflipId);
             return ApproveOutcome.failure(ApprovalResult.GONE);
         }

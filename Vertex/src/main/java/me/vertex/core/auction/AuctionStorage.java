@@ -219,11 +219,52 @@ public final class AuctionStorage {
         }
     }
 
-    public void deleteClaims(UUID ownerUuid) throws SQLException {
-        try (Connection connection = database.getConnection();
-             PreparedStatement statement = connection.prepareStatement("DELETE FROM auction_claims WHERE owner_uuid = ?")) {
-            statement.setString(1, ownerUuid.toString());
-            statement.executeUpdate();
+    /**
+     * Atomically removes this owner's claims and returns exactly the rows that
+     * were deleted.
+     *
+     * <p>The delete is what authorises handing the items over, rather than a
+     * snapshot read beforehand. Reading first and deleting after let a
+     * repeated click grant the same snapshot twice before the delete landed,
+     * and let a claim created in between be deleted without ever being shown.
+     * Deleting by row id means only rows this call actually removed are paid
+     * out, and anything queued later survives untouched.
+     */
+    public List<AuctionClaim> takeClaims(UUID ownerUuid) throws SQLException {
+        try (Connection connection = database.getConnection()) {
+            boolean previousAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                List<AuctionClaim> claims = new ArrayList<>();
+                try (PreparedStatement select = connection.prepareStatement(
+                        "SELECT id, item, created_at FROM auction_claims WHERE owner_uuid = ?")) {
+                    select.setString(1, ownerUuid.toString());
+                    try (ResultSet results = select.executeQuery()) {
+                        while (results.next()) {
+                            claims.add(new AuctionClaim(results.getInt("id"), ownerUuid,
+                                    ItemStack.deserializeBytes(results.getBytes("item")),
+                                    results.getLong("created_at")));
+                        }
+                    }
+                }
+                if (!claims.isEmpty()) {
+                    try (PreparedStatement delete = connection.prepareStatement(
+                            "DELETE FROM auction_claims WHERE id = ?")) {
+                        for (AuctionClaim claim : claims) {
+                            delete.setInt(1, claim.id());
+                            delete.addBatch();
+                        }
+                        delete.executeBatch();
+                    }
+                }
+                connection.commit();
+                return claims;
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(previousAutoCommit);
+            }
         }
     }
 

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
+import org.mockbukkit.mockbukkit.scheduler.BukkitSchedulerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.plugin.PluginMock;
 
@@ -69,7 +70,7 @@ class AuctionManagerTest {
     @AfterEach
     void tearDown() {
         if (manager != null) {
-            manager.awaitWrites();
+            settle();
         }
         if (database != null) {
             database.close();
@@ -82,7 +83,7 @@ class AuctionManagerTest {
         AuctionManager.ListOutcome outcome = manager.list(seller, new ItemStack(Material.DIAMOND, 3), 100.0, AuctionCurrency.MONEY);
 
         assertEquals(AuctionManager.ListResult.OK, outcome.result());
-        manager.awaitWrites();
+        settle();
 
         List<AuctionListing> active = manager.activeListings();
         assertEquals(1, active.size());
@@ -106,7 +107,7 @@ class AuctionManagerTest {
             AuctionManager.ListOutcome outcome = manager.list(seller, new ItemStack(Material.DIRT), 5.0, AuctionCurrency.MONEY);
             assertEquals(AuctionManager.ListResult.OK, outcome.result());
         }
-        manager.awaitWrites();
+        settle();
 
         AuctionManager.ListOutcome eleventh = manager.list(seller, new ItemStack(Material.DIRT), 5.0, AuctionCurrency.MONEY);
 
@@ -116,7 +117,7 @@ class AuctionManagerTest {
     @Test
     void buyingTransfersMoneyAndTheItemAndRemovesTheListing() {
         manager.list(seller, new ItemStack(Material.DIAMOND, 5), 200.0, AuctionCurrency.MONEY);
-        manager.awaitWrites();
+        settle();
         int listingId = manager.activeListings().get(0).id();
 
         AuctionManager.BuyResult result = manager.buy(listingId, buyer);
@@ -131,7 +132,7 @@ class AuctionManagerTest {
     @Test
     void buyingFailsAndStaysActiveIfTheBuyerCannotAfford() {
         manager.list(seller, new ItemStack(Material.DIAMOND), 200.0, AuctionCurrency.MONEY);
-        manager.awaitWrites();
+        settle();
         int listingId = manager.activeListings().get(0).id();
         economy.set(buyer.getUniqueId(), 10.0);
 
@@ -145,7 +146,7 @@ class AuctionManagerTest {
     @Test
     void sellerCannotBuyTheirOwnListing() {
         manager.list(seller, new ItemStack(Material.DIAMOND), 200.0, AuctionCurrency.MONEY);
-        manager.awaitWrites();
+        settle();
         int listingId = manager.activeListings().get(0).id();
 
         AuctionManager.BuyResult result = manager.buy(listingId, seller);
@@ -157,7 +158,7 @@ class AuctionManagerTest {
     @Test
     void buyingAnAlreadySoldListingReportsGone() {
         manager.list(seller, new ItemStack(Material.DIAMOND), 200.0, AuctionCurrency.MONEY);
-        manager.awaitWrites();
+        settle();
         int listingId = manager.activeListings().get(0).id();
         manager.buy(listingId, buyer);
 
@@ -169,7 +170,7 @@ class AuctionManagerTest {
     @Test
     void cancellingReturnsTheItemDirectlyToAnOnlineSeller() {
         manager.list(seller, new ItemStack(Material.EMERALD, 4), 200.0, AuctionCurrency.MONEY);
-        manager.awaitWrites();
+        settle();
         AuctionListing listing = manager.activeListings().get(0);
 
         boolean cancelled = manager.cancel(listing, seller);
@@ -182,7 +183,7 @@ class AuctionManagerTest {
     @Test
     void onlySellerOrPermittedStaffCanCancel() {
         manager.list(seller, new ItemStack(Material.EMERALD), 200.0, AuctionCurrency.MONEY);
-        manager.awaitWrites();
+        settle();
         AuctionListing listing = manager.activeListings().get(0);
         PlayerMock stranger = server.addPlayer("Stranger");
 
@@ -199,6 +200,7 @@ class AuctionManagerTest {
         assertEquals(1, manager.activeListings().size());
 
         manager.sweepExpired();
+        settle();
 
         assertTrue(manager.activeListings().isEmpty());
         assertTrue(manager.hasClaims(seller.getUniqueId()));
@@ -211,7 +213,7 @@ class AuctionManagerTest {
     @Test
     void sweepExpiredLeavesAnUnexpiredListingAlone() {
         manager.list(seller, new ItemStack(Material.DIRT), 5.0, AuctionCurrency.MONEY);
-        manager.awaitWrites();
+        settle();
 
         manager.sweepExpired();
 
@@ -221,7 +223,7 @@ class AuctionManagerTest {
     @Test
     void marketDataPersistsAcrossAFreshManagerLoadingFromTheSameDatabase() {
         manager.list(seller, new ItemStack(Material.DIAMOND, 7), 321.0, AuctionCurrency.MONEY);
-        manager.awaitWrites();
+        settle();
 
         AuctionManager reloaded = new AuctionManager(plugin, storage);
         reloaded.load();
@@ -240,7 +242,7 @@ class AuctionManagerTest {
 
         AuctionManager.ListOutcome outcome = manager.list(seller, new ItemStack(Material.DIAMOND), 20.0, AuctionCurrency.EXP);
         assertEquals(AuctionManager.ListResult.OK, outcome.result());
-        manager.awaitWrites();
+        settle();
         int listingId = manager.activeListings().get(0).id();
         assertEquals(AuctionCurrency.EXP, manager.activeListings().get(0).currency());
         // Listing an EXP-priced item doesn't itself charge the seller anything (only buying does).
@@ -260,7 +262,7 @@ class AuctionManagerTest {
         seller.setLevel(50);
         buyer.setLevel(5);
         manager.list(seller, new ItemStack(Material.DIAMOND), 20.0, AuctionCurrency.EXP);
-        manager.awaitWrites();
+        settle();
         int listingId = manager.activeListings().get(0).id();
 
         AuctionManager.BuyResult result = manager.buy(listingId, buyer);
@@ -273,7 +275,7 @@ class AuctionManagerTest {
     @Test
     void watchingAListingAddsItToTheWatchlistAndUnwatchingRemovesIt() {
         manager.list(seller, new ItemStack(Material.DIAMOND), 200.0, AuctionCurrency.MONEY);
-        manager.awaitWrites();
+        settle();
         int listingId = manager.activeListings().get(0).id();
 
         assertFalse(manager.isWatching(buyer.getUniqueId(), listingId));
@@ -291,10 +293,10 @@ class AuctionManagerTest {
     @Test
     void watchlistPersistsAcrossAFreshManagerLoadingFromTheSameDatabase() {
         manager.list(seller, new ItemStack(Material.DIAMOND), 200.0, AuctionCurrency.MONEY);
-        manager.awaitWrites();
+        settle();
         int listingId = manager.activeListings().get(0).id();
         manager.toggleWatch(buyer.getUniqueId(), listingId);
-        manager.awaitWrites();
+        settle();
 
         AuctionManager reloaded = new AuctionManager(plugin, storage);
         reloaded.load();
@@ -306,7 +308,7 @@ class AuctionManagerTest {
     @Test
     void aResolvedListingIsRemovedFromEveryonesWatchlist() {
         manager.list(seller, new ItemStack(Material.DIAMOND), 200.0, AuctionCurrency.MONEY);
-        manager.awaitWrites();
+        settle();
         int listingId = manager.activeListings().get(0).id();
         manager.toggleWatch(buyer.getUniqueId(), listingId);
         assertTrue(manager.isWatching(buyer.getUniqueId(), listingId));
@@ -590,4 +592,86 @@ class AuctionManagerTest {
             return true;
         }
     }
+
+    /**
+     * Waits for the insert AND runs the main-thread task that swaps the
+     * in-memory placeholder for its real database id. Until that task runs the
+     * entry is still pending, and pending entries deliberately refuse every
+     * action -- exactly as a player would find them.
+     */
+    private void settle() {
+        manager.awaitWrites();
+        BukkitSchedulerMock scheduler = (BukkitSchedulerMock) server.getScheduler();
+        // awaitWrites returns once the insert itself completes, which can be
+        // a moment before its callback has even been queued onto the main
+        // thread -- so wait for the placeholder to actually be gone rather
+        // than assuming a fixed number of ticks is enough.
+        for (int attempt = 0; attempt < 100 && manager.activeListings().stream().anyMatch(AuctionListing::isPending); attempt++) {
+            scheduler.performTicks(1L);
+            try {
+                Thread.sleep(2L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+        scheduler.performTicks(1L);
+    }
+
+
+    /**
+     * The dupe this guard exists for: buying a listing before its insert
+     * lands removes it, and the insert callback then re-adds it under its
+     * real id -- putting the same item back up for sale after it was sold.
+     */
+    @Test
+    void aListingCannotBeBoughtBeforeItIsDurable() {
+        manager.list(seller, new ItemStack(Material.DIAMOND, 5), 200.0, AuctionCurrency.MONEY);
+
+        AuctionListing pending = manager.activeListings().get(0);
+        assertTrue(pending.isPending(), "a freshly listed item has no database id yet");
+        assertEquals(AuctionManager.BuyResult.GONE, manager.buy(pending.id(), buyer));
+        assertEquals(1000.0, economy.get(buyer.getUniqueId()), 0.0001, "the buyer must not have paid");
+
+        settle();
+        assertEquals(1, manager.activeListings().size(), "the listing should survive to become durable");
+        assertFalse(manager.activeListings().get(0).isPending());
+        assertEquals(AuctionManager.BuyResult.OK, manager.buy(manager.activeListings().get(0).id(), buyer));
+    }
+
+    @Test
+    void aPendingListingCannotBeCancelledOrSwept() {
+        manager.list(seller, new ItemStack(Material.DIAMOND, 5), 200.0, AuctionCurrency.MONEY);
+        AuctionListing pending = manager.activeListings().get(0);
+
+        assertFalse(manager.cancel(pending, seller), "a pending listing must not be cancellable");
+        manager.sweepExpired();
+        assertEquals(1, manager.activeListings().size(), "the sweep must leave a pending listing alone");
+    }
+
+    /**
+     * Claiming is authorised by the delete, not by the menu's snapshot, so a
+     * repeated claim cannot hand the same items out twice.
+     */
+    @Test
+    void collectionBoxPaysOutExactlyOnce() throws Exception {
+        storage.insertClaim(seller.getUniqueId(), new ItemStack(Material.DIAMOND, 3), System.currentTimeMillis());
+
+        List<ItemStack> first = manager.takeClaims(seller.getUniqueId()).get();
+        List<ItemStack> second = manager.takeClaims(seller.getUniqueId()).get();
+
+        assertEquals(1, first.size(), "the first claim gets the items");
+        assertEquals(List.of(), second, "a second claim must get nothing");
+    }
+
+    @Test
+    void aClaimQueuedAfterTheMenuOpenedIsNotDestroyed() throws Exception {
+        storage.insertClaim(seller.getUniqueId(), new ItemStack(Material.DIAMOND, 3), System.currentTimeMillis());
+        assertEquals(1, manager.takeClaims(seller.getUniqueId()).get().size());
+
+        storage.insertClaim(seller.getUniqueId(), new ItemStack(Material.EMERALD, 1), System.currentTimeMillis());
+        assertEquals(1, manager.takeClaims(seller.getUniqueId()).get().size(),
+                "a claim queued later must still be collectable");
+    }
+
 }

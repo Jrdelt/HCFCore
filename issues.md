@@ -123,7 +123,7 @@ not cover several high-risk persistence and packet-race paths below.
 
 ### In-game / player-visible issues
 
-- **[critical] Fresh Auction House and Coinflip entries can be acted on before
+- **[FIXED] Fresh Auction House and Coinflip entries can be acted on before
   they have a database ID.** Both managers put a negative-ID placeholder in
   their live map while an async insert is in flight, and both browsers render
   those placeholders as normal clickable entries. A buyer/opponent can settle
@@ -132,7 +132,7 @@ not cover several high-risk persistence and packet-race paths below.
   settled again. Do not render/click a listing until it is durable, or mark
   placeholders explicitly non-actionable.
 
-- **[critical] Auction collection-box claiming has no transaction lock or row
+- **[FIXED] Auction collection-box claiming has no transaction lock or row
   identity.** The GUI hands out its cached item snapshot first and then starts
   an async `DELETE` of *all* claims for the player. Replayed/double-clicked
   inventory packets can grant the same snapshot more than once before that
