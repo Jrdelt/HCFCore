@@ -46,6 +46,17 @@ sandbot:
   stopped: '<green>Se detuvieron {amount} de tus Sand Bot(s) activos.'
   stopped-other: '<green>Se detuvieron {amount} Sand Bot(s) activos de {player}.'
 
+tntfill:
+  usage: '<red>Uso: /tntfill <radius> <amount> bank|inventory'
+  disabled: '<red>TNT Fill está deshabilitado actualmente.'
+  invalid-radius: '<red>El radio debe estar entre 1 y {max}.'
+  invalid-amount: '<red>La cantidad debe ser al menos 1.'
+  no-faction: '<red>Debes estar en una facción para usar esto.'
+  bank-empty: '<red>El banco de TNT de tu facción está vacío.'
+  inventory-empty: '<red>No tienes TNT para rellenar.'
+  none-found: '<red>No se encontraron dispensadores en el rango dentro del claim de tu facción.'
+  filled: '<green>Se rellenaron {dispensers} dispensador(es) con {amount} TNT.'
+
 tags:
   title-your: 'Tus Tags ({count})'
   title-unowned: 'Tags No Obtenidos ({count})'

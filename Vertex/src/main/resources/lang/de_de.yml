@@ -46,6 +46,17 @@ sandbot:
   stopped: '<green>{amount} deiner aktiven Sandbot(s) gestoppt.'
   stopped-other: '<green>{amount} aktive(r) Sandbot(s) von {player} gestoppt.'
 
+tntfill:
+  usage: '<red>Verwendung: /tntfill <radius> <amount> bank|inventory'
+  disabled: '<red>TNT Fill ist derzeit deaktiviert.'
+  invalid-radius: '<red>Radius muss zwischen 1 und {max} liegen.'
+  invalid-amount: '<red>Menge muss mindestens 1 sein.'
+  no-faction: '<red>Du musst in einer Fraktion sein, um dies zu nutzen.'
+  bank-empty: '<red>Die TNT-Bank deiner Fraktion ist leer.'
+  inventory-empty: '<red>Du hast kein TNT zum Befüllen.'
+  none-found: '<red>Keine Werfer im Bereich innerhalb des Claims deiner Fraktion gefunden.'
+  filled: '<green>{dispensers} Werfer mit {amount} TNT befüllt.'
+
 tags:
   title-your: 'Deine Tags ({count})'
   title-unowned: 'Fehlende Tags ({count})'

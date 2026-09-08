@@ -46,6 +46,17 @@ sandbot:
   stopped: "<green>✔ Stopped {amount} of your active Sand Bot(s)."
   stopped-other: "<green>✔ Stopped {amount} of {player}'s active Sand Bot(s)."
 
+tntfill:
+  usage: "<red>✖ <gray>Usage: /tntfill <radius> <amount> bank|inventory"
+  disabled: "<red>✖ <gray>TNT Fill is currently disabled."
+  invalid-radius: "<red>✖ <gray>Radius must be between 1 and {max}."
+  invalid-amount: "<red>✖ <gray>Amount must be at least 1."
+  no-faction: "<red>✖ <gray>You must be in a faction to use this."
+  bank-empty: "<red>✖ <gray>Your faction's TNT bank is empty."
+  inventory-empty: "<red>✖ <gray>You don't have any TNT to fill with."
+  none-found: "<red>✖ <gray>No dispensers found in range within your faction's claim."
+  filled: "<green>✔ <green>Filled {dispensers} dispenser(s) with {amount} TNT."
+
 tags:
   title-your: "ʏᴏᴜʀ ᴛᴀɢꜱ  ({count})"
   title-unowned: "ᴜɴᴏᴡɴᴇᴅ ᴛᴀɢꜱ ({count})"

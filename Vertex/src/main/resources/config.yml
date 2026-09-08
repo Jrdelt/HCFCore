@@ -507,6 +507,21 @@ sandbot:
   tick-interval-ticks: 10
 
 # ============================================
+# TNT FILL
+# /tntfill <radius> <amount> <bank|inventory> tops up every dispenser
+# within radius blocks of the player, drawing TNT from either
+# FactionsUUID's own native TNT bank (the same balance /f tnt,
+# /f tntdeposit, and /f tntwithdraw manage -- Vertex doesn't keep a
+# second, separate TNT ledger) or the player's own inventory. Only
+# dispensers inside the player's own faction's claimed land count.
+# ============================================
+tntfill:
+  enabled: true
+
+  # Hard-capped at 100 in code regardless of this value.
+  max-radius: 100
+
+# ============================================
 # NAMETAGS
 # ============================================
 nametags:

@@ -138,6 +138,9 @@ commands:
   sandbot:
     description: Give a Sand Bot item, or stop an active Sand Bot.
     usage: /<command> give <player>|stop [player]
+  tntfill:
+    description: Fill dispensers in your claim with TNT from your faction's TNT bank or your own inventory.
+    usage: /<command> <radius> <amount> bank|inventory
 
 permissions:
   vertex.admin:
@@ -260,3 +263,6 @@ permissions:
   vertex.combat.safezone.bypass:
     description: Move into a protected zone while combat-tagged.
     default: op
+  vertex.tntfill.use:
+    description: Fill dispensers in your claim with TNT from your faction bank or inventory.
+    default: true

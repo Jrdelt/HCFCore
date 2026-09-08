@@ -39,6 +39,11 @@ For every redstone/dispenser-triggered TNT chain, the module:
 stop firing immediately; `/cannon reload` picks up `cannon.*` config
 changes without a restart. Both need `vertex.cannon.admin`.
 
+Stocking a cannon's dispensers is a separate command — see
+[`/tntfill`](factions-integration.md#faction-bank) in Factions
+Integration, which fills every dispenser in range inside your claim from
+either the faction's native TNT bank or your own inventory.
+
 ### Deferred
 
 Player-payload riding (fall-damage handling, launch range limits), full

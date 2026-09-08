@@ -154,6 +154,13 @@ prompt: type a positive whole number, then click the green confirm result.
 Vertex accepts a number typed after the displayed prompt as well as a
 replaced prompt.
 
+`/tntfill <radius> <amount> bank|inventory` (see
+[Commands & Permissions](commands-and-permissions.md#factions--rally))
+draws from this same native TNT bank (or the player's own inventory
+instead) to top up every dispenser within range inside the player's own
+claim — a faster way to stock a cannon's dispensers than manually
+depositing/withdrawing and hand-filling each one.
+
 Vertex serializes each faction's money/XP write before it changes the cached
 balance. If a money/XP deposit cannot be saved, it returns the resources;
 failed money payouts are compensated back into the bank. `bank-deposit` and

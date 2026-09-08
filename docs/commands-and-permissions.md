@@ -109,6 +109,7 @@ are available for staff testing. See [Player Trading](trading.md).
 | `/f permissions` / `/f perms` | Faction leader only (checked in-code, not a permission node) | Opens the faction permission matrix GUI. |
 | `/f upgrades` / `/f upgrade` | Faction role needs FactionsUUID's native `UPGRADE` action allowed | Opens Vertex's persistent faction-upgrades GUI. Set `faction-upgrades.leader-only: true` to restrict purchases further. FactionsUUID's native upgrade administration remains separate. |
 | `/f bank` | Faction member; role permissions apply to deposits/withdrawals | Opens the six-row faction bank for money, experience, and TNT. |
+| `/tntfill <radius> <amount> bank\|inventory` | `vertex.tntfill.use` (default: everyone) | Fills every dispenser within `radius` blocks (max 100) of you, inside your own faction's claim, with up to `amount` TNT — drawn from FactionsUUID's native TNT bank (the same one `/f bank` manages) or your own inventory. |
 
 ## KOTH & Outposts
 

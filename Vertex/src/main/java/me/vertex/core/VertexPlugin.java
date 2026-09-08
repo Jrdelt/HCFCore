@@ -259,6 +259,11 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         me.vertex.core.faction.RallyPermissionMenu rallyPermissionMenu =
                 new me.vertex.core.faction.RallyPermissionMenu(this, rallyManager, messages);
         Bukkit.getPluginManager().registerEvents(rallyPermissionMenu, this);
+
+        me.vertex.core.faction.TntFillCommand tntFillCommand = new me.vertex.core.faction.TntFillCommand(this, messages);
+        getCommand("tntfill").setExecutor(tntFillCommand);
+        getCommand("tntfill").setTabCompleter(tntFillCommand);
+
         factionUpgradeManager = new FactionUpgradeManager(this, factionUpgradeStorage);
         factionUpgradeManager.load();
         Bukkit.getPluginManager().registerEvents(factionUpgradeManager, this);
