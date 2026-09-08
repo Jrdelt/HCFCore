@@ -252,6 +252,19 @@ public final class AuctionManager {
             buyer.setLevel(buyer.getLevel() - priceLevels);
         }
 
+        // The buyer has paid, but nothing is delivered until the sale is
+        // durable. If it cannot be, the payment is returned and the listing
+        // goes back up -- so a failure costs nobody anything.
+        if (!settle(listing, buyer.getUniqueId(), AuctionLogEntry.Status.SOLD, null)) {
+            if (listing.currency() == AuctionCurrency.MONEY) {
+                EconomyHook.getEconomy().depositPlayer(buyer, listing.price());
+            } else {
+                buyer.setLevel(buyer.getLevel() + priceLevels);
+            }
+            activeListings.put(listingId, listing);
+            return BuyResult.GONE;
+        }
+
         double tax = listing.price() * (saleTaxPercent / 100.0);
         double proceeds = listing.price() - tax;
         if (listing.currency() == AuctionCurrency.MONEY) {
@@ -262,8 +275,6 @@ public final class AuctionManager {
         for (ItemStack leftover : buyer.getInventory().addItem(listing.item().clone()).values()) {
             buyer.getWorld().dropItemNaturally(buyer.getLocation(), leftover);
         }
-
-        logAndRemove(listing, buyer.getUniqueId(), AuctionLogEntry.Status.SOLD, null);
         return BuyResult.OK;
     }
 
@@ -315,9 +326,12 @@ public final class AuctionManager {
         if (listing.isPending() || !activeListings.remove(listing.id(), listing)) {
             return false;
         }
-        giveOrClaim(listing.sellerUuid(), listing.item());
         boolean adminCancel = !listing.sellerUuid().equals(actor.getUniqueId());
-        logAndRemove(listing, null, AuctionLogEntry.Status.CANCELLED, adminCancel ? actor.getUniqueId() : null);
+        if (!settle(listing, null, AuctionLogEntry.Status.CANCELLED, adminCancel ? actor.getUniqueId() : null)) {
+            activeListings.put(listing.id(), listing);
+            return false;
+        }
+        giveOrClaim(listing.sellerUuid(), listing.item());
         return true;
     }
 
@@ -333,23 +347,43 @@ public final class AuctionManager {
             if (!activeListings.remove(listing.id(), listing)) {
                 continue;
             }
+            if (!settle(listing, null, AuctionLogEntry.Status.EXPIRED, null)) {
+                // Left active so the next sweep retries it; returning the item
+                // now could hand it back twice.
+                activeListings.put(listing.id(), listing);
+                continue;
+            }
             queueClaim(listing.sellerUuid(), listing.item());
-            logAndRemove(listing, null, AuctionLogEntry.Status.EXPIRED, null);
         }
     }
 
-    private void logAndRemove(AuctionListing listing, UUID buyerUuid, AuctionLogEntry.Status status, UUID cancelledBy) {
-        clearWatchesForListing(listing.id());
+    /**
+     * Commits the settlement before anything is handed over.
+     *
+     * <p>Deliberately synchronous. The old order moved money and items first
+     * and persisted afterwards, so a crash in between could resurrect a sold
+     * listing on restart while the buyer already had the item. Nothing is
+     * delivered now until this has committed, which costs one indexed
+     * transaction on the calling thread and removes that entire class of
+     * duplication.
+     *
+     * @return false when the settlement did not commit, meaning the caller
+     *         must not deliver anything and should put the listing back
+     */
+    private boolean settle(AuctionListing listing, UUID buyerUuid, AuctionLogEntry.Status status, UUID cancelledBy) {
         String summary = listing.item().getAmount() + "x " + listing.item().getType();
-        track(CompletableFuture.runAsync(() -> {
-            try {
-                storage.deleteListing(listing.id());
-                storage.insertLogEntry(listing.sellerUuid(), buyerUuid, summary, listing.price(),
-                        listing.listedAtMillis(), System.currentTimeMillis(), status, cancelledBy);
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to persist resolved Auction House listing " + listing.id(), e);
+        try {
+            if (!storage.settleListing(listing.id(), listing.sellerUuid(), buyerUuid, summary, listing.price(),
+                    listing.listedAtMillis(), System.currentTimeMillis(), status, cancelledBy)) {
+                return false;
             }
-        }));
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE,
+                    "Failed to settle Auction House listing " + listing.id() + " -- nothing was delivered.", e);
+            return false;
+        }
+        clearWatchesForListing(listing.id());
+        return true;
     }
 
     // ---- Claims (returned items) ----

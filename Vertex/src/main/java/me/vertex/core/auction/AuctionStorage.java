@@ -179,6 +179,61 @@ public final class AuctionStorage {
         }
     }
 
+    /**
+     * Removes a listing and records how it ended, in one transaction.
+     *
+     * <p>This is the durable settlement record. It is committed *before* money
+     * or items move, so a crash can never leave a delivered item behind a
+     * listing that still exists in the database and comes back on restart.
+     * Doing the delete and the log separately allowed exactly that: the
+     * listing row could survive while the item had already been handed over.
+     *
+     * @return false when the listing was already settled by someone else, so
+     *         the caller knows not to deliver anything
+     */
+    public boolean settleListing(int id, UUID sellerUuid, UUID buyerUuid, String itemSummary, double price,
+            long listedAt, long resolvedAt, AuctionLogEntry.Status status, UUID cancelledByUuid) throws SQLException {
+        try (Connection connection = database.getConnection()) {
+            boolean previousAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                int deleted;
+                try (PreparedStatement delete = connection.prepareStatement(
+                        "DELETE FROM auction_listings WHERE id = ?")) {
+                    delete.setInt(1, id);
+                    deleted = delete.executeUpdate();
+                }
+                if (deleted == 0) {
+                    // Someone else settled it first. Roll back rather than
+                    // logging a sale that did not happen.
+                    connection.rollback();
+                    return false;
+                }
+                try (PreparedStatement log = connection.prepareStatement("""
+                        INSERT INTO auction_log (seller_uuid, buyer_uuid, item_summary, price, listed_at,
+                            resolved_at, status, cancelled_by)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""")) {
+                    log.setString(1, sellerUuid.toString());
+                    setNullableUuid(log, 2, buyerUuid);
+                    log.setString(3, itemSummary);
+                    log.setDouble(4, price);
+                    log.setLong(5, listedAt);
+                    log.setLong(6, resolvedAt);
+                    log.setString(7, status.name());
+                    setNullableUuid(log, 8, cancelledByUuid);
+                    log.executeUpdate();
+                }
+                connection.commit();
+                return true;
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(previousAutoCommit);
+            }
+        }
+    }
+
     // ---- Claims ----
 
     public List<AuctionClaim> loadClaims(UUID ownerUuid) throws SQLException {

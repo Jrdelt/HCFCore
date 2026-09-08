@@ -674,4 +674,39 @@ class AuctionManagerTest {
                 "a claim queued later must still be collectable");
     }
 
+
+    /**
+     * Settlement is committed before anything is delivered, so a persistence
+     * failure must leave the world exactly as it was -- buyer refunded,
+     * listing still for sale, item undelivered. The old order paid and
+     * delivered first, which let a crash resurrect a sold listing.
+     */
+    @Test
+    void aFailedSettlementDeliversNothingAndRefundsTheBuyer() {
+        manager.list(seller, new ItemStack(Material.DIAMOND, 5), 200.0, AuctionCurrency.MONEY);
+        settle();
+        int listingId = manager.activeListings().get(0).id();
+
+        database.close();
+        AuctionManager.BuyResult result = manager.buy(listingId, buyer);
+
+        assertEquals(AuctionManager.BuyResult.GONE, result);
+        assertEquals(1000.0, economy.get(buyer.getUniqueId()), 0.0001, "the buyer must have been refunded");
+        assertEquals(1000.0, economy.get(seller.getUniqueId()), 0.0001, "the seller must not have been paid");
+        assertEquals(0, countInInventory(buyer, Material.DIAMOND), "the item must not have been delivered");
+        assertEquals(1, manager.activeListings().size(), "the listing must still be for sale");
+    }
+
+    @Test
+    void aFailedSettlementLeavesACancelledListingInPlace() {
+        manager.list(seller, new ItemStack(Material.DIAMOND, 5), 200.0, AuctionCurrency.MONEY);
+        settle();
+        AuctionListing listing = manager.activeListings().get(0);
+
+        database.close();
+
+        assertFalse(manager.cancel(listing, seller), "a cancel that cannot be recorded must not succeed");
+        assertEquals(1, manager.activeListings().size(), "the listing must still be for sale");
+    }
+
 }

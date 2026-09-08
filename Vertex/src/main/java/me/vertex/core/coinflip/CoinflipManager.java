@@ -515,16 +515,31 @@ public final class CoinflipManager {
 
         boolean opponentWon = ThreadLocalRandom.current().nextBoolean();
         UUID winnerUuid = opponentWon ? opponent.getUniqueId() : coinflip.hostUuid();
+        long resolvedAt = System.currentTimeMillis();
+
+        // The outcome is committed before a single coin moves. If it cannot
+        // be, both wagers go back and the coinflip returns to the list, so a
+        // failure leaves the world exactly as it was.
+        if (!persistResolution(coinflip, opponent.getUniqueId(), winnerUuid, resolvedAt)) {
+            if (coinflip.type() == CoinflipType.MONEY) {
+                EconomyHook.getEconomy().depositPlayer(opponent, coinflip.amount());
+            } else {
+                opponent.setLevel(opponent.getLevel() + (int) coinflip.amount());
+            }
+            activeCoinflips.put(coinflipId, coinflip);
+            browserChanged();
+            return PlayOutcome.failure(PlayResult.GONE);
+        }
+
         double keepFraction = 1.0 - (houseFeePercent / 100.0);
         double payout = coinflip.amount() + coinflip.amount() * keepFraction;
-
         if (coinflip.type() == CoinflipType.MONEY) {
             EconomyHook.getEconomy().depositPlayer(Bukkit.getOfflinePlayer(winnerUuid), payout);
         } else {
             creditExp(winnerUuid, (int) Math.round(payout));
         }
 
-        finishResolution(coinflip, opponent.getUniqueId(), winnerUuid);
+        finishResolution(coinflip, opponent.getUniqueId(), winnerUuid, resolvedAt);
         return new PlayOutcome(PlayResult.OK, opponentWon);
     }
 
@@ -629,11 +644,23 @@ public final class CoinflipManager {
 
         boolean opponentWon = ThreadLocalRandom.current().nextBoolean();
         UUID winnerUuid = opponentWon ? match.opponentUuid() : coinflip.hostUuid();
+        long resolvedAt = System.currentTimeMillis();
+
+        // Committed before either side's items are handed to the winner. If it
+        // fails, both wagers stay escrowed and the match goes back to pending,
+        // so nobody gains or loses anything.
+        if (!persistResolution(coinflip, match.opponentUuid(), winnerUuid, resolvedAt)) {
+            activeCoinflips.put(coinflipId, coinflip);
+            pendingItemMatches.put(coinflipId, match);
+            browserChanged();
+            return ApproveOutcome.failure(ApprovalResult.GONE);
+        }
+
         List<ItemStack> combined = new ArrayList<>(List.of(coinflip.items()));
         combined.addAll(List.of(match.items()));
         queueClaim(winnerUuid, combined.toArray(new ItemStack[0]));
 
-        finishResolution(coinflip, match.opponentUuid(), winnerUuid);
+        finishResolution(coinflip, match.opponentUuid(), winnerUuid, resolvedAt);
         deletePendingMatchRow(match.id());
         return new ApproveOutcome(ApprovalResult.OK, opponentWon);
     }
@@ -708,28 +735,32 @@ public final class CoinflipManager {
         }));
     }
 
-    private void finishResolution(Coinflip coinflip, UUID opponentUuid, UUID winnerUuid) {
-        boolean hostWon = winnerUuid.equals(coinflip.hostUuid());
-        OfflinePlayer hostOffline = Bukkit.getOfflinePlayer(coinflip.hostUuid());
-        OfflinePlayer opponentOffline = Bukkit.getOfflinePlayer(opponentUuid);
-        String summary = summarize(coinflip);
-        long resolvedAt = System.currentTimeMillis();
-        CompletableFuture<Void> persist = CompletableFuture.runAsync(() -> {
-            try {
-                storage.resolveCoinflip(coinflip, opponentUuid, winnerUuid, summary, resolvedAt);
-            } catch (Exception e) {
-                throw new java.util.concurrent.CompletionException(e);
-            }
-        });
-        track(persist);
-        persist.whenComplete((ignored, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
-            if (error != null) {
-                plugin.getLogger().log(Level.SEVERE,
-                        "Failed to persist resolved Coinflip " + coinflip.id() + "; result chat was withheld.", error);
-                return;
-            }
-            presentResolvedCoinflip(coinflip.hostUuid(), opponentUuid, hostWon, hostOffline, opponentOffline, resolvedAt);
-        }));
+    /**
+     * Commits the decided outcome before anybody is paid.
+     *
+     * <p>Deliberately synchronous. The payout used to happen first and persist
+     * afterwards, so a crash in between left the winner paid while the
+     * coinflip row survived -- making the same wager playable again after a
+     * restart. The result is decided server-side beforehand and written in one
+     * transaction, so what is committed is exactly what gets paid.
+     *
+     * @return false when nothing committed, meaning the caller must not pay
+     *         out and should return the wagers instead
+     */
+    private boolean persistResolution(Coinflip coinflip, UUID opponentUuid, UUID winnerUuid, long resolvedAt) {
+        try {
+            storage.resolveCoinflip(coinflip, opponentUuid, winnerUuid, summarize(coinflip), resolvedAt);
+            return true;
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE,
+                    "Failed to persist resolved Coinflip " + coinflip.id() + " -- nobody was paid.", e);
+            return false;
+        }
+    }
+
+    private void finishResolution(Coinflip coinflip, UUID opponentUuid, UUID winnerUuid, long resolvedAt) {
+        presentResolvedCoinflip(coinflip.hostUuid(), opponentUuid, winnerUuid.equals(coinflip.hostUuid()),
+                Bukkit.getOfflinePlayer(coinflip.hostUuid()), Bukkit.getOfflinePlayer(opponentUuid), resolvedAt);
     }
 
     /**

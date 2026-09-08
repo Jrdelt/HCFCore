@@ -168,7 +168,7 @@ not cover several high-risk persistence and packet-race paths below.
 
 ### Backend / integrity issues
 
-- **[critical] Auction settlement is only durable after money and item state
+- **[FIXED] Auction settlement is only durable after money and item state
   has already changed.** Buying, cancellation, and expiry remove the live
   listing and move money/items first; `deleteListing`, audit logging, and
   offline claims happen later in independent async writes. A database failure
@@ -176,7 +176,7 @@ not cover several high-risk persistence and packet-race paths below.
   while the item has already been delivered, or lose an offline return. Use a
   single durable settlement record/transaction before exposing the result.
 
-- **[critical] Coinflip money/item settlement has the same crash window.**
+- **[FIXED] Coinflip money/item settlement has the same crash window.**
   The opponent is charged and the winner is paid or queued before
   `resolveCoinflip` completes. If persistence fails, the in-memory listing is
   gone while the original database listing can remain; after restart it is

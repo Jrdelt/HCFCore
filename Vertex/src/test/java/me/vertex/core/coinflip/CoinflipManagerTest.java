@@ -872,4 +872,27 @@ class CoinflipManagerTest {
         scheduler.performTicks(1L);
     }
 
+
+    /**
+     * The outcome is committed before anyone is paid, so a persistence
+     * failure must return both wagers and put the coinflip back. The old
+     * order paid the winner first, which let a crash leave the coinflip
+     * playable again after restart with the payout already made.
+     */
+    @Test
+    void aFailedResolutionPaysNobodyAndKeepsTheCoinflipOpen() {
+        manager.createMoneyCoinflip(host, 100.0, null);
+        settle();
+        Coinflip coinflip = manager.activeCoinflips().get(0);
+        assertEquals(900.0, economy.get(host.getUniqueId()), "the host's wager is escrowed at creation");
+
+        database.close();
+        CoinflipManager.PlayOutcome outcome = manager.play(coinflip.id(), opponent);
+
+        assertEquals(CoinflipManager.PlayResult.GONE, outcome.result());
+        assertEquals(1000.0, economy.get(opponent.getUniqueId()), "the opponent's wager must have been returned");
+        assertEquals(900.0, economy.get(host.getUniqueId()), "nobody may be paid when nothing was recorded");
+        assertEquals(1, manager.activeCoinflips().size(), "the coinflip must still be open");
+    }
+
 }
