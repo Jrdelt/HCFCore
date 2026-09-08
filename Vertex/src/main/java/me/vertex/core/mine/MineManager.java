@@ -47,6 +47,7 @@ public final class MineManager {
     private final File file;
 
     private final Map<String, MineRegion> regions = new LinkedHashMap<>();
+    private final Map<String, MineKothDefinition> kothDefinitions = new LinkedHashMap<>();
     private final Map<UUID, Selection> selections = new HashMap<>();
     private final MineRegenQueue regenQueue = new MineRegenQueue();
 
@@ -57,6 +58,7 @@ public final class MineManager {
     private volatile long maximumSelectionVolume;
     private volatile long workerIntervalTicks;
     private volatile int maxRegenPerPass;
+    private volatile long kothTickIntervalTicks;
     private BukkitTask regenTask;
 
     public MineManager(Plugin plugin, Messages messages) {
@@ -78,8 +80,10 @@ public final class MineManager {
         maximumSelectionVolume = Math.max(1L, config.getLong("selection.maximum-volume", 60_000_000L));
         workerIntervalTicks = Math.max(1L, config.getLong("regeneration.worker-interval-ticks", 5L));
         maxRegenPerPass = Math.max(1, config.getInt("regeneration.max-per-pass", 100));
+        kothTickIntervalTicks = Math.max(1L, config.getLong("koth.tick-interval-ticks", 20L));
 
         regions.clear();
+        kothDefinitions.clear();
         ConfigurationSection mines = config.getConfigurationSection("mines");
         if (mines != null) {
             for (String id : mines.getKeys(false)) {
@@ -87,9 +91,14 @@ public final class MineManager {
                 if (section == null) {
                     continue;
                 }
-                MineRegion region = readRegion(id.toLowerCase(Locale.ROOT), section);
+                String mineId = id.toLowerCase(Locale.ROOT);
+                MineRegion region = readRegion(mineId, section);
                 if (region != null) {
                     regions.put(region.id(), region);
+                }
+                MineKothDefinition koth = readKoth(mineId, region, section.getConfigurationSection("koth"));
+                if (koth != null) {
+                    kothDefinitions.put(mineId, koth);
                 }
             }
         }
@@ -139,6 +148,49 @@ public final class MineManager {
                 MineOreTable.of(entries));
     }
 
+    private MineKothDefinition readKoth(String mineId, MineRegion region, ConfigurationSection section) {
+        if (section == null || region == null) {
+            return null;
+        }
+        List<MineKothBooster.Tier> tiers = new ArrayList<>();
+        for (Map<?, ?> raw : section.getMapList("booster-tiers")) {
+            Object after = raw.get("after-seconds");
+            Object percent = raw.get("percent");
+            if (after instanceof Number afterSeconds && percent instanceof Number bonus) {
+                tiers.add(new MineKothBooster.Tier(afterSeconds.longValue(), bonus.doubleValue()));
+            } else {
+                plugin.getLogger().warning("mines.yml: " + mineId + " has a malformed KOTH booster tier, ignoring it.");
+            }
+        }
+        MineKothControl.Settings settings = new MineKothControl.Settings(
+                Math.max(1D, section.getDouble("capture-seconds", 180D)),
+                section.getBoolean("multiple-members-speed-up", true),
+                Math.max(0D, section.getDouble("additional-member-speed", 0.25D)),
+                Math.max(1, section.getInt("max-counted-members", 5)),
+                Math.max(1D, section.getDouble("max-speed-multiplier", 2.0D)),
+                Math.max(0D, Math.min(100D, section.getDouble("booster-reset-threshold", 50D))));
+
+        return new MineKothDefinition(mineId,
+                section.getBoolean("enabled", true),
+                region.world(),
+                section.getInt("minimum.x"), section.getInt("minimum.y"), section.getInt("minimum.z"),
+                section.getInt("maximum.x"), section.getInt("maximum.y"), section.getInt("maximum.z"),
+                settings,
+                MineKothBooster.of(tiers));
+    }
+
+    public List<MineKothDefinition> kothDefinitions() {
+        return List.copyOf(kothDefinitions.values());
+    }
+
+    public MineKothDefinition kothDefinition(String mineId) {
+        return mineId == null ? null : kothDefinitions.get(mineId.toLowerCase(Locale.ROOT));
+    }
+
+    public long kothTickIntervalTicks() {
+        return kothTickIntervalTicks;
+    }
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -175,6 +227,10 @@ public final class MineManager {
     // ---- Selection ----
 
     public boolean beginSelection(Player player, String mineId) {
+        return beginSelection(player, mineId, false);
+    }
+
+    public boolean beginSelection(Player player, String mineId, boolean kothZone) {
         MineRegion region = region(mineId);
         if (region == null) {
             player.sendMessage(messages.get(player, "mines.unknown",
@@ -183,10 +239,12 @@ public final class MineManager {
         }
         Selection selection = selections.computeIfAbsent(player.getUniqueId(), ignored -> new Selection());
         selection.mineId = region.id();
+        selection.kothZone = kothZone;
         selection.first = null;
         selection.second = null;
         giveWand(player);
-        player.sendMessage(messages.get(player, "mines.selection-started", "mine", region.id()));
+        player.sendMessage(messages.get(player,
+                kothZone ? "mines.koth-selection-started" : "mines.selection-started", "mine", region.id()));
         return true;
     }
 
@@ -253,8 +311,10 @@ public final class MineManager {
             return;
         }
 
-        String path = "mines." + selection.mineId;
-        config.set(path + ".world", selection.first.getWorld().getName());
+        String path = "mines." + selection.mineId + (selection.kothZone ? ".koth" : "");
+        if (!selection.kothZone) {
+            config.set(path + ".world", selection.first.getWorld().getName());
+        }
         config.set(path + ".minimum.x", minX);
         config.set(path + ".minimum.y", minY);
         config.set(path + ".minimum.z", minZ);
@@ -271,7 +331,7 @@ public final class MineManager {
 
         selections.remove(player.getUniqueId());
         load();
-        player.sendMessage(messages.get(player, "mines.created",
+        player.sendMessage(messages.get(player, selection.kothZone ? "mines.koth-created" : "mines.created",
                 "mine", selection.mineId,
                 "world", selection.first.getWorld().getName(),
                 "volume", String.format("%,d", volume)));
@@ -340,6 +400,7 @@ public final class MineManager {
 
     private static final class Selection {
         private String mineId;
+        private boolean kothZone;
         private Location first;
         private Location second;
     }

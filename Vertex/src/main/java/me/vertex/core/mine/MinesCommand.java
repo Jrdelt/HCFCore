@@ -51,7 +51,8 @@ public final class MinesCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(messages.get(player, "mines.usage-admin"));
                     return true;
                 }
-                mines.beginSelection(player, args[1]);
+                boolean kothZone = args.length >= 3 && args[2].equalsIgnoreCase("koth");
+                mines.beginSelection(player, args[1], kothZone);
             }
             case "cancel" -> player.sendMessage(messages.get(player,
                     mines.cancelSelection(player) ? "mines.selection-cancelled" : "mines.selection-none"));
@@ -105,6 +106,9 @@ public final class MinesCommand implements CommandExecutor, TabCompleter {
                     .map(MineRegion::id)
                     .filter(id -> id.startsWith(args[1].toLowerCase(Locale.ROOT)))
                     .toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("wand")) {
+            return "koth".startsWith(args[2].toLowerCase(Locale.ROOT)) ? List.of("koth") : List.of();
         }
         return List.of();
     }

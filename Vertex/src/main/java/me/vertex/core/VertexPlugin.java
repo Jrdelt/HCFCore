@@ -144,6 +144,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.booster.BoosterService boosterService;
     private me.vertex.core.wand.WandManager wandManager;
     private me.vertex.core.mine.MineManager mineManager;
+    private me.vertex.core.mine.MineKothManager mineKothManager;
     private me.vertex.core.menu.MenuRegistry menuRegistry;
     private me.vertex.core.coinflip.CoinflipStorage coinflipStorage;
     private me.vertex.core.coinflip.CoinflipManager coinflipManager;
@@ -440,6 +441,16 @@ combatManager.start();
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.mine.MineListener(mineManager, boosterService, messages), this);
 
+        me.vertex.core.mine.MineKothStorage mineKothStorage = new me.vertex.core.mine.MineKothStorage(database);
+        try {
+            mineKothStorage.init();
+        } catch (Exception e) {
+            getLogger().log(Level.SEVERE, "Failed to initialise Mine KOTH storage.", e);
+        }
+        mineKothManager = new me.vertex.core.mine.MineKothManager(this, mineManager, mineKothStorage, messages);
+        mineKothManager.load();
+        boosterService.register(new me.vertex.core.mine.MineKothBoosterSource(mineKothManager));
+
         wandManager = new me.vertex.core.wand.WandManager(this);
         wandManager.load();
         me.vertex.core.wand.WandCommand wandCommand =
@@ -691,6 +702,9 @@ combatManager.start();
         if (sandBotManager != null) {
             sandBotManager.stop();
         }
+        if (mineKothManager != null) {
+            mineKothManager.shutdown();
+        }
         if (mineManager != null) {
             mineManager.shutdown();
         }
@@ -914,6 +928,9 @@ combatManager.start();
         }
         if (mineManager != null) {
             mineManager.load();
+        }
+        if (mineKothManager != null) {
+            mineKothManager.load();
         }
         if (boosterService != null) {
             boosterService.reloadConfig();

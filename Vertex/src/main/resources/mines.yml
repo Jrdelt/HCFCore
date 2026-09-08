@@ -66,6 +66,37 @@ mines:
         weight: 2.0
         drop: 1
 
+    # The Mine KOTH capture zone, a sub-region of this mine. Place it with
+    #   /mines wand stonewake koth
+    # using the same blaze rod; the corners are written back here.
+    #
+    # Control runs 0-100%. An attacker wears the holder's control down first
+    # and only starts climbing their own once it reaches zero, so taking a
+    # defended point costs about twice an empty capture. The booster is only
+    # active at 100% control.
+    koth:
+      enabled: true
+      capture-seconds: 180
+      multiple-members-speed-up: true
+      additional-member-speed: 0.25
+      max-counted-members: 5
+      max-speed-multiplier: 2.0
+      # Control falling below this wipes booster progression back to the
+      # first stage. Between it and 100% the booster is inactive but the
+      # earned stage is only paused, not lost.
+      booster-reset-threshold: 50.0
+      # Ore Drop bonus by continuous hold time. Every stage is stated
+      # outright -- no multiplier is derived between them.
+      booster-tiers:
+        - after-seconds: 0
+          percent: 5.0
+        - after-seconds: 1800
+          percent: 10.0
+        - after-seconds: 3600
+          percent: 15.0
+        - after-seconds: 7200
+          percent: 20.0
+
   bloodvein:
     display-name: "ʙʟᴏᴏᴅᴠᴇɪɴ"
     world: ''
@@ -96,3 +127,34 @@ mines:
       NETHERITE_BLOCK:
         weight: 0.005
         drop: 1
+
+    # The Mine KOTH capture zone, a sub-region of this mine. Place it with
+    #   /mines wand bloodvein koth
+    # using the same blaze rod; the corners are written back here.
+    #
+    # Control runs 0-100%. An attacker wears the holder's control down first
+    # and only starts climbing their own once it reaches zero, so taking a
+    # defended point costs about twice an empty capture. The booster is only
+    # active at 100% control.
+    koth:
+      enabled: true
+      capture-seconds: 180
+      multiple-members-speed-up: true
+      additional-member-speed: 0.25
+      max-counted-members: 5
+      max-speed-multiplier: 2.0
+      # Control falling below this wipes booster progression back to the
+      # first stage. Between it and 100% the booster is inactive but the
+      # earned stage is only paused, not lost.
+      booster-reset-threshold: 50.0
+      # Ore Drop bonus by continuous hold time. Every stage is stated
+      # outright -- no multiplier is derived between them.
+      booster-tiers:
+        - after-seconds: 0
+          percent: 5.0
+        - after-seconds: 1800
+          percent: 10.0
+        - after-seconds: 3600
+          percent: 15.0
+        - after-seconds: 7200
+          percent: 20.0

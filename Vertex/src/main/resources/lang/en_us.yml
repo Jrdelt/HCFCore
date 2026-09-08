@@ -906,6 +906,7 @@ boosters:
 
   source-backpack: "ʙᴀᴄᴋᴘᴀᴄᴋ"
   source-faction-upgrade: "ꜰᴀᴄᴛɪᴏɴ ᴜᴘɢʀᴀᴅᴇ"
+  source-mine-koth: "ᴍɪɴᴇ ᴋᴏᴛʜ"
 
   line-active: "<gray>{source}: <green>+{percent}%"
   line-inactive: "<dark_gray>{source}: <dark_gray>inactive"
@@ -915,6 +916,7 @@ boosters:
   reason-no-backpack: "no Backpack equipped"
   reason-no-faction: "you are not in a faction"
   reason-not-upgraded: "not upgraded yet"
+  reason-koth-not-held: "your faction does not control this Mine KOTH"
 
 wand:
   usage: "&d&lWANDS&r &7> <gray>Usage: <yellow>/wand give <player> <tier> [uses]"
@@ -936,7 +938,7 @@ wand:
 
 mines:
   disabled: "&b&lMINES&r &7> <red>Mining worlds are disabled."
-  usage-admin: "&b&lMINES&r &7> <gray>Staff: <yellow>/mines wand <mine><gray>, <yellow>/mines cancel<gray>, <yellow>/mines list"
+  usage-admin: "&b&lMINES&r &7> <gray>Staff: <yellow>/mines wand <mine> [koth]<gray>, <yellow>/mines cancel<gray>, <yellow>/mines list"
   unknown: "&b&lMINES&r &7> <red>Unknown mine. Available: <yellow>{mines}"
   none-defined: "&b&lMINES&r &7> <gray>No mining worlds have been placed yet."
   overview-entry: "&b&lMINES&r &7> <yellow>{mine} <dark_gray>({world}) <gray>-- {ores}"
@@ -959,3 +961,7 @@ mines:
   selection-none: "&b&lMINES&r &7> <red>You have no selection in progress."
   save-failed: "&b&lMINES&r &7> <red>Could not save mines.yml -- check the console."
   created: "&b&lMINES&r &7> <green>Placed <yellow>{mine}<green> in <yellow>{world}<green> ({volume} blocks)."
+  koth-selection-started: "&b&lMINES&r &7> <yellow>Selecting the <white>KOTH capture zone<yellow> for <white>{mine}<yellow>. Left-click one corner, right-click the other, then sneak and click air."
+  koth-created: "&b&lMINES&r &7> <green>Placed the KOTH zone for <yellow>{mine}<green> ({volume} blocks)."
+  koth-captured: "&b&lMINE KOTH&r &7> <yellow>{faction}<green> now controls the <yellow>{mine}<green> KOTH!"
+  koth-contested: "&b&lMINE KOTH&r &7> <red>Your faction's {mine} KOTH is being taken -- control is at <yellow>{control}%<red>!"

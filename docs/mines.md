@@ -85,7 +85,61 @@ would otherwise stay mined out forever. Before regenerating, the location is
 re-checked: if the region moved or the area was rebuilt while it waited, it
 is skipped rather than pasted into someone's structure.
 
+## Mine KOTHs
+
+Each mine has a permanent, 24/7 capturable point. Place its capture zone
+with the same blaze rod:
+
+```
+/mines wand stonewake koth
+```
+
+Holding it gives the controlling faction an **Ore Drop bonus in that mining
+world only**, visible in [`/boosters`](boosters.md) like any other source.
+
+### Control
+
+Control is a single 0–100% value owned by whoever holds the point, not a
+progress bar per faction. An attacker wears the holder's control **down**
+first and only starts climbing their own once it reaches zero — so taking a
+defended point costs about twice an empty capture, without tracking every
+faction separately.
+
+- **Unopposed:** 180s from 0 to 100 for one member (configurable).
+- **More members:** +25% rate each, capped at 5 members / 2.00x.
+- **Contested:** while more than one hostile faction is present, nobody
+  advances and the holder keeps the point. Letting control slide to whoever
+  is standing there would make a third faction usable as *cover* to take a
+  point off someone.
+- **Owner present:** they defend and push control back toward 100%, however
+  many attackers there are.
+- **Factionless players cannot capture.**
+
+### Booster
+
+Active **only at 100% control** — a point being worn away pays nothing until
+it has been defended back. Stages are stated outright in config, so the
+ladder can be any shape:
+
+| Held for | Bonus |
+|---|---|
+| On capture | +5% |
+| 30 minutes | +10% |
+| 1 hour | +15% |
+| 2 hours | +20% |
+
+Control falling below `booster-reset-threshold` (50%) wipes progression back
+to the first stage. Between that and 100% the booster is inactive but the
+earned stage is only paused.
+
+### Persistence
+
+The **moment** a faction took the point is stored, not how long they have
+held it — so elapsed time is derived from the clock and a reboot cannot hand
+anyone a fresh ladder. State is written on every ownership change and
+threshold crossing, and flushed on shutdown.
+
 ## Not yet built
 
-Mine KOTHs, Hot Zones, and the `/mines` GUI. `/mines` currently prints a
-text overview of the placed mines.
+Hot Zones and the `/mines` GUI. `/mines` currently prints a text overview of
+the placed mines.
