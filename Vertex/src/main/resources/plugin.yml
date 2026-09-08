@@ -104,6 +104,9 @@ commands:
     description: Browse, host, or play a coinflip.
     usage: /<command> [amount [exp|money] [player]|hand [player]|review <id>|approve <id>|deny <id>|ban|unban|cancel <id>|logs [player]]
     aliases: [coinflip]
+  boosters:
+    description: View the bonuses currently applying to you.
+    usage: /<command> [inspect <player>]
   shop:
     description: Browse categorized items, or buy/sell at their current market price.
     usage: /<command> [buy|sell <item> [amount]]
@@ -226,6 +229,9 @@ permissions:
     default: op
   vertex.staff.punish.bypasscombat:
     description: Kick or ban a combat-tagged player anyway. Every use is logged.
+    default: op
+  vertex.boosters.inspect:
+    description: View another player's booster breakdown with /boosters inspect.
     default: op
   vertex.staff.mode:
     description: Toggle full staff mode (vanish + staff-build).

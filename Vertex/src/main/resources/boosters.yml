@@ -1,0 +1,48 @@
+# How Vertex combines bonuses from every source into the figure the server
+# actually applies, and the figure /boosters shows.
+#
+# This file only decides how contributions COMBINE. It never grants a bonus
+# and never changes what a source is worth -- each value is still owned and
+# configured by the system that produces it (Backpack tiers in backpacks.yml,
+# faction upgrades in config.yml, and so on).
+#
+# Sources currently wired in:
+#   backpack        drop bonus of the equipped Backpack -> ore-drop, mob-drop
+#   faction-upgrade spawner-rate -> mob-spawn-rate, mob-xp -> exp
+#
+# Mine KOTH ownership, Mining Hot Zones, Resource Rush, and temporary event
+# rewards register themselves here as they are built; nothing in this file
+# needs to change to accept them.
+
+categories:
+  # stacking:
+  #   additive      every active contribution adds together (default)
+  #   highest_only  only the single largest contribution counts
+  #
+  # max-percent:
+  #   -1            no ceiling
+  #   any value     the combined total is clamped to it, and /boosters shows
+  #                 both the raw total and the capped result
+
+  ore-drop:
+    stacking: additive
+    max-percent: -1
+
+  # Sell ships with the one ceiling. A sell bonus multiplies an already
+  # dynamic price, so an uncapped stack is the quickest way to wreck the
+  # economy. +500% means a maximum of 6.00x.
+  sell:
+    stacking: additive
+    max-percent: 500
+
+  mob-spawn-rate:
+    stacking: additive
+    max-percent: -1
+
+  mob-drop:
+    stacking: additive
+    max-percent: -1
+
+  exp:
+    stacking: additive
+    max-percent: -1

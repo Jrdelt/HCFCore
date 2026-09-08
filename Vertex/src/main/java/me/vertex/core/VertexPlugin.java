@@ -141,6 +141,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.listener.ItemRestrictionListener itemRestrictionListener;
     private StaffManager staffManager;
     private me.vertex.core.backpack.BackpackManager backpackManager;
+    private me.vertex.core.booster.BoosterService boosterService;
     private me.vertex.core.coinflip.CoinflipStorage coinflipStorage;
     private me.vertex.core.coinflip.CoinflipManager coinflipManager;
     private org.bukkit.scheduler.BukkitTask coinflipGuiRefreshTask;
@@ -356,6 +357,20 @@ combatManager.start();
 
         backpackManager = new me.vertex.core.backpack.BackpackManager(this, messages);
         backpackManager.load();
+
+        // Reads the bonuses the Backpack and faction-upgrade systems already
+        // apply; it grants nothing itself, so wiring it cannot change what a
+        // player receives.
+        boosterService = new me.vertex.core.booster.BoosterService(this);
+        boosterService.reloadConfig();
+        boosterService.register(new me.vertex.core.booster.BackpackBoosterSource(backpackManager));
+        boosterService.register(new me.vertex.core.booster.FactionUpgradeBoosterSource(factionUpgradeManager));
+        me.vertex.core.booster.BoostersCommand boostersCommand =
+                new me.vertex.core.booster.BoostersCommand(boosterService, messages);
+        getCommand("boosters").setExecutor(boostersCommand);
+        getCommand("boosters").setTabCompleter(boostersCommand);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.booster.BoostersMenuListener(boosterService, messages), this);
         me.vertex.core.backpack.BackpackFilterManager backpackFilterManager = new me.vertex.core.backpack.BackpackFilterManager(
                 this);
         backpackFilterManager.load();
@@ -862,6 +877,9 @@ combatManager.start();
         }
         if (backpackManager != null) {
             backpackManager.load();
+        }
+        if (boosterService != null) {
+            boosterService.reloadConfig();
         }
         if (coinflipManager != null) {
             long previousGuiRefreshInterval = coinflipManager.guiRefreshIntervalTicks();

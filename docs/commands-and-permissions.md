@@ -87,6 +87,13 @@ are available for staff testing. See [Player Trading](trading.md).
 | `/cf cancel <id>` | `vertex.coinflip.remove` for someone else's; open to the host for their own | Cancels an unplayed coinflip and refunds its wager. |
 | `/cf logs [player] [page]` | `vertex.coinflip.logs` | Reads the permanent staff audit log. |
 
+## Boosters
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/boosters` | Open to all | Shows the bonuses actually in force, per category — see [Boosters](boosters.md). |
+| `/boosters inspect <player>` | `vertex.boosters.inspect` | Another player's breakdown. Only advertised in usage text to holders of the permission. |
+
 ## Shop
 
 | Command | Permission | Notes |

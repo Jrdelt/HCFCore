@@ -263,6 +263,18 @@ public final class BackpackManager {
     }
 
     /**
+     * The equipped Backpack's drop bonus, or -1 when none is equipped.
+     *
+     * <p>Deliberately routed through the same {@link #dropBonusPercent} that
+     * {@code applyBonus} uses, so the figure the booster tracker shows can
+     * never drift from the one actually applied to drops.
+     */
+    public double equippedDropBonusPercent(org.bukkit.entity.Player player) {
+        EquippedBackpack equipped = equippedBackpack(player);
+        return equipped == null ? -1D : dropBonusPercent(equipped.tier(), equipped.data().level());
+    }
+
+    /**
      * Applies the Backpack's configured drop bonus, stores as much as fits,
      * and returns every item that could not be stored. The caller is
      * responsible for dropping the returned items naturally.
