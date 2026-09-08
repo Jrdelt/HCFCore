@@ -5,8 +5,6 @@ import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.luckperms.LuckPermsHook;
 import me.vertex.core.pvp.CombatManager;
 import me.vertex.core.pvp.GhostPlayerManager;
-import me.vertex.core.scoreboard.ScoreboardManager;
-import me.vertex.core.tablist.TablistManager;
 import me.vertex.core.user.UserManager;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -21,25 +19,12 @@ import java.util.UUID;
 public final class PlayerConnectionListener implements Listener {
 
     private final UserManager userManager;
-    private volatile ScoreboardManager scoreboardManager;
-    private volatile TablistManager tablistManager;
     private final CombatManager combatManager;
     private volatile GhostPlayerManager ghostPlayerManager;
 
-    public PlayerConnectionListener(UserManager userManager, ScoreboardManager scoreboardManager,
-            TablistManager tablistManager, CombatManager combatManager) {
+    public PlayerConnectionListener(UserManager userManager, CombatManager combatManager) {
         this.userManager = userManager;
-        this.scoreboardManager = scoreboardManager;
-        this.tablistManager = tablistManager;
         this.combatManager = combatManager;
-    }
-
-    public void setScoreboardManager(ScoreboardManager scoreboardManager) {
-        this.scoreboardManager = scoreboardManager;
-    }
-
-    public void setTablistManager(TablistManager tablistManager) {
-        this.tablistManager = tablistManager;
     }
 
     public void setGhostPlayerManager(GhostPlayerManager ghostPlayerManager) {
@@ -76,28 +61,6 @@ public final class PlayerConnectionListener implements Listener {
                 ? "[" + rank + "] " + displayName
                 : displayName));
 
-        if (scoreboardManager == null) {
-            return;
-        }
-
-        // Scoreboard rendering does not require the database-backed User
-        // object.  Setting it up immediately avoids a one-tick race with a
-        // slow MySQL login load, which otherwise left players without a
-        // scoreboard for the rest of their session.
-        scoreboardManager.setup(player);
-
-        if (tablistManager != null) {
-            // Tab list rendering is stateless (no per-player Scoreboard
-            // object like the sidebar needs), so this alone is enough to
-            // have it correct from the first tick rather than waiting up
-            // to tablist.update-interval-ticks for the join to be noticed.
-            tablistManager.renderNow(player);
-            // A joining LuckPerms user can finish its inherited prefix/group
-            // calculation just after PlayerJoinEvent. Refresh twice across
-            // that short window so they never need to chat to get their
-            // colored prefix or correct highest-weight ordering in tab.
-            tablistManager.refreshAfterJoin();
-        }
     }
 
     @EventHandler
@@ -133,12 +96,6 @@ public final class PlayerConnectionListener implements Listener {
         if (combatManager != null) {
             combatManager.clear(uuid);
             combatManager.forgetPlayer(uuid);
-        }
-        if (scoreboardManager != null) {
-            scoreboardManager.remove(player.getUniqueId());
-        }
-        if (tablistManager != null) {
-            tablistManager.remove(player.getUniqueId());
         }
         if (userManager != null) {
             userManager.unload(player.getUniqueId());

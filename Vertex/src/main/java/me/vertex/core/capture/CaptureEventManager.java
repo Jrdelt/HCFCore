@@ -509,7 +509,6 @@ public final class CaptureEventManager implements Listener {
         config.set(path + ".world", selection.first.getWorld().getName());
         setLocation(path + ".minimum", minX, minY, minZ);
         setLocation(path + ".maximum", maxX, maxY, maxZ);
-        setLocation(path + ".hologram", (minX + maxX + 1D) / 2D, minY + 2D, (minZ + maxZ + 1D) / 2D);
         config.set(path + ".capture-seconds", defaultCaptureSeconds);
         config.set(path + ".max-duration-seconds", defaultMaxDurationSeconds);
         config.set(path + ".additional-member-speed", defaultAdditionalMemberSpeed);
@@ -815,7 +814,7 @@ public final class CaptureEventManager implements Listener {
     }
 
     private void updateHologram(ActiveCapture capture) {
-        if (!hologramsEnabled || !hologramsAvailable() || hologramFailures.contains(capture.hologramName())) {
+        if (!hologramsEnabled || !hologramsAvailable()) {
             return;
         }
         Location location = capture.definition.hologramLocation();
@@ -841,9 +840,24 @@ public final class CaptureEventManager implements Listener {
             } else {
                 DHAPI.setHologramLines(hologram, lines);
             }
-        } catch (Exception e) {
-            hologramFailures.add(capture.hologramName());
-            plugin.getLogger().log(Level.WARNING, "Failed to update capture hologram " + capture.hologramName(), e);
+            // A hologram that recovers should be able to warn again if it later breaks again.
+            hologramFailures.remove(capture.hologramName());
+        } catch (Throwable e) {
+            // Every active capture retries every tick regardless of a
+            // past failure -- a transient error (DecentHolograms still
+            // starting up, a momentarily unloaded chunk) self-heals on
+            // its own instead of leaving the hologram silently broken
+            // for the rest of that capture's run. Throwable (not just
+            // Exception) is caught deliberately: an incompatible
+            // DecentHolograms API upgrade throws a LinkageError/
+            // NoSuchMethodError, which would otherwise escape this
+            // per-capture try and abort the whole shared tick() pass.
+            // Set.add(...) is only true the first time, so this warns
+            // once per failure streak instead of once per second.
+            if (hologramFailures.add(capture.hologramName())) {
+                plugin.getLogger().log(Level.WARNING, "Failed to update capture hologram "
+                        + capture.hologramName() + " -- will keep retrying silently.", e);
+            }
         }
     }
 

@@ -26,7 +26,7 @@ Enables money costs. Specifically:
 - Buying Chunk Collector upgrade tiers.
 - Buying faction-upgrade levels through `/f upgrades`.
 - Depositing to or withdrawing from the faction **money** bank.
-- The `{balance}` scoreboard placeholder.
+- The `{balance}` placeholder in chat.
 
 Without Vault, only free or item-cost kits work, spawners/collectors that
 require a purchase can't be bought, faction money transactions and paid
@@ -51,8 +51,8 @@ since those don't need WorldGuard.
 
 Enables:
 
-- Rank display in chat and on the scoreboard (`{rank}`, `{rank_prefix}`,
-  `{prefix}` placeholders, and `chat.rank-format`).
+- Rank display in chat (`{rank}`, `{rank_prefix}`, `{prefix}`
+  placeholders, and `chat.rank-format`).
 - The **Repair** ability, which grants a temporary LuckPerms permission
   node so a player can break/fix their own gear for a limited window.
 
@@ -63,36 +63,29 @@ handled so a player in it shows a blank rank instead of the literal word
 
 ## PlaceholderAPI — optional
 
-Lets `chat.*` and `scoreboard.lines` templates use `%placeholder%`
-tokens — from LuckPerms' own PlaceholderAPI expansion, or any other
-installed expansion — mixed in alongside Vertex's own `{curly}`
-placeholders. They're expanded as a final pass over the fully-resolved
-line, per viewing player.
+Two directions. Lets `chat.*` templates use `%placeholder%` tokens —
+from LuckPerms' own PlaceholderAPI expansion, or any other installed
+expansion — mixed in alongside Vertex's own `{curly}` placeholders.
+They're expanded as a final pass over the fully-resolved line, per
+viewing player.
+
+Vertex also registers its own expansion, providing `%vertex_...%`
+tokens (faction stats, cooldowns, combat status, the faction bank, ...)
+for any other installed plugin to read — a scoreboard/tablist plugin in
+particular. See [Placeholders](placeholders.md) for the full list.
 
 Without PlaceholderAPI, any `%...%` token in a template is left as
-literal text rather than being expanded.
+literal text rather than being expanded, and Vertex's own tokens simply
+don't exist for other plugins to use.
 
 ## EssentialsX — optional
 
-Wherever a player's name is shown — chat, scoreboard, the tags GUI
-nickname preview, and default join/quit/death messages — their
-EssentialsX `/nick` nickname is used instead of their real username, if
-one is set.
+Wherever a player's name is shown — chat, the tags GUI nickname preview,
+and default join/quit/death messages — their EssentialsX `/nick`
+nickname is used instead of their real username, if one is set.
 
 Without EssentialsX, or for a player with no nickname set, the real
 username is used as before.
-
-## ProtocolLib — optional
-
-Powers the header rows in [grouped-mode tab list](configuration.md#grouped-mode-rank-separated-tab-list)
-(`tablist.grouped.enabled`) — a fake, non-player row showing each
-LuckPerms group's name and online count above its block of players.
-Bukkit has no API for a tab entry that isn't a real connected player, so
-this is the one piece of Vertex that needs a packet library at all.
-
-Without ProtocolLib, grouped mode still works otherwise: every real
-player row is still sorted and grouped by LuckPerms weight correctly,
-there's just no header line above each block.
 
 ## FastAsyncWorldEdit + DecentHolograms — optional, required together
 
@@ -117,13 +110,12 @@ penalty.
 
 | Plugin | Required? | Powers |
 |---|---|---|
-| FactionsUUID | **Yes** | Claims, roles/permissions, relations, chat/scoreboard/nametags, rallies, native TNT/Warps |
+| FactionsUUID | **Yes** | Claims, roles/permissions, relations, chat/nametags, rallies, native TNT/Warps |
 | Vault | No | Kit money costs, spawner/collector/faction-upgrade economy, faction money bank, `{balance}` |
 | WorldGuard | No | Region-based ability and no-pearl restrictions |
 | LuckPerms | No | Rank display, the Repair ability |
-| PlaceholderAPI | No | `%placeholder%` support in chat/scoreboard templates |
+| PlaceholderAPI | No | `%placeholder%` support in chat templates, and Vertex's own `%vertex_...%` tokens for other plugins |
 | EssentialsX | No | Nickname display everywhere a player's name appears |
-| ProtocolLib | No | Header rows in grouped-mode tab list |
 | FastAsyncWorldEdit | No (paired with DecentHolograms) | Loading/pasting Blueprint `.schem` files |
 | DecentHolograms | No (paired with FastAsyncWorldEdit) | Blueprint build-progress display |
 | Citizens | No | Configurable Ghost Player NPCs for forced disconnects |

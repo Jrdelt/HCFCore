@@ -14,13 +14,13 @@
   Combat, Archer Tags, optional Citizens Ghost Players, pearl restrictions,
   and persistent item cooldowns.
 - **Factions:** rally points, a role-permission GUI, per-faction upgrades,
-  a shared money/XP/TNT bank, faction chat, scoreboards, a configurable
-  tab list, relation-aware nametags, faction KOTHs, and reward Outposts.
+  a shared money/XP/TNT bank, faction chat, relation-aware nametags,
+  faction KOTHs, and reward Outposts.
 - **Automation:** stackable spawners that work in daylight, mob stacking,
   upgradeable Chunk Collectors, and progressive `.schem` Blueprint builds.
 - **Server tools:** cosmetic tags, four languages, vanish/staff tools,
-  inventory inspection, death rollback, scheduled reboots, and tiered,
-  custom-model-data Backpacks.
+  inventory inspection, death rollback, scheduled reboots, tiered
+  custom-model-data Backpacks, and money/experience/item Coinflips.
 
 Feature messages, labels, and lore are configured in the language files.
 See the [documentation index](docs/README.md) for exact behavior,
@@ -36,7 +36,7 @@ configuration, permissions, and operational limits.
 | FastAsyncWorldEdit + DecentHolograms | Blueprint base building |
 | Citizens | optional Ghost Player NPCs for forced disconnects |
 
-WorldGuard, LuckPerms, PlaceholderAPI, EssentialsX, ProtocolLib,
+WorldGuard, LuckPerms, PlaceholderAPI, EssentialsX,
 MySQL/MariaDB is optional. Its exact effects are
 listed in [Integrations](docs/integrations.md).
 
@@ -62,6 +62,10 @@ cd Vertex
 | [Spawners & Collectors](docs/spawners-and-collectors.md) | Spawners, daylight/lava behavior, mob stacks, and collectors |
 | [Blueprints](docs/blueprints.md) | Schematic placement, builds, repairs, cooldowns, and recovery |
 | [Backpacks](docs/backpacks.md) | Hidden auto-storage, drop bonuses, filters, leveling, and custom models |
+| [Player Trading](docs/trading.md) | Secure item, money, and XP trades with escrow and recovery |
+| [Coinflips](docs/coinflips.md) | 50/50 money, experience, and item wagers, self-ban, and staff audit log |
+| [Shop](docs/shop.md) | Categorized, dynamic-price item trading |
+| [Auction House](docs/auctionhouse.md) | Buy-it-now listings for any item, claim stashes, and staff audit log |
 | [KOTH & Outposts](docs/koth-and-outposts.md) | Faction captures, schedules, navigation, holograms, rewards, and Outpost XP boosts |
 | [Commands & permissions](docs/commands-and-permissions.md) | Every command and permission node |
 | [Configuration](docs/configuration.md) | `config.yml` and reload behavior |

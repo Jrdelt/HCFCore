@@ -57,7 +57,8 @@ public final class BackpackManager {
     private volatile double upgradeCostBase;
     private volatile int upgradeCostEasyThroughLevel;
     private volatile double upgradeCostEasyMultiplier;
-    private volatile double upgradeCostPost50Multiplier;
+    private volatile int upgradeCostRampThroughLevel;
+    private volatile double upgradeCostMaxMultiplier;
     private final Map<String, BackpackTier> tiers = new LinkedHashMap<>();
 
     public BackpackManager(Plugin plugin, Messages messages) {
@@ -100,7 +101,9 @@ public final class BackpackManager {
         upgradeCostBase = Math.max(0, config.getDouble("upgrade-cost.base", 500.0));
         upgradeCostEasyThroughLevel = Math.max(1, config.getInt("upgrade-cost.easy-through-level", 50));
         upgradeCostEasyMultiplier = Math.max(1.0, config.getDouble("upgrade-cost.easy-multiplier", 1.10));
-        upgradeCostPost50Multiplier = Math.max(1.0, config.getDouble("upgrade-cost.post-50-multiplier", 2.0));
+        upgradeCostRampThroughLevel = Math.max(upgradeCostEasyThroughLevel,
+                config.getInt("upgrade-cost.ramp-through-level", 150));
+        upgradeCostMaxMultiplier = Math.max(1.0, config.getDouble("upgrade-cost.max-multiplier", 2.0));
 
         tiers.clear();
         ConfigurationSection tiersSection = config.getConfigurationSection("tiers");
@@ -185,7 +188,7 @@ public final class BackpackManager {
     /** No tier-configured level cap: every normal positive level has a next upgrade. */
     public double upgradeCost(BackpackTier tier, int level) {
         return level == Integer.MAX_VALUE ? -1 : BackpackProgression.upgradeCost(level, upgradeCostBase,
-                upgradeCostEasyThroughLevel, upgradeCostEasyMultiplier, upgradeCostPost50Multiplier);
+                upgradeCostEasyThroughLevel, upgradeCostEasyMultiplier, upgradeCostRampThroughLevel, upgradeCostMaxMultiplier);
     }
 
     public double dropBonusPercent(BackpackTier tier, int level) {
@@ -236,6 +239,27 @@ public final class BackpackManager {
         BackpackData data = readData(item);
         BackpackTier tier = data == null ? null : getTier(data.tierId());
         return tier == null ? null : new EquippedBackpack(item, tier, data);
+    }
+
+    /**
+     * Convenience trio for callers outside this package (the PlaceholderAPI
+     * expansion) that only need primitives/strings back -- {@link
+     * BackpackTier} and {@link BackpackData} are deliberately package-private,
+     * so an {@link EquippedBackpack} can only be inspected from in here.
+     */
+    public String equippedTierDisplayName(org.bukkit.entity.Player player) {
+        EquippedBackpack equipped = equippedBackpack(player);
+        return equipped == null ? null : displayName(equipped.tier());
+    }
+
+    public long equippedStoredCount(org.bukkit.entity.Player player) {
+        EquippedBackpack equipped = equippedBackpack(player);
+        return equipped == null ? -1 : storedItemCount(equipped.data().contents());
+    }
+
+    public long equippedCapacity(org.bukkit.entity.Player player) {
+        EquippedBackpack equipped = equippedBackpack(player);
+        return equipped == null ? -1 : itemCapacityForLevel(equipped.data().level());
     }
 
     /**

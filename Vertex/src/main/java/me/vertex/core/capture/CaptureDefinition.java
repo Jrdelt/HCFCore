@@ -19,9 +19,6 @@ final class CaptureDefinition {
     private final int maxX;
     private final int maxY;
     private final int maxZ;
-    private final double hologramX;
-    private final double hologramY;
-    private final double hologramZ;
     private final int captureSeconds;
     private final int maxDurationSeconds;
     private final double additionalMemberSpeed;
@@ -33,7 +30,7 @@ final class CaptureDefinition {
 
     private CaptureDefinition(String id, CaptureEventType type, String displayName, String worldName,
             int minX, int minY, int minZ, int maxX, int maxY, int maxZ,
-            double hologramX, double hologramY, double hologramZ, int captureSeconds, int maxDurationSeconds,
+            int captureSeconds, int maxDurationSeconds,
             double additionalMemberSpeed, boolean abilitiesDisabled, List<String> scheduleTimes, List<String> rewardCommands,
             double outpostXpMultiplier, long outpostXpDurationSeconds) {
         this.id = id;
@@ -46,9 +43,6 @@ final class CaptureDefinition {
         this.maxX = maxX;
         this.maxY = maxY;
         this.maxZ = maxZ;
-        this.hologramX = hologramX;
-        this.hologramY = hologramY;
-        this.hologramZ = hologramZ;
         this.captureSeconds = captureSeconds;
         this.maxDurationSeconds = maxDurationSeconds;
         this.additionalMemberSpeed = additionalMemberSpeed;
@@ -77,13 +71,9 @@ final class CaptureDefinition {
         int maxX = Math.max(minimum.getInt("x"), maximum.getInt("x"));
         int maxY = Math.max(minimum.getInt("y"), maximum.getInt("y"));
         int maxZ = Math.max(minimum.getInt("z"), maximum.getInt("z"));
-        ConfigurationSection hologram = section.getConfigurationSection("hologram");
-        double hologramX = hologram == null ? (minX + maxX + 1D) / 2D : hologram.getDouble("x");
-        double hologramY = hologram == null ? minY + 2D : hologram.getDouble("y");
-        double hologramZ = hologram == null ? (minZ + maxZ + 1D) / 2D : hologram.getDouble("z");
         ConfigurationSection outpostBooster = section.getConfigurationSection("rewards.xp-booster");
         return new CaptureDefinition(id, type, section.getString("display-name", id), worldName,
-                minX, minY, minZ, maxX, maxY, maxZ, hologramX, hologramY, hologramZ,
+                minX, minY, minZ, maxX, maxY, maxZ,
                 Math.max(1, section.getInt("capture-seconds", defaultCaptureSeconds)),
                 Math.max(1, section.getInt("max-duration-seconds", defaultMaxDurationSeconds)),
                 Math.max(0D, section.getDouble("additional-member-speed", defaultAdditionalMemberSpeed)),
@@ -113,9 +103,17 @@ final class CaptureDefinition {
                 (minZ + maxZ + 1D) / 2D);
     }
 
+    /**
+     * Always centered over X/Z and 3.5 blocks above the zone's lowest
+     * block -- derived live from the zone bounds rather than a value
+     * frozen in config at selection time, so changing this formula (or
+     * the bounds themselves, via {@code /koth|outpost wand}) fixes every
+     * existing zone immediately rather than only new ones.
+     */
     Location hologramLocation() {
         World world = Bukkit.getWorld(worldName);
-        return world == null ? null : new Location(world, hologramX, hologramY, hologramZ);
+        return world == null ? null : new Location(world, (minX + maxX + 1D) / 2D, minY + 3.5D,
+                (minZ + maxZ + 1D) / 2D);
     }
 
     boolean contains(Location location) {

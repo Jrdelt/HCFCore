@@ -82,10 +82,6 @@
       <url>https://repo.codemc.io/repository/maven-public/</url>
     </repository>
     <repository>
-      <id>dmulloy2-repo</id>
-      <url>https://repo.dmulloy2.net/repository/public/</url>
-    </repository>
-    <repository>
       <id>citizens-repo</id>
       <url>https://maven.citizensnpcs.co/repo</url>
     </repository>
@@ -170,12 +166,6 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>com.comphenix.protocol</groupId>
-      <artifactId>ProtocolLib</artifactId>
-      <version>5.4.0-SNAPSHOT</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <version>5.11.3</version>
@@ -208,6 +198,10 @@
         <exclusion>
           <artifactId>adventure-platform-bungeecord</artifactId>
           <groupId>net.kyori</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>byte-buddy</artifactId>
+          <groupId>net.bytebuddy</groupId>
         </exclusion>
         <exclusion>
           <artifactId>junit-jupiter-api</artifactId>

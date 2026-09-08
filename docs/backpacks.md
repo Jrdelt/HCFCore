@@ -25,7 +25,7 @@ drop-bonus stat.
 
 ## The GUI
 
-The GUI is always four rows and contains only the Backpack display,
+The GUI is always three rows and contains only the Backpack display,
 **Empty Backpack**, and **Upgrade Backpack** controls. Stored items are
 never displayed or manually moved into the Backpack. Storage lives entirely
 on the item itself (in its PersistentDataContainer, alongside its
@@ -46,11 +46,14 @@ matches what it currently holds.
   anything that does not fit at your feet. Use it again only after it receives
   more items.
 - **Upgrade Backpack** spends Vault money and reopens the GUI. The default
-  `upgrade-cost` curve starts at `$500`, grows by `1.10` through level 50,
-  then doubles per level afterward. Contents carry over untouched -- there's
-  nothing to resize, since capacity is a count, not a slot array. There is
-  no configured Backpack level cap; upgrades stop only when the player
-  chooses not to buy another one.
+  `upgrade-cost` curve starts at `$500` and grows by `1.10` per level
+  through level 50; from there the per-level multiplier ramps up
+  gradually (not a sudden jump) until it caps at `2.0` (double) once the
+  Backpack reaches level 150, and stays at that cap for every level
+  after. Contents carry over untouched -- there's nothing to resize,
+  since capacity is a count, not a slot array. There is no configured
+  Backpack level cap; upgrades stop only when the player chooses not to
+  buy another one.
 
 ## Automatic collection and filters
 
@@ -58,9 +61,11 @@ With a valid single Backpack in the offhand, normal drops from blocks listed
 under `auto-store.mining-materials` are routed into it. The block's ordinary
 Fortune/Silk Touch calculation happens first; Vertex then applies the
 Backpack tier/level bonus to those resulting drops. The bundled tiers all
-start at a guaranteed **+100%** bonus, so every eligible drop is at least
-doubled; higher tier/level settings can add more. This means enchantment and
-Backpack bonuses stack without replacing each other.
+start at a guaranteed **+25%** bonus at level 1, compounding higher every
+level from there (see [Leveling and the drop-bonus stat](#leveling-and-the-drop-bonus-stat)
+below) -- so a fresh Backpack gives a modest boost, and a heavily upgraded
+one gives dramatically more. This means enchantment and Backpack bonuses
+stack without replacing each other.
 
 Player-killed, non-player mob drops are handled the same way when
 `auto-store.mob-drops` is enabled. A nearby Chunk Collector still receives
@@ -106,9 +111,14 @@ Nothing already earned is ever silently deleted.
 
 ## Leveling and the drop-bonus stat
 
-Every tier's drop bonus grows with level
-(`drop-bonus-base-percent` + `drop-bonus-per-level-percent` ×
-`(level - 1)`).
+Every tier's drop bonus **compounds** with level, like interest, rather
+than adding a flat amount each time:
+`drop-bonus-base-percent × (1 + drop-bonus-per-level-percent / 100) ^ (level - 1)`.
+A level 1 Backpack only has its base bonus; by dozens of levels in, the
+compounding has pulled it dramatically ahead of a fresh one, rewarding
+real investment instead of the bonus only creeping up by a fixed amount
+each time. Higher tiers compound faster (a larger
+`drop-bonus-per-level-percent`), keeping their advantage at every level.
 It applies to every item routed by automatic ore mining or player-killed
 mob collection. Upgrades are purchased with Vault money; Backpacks never
 store or award experience.
@@ -122,11 +132,13 @@ store or award experience.
 | `auto-store.mining-materials` | Block materials whose normal drops are automatically routed to an equipped Backpack |
 | `auto-store.mob-drops` | Whether player-killed non-player mob drops are automatically routed |
 | `upgrade-cost.base` | Cost to upgrade from level 1 to level 2 (default `500`) |
-| `upgrade-cost.easy-through-level` / `easy-multiplier` | Affordable curve through level 50 (default `1.10`) |
-| `upgrade-cost.post-50-multiplier` | Multiplier for every level after 50 (default `2.0`) |
+| `upgrade-cost.easy-through-level` / `easy-multiplier` | Affordable flat curve through this level (default `50` levels at `1.10`) |
+| `upgrade-cost.ramp-through-level` | The level by which the per-level multiplier has gradually climbed to and capped at `max-multiplier` (default `150`) |
+| `upgrade-cost.max-multiplier` | The per-level multiplier cap the ramp climbs to (default `2.0`, i.e. double) |
 | `tiers.<id>.display-name` | The item's name, shown in-game |
 | `tiers.<id>.item-type` | Bukkit material to use (for example `LEATHER`) |
 | `tiers.<id>.custom-model-data` | Positive resource-pack model number; `0` uses the vanilla item model |
-| `tiers.<id>.drop-bonus-base-percent` / `drop-bonus-per-level-percent` | Automatic-collection bonus at level 1 and extra percentage per level; it applies after normal mining-drop calculations |
+| `tiers.<id>.drop-bonus-base-percent` | Automatic-collection bonus at level 1 |
+| `tiers.<id>.drop-bonus-per-level-percent` | The percentage the bonus *compounds* by every level after that (not a flat add-on) -- it applies after normal mining-drop calculations |
 
 After changing this file, run `/vertex reload` or restart the server.

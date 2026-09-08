@@ -47,7 +47,6 @@ import me.vertex.core.pvp.LegacyCombatManager;
 import me.vertex.core.reboot.NextRebootCommand;
 import me.vertex.core.reboot.RebootCommand;
 import me.vertex.core.reboot.RebootManager;
-import me.vertex.core.scoreboard.ScoreboardManager;
 import me.vertex.core.faction.RallyCommand;
 import me.vertex.core.faction.RallyManager;
 import me.vertex.core.faction.FactionUpgradeManager;
@@ -108,9 +107,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private LanguageCommand languageCommand;
     private KitManager kitManager;
     private AbilityManager abilityManager;
-    private ScoreboardManager scoreboardManager;
-    private me.vertex.core.tablist.TablistManager tablistManager;
     private CombatManager combatManager;
+    private me.vertex.core.cannon.CannonManager cannonManager;
     private LegacyCombatManager legacyCombatManager;
     private me.vertex.core.spawner.SpawnerStorage spawnerStorage;
     private me.vertex.core.spawner.SpawnerManager spawnerManager;
@@ -145,6 +143,19 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private NametagManager nametagManager;
     private StaffManager staffManager;
     private me.vertex.core.backpack.BackpackManager backpackManager;
+    private me.vertex.core.coinflip.CoinflipStorage coinflipStorage;
+    private me.vertex.core.coinflip.CoinflipManager coinflipManager;
+    private org.bukkit.scheduler.BukkitTask coinflipGuiRefreshTask;
+    private me.vertex.core.shop.ShopStorage shopStorage;
+    private me.vertex.core.shop.ShopManager shopManager;
+    private me.vertex.core.sandbot.SandBotManager sandBotManager;
+    private me.vertex.core.placeholderapi.VertexPlaceholderExpansion placeholderExpansion;
+    private org.bukkit.scheduler.BukkitTask shopDecayTask;
+    private me.vertex.core.auction.AuctionStorage auctionStorage;
+    private me.vertex.core.auction.AuctionManager auctionManager;
+    private org.bukkit.scheduler.BukkitTask auctionSweepTask;
+    private me.vertex.core.trade.TradeStorage tradeStorage;
+    private me.vertex.core.trade.TradeManager tradeManager;
     private GhostPlayerManager ghostPlayerManager;
 
     @Override
@@ -186,6 +197,14 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             factionUpgradeStorage.init();
             factionBankStorage = new me.vertex.core.faction.FactionBankStorage(database);
             factionBankStorage.init();
+            coinflipStorage = new me.vertex.core.coinflip.CoinflipStorage(database);
+            coinflipStorage.init();
+            shopStorage = new me.vertex.core.shop.ShopStorage(database);
+            shopStorage.init();
+            auctionStorage = new me.vertex.core.auction.AuctionStorage(database);
+            auctionStorage.init();
+            tradeStorage = new me.vertex.core.trade.TradeStorage(database);
+            tradeStorage.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize the database, disabling.", e);
             Bukkit.getPluginManager().disablePlugin(this);
@@ -207,12 +226,6 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         archerTagManager = new ArcherTagManager();
         tagManager = new TagManager(this);
         tagManager.load();
-
-        scoreboardManager = new ScoreboardManager(this, getConfig(), userManager, abilityManager);
-        scoreboardManager.start();
-
-        tablistManager = new me.vertex.core.tablist.TablistManager(this, getConfig());
-        tablistManager.start();
 
         combatManager = new CombatManager(
                 this,
@@ -263,13 +276,13 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         nametagManager = new NametagManager(this);
         Bukkit.getPluginManager().registerEvents(new NametagListener(nametagManager), this);
 
+        cannonManager = loadCannonManager();
+        cannonManager.start();
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.cannon.CannonListener(cannonManager), this);
+        getCommand("cannon").setExecutor(new me.vertex.core.cannon.CannonCommand(this, cannonManager, messages));
+
         staffManager = new StaffManager(this);
-        if (scoreboardManager != null) {
-            scoreboardManager.setStaffManager(staffManager);
-        }
-        if (tablistManager != null) {
-            tablistManager.setStaffManager(staffManager);
-        }
+
         captureEventManager = new CaptureEventManager(this, messages, rallyManager, staffManager);
         captureEventManager.load();
         captureEventManager.start();
@@ -363,6 +376,83 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         getCommand("filter").setExecutor(backpackFilterCommand);
         getCommand("filter").setTabCompleter(backpackFilterCommand);
 
+        coinflipManager = new me.vertex.core.coinflip.CoinflipManager(this, coinflipStorage, messages, combatManager);
+        coinflipManager.load();
+        coinflipManager.loadState();
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.coinflip.CoinflipMenuListener(coinflipManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.coinflip.CoinflipWagerMenuListener(coinflipManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.coinflip.CoinflipJoinListener(coinflipManager), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.coinflip.CoinflipAnimationMenuListener(), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.coinflip.CoinflipMatchReviewMenuListener(coinflipManager, messages), this);
+        me.vertex.core.coinflip.CoinflipCommand coinflipCommand =
+                new me.vertex.core.coinflip.CoinflipCommand(coinflipManager, messages);
+        getCommand("cf").setExecutor(coinflipCommand);
+        getCommand("cf").setTabCompleter(coinflipCommand);
+        // Bukkit cancels this along with every other of this plugin's tasks on disable --
+        // no explicit cancel()/reschedule needed, same as every other fixed-cadence task here.
+        Bukkit.getScheduler().runTaskTimer(this, () -> {
+            coinflipManager.sweepExpiredItemMatches();
+            coinflipManager.pruneLog();
+        }, 600L, 600L);
+        coinflipGuiRefreshTask = Bukkit.getScheduler().runTaskTimer(this, this::refreshOpenCoinflipBrowsers,
+                coinflipManager.guiRefreshIntervalTicks(), coinflipManager.guiRefreshIntervalTicks());
+
+        shopManager = new me.vertex.core.shop.ShopManager(this, shopStorage);
+        shopManager.load();
+        shopManager.loadState();
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.shop.ShopMenuListener(shopManager, messages), this);
+        me.vertex.core.shop.ShopCommand shopCommand = new me.vertex.core.shop.ShopCommand(shopManager, messages);
+        getCommand("shop").setExecutor(shopCommand);
+        getCommand("shop").setTabCompleter(shopCommand);
+        shopDecayTask = Bukkit.getScheduler().runTaskTimer(this, shopManager::decayTick,
+                shopManager.decayIntervalTicks(), shopManager.decayIntervalTicks());
+
+        sandBotManager = loadSandBotManager();
+        sandBotManager.start();
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.sandbot.SandBotListener(sandBotManager, messages), this);
+        me.vertex.core.sandbot.SandBotCommand sandBotCommand =
+                new me.vertex.core.sandbot.SandBotCommand(sandBotManager, messages);
+        getCommand("sandbot").setExecutor(sandBotCommand);
+        getCommand("sandbot").setTabCompleter(sandBotCommand);
+
+        auctionManager = new me.vertex.core.auction.AuctionManager(this, auctionStorage);
+        auctionManager.load();
+        auctionManager.loadState();
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.auction.AuctionMenuListener(auctionManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.auction.AuctionHubMenuListener(auctionManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.auction.AuctionHistoryMenuListener(auctionManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.auction.AuctionJoinListener(auctionManager), this);
+        me.vertex.core.auction.AuctionCommand auctionCommand =
+                new me.vertex.core.auction.AuctionCommand(auctionManager, messages);
+        getCommand("ah").setExecutor(auctionCommand);
+        getCommand("ah").setTabCompleter(auctionCommand);
+        auctionSweepTask = Bukkit.getScheduler().runTaskTimer(this, auctionManager::sweepExpired,
+                auctionManager.sweepIntervalTicks(), auctionManager.sweepIntervalTicks());
+
+        tradeManager = new me.vertex.core.trade.TradeManager(this, tradeStorage, messages);
+        tradeManager.load();
+        tradeManager.restoreEscrow();
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.trade.TradeListener(this, tradeManager, messages), this);
+        me.vertex.core.trade.TradeCommand tradeCommand = new me.vertex.core.trade.TradeCommand(tradeManager, messages);
+        getCommand("trade").setExecutor(tradeCommand);
+        getCommand("trade").setTabCompleter(tradeCommand);
+        getCommand("tradetoggle").setExecutor(new me.vertex.core.trade.TradeToggleCommand(tradeManager, messages));
+        getCommand("tradeadmin").setExecutor(new me.vertex.core.trade.TradeAdminCommand(tradeManager, messages));
+        me.vertex.core.trade.TradeHistoryCommand tradeHistoryCommand = new me.vertex.core.trade.TradeHistoryCommand(tradeManager, messages);
+        getCommand("tradehistory").setExecutor(tradeHistoryCommand);
+        getCommand("tradehistory").setTabCompleter(tradeHistoryCommand);
+        getCommand("tradelogs").setExecutor(tradeHistoryCommand);
+        getCommand("tradelogs").setTabCompleter(tradeHistoryCommand);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.trade.TradeHistoryListener(tradeManager, messages), this);
+        Bukkit.getScheduler().runTaskTimer(this, tradeManager::sweep, 20L, 20L);
+
         initializeBlueprintFeature();
         initializeGhostPlayerFeature();
 
@@ -370,7 +460,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(combatListener, this);
         lootProtectionListener = new me.vertex.core.pvp.LootProtectionListener(this, messages);
         Bukkit.getPluginManager().registerEvents(lootProtectionListener, this);
-        playerConnectionListener = new PlayerConnectionListener(userManager, scoreboardManager, tablistManager, combatManager);
+        playerConnectionListener = new PlayerConnectionListener(userManager, combatManager);
         playerConnectionListener.setGhostPlayerManager(ghostPlayerManager);
         Bukkit.getPluginManager().registerEvents(playerConnectionListener, this);
         Bukkit.getPluginManager().registerEvents(new AbilityMenuListener(this, abilityManager, messages), this);
@@ -387,13 +477,15 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(new LeapListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new PortableBardListener(this, abilityManager, userManager, messages), this);
-        repairListener = new RepairListener(this, abilityManager, userManager, scoreboardManager, messages);
+        repairListener = new RepairListener(this, abilityManager, userManager, messages);
         Bukkit.getPluginManager().registerEvents(repairListener, this);
         Bukkit.getPluginManager().registerEvents(
                 new SwitcherSnowballListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new TimeWarpPearlListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new NoPearlSpawnListener(this, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.pvp.CombatSafezoneListener(this, combatManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new PearlVelocityListener(this), this);
         hungerManagementListener = new HungerManagementListener(this);
         Bukkit.getPluginManager().registerEvents(hungerManagementListener, this);
@@ -419,7 +511,9 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         getCommand("kits").setExecutor(new KitsCommand(this, kitManager, userManager, messages));
         Bukkit.getPluginManager().registerEvents(new KitMenuListener(this, kitManager, messages), this);
 
-        getCommand("vertex").setExecutor(new VertexCommand(this, messages));
+        VertexCommand vertexCommand = new VertexCommand(this, messages);
+        getCommand("vertex").setExecutor(vertexCommand);
+        getCommand("vertex").setTabCompleter(vertexCommand);
 
         languageCommand = new LanguageCommand(this, storage, userManager, messages);
         getCommand("language").setExecutor(languageCommand);
@@ -456,6 +550,16 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             var uuid = player.getUniqueId();
             Bukkit.getScheduler().runTaskAsynchronously(this, () -> userManager.load(uuid));
         }
+
+        // Registered last, once every manager it can reference is
+        // definitely constructed.
+        if (me.vertex.core.placeholderapi.PlaceholderApiHook.isAvailable()) {
+            placeholderExpansion = new me.vertex.core.placeholderapi.VertexPlaceholderExpansion(this, userManager,
+                    kitManager, abilityManager, combatManager, factionBankManager, staffManager, rebootManager,
+                    backpackManager, tagManager, blueprintManager, coinflipManager, auctionManager, tradeManager,
+                    rallyManager, factionUpgradeManager, cannonManager, sandBotManager);
+            placeholderExpansion.register();
+        }
     }
 
     /**
@@ -481,13 +585,92 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         }
     }
 
+    /** Re-renders the Active Coinflips browser in place for every online player who currently has it open. */
+    private void refreshOpenCoinflipBrowsers() {
+        for (org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
+            me.vertex.core.coinflip.CoinflipMenu.refreshOpenBrowse(player, coinflipManager, messages);
+        }
+    }
+
+    private me.vertex.core.cannon.CannonManager loadCannonManager() {
+        java.util.Set<String> disabledRegions =
+                java.util.Set.copyOf(getConfig().getStringList("cannon.disabled-regions"));
+        java.util.Set<String> disabledClaimNames =
+                java.util.Set.copyOf(getConfig().getStringList("cannon.disabled-claim-names"));
+        return new me.vertex.core.cannon.CannonManager(this,
+                getConfig().getBoolean("cannon.enabled", true),
+                getConfig().getInt("cannon.max-ignitions-per-tick", 12),
+                getConfig().getInt("cannon.max-simultaneous-per-location", 4),
+                getConfig().getDouble("cannon.max-y-velocity", 3.6),
+                getConfig().getDouble("cannon.height-band.lower", 256),
+                getConfig().getDouble("cannon.height-band.upper", 320),
+                getConfig().getDouble("cannon.height-band.velocity-multiplier", 0.6),
+                getConfig().getDouble("cannon.velocity-scan-radius-blocks", 8),
+                getConfig().getInt("cannon.launch-window-ticks", 20),
+                getConfig().getBoolean("cannon.damage-control.protect-launch-structure", true),
+                getConfig().getBoolean("cannon.damage-control.suppress-fire-spread", true),
+                disabledRegions, disabledClaimNames);
+    }
+
+    /** Applies the current cannon.* config values to the running manager, in place. */
+    private void applyCannonConfig() {
+        if (cannonManager == null) {
+            return;
+        }
+        java.util.Set<String> disabledRegions =
+                java.util.Set.copyOf(getConfig().getStringList("cannon.disabled-regions"));
+        java.util.Set<String> disabledClaimNames =
+                java.util.Set.copyOf(getConfig().getStringList("cannon.disabled-claim-names"));
+        cannonManager.reconfigure(
+                getConfig().getBoolean("cannon.enabled", true),
+                getConfig().getInt("cannon.max-ignitions-per-tick", 12),
+                getConfig().getInt("cannon.max-simultaneous-per-location", 4),
+                getConfig().getDouble("cannon.max-y-velocity", 3.6),
+                getConfig().getDouble("cannon.height-band.lower", 256),
+                getConfig().getDouble("cannon.height-band.upper", 320),
+                getConfig().getDouble("cannon.height-band.velocity-multiplier", 0.6),
+                getConfig().getDouble("cannon.velocity-scan-radius-blocks", 8),
+                getConfig().getInt("cannon.launch-window-ticks", 20),
+                getConfig().getBoolean("cannon.damage-control.protect-launch-structure", true),
+                getConfig().getBoolean("cannon.damage-control.suppress-fire-spread", true),
+                disabledRegions, disabledClaimNames);
+    }
+
+    /** Reloads config.yml and applies cannon.* in place -- called by /cannon reload. */
+    public void reloadCannonModule() {
+        reloadConfig();
+        applyCannonConfig();
+    }
+
+    private me.vertex.core.sandbot.SandBotManager loadSandBotManager() {
+        return new me.vertex.core.sandbot.SandBotManager(this, factionBankManager, shopManager, messages,
+                getConfig().getBoolean("sandbot.enabled", true),
+                getConfig().getInt("sandbot.radius-blocks", 2),
+                getConfig().getLong("sandbot.tick-interval-ticks", 10L),
+                org.bukkit.entity.EntityType.PLAYER);
+    }
+
+    private void applySandBotConfig() {
+        if (sandBotManager == null) {
+            return;
+        }
+        sandBotManager.reconfigure(
+                getConfig().getBoolean("sandbot.enabled", true),
+                getConfig().getInt("sandbot.radius-blocks", 2),
+                getConfig().getLong("sandbot.tick-interval-ticks", 10L),
+                org.bukkit.entity.EntityType.PLAYER);
+    }
+
     @Override
     public void onDisable() {
-        if (scoreboardManager != null) {
-            scoreboardManager.stop();
+        if (placeholderExpansion != null) {
+            placeholderExpansion.unregister();
         }
-        if (tablistManager != null) {
-            tablistManager.stop();
+        if (sandBotManager != null) {
+            sandBotManager.stop();
+        }
+        if (cannonManager != null) {
+            cannonManager.stop();
         }
         if (combatManager != null) {
             combatManager.stop();
@@ -534,6 +717,18 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         }
         if (factionBankManager != null) {
             factionBankManager.awaitWrites();
+        }
+        if (coinflipManager != null) {
+            coinflipManager.awaitWrites();
+        }
+        if (shopManager != null) {
+            shopManager.awaitWrites();
+        }
+        if (auctionManager != null) {
+            auctionManager.awaitWrites();
+        }
+        if (tradeManager != null) {
+            tradeManager.shutdown();
         }
         if (nametagManager != null) {
             nametagManager.shutdown();
@@ -639,7 +834,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             return false;
         }
 
-        List<String> optionalDependencies = List.of("Vault", "WorldGuard", "LuckPerms", "ProtocolLib",
+        List<String> optionalDependencies = List.of("Vault", "WorldGuard", "LuckPerms",
                 "FastAsyncWorldEdit", "DecentHolograms", "Citizens");
         for (String dependency : optionalDependencies) {
             Plugin present = Bukkit.getPluginManager().getPlugin(dependency);
@@ -661,6 +856,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         if (itemRestrictionListener != null) {
             itemRestrictionListener.reload();
         }
+        applyCannonConfig();
+        applySandBotConfig();
         if (abilityManager != null) {
             abilityManager.load();
         }
@@ -687,6 +884,36 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         if (backpackManager != null) {
             backpackManager.load();
         }
+        if (coinflipManager != null) {
+            long previousGuiRefreshInterval = coinflipManager.guiRefreshIntervalTicks();
+            coinflipManager.load();
+            if (coinflipGuiRefreshTask != null && previousGuiRefreshInterval != coinflipManager.guiRefreshIntervalTicks()) {
+                coinflipGuiRefreshTask.cancel();
+                coinflipGuiRefreshTask = Bukkit.getScheduler().runTaskTimer(this, this::refreshOpenCoinflipBrowsers,
+                        coinflipManager.guiRefreshIntervalTicks(), coinflipManager.guiRefreshIntervalTicks());
+            }
+        }
+        if (shopManager != null) {
+            long previousInterval = shopManager.decayIntervalTicks();
+            shopManager.load();
+            if (shopDecayTask != null && previousInterval != shopManager.decayIntervalTicks()) {
+                shopDecayTask.cancel();
+                shopDecayTask = Bukkit.getScheduler().runTaskTimer(this, shopManager::decayTick,
+                        shopManager.decayIntervalTicks(), shopManager.decayIntervalTicks());
+            }
+        }
+        if (auctionManager != null) {
+            long previousSweepInterval = auctionManager.sweepIntervalTicks();
+            auctionManager.load();
+            if (auctionSweepTask != null && previousSweepInterval != auctionManager.sweepIntervalTicks()) {
+                auctionSweepTask.cancel();
+                auctionSweepTask = Bukkit.getScheduler().runTaskTimer(this, auctionManager::sweepExpired,
+                        auctionManager.sweepIntervalTicks(), auctionManager.sweepIntervalTicks());
+            }
+        }
+        if (tradeManager != null) {
+            tradeManager.load();
+        }
         if (kitManager != null) {
             kitManager.load();
         }
@@ -695,46 +922,6 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         }
         if (nametagManager != null) {
             nametagManager.reload();
-        }
-
-        if (scoreboardManager != null) {
-            scoreboardManager.stop();
-            scoreboardManager = null;
-        }
-        if (userManager != null && abilityManager != null) {
-            scoreboardManager = new ScoreboardManager(this, getConfig(), userManager, abilityManager);
-            scoreboardManager.setStaffManager(staffManager);
-            scoreboardManager.start();
-        }
-
-        if (tablistManager != null) {
-            tablistManager.stop();
-            tablistManager = null;
-        }
-        tablistManager = new me.vertex.core.tablist.TablistManager(this, getConfig());
-        tablistManager.setStaffManager(staffManager);
-        tablistManager.start();
-        for (var player : Bukkit.getOnlinePlayers()) {
-            tablistManager.renderNow(player);
-        }
-
-        if (playerConnectionListener != null) {
-            playerConnectionListener.setScoreboardManager(scoreboardManager);
-            playerConnectionListener.setTablistManager(tablistManager);
-        }
-        if (repairListener != null) {
-            repairListener.setScoreboardManager(scoreboardManager);
-        }
-        if (scoreboardManager != null) {
-            for (var player : Bukkit.getOnlinePlayers()) {
-                scoreboardManager.setup(player);
-                // setup() just replaced this player's scoreboard object
-                // with a blank one -- nametag teams lived on the old one,
-                // so it needs every online player's nametag re-applied.
-                if (nametagManager != null) {
-                    nametagManager.applyAllNametagsTo(player);
-                }
-            }
         }
 
         if (combatManager != null) {
@@ -812,6 +999,10 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         if (blueprintManager != null) blueprintManager.awaitWrites();
         if (factionUpgradeManager != null) factionUpgradeManager.awaitWrites();
         if (factionBankManager != null) factionBankManager.awaitWrites();
+        if (coinflipManager != null) coinflipManager.awaitWrites();
+        if (shopManager != null) shopManager.awaitWrites();
+        if (auctionManager != null) auctionManager.awaitWrites();
+        if (tradeManager != null) tradeManager.awaitWrites();
     }
 
     public void finishStorageMigration() {

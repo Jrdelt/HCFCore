@@ -184,8 +184,7 @@ is required for this release.
 `/vertex reload` (permission `vertex.admin`) reloads `config.yml`,
 `kits.yml`, `abilities.yml`, `tags.yml`, `spawners.yml`, `collectors.yml`,
 `blueprints.yml` (when Blueprints are enabled), and every `lang/*.yml` file
-live. It reapplies current spawner tuning and faction upgrade definitions,
-then rebuilds the scoreboard for every online player.
+live. It reapplies current spawner tuning and faction upgrade definitions.
 
 For anything that isn't a config/content change (a plugin update, a JVM
 flag change, a dependency being added/removed), perform a full server

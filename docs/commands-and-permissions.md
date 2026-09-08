@@ -33,6 +33,7 @@ permission is checked — anyone can run it.
 | `/uncombat <player>` | `vertex.combat.uncombat` | Clears a combat tag early. |
 | `/combatcheck <player>` | `vertex.combat.check` | Reports tag status, time left, opponent, health, ping. |
 | `/combattag <player> [opponent\|server]` | `vertex.combat.tag` | Testing tool — see [PvP & Combat](pvp-and-combat.md). |
+| — | `vertex.combat.safezone.bypass` | Not a command — lets staff move into a protected zone while combat-tagged, where every other player is blocked. See [PvP & Combat](pvp-and-combat.md#combat-locks-you-out-of-safezone-entirely). |
 
 ## Spawners & Chunk Collectors
 
@@ -56,6 +57,50 @@ permission is checked — anyone can run it.
 | `/backpack debug` | `vertex.backpack.debug` | Toggles personal Backpack interaction diagnostics. It prints the received action, hand, cancellation state, and reject/open reason to chat and console; run it again to turn tracing off. |
 | `/filter <material>` / `/filter clear` | — | Toggles or clears persistent Backpack auto-collection filters. Filters discard matching routed drops only while a Backpack is equipped. |
 
+## Player trading
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/trade <player>` / `/trade accept <player>` / `/trade cancel` | `vertex.trade.use` | Creates, accepts, or cancels a secured direct trade. |
+| `/tradetoggle` | `vertex.trade.use` | Persists an incoming-request opt-out. |
+| `/tradeadmin reload` | `vertex.trade.staff.reload` | Reloads and validates `traders.yml`. |
+| `/tradehistory [player]` / `/tradelogs [all\|player]` | `vertex.trade.staff.history` | Opens the read-only, paginated trade audit history. |
+
+`vertex.trade.staff.bypassdistance` and `vertex.trade.staff.bypassblacklist`
+are available for staff testing. See [Player Trading](trading.md).
+
+## Coinflips
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/cf` (alias `/coinflip`) | — | Opens the Active Coinflips browser. |
+| `/cf <amount> [money] [player]` | — | Hosts a money coinflip, optionally targeted at one player. "money" is an optional explicit keyword. |
+| `/cf <amount> exp [player]` | — | Hosts an experience-level coinflip. |
+| `/cf hand [player]` | — | Opens the item wager picker GUI. |
+| `/cf review <id>` | Open to the coinflip's host only | Opens the match-review GUI: the host's wager above, the proposed items below, Accept/Deny buttons — see [Item wager approval](coinflips.md#item-wager-approval). |
+| `/cf approve <id>` / `/cf deny <id>` | Open to the coinflip's host only | Accepts or rejects a pending item-wager match straight from chat, without opening the review GUI. |
+| `/cf ban` / `/cf ban confirm` / `/cf unban` | — | Self-exclusion — see [Coinflips](coinflips.md#self-ban). Confirmation is required within 30 seconds; the ban itself cannot be lifted early. |
+| `/cf cancel <id>` | `vertex.coinflip.remove` for someone else's; open to the host for their own | Cancels an unplayed coinflip and refunds its wager. |
+| `/cf logs [player] [page]` | `vertex.coinflip.logs` | Reads the permanent staff audit log. |
+
+## Shop
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/shop` | — | Opens the category picker — see [Shop](shop.md#categories-shopyml). |
+| `/shop buy <item> [amount]` | — | Buys at the current dynamic price, regardless of category. |
+| `/shop sell <item> [amount]` | — | Sells at the current dynamic price, regardless of category. |
+
+## Auction House
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/ah` (alias `/auctionhouse`) | — | Opens the browse GUI. |
+| `/ah sell <price> [money\|exp]` | — | Lists the item in your main hand at a fixed buy-it-now price, in money (default) or experience levels. |
+| `/ah cancel <id>` | `vertex.auction.remove` for someone else's; open to the seller for their own | Cancels an unsold listing and returns the item. |
+| `/ah collect` | — | Opens the claim GUI for items waiting on you (sold, expired, or cancelled while you couldn't receive them directly). |
+| `/ah logs [player] [page]` | `vertex.auction.logs` | Reads the permanent staff audit log. |
+
 ## Factions & Rally
 
 | Command | Permission | Notes |
@@ -76,6 +121,16 @@ permission is checked — anyone can run it.
 
 See [KOTH & Outposts](koth-and-outposts.md) for capture rules, schedules,
 rewards, and the `capture-events.yml` reference.
+
+## TNT Cannons & Sand Bots
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/cannon reload` | `vertex.cannon.admin` | Reloads `cannon.*` config in place. |
+| `/cannon toggle` | `vertex.cannon.admin` | Global on/off switch, without a config edit + reload. |
+| `/sandbot give <player>` | `vertex.sandbot.give` | Gives a Sand Bot item. |
+| `/sandbot stop` | Open to all | Stops your own active Sand Bot(s). |
+| `/sandbot stop <player>` | `vertex.sandbot.admin` | Stops another player's active Sand Bot(s). |
 
 ## Reboot
 

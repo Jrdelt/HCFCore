@@ -26,7 +26,6 @@ All code lives under `me.vertex.core`, one package per feature area:
 | `placeholderapi` | PlaceholderAPI expansion hook |
 | `pvp` | Combat tag, Legacy Combat, Archer Tag, vanilla item cooldowns |
 | `reboot` | Scheduled shutdown |
-| `scoreboard` | Sidebar scoreboard |
 | `spawner` | Spawner shop, stacking, mob stacking |
 | `staff` | Vanish, staff chat/build, freeze, invsee/endersee, death rollback |
 | `storage` | Database layer: dialect selection, connection pool, and the shared `Storage` implementation |

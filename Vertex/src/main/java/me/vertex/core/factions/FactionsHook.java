@@ -281,4 +281,34 @@ public final class FactionsHook {
         FPlayer fPlayer = FPlayers.fPlayers().get(player.getUniqueId());
         return fPlayer == null || !fPlayer.hasFaction() ? null : fPlayer.faction();
     }
+
+    public static Faction getFactionById(int factionId) {
+        if (factionId == NO_FACTION) {
+            return null;
+        }
+        for (Faction faction : Factions.factions().all()) {
+            if (faction != null && faction.id() == factionId) {
+                return faction;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * True only when FactionsUUID's own native economy (its {@code /f
+     * money}, a separate Vault-backed balance per faction -- distinct from
+     * Vertex's own {@code FactionBankManager}) is actually enabled and
+     * usable right now.
+     */
+    public static boolean isFactionMoneyAvailable() {
+        return dev.kitteh.factions.integration.Econ.isSetup() && dev.kitteh.factions.integration.Econ.shouldBeUsed();
+    }
+
+    public static boolean hasFactionMoney(Faction faction, double amount) {
+        return faction != null && isFactionMoneyAvailable() && dev.kitteh.factions.integration.Econ.has(faction, amount);
+    }
+
+    public static boolean withdrawFactionMoney(Faction faction, double amount) {
+        return faction != null && isFactionMoneyAvailable() && dev.kitteh.factions.integration.Econ.withdraw(faction, amount);
+    }
 }

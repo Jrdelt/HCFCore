@@ -78,118 +78,6 @@ and collector state, blueprint progress) go through the connection pool
 asynchronously on either backend. Only the one-time startup schema check
 touches the main thread.
 
-## Scoreboard
-
-```yaml
-scoreboard:
-  update-interval-ticks: 15
-  title: '<blue><bold>ꜰᴀᴄᴛɪᴏɴꜱ<reset>   <gray>{date}'
-  date-format: 'MM/dd'
-  lines:
-    - '     <gray>ꜱᴇᴀꜱᴏɴ I'
-    - '%luckperms_prefix%<gray>{name}'
-    - ...
-```
-
-Available placeholders in `title` and every entry of `lines`:
-
-| Placeholder | Value |
-|---|---|
-| `{date}` | Current date, formatted with `date-format` |
-| `{name}` | Player name (EssentialsX nickname if set, otherwise username) |
-| `{rank_prefix}` | LuckPerms group display name, wrapped in `[brackets]` |
-| `{rank}` | Same group display name, unwrapped/uncolored |
-| `{prefix}` | The player's own LuckPerms prefix meta, raw (not escaped) |
-| `{faction}` | Player's faction name |
-| `{power}` | Faction power, current/max |
-| `{ftop}` | Faction's rank on the power leaderboard |
-| `{fplayers_online}` | Online members of the player's faction |
-| `{exp}` | Player's XP level |
-| `{balance}` | Player's Vault balance |
-
-With **PlaceholderAPI** installed, any line can also mix in its
-`%percent%` placeholders (LuckPerms' own expansion, or any other
-installed one) alongside the `{curly}` ones above — they're expanded as a
-final pass over the whole resolved line, per viewing player. Without
-PlaceholderAPI, a `%...%` token is left as literal text.
-
-`update-interval-ticks` controls both the title and every line's refresh
-rate; a line is only re-sent to a player if its resolved text actually
-changed since the last tick.
-
-## Tab list
-
-```yaml
-tablist:
-  enabled: true
-  update-interval-ticks: 15
-  format: '{prefix}<gray>{name}'
-  header:
-    - '<blue><bold>VERTEX'
-    - '<gray>{online} players online'
-    - ''
-  footer:
-    - ''
-    - '<white>{faction} <gray>[<yellow>#{ftop}<gray>]'
-    - '<gray>{date}'
-```
-
-`format` controls how each player's name is shown to everyone in the tab
-list. `header`/`footer` are each a list of lines (empty list = no
-header/footer) resolved **per viewer**, so a line can use that viewer's
-own `{faction}`/`{balance}`/etc., not just server-wide values like
-`{online}`. All three accept the same placeholders as
-[Scoreboard](#scoreboard) above, plus PlaceholderAPI `%percent%` tokens.
-Vertex resolves the colored `{prefix}` again one and twenty ticks after a
-join, covering LuckPerms' delayed inherited-meta load. Even in flat mode,
-real players are ordered by their highest inherited LuckPerms group weight
-(then username); grouped mode adds rank headers to that same order.
-
-**Vanished staff are never shown in the tab list to anyone who can't
-already see them** — this isn't a setting because it isn't really this
-plugin's to control: `/vanish` already uses Bukkit's own
-`hidePlayer`/`showPlayer`, which removes a hidden player from the
-viewer's tab list at the packet level as part of hiding them at all.
-There's no separate "listed but invisible" state for Vertex to manage on
-top of that.
-
-### Grouped mode (rank-separated tab list)
-
-```yaml
-tablist:
-  grouped:
-    enabled: true
-    player-format: '{prefix}<white>{name} <gray>{faction}'
-    header-format: '<bold>{group} <gray>({count})'
-    fallback-group-name: 'Members'
-```
-
-`grouped.enabled: true` replaces the flat `format` list above with one
-block per LuckPerms group, highest [group
-weight](https://luckperms.net/wiki/Command-Usage#group-setweight) first,
-each with a header row showing that group's online count — the layout in
-[Complex](https://mc-complex.com)-style tab lists. `player-format` uses
-`{prefix}` (the player's resolved LuckPerms prefix), `{name}` (Essentials
-nickname when present, otherwise the Mojang username), `{username}`
-(always the real Mojang username), and `{faction}` (`[TAG]`, or blank with
-no faction). `header-format` uses `{group}` (the group's LuckPerms display
-name) and `{count}` by default. It can also use `{prefix}` (borrowed from
-the first online member found in that group), but combining it with `{group}`
-will commonly repeat the rank name. Players with no resolvable LuckPerms rank (no
-LuckPerms, no loaded user, or LuckPerms' own unconfigured `default` base
-group) are grouped under `fallback-group-name`, always sorted last.
-
-Real rows are ordered with `Player#setPlayerListOrder` — vanilla Paper
-API since 1.21.2, independent of scoreboard teams, so this doesn't
-interact with [nametag](#nametags) team assignments at all. **Header
-rows need [ProtocolLib](https://www.spigotmc.org/resources/protocollib.1997/)**
-installed too: Bukkit has no concept of a tab entry that isn't a real
-connected player, so a header is injected as a fake `PLAYER_INFO` packet.
-Without ProtocolLib, grouped mode still sorts and labels every real row
-correctly — there just isn't a header line above each block. `grouped`
-is independent of `format`/`header`/`footer`: the header/footer lines
-configured above still apply on top of a grouped body.
-
 ## Chat formatting
 
 ```yaml
@@ -205,13 +93,17 @@ part is independently optional — a faction-less player has no
 `[faction]`, a player with no cosmetic tag equipped has no `[tag]`, and
 `rank-format` left blank drops the rank entirely.
 
-`rank-format` accepts `{rank}`, `{prefix}` (see the scoreboard table
-above for the difference), or a PlaceholderAPI token. `{prefix}` is
-substituted raw, the same treatment a tag's `display` string gets, since
-it's expected to carry its own color/formatting already.
+`rank-format` accepts `{rank}` (the player's LuckPerms group display
+name, unwrapped/uncolored), `{prefix}` (the player's own LuckPerms
+prefix meta, raw and not escaped), or a PlaceholderAPI token. `{prefix}`
+is substituted raw, the same treatment a tag's `display` string gets,
+since it's expected to carry its own color/formatting already.
 
-Every `chat.*` template gets the same PlaceholderAPI `%percent%` support
-described for the scoreboard.
+With **PlaceholderAPI** installed, every `chat.*` template can also mix
+in its `%percent%` placeholders (LuckPerms' own expansion, or any other
+installed one) alongside the `{curly}` ones above — they're expanded as a
+final pass over the whole resolved line, per viewing player. Without
+PlaceholderAPI, a `%...%` token is left as literal text.
 
 See [Factions Integration](factions-integration.md) for how tags and
 faction relations plug into this.

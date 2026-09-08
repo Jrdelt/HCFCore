@@ -3,7 +3,7 @@ main: me.vertex.core.VertexPlugin
 version: ${project.version}
 api-version: '1.21.10'
 author: cesardeltorojr
-description: Kits, sidebar scoreboard, and PvP combat-tag timers, integrated with FactionsUUID.
+description: Kits and PvP combat-tag timers, integrated with FactionsUUID.
 
 depend:
   - FactionsUUID
@@ -16,7 +16,6 @@ softdepend:
   - Essentials
   - FastAsyncWorldEdit
   - DecentHolograms
-  - ProtocolLib
   - Citizens
 
 commands:
@@ -104,9 +103,41 @@ commands:
   koth:
     description: Focus an active KOTH or manage KOTH regions as staff.
     usage: /<command> focus [name|off]|create|wand|cancel|start|stop|delete|list|validate
+  cf:
+    description: Browse, host, or play a coinflip.
+    usage: /<command> [amount [exp|money] [player]|hand [player]|review <id>|approve <id>|deny <id>|ban|unban|cancel <id>|logs [player]]
+    aliases: [coinflip]
+  shop:
+    description: Browse categorized items, or buy/sell at their current market price.
+    usage: /<command> [buy|sell <item> [amount]]
+  ah:
+    description: Browse, list, or manage Auction House listings.
+    usage: /<command> [sell <price>|cancel <id>|collect|logs [player]]
+    aliases: [auctionhouse]
   outpost:
     description: Focus an active Outpost or manage Outpost regions as staff.
     usage: /<command> focus [name|off]|create|wand|cancel|start|stop|delete|list|validate
+  trade:
+    description: Request, accept, or cancel a secure player trade.
+    usage: /<command> <player>|accept <player>|cancel
+  tradetoggle:
+    description: Toggle whether you accept incoming trade requests.
+    usage: /<command>
+  tradeadmin:
+    description: Reload and validate the player-trade configuration.
+    usage: /<command> reload
+  tradehistory:
+    description: View player trade history as staff.
+    usage: /<command> [player]
+  tradelogs:
+    description: View all or one player's trade history as staff.
+    usage: /<command> [all|player]
+  cannon:
+    description: Toggle or reload the TNT cannon module.
+    usage: /<command> reload|toggle
+  sandbot:
+    description: Give a Sand Bot item, or stop an active Sand Bot.
+    usage: /<command> give <player>|stop [player]
 
 permissions:
   vertex.admin:
@@ -123,6 +154,39 @@ permissions:
     default: op
   vertex.backpack.give:
     description: Give a player a Backpack.
+    default: op
+  vertex.backpack.debug:
+    description: Toggle personal Backpack interaction diagnostics.
+    default: op
+  vertex.coinflip.remove:
+    description: Cancel any player's active coinflip and refund its wager.
+    default: op
+  vertex.coinflip.logs:
+    description: View the Coinflip staff audit log.
+    default: op
+  vertex.auction.remove:
+    description: Cancel any player's active Auction House listing and refund it.
+    default: op
+  vertex.auction.logs:
+    description: View the Auction House staff audit log.
+    default: op
+  vertex.trade.use:
+    description: Request and accept player trades.
+    default: true
+  vertex.trade.staff.bypassdistance:
+    description: Bypass the player-trade distance check.
+    default: op
+  vertex.trade.staff.bypassblacklist:
+    description: Bypass player-trade item, world, and gamemode restrictions.
+    default: op
+  vertex.trade.staff.reload:
+    description: Reload and validate traders.yml.
+    default: op
+  vertex.trade.staff.history:
+    description: View the player-trade audit log.
+    default: op
+  vertex.trade.staff.alerts:
+    description: Receive suspicious player-trade alerts.
     default: op
   vertex.koth.admin:
     description: Create, edit, start, stop, and delete KOTH events.
@@ -183,4 +247,16 @@ permissions:
     default: op
   vertex.staff.endersee:
     description: View a player's live ender chest.
+    default: op
+  vertex.cannon.admin:
+    description: Toggle the TNT cannon module and reload its config.
+    default: op
+  vertex.sandbot.give:
+    description: Give a player a Sand Bot item.
+    default: op
+  vertex.sandbot.admin:
+    description: Stop another player's active Sand Bot.
+    default: op
+  vertex.combat.safezone.bypass:
+    description: Move into a protected zone while combat-tagged.
     default: op

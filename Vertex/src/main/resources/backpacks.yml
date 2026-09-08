@@ -41,41 +41,48 @@ auto-store:
   mob-drops: true
 
 # Vault economy cost to upgrade a Backpack. Levels 1 through 50 have a
-# gentle multiplier. Starting with the cost after level 50, each level
-# doubles the previous cost. This keeps early progression affordable while
-# making very high levels a meaningful investment.
+# gentle multiplier. From there the per-level multiplier gradually ramps
+# up -- not a sudden jump -- until it caps at max-multiplier once the
+# Backpack reaches ramp-through-level. This keeps early progression
+# affordable while making very high levels a meaningful investment,
+# without a jarring cost cliff right at the easy/ramp boundary.
 upgrade-cost:
   base: 500.0
   easy-through-level: 50
   easy-multiplier: 1.10
-  post-50-multiplier: 2.0
+  ramp-through-level: 150
+  max-multiplier: 2.0
 
 # Each tier is a separate Backpack a player can be given (see
 # /backpack give <player> <tier>). item-type is any Bukkit Material. Its
 # custom-model-data is the positive integer your resource pack assigns to
 # that material's Backpack model. Use 0 for the normal vanilla model.
 # There is no per-tier maximum level: every Backpack can keep upgrading.
-# Every tier starts at a guaranteed +100% auto-collection bonus, so one
-# eligible drop always becomes at least two stored items. Higher tiers keep
-# their advantage through their larger per-level bonus.
+#
+# drop-bonus-base-percent is the auto-collection bonus at level 1.
+# drop-bonus-per-level-percent COMPOUNDS onto it every level after that
+# (like interest, not a flat per-level add-on) -- so the bonus climbs
+# slowly at first and then dramatically at high levels, making a heavily
+# upgraded Backpack meaningfully better than a fresh one instead of only
+# creeping up by a fixed amount each level. Higher tiers compound faster.
 tiers:
   t1_basic:
     display-name: '<white>T1 Winter Backpack'
     item-type: LEATHER
     custom-model-data: 10001
-    drop-bonus-base-percent: 100.0
-    drop-bonus-per-level-percent: 1.0
+    drop-bonus-base-percent: 25.0
+    drop-bonus-per-level-percent: 3.725
 
   t2_reinforced:
     display-name: '<aqua>T2 Reinforced Backpack'
     item-type: LEATHER
     custom-model-data: 10002
-    drop-bonus-base-percent: 100.0
-    drop-bonus-per-level-percent: 2.0
+    drop-bonus-base-percent: 25.0
+    drop-bonus-per-level-percent: 7.45
 
   t3_corrupted:
     display-name: '<light_purple>T3 Corrupted Backpack'
     item-type: LEATHER
     custom-model-data: 10003
-    drop-bonus-base-percent: 100.0
-    drop-bonus-per-level-percent: 3.75
+    drop-bonus-base-percent: 25.0
+    drop-bonus-per-level-percent: 13.97

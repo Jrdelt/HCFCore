@@ -38,14 +38,15 @@ hologram:
 # manually with /koth start <id> or /outpost start <id>.
 events: {}
 
-# Example event (remove the leading # lines only after changing world and bounds):
+# Example event (remove the leading # lines only after changing world and bounds).
+# The hologram is always centered over X/Z and 3.5 blocks above the lowest
+# Y in "minimum"/"maximum" -- it isn't configured per-event.
 # central_koth:
 #   type: koth
 #   display-name: 'Central KOTH'
 #   world: world
 #   minimum: { x: 0, y: 64, z: 0 }
 #   maximum: { x: 10, y: 75, z: 10 }
-#   hologram: { x: 5.5, y: 66.0, z: 5.5 }
 #   capture-seconds: 300
 #   max-duration-seconds: 2700
 #   additional-member-speed: 0.25

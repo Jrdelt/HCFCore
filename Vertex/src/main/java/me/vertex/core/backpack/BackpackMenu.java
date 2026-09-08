@@ -23,7 +23,7 @@ public final class BackpackMenu {
     public static final int DISPLAY_SLOT = 11;
     public static final int EMPTY_SLOT = 13;
     public static final int UPGRADE_SLOT = 15;
-    public static final int ROWS = 4;
+    public static final int ROWS = 3;
 
     private BackpackMenu() {
     }

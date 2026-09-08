@@ -45,93 +45,6 @@ mysql:
   use-ssl: false  # Set to true if using SSL certificates
 
 # ============================================
-# SCOREBOARD
-# ============================================
-scoreboard:
-  # How often to update the scoreboard (in ticks; 20 ticks = 1 second)
-  update-interval-ticks: 20
-
-  # Scoreboard title with placeholders
-  title: '<blue><bold>ꜰᴀᴄᴛɪᴏɴꜱ<reset>   <gray>{date}'
-
-  # Date format shown in title
-  date-format: 'MM/dd'
-
-  # Scoreboard content lines
-  # Supports: {name}, {rank_prefix}, {rank}, {prefix}, {exp}, {balance}, {faction}, {power}, {fplayers_online}, {ftop}
-  # Also supports PlaceholderAPI %placeholder% tokens (e.g. %luckperms_prefix%) if PlaceholderAPI is installed.
-  lines:
-    - '     <gray>ꜱᴇᴀꜱᴏɴ I'
-    - '%luckperms_prefix%<gray>{name}'
-    - '<gray>• <red>Balance: <white>%vault_eco_balance_formatted%'
-    - '<gray>• <red>Experience: <white>{exp}'
-    - '<gray>• <red>K/D: <white>%kdratio_kills%<gray>:<white>%kdratio_deaths%'
-    - ''
-    - '<white>{faction} <gray>[<yellow>#{ftop}<gray>]'
-    - '<gray> <red>• Power: <white>{power}'
-    - '<gray> <red>• Online: <white>{fplayers_online}'
-    - ''
-    - '<gray>hub.mc-vertex.com'
-
-# ============================================
-# TAB LIST
-# Supports the same {curly} placeholders as scoreboard.lines above (name,
-# rank_prefix, rank, prefix, faction, ftop, power, fplayers_online, exp,
-# balance, online, date), plus PlaceholderAPI %percent% tokens.
-#
-# Vanished staff are not a setting here: Bukkit's own vanish (hidePlayer/
-# showPlayer, used by /vanish) already removes a vanished player from a
-# non-staff viewer's tab list at the packet level, the same way it removes
-# them from view entirely -- there's no separate "in tab but invisible"
-# state for this plugin to manage on top of that.
-# ============================================
-tablist:
-  enabled: true
-
-  # How often the tab list refreshes (in ticks; 20 ticks = 1 second).
-  update-interval-ticks: 15
-
-  # Shown next to each player's name in the tab list.
-  format: '{prefix}<gray>{name}'
-
-  # Sent to the top of everyone's tab list. Each entry is one line; leave
-  # the list empty for no header. Resolved per-viewer, so a line can use
-  # that player's own {faction}/{balance}/etc., not just {online}/{date}.
-  header:
-    - '<blue><bold>VERTEX'
-    - '<gray>{online} players online'
-    - ''
-
-  # Sent to the bottom of everyone's tab list. Leave empty for no footer.
-  footer:
-    - ''
-    - '<white>{faction} <gray>[<yellow>#{ftop}<gray>]'
-    - '<gray>{date}'
-
-  # Separates the tab list body into a block per LuckPerms rank (highest
-  # weight first), each with a header row showing that rank's online
-  # count, in place of the flat "format" list above. Requires LuckPerms
-  # for grouping and ProtocolLib for the header rows themselves --
-  # without ProtocolLib, real rows still sort/render correctly, just with
-  # no header line above each block. Real usernames only: {username}
-  # never reflects a nickname plugin, unlike {name} above.
-  grouped:
-    enabled: true
-
-    # One row per online player. Tokens: {prefix} (LuckPerms prefix,
-    # already colored), {name} (Essentials nickname if present), {username}
-    # (real name), and {faction} (e.g. "[TAG]", blank if none).
-    player-format: '{prefix}<white>{name} <gray>{faction}'
-
-    # One row per rank, shown above that rank's players. The rank's display
-    # name is used by default; adding {prefix} too usually duplicates it.
-    # Tokens: {prefix}, {group} (LuckPerms group display name), {count}.
-    header-format: '<bold>{group} <gray>({count})'
-
-    # Header shown for players with no LuckPerms rank to group under.
-    fallback-group-name: 'Members'
-
-# ============================================
 # CHAT FORMATTING
 # Chat format components (use MiniMessage or legacy & color codes).
 # rank-format also supports {rank}, {prefix}, or a PlaceholderAPI
@@ -191,6 +104,15 @@ pvp:
     - spawn
   no-pearl-claim-names:
     - safezone
+
+  # Same zones as no-pearl-regions/no-pearl-claim-names above, but for
+  # plain walking and non-pearl teleports (commands, /f home, other
+  # plugins): a combat-tagged player can't cross into one at all -- not
+  # just pearl into it -- so combat can't be escaped by simply walking
+  # back to safety. Only applies while actually tagged; untagged players
+  # move freely. vertex.combat.safezone.bypass (default op) skips this,
+  # for staff moderation.
+  combat-blocks-safezone-entry: true
 
   # Extra velocity on a thrown ender pearl, but only while actively falling
   # or aiming downward -- a flat/upward throw is untouched, so this can't
@@ -493,6 +415,96 @@ abilities:
   # (set via /f safezone, /f warzone) if you've named them this way.
   disabled-claim-names:
     - safezone
+
+# ============================================
+# TNT CANNONS
+# Applies only to TNT that ignites without a player's hand directly
+# lighting it -- i.e. redstone- or dispenser-triggered chains, which in
+# practice means a built cannon mechanism. A player manually lighting TNT
+# with flint and steel (or TNT chain-reacting off THAT explosion) is left
+# completely vanilla, so normal base-breaking/defense play is unaffected.
+# ============================================
+cannon:
+  enabled: true
+
+  # Redstone/dispenser TNT ignitions allowed per world per tick. Extra
+  # ignitions are cancelled outright rather than queued -- a real redstone
+  # clock retries on its very next pulse anyway, so this reads as a brief
+  # stutter in the clock rather than a dropped shot.
+  max-ignitions-per-tick: 12
+
+  # Ignitions allowed at the exact same block position within one tick.
+  # Note: vanilla does not actually merge TNT entities the way it merges
+  # dropped items -- a "compact" cannon's extra power instead comes from
+  # several separate TNT explosions resolving simultaneously at the same
+  # spot, with their knockback summing. This caps that stacking directly.
+  max-simultaneous-per-location: 4
+
+  # Hard ceiling on the upward velocity component this module leaves in
+  # place after a cannon explosion.
+  max-y-velocity: 3.6
+
+  # A tighter multiplier applied only while the payload's current Y is
+  # inside this band -- keeps shots built for the 256-320 range from
+  # rocketing straight to the build-height ceiling.
+  height-band:
+    lower: 256
+    upper: 320
+    velocity-multiplier: 0.6
+
+  # How far around a cannon explosion to look for entities (TNT, falling
+  # blocks, players) whose velocity needs clamping.
+  velocity-scan-radius-blocks: 8
+
+  # How many ticks after a sequence's first ignition its explosions still
+  # count as "launch structure" (block damage suppressed) rather than a
+  # payload "landing" (claim-gated real damage). Real cannon barrels
+  # finish firing well within a second; raise this if yours doesn't.
+  launch-window-ticks: 20
+
+  damage-control:
+    # Clear block damage from launch-stage explosions so a cannon doesn't
+    # blow up its own barrel/platform every shot.
+    protect-launch-structure: true
+    # Don't let launch-stage explosions ignite the platform.
+    suppress-fire-spread: true
+
+  # Locations a cannon sequence is blocked from starting in, and where a
+  # landing payload's real damage is suppressed even if it started
+  # elsewhere -- same blocklist model as abilities.disabled-regions /
+  # abilities.disabled-claim-names above, checked independently at both
+  # ends.
+  disabled-regions:
+    - spawn
+  disabled-claim-names:
+    - safezone
+
+# ============================================
+# SAND BOTS
+# Give with /sandbot give <player>. Placed on top of andesite, sandstone,
+# red sandstone, or any color of concrete -- must be inside the placing
+# player's own faction's claim. The Citizens NPC that appears then
+# converts every matching trigger block in its flat radius (andesite ->
+# gravel, sandstone -> sand, red sandstone -> red sand, colored concrete
+# -> matching concrete powder) into a falling-block entity, which free-
+# falls under normal gravity to wherever solid ground stops it. Each
+# block is charged for individually at the Shop's price for the falling-
+# block material (SAND/GRAVEL/RED_SAND/*_CONCRETE_POWDER in shop.yml,
+# marked dynamic-pricing: false so bulk purchases don't spike the price),
+# drawn from FactionsUUID's native /f money first and Vertex's own
+# /fbank as a fallback. The bot despawns once a pass finds no more
+# trigger blocks in range, or once neither source can afford the next one.
+# ============================================
+sandbot:
+  enabled: true
+
+  # How many blocks in each direction from the placement point the bot
+  # operates across (2 = a 5x5 footprint). Capped at 5 regardless of this
+  # value.
+  radius-blocks: 2
+
+  # How often the bot attempts a conversion pass (in ticks; 20 = 1 second).
+  tick-interval-ticks: 10
 
 # ============================================
 # NAMETAGS

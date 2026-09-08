@@ -25,14 +25,16 @@ import java.util.concurrent.ConcurrentHashMap;
  * Dynamic faction-based coloring and real-time updates.
  * Configuration-driven via config.yml nametags section.
  *
- * <p>Teams live on each <b>viewer's own active scoreboard</b>, one team
- * per (viewer, subject) pair -- not on the main scoreboard. Every player
- * has their own {@link Scoreboard} object (assigned by
- * {@code ScoreboardManager} for the sidebar, replacing whatever scoreboard
- * they had before), and a team only renders for players whose *currently
- * active* scoreboard it's registered on. A shared main-scoreboard team was
- * tried first and only visible on that main scoreboard -- which nobody
- * stays on once {@code ScoreboardManager.setup()} gives them their own.
+ * <p>Teams live on each <b>viewer's own active {@link Scoreboard}</b>, one
+ * team per (viewer, subject) pair, and a team only renders for players
+ * whose *currently active* scoreboard it's registered on. This only
+ * produces a genuinely per-viewer relation color if every viewer actually
+ * has a distinct scoreboard object -- {@link NametagListener#onJoin}
+ * gives each player a fresh one on join for exactly this reason, unless
+ * something else (another plugin) already assigned one of its own. If a
+ * viewer's active scoreboard is ever swapped out for a different object,
+ * any team registered on the old one stops rendering for them and their
+ * nametags need re-applying to the new one.
  */
 public final class NametagManager {
 
@@ -191,11 +193,10 @@ public final class NametagManager {
     /**
      * Populates `viewer`'s scoreboard with every currently-online subject's
      * nametag, bypassing the change-detection {@link #updatePlayerNametag}
-     * does -- for a viewer whose scoreboard object was just replaced (a
-     * fresh join, or {@code ScoreboardManager} rebuilding everyone's
-     * sidebar scoreboard on {@code /vertex reload}), that replacement is
-     * blank and needs every subject re-applied regardless of whether their
-     * faction state happens to have "changed" recently.
+     * does -- for a viewer whose scoreboard object was just replaced (e.g.
+     * a fresh join), that replacement is blank and needs every subject
+     * re-applied regardless of whether their faction state happens to have
+     * "changed" recently.
      */
     public void applyAllNametagsTo(Player viewer) {
         for (Player subject : Bukkit.getOnlinePlayers()) {

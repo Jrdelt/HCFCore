@@ -125,6 +125,17 @@ spawn long before a fight can't become an anytime recall-to-safety
 button. Switcher Snowball refuses to swap either side if the thrower or
 the target is standing in one of these zones, for the same reason.
 
+## Combat locks you out of safezone entirely
+
+`pvp.combat-blocks-safezone-entry` (default `true`) closes the gap the
+zones above don't: a combat-tagged player can't walk or teleport
+(command, `/f home`, another plugin's teleport — anything but an ender
+pearl, which the zones above already fully own) into a protected zone
+either, not just pearl into one. Untagged players move freely; this only
+ever fires for someone currently in combat, and cancelling the movement
+leaves them exactly where they were. `vertex.combat.safezone.bypass`
+(default `op`) skips it, for staff moderation.
+
 ## Hunger
 
 `pvp.disable-hunger-worlds` lists worlds where hunger never changes at

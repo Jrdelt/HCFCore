@@ -51,7 +51,7 @@ class BackpackManagerTest {
         assertTrue(manager.isEnabled());
         assertTrue(manager.tierIds().contains("t1_basic"));
         assertTrue(manager.tierIds().contains("t3_corrupted"));
-        assertEquals(100.0, manager.getTier("t1_basic").dropBonusBasePercent());
+        assertEquals(25.0, manager.getTier("t1_basic").dropBonusBasePercent());
         assertTrue(manager.getTier("t1_basic").dropBonusPerLevelPercent() >= 0.0);
     }
 
@@ -118,7 +118,7 @@ class BackpackManagerTest {
         ItemStack item = manager.createBackpackItem(tier);
 
         // 5 separate mining events, 60 coal each. The shipped base bonus
-        // is a guaranteed 100%, so each event stores 120 -- well past a
+        // is a guaranteed 25%, so each event stores 75 -- well past a
         // single vanilla stack's
         // 64-item cap once merged. Re-reads data each time since
         // storeAutoCollected persists onto the item itself.
@@ -130,8 +130,8 @@ class BackpackManagerTest {
 
         BackpackData stored = manager.readData(item);
         assertEquals(1, stored.contents().length, "same material merges into one entry, not one per drop");
-        // 5 x 60 coal, boosted 100% each time (60 -> 120) -- well past 64.
-        assertEquals(5 * 120, stored.contents()[0].getAmount(), "an entry's amount isn't capped at 64");
+        // 5 x 60 coal, boosted 25% each time (60 -> 75) -- well past 64.
+        assertEquals(5 * 75, stored.contents()[0].getAmount(), "an entry's amount isn't capped at 64");
     }
 
     @Test
@@ -142,9 +142,9 @@ class BackpackManagerTest {
         BackpackManager.EquippedBackpack equipped =
                 new BackpackManager.EquippedBackpack(item, tier, manager.readData(item));
 
-        // The shipped t1 bonus is a deterministic 100% at level one.
+        // The shipped t1 bonus is a deterministic 25% at level one.
         int requested = 2000;
-        long boosted = requested * 2L;
+        long boosted = requested + requested * 25L / 100L;
         List<ItemStack> leftovers = manager.storeAutoCollected(equipped,
                 List.of(new ItemStack(Material.COBBLESTONE, requested)));
 
@@ -297,10 +297,13 @@ class BackpackManagerTest {
         BackpackManager.EquippedBackpack equipped =
                 new BackpackManager.EquippedBackpack(item, tier, manager.readData(item));
 
-        manager.storeAutoCollected(equipped, List.of(new ItemStack(Material.DIAMOND, 10)));
+        // 12, not 10: 25% of it is a whole number (3), so the boosted total
+        // is deterministic instead of depending on applyBonus's fractional
+        // random-extra-item roll.
+        manager.storeAutoCollected(equipped, List.of(new ItemStack(Material.DIAMOND, 12)));
 
         String storedLore = plainLore(item);
-        assertTrue(storedLore.contains("20/1,250"),
+        assertTrue(storedLore.contains("15/1,250"),
                 "the lore must reflect the boosted number stored immediately");
 
         BackpackData data = manager.readData(item);

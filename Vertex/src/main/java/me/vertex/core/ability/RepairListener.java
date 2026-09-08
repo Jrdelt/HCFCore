@@ -2,9 +2,7 @@ package me.vertex.core.ability;
 
 import me.vertex.core.lang.Messages;
 import me.vertex.core.luckperms.LuckPermsHook;
-import me.vertex.core.scoreboard.ScoreboardManager;
 import me.vertex.core.user.UserManager;
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -12,9 +10,6 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
-
-import java.util.UUID;
 
 public final class RepairListener implements Listener {
 
@@ -23,20 +18,14 @@ public final class RepairListener implements Listener {
     private final Plugin plugin;
     private final AbilityManager abilityManager;
     private final UserManager userManager;
-    private volatile ScoreboardManager scoreboardManager;
     private final Messages messages;
 
     public RepairListener(Plugin plugin, AbilityManager abilityManager, UserManager userManager,
-                           ScoreboardManager scoreboardManager, Messages messages) {
+                           Messages messages) {
         this.plugin = plugin;
         this.abilityManager = abilityManager;
         this.userManager = userManager;
-        this.scoreboardManager = scoreboardManager;
         this.messages = messages;
-    }
-
-    public void setScoreboardManager(ScoreboardManager scoreboardManager) {
-        this.scoreboardManager = scoreboardManager;
     }
 
     @EventHandler
@@ -72,28 +61,5 @@ public final class RepairListener implements Listener {
 
         LuckPermsHook.grantTemporaryPermission(plugin, player, permissionNode, durationSeconds);
         player.sendMessage(messages.getChat(player, "ability.repair-granted", "seconds", String.valueOf(durationSeconds)));
-
-        startCountdown(player.getUniqueId(), durationSeconds);
-    }
-
-    private void startCountdown(UUID uuid, int totalSeconds) {
-        new BukkitRunnable() {
-            int remaining = totalSeconds;
-
-            @Override
-            public void run() {
-                Player player = Bukkit.getPlayer(uuid);
-                if (player == null || remaining <= 0) {
-                    if (player != null) {
-                        scoreboardManager.clearPlaceholder(uuid, "repair");
-                    }
-                    cancel();
-                    return;
-                }
-                scoreboardManager.setPlaceholder(uuid, "repair",
-                        messages.getRaw(player, "ability.repair-countdown", "seconds", String.valueOf(remaining)));
-                remaining--;
-            }
-        }.runTaskTimer(plugin, 0L, 20L);
     }
 }

@@ -69,7 +69,7 @@ to a protective 500-row scan limit while searching for valid history.
 
 | Command | Permission | Behavior |
 |---|---|---|
-| `/vertex reload` | `vertex.admin` | Reloads config, messages, kits, abilities, and tags, and rebuilds the scoreboard for every online player. See [Installation](installation.md#reload-vs-restart) for when to use a full restart instead. |
+| `/vertex reload` | `vertex.admin` | Reloads config, messages, kits, abilities, and tags. See [Installation](installation.md#reload-vs-restart) for when to use a full restart instead. |
 | `/vertex clearmobstacks` | `vertex.admin` | Removes every currently-tracked stacked mob across all loaded chunks — see [Spawners & Mob Stacking](spawners-and-collectors.md#mob-stacking-spawnersyml--mob-stacking). |
 | `/vertex storage [local\|mysql] [confirm]` | `vertex.admin` | Shows the active storage backend, or copies all data to the other one and switches to it on the next restart — see [Installation](installation.md#switching-backends-in-game). |
 | `/reboot [minutes]` / `/reboot cancel` | `vertex.reboot.start` | Starts or cancels a shutdown countdown — see [Configuration](configuration.md#reboot-scheduling). |

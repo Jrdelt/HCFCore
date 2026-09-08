@@ -42,10 +42,6 @@
             <url>https://repo.codemc.io/repository/maven-public/</url>
         </repository>
         <repository>
-            <id>dmulloy2-repo</id>
-            <url>https://repo.dmulloy2.net/repository/public/</url>
-        </repository>
-        <repository>
             <id>citizens-repo</id>
             <url>https://maven.citizensnpcs.co/repo</url>
         </repository>
@@ -159,24 +155,6 @@
             <groupId>me.clip</groupId>
             <artifactId>placeholderapi</artifactId>
             <version>2.11.6</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!--
-            Grouped tab list rendering (me.vertex.core.tablist) needs
-            server-controlled tab entry ordering (Player#setPlayerListOrder,
-            vanilla since 1.21.2) plus fake group-header rows, which are
-            injected as raw PLAYER_INFO packets. Neither is exposed for
-            fake (non-player) entries by the Bukkit API itself. ProtocolLib
-            only shipped listOrder support in its 5.4.0 line; 5.3.0 (their
-            latest tagged release) predates it, so this pins their published
-            5.4.0 snapshot build rather than an unreleased version number.
-            Optional server-side plugin (see plugin.yml softdepend).
-        -->
-        <dependency>
-            <groupId>com.comphenix.protocol</groupId>
-            <artifactId>ProtocolLib</artifactId>
-            <version>5.4.0-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
 

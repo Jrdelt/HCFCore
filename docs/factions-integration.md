@@ -4,10 +4,9 @@ Vertex is built directly on top of **FactionsUUID** — it's a hard
 dependency, not an optional one. Vertex is compiled against FactionsUUID
 4.4.0, and its direct API use has also been checked against 4.7.0. This page
 covers everything that plugs into faction identity and relationships:
-nametags, rallies, permissions, upgrades, and the bank. Chat formatting and
-scoreboard placeholders are covered in
-[Configuration](configuration.md#chat-formatting) since they're primarily
-config-driven.
+nametags, rallies, permissions, upgrades, and the bank. Chat formatting
+is covered in [Configuration](configuration.md#chat-formatting) since
+it's primarily config-driven.
 
 ## Nametags
 

@@ -151,8 +151,15 @@ public final class KitCommand implements CommandExecutor, TabCompleter {
             return List.of();
         }
         List<String> options = new ArrayList<>(kitManager.getKits().keySet());
-        options.add("create");
-        options.add("delete");
+        // Only suggest these to whoever could actually use them -- a
+        // regular player has no business being tipped off that they exist.
+        if (sender.hasPermission("vertex.kit.create") || sender.hasPermission("vertex.kit.save")) {
+            options.add("create");
+            options.add("save");
+        }
+        if (sender.hasPermission("vertex.kit.delete")) {
+            options.add("delete");
+        }
         List<String> matches = new ArrayList<>();
         String partial = args[0].toLowerCase(Locale.ROOT);
         for (String option : options) {

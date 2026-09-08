@@ -2,10 +2,10 @@
 
 Vertex is a Paper plugin that adds a full HCF
 gameplay layer on top of **FactionsUUID**: armor-based kit classes, PvP
-ability items, 1.8-style legacy combat, a combat-tag system, a live
-sidebar scoreboard, faction-aware chat and nametags, rallies, a faction
-permission matrix, faction upgrades, a shared faction bank, cosmetic tags,
-stackable spawners, Chunk Collectors, a progressive schematic base-builder,
+ability items, 1.8-style legacy combat, a combat-tag system,
+faction-aware chat and nametags, rallies, a faction permission matrix,
+faction upgrades, a shared faction bank, cosmetic tags, stackable
+spawners, Chunk Collectors, a progressive schematic base-builder,
 KOTH/Outpost captures, and a staff toolkit.
 
 This is the detailed, developer-facing reference. If you just want a
@@ -19,19 +19,25 @@ integration behavior.
 | Guide | Covers |
 |---|---|
 | [Installation](installation.md) | Requirements, building from source, first deploy, upgrading, database migrations |
-| [Configuration](configuration.md) | Full walkthrough of `config.yml`: database, scoreboard, chat, factions/upgrades, nametags, reboot, and reload semantics |
+| [Configuration](configuration.md) | Full walkthrough of `config.yml`: database, chat, factions/upgrades, nametags, reboot, and reload semantics |
 | [PvP & Combat](pvp-and-combat.md) | Combat tag, action bar, item cooldowns, no-pearl zones, Legacy Combat (1.8 PvP), Archer Tag |
 | [Kits & Abilities](kits-and-abilities.md) | Kit classes, class effects, kit costs, the full ability item catalog and their mechanics |
-| [Factions Integration](factions-integration.md) | FactionsUUID compatibility, chat/scoreboard placeholders, nametags, rallies, permissions, upgrades, bank, leader-leave protection |
+| [Factions Integration](factions-integration.md) | FactionsUUID compatibility, chat placeholders, nametags, rallies, permissions, upgrades, bank, leader-leave protection |
 | [Spawners & Collectors](spawners-and-collectors.md) | Spawner shop/economy, daylight and lava behavior, stacking, mob stacks, and Chunk Collectors |
 | [Blueprint Base Builder](blueprints.md) | Automated `.schem` base building with FastAsyncWorldEdit + DecentHolograms |
 | [Backpacks](backpacks.md) | Tiered offhand auto-storage: drop bonuses, filters, leveling, and custom models |
+| [Player Trading](trading.md) | Secure two-player item, money, and XP escrow trades |
+| [TNT Cannons & Sand Bots](cannon-and-sandbot.md) | Controlled redstone TNT cannons, and automated falling-block conversion |
+| [Coinflips](coinflips.md) | 50/50 money, experience, and item wagers, claim stashes, self-ban, and the staff audit log |
+| [Shop](shop.md) | Categorized, dynamic-price item trading |
+| [Auction House](auctionhouse.md) | Buy-it-now listings for any item, claim stashes, expiry, fees, and the staff audit log |
 | [KOTH & Outposts](koth-and-outposts.md) | Faction capture rules, directions/focus, schedules, staff selection, holograms, rewards, and Outpost XP boosters |
 | [Tags & Cosmetics](tags-and-cosmetics.md) | The `/tags` system: unlocking, equipping, nickname-match, the GUI |
 | [Staff Tools](staff-tools.md) | Vanish, staff chat, staff-build, freeze, invsee/endersee, and death rollback |
 | [Localization](localization.md) | Supported languages, `/language`, adding a translation, color/placeholder conventions |
 | [Commands & Permissions](commands-and-permissions.md) | Every command and permission node in one place |
 | [Integrations](integrations.md) | Exactly what each supported plugin unlocks, and what happens without it |
+| [Placeholders](placeholders.md) | Every `%vertex_...%` PlaceholderAPI token Vertex provides for other plugins to read |
 | [Architecture](architecture.md) | Package layout, internal design notes, and testing — for contributors |
 
 ## Conventions used throughout

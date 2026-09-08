@@ -1,9 +1,13 @@
 package me.vertex.core.storage;
 
+import me.vertex.core.auction.AuctionStorage;
 import me.vertex.core.blueprint.BlueprintStorage;
+import me.vertex.core.coinflip.CoinflipStorage;
+import me.vertex.core.trade.TradeStorage;
 import me.vertex.core.collector.ChunkCollectorStorage;
 import me.vertex.core.faction.FactionUpgradeStorage;
 import me.vertex.core.faction.FactionBankStorage;
+import me.vertex.core.shop.ShopStorage;
 import me.vertex.core.spawner.SpawnerStorage;
 
 import java.io.File;
@@ -54,6 +58,26 @@ public final class StorageMigrator {
         TABLES.put("blueprint_cooldowns", List.of("uuid", "available_at"));
         TABLES.put("faction_upgrade_levels", List.of("faction_id", "upgrade_key", "level"));
         TABLES.put("faction_banks", List.of("faction_id", "money", "experience"));
+        TABLES.put("coinflips", List.of("id", "host_uuid", "target_uuid", "type", "amount", "items", "created_at"));
+        TABLES.put("coinflip_claims", List.of("id", "winner_uuid", "items", "won_at"));
+        TABLES.put("coinflip_bans", List.of("uuid", "banned_until"));
+        TABLES.put("coinflip_pending_exp", List.of("uuid", "levels"));
+        TABLES.put("coinflip_log", List.of("id", "host_uuid", "opponent_uuid", "type", "summary",
+                "winner_uuid", "resolved_at", "status", "cancelled_by"));
+        TABLES.put("coinflip_pending_matches", List.of("id", "coinflip_id", "opponent_uuid", "items", "requested_at"));
+        TABLES.put("shop_stock", List.of("material", "net_volume"));
+        TABLES.put("auction_listings", List.of("id", "seller_uuid", "item", "price", "currency", "listed_at", "expires_at"));
+        TABLES.put("auction_claims", List.of("id", "owner_uuid", "item", "created_at"));
+        TABLES.put("auction_log", List.of("id", "seller_uuid", "buyer_uuid", "item_summary", "price",
+                "listed_at", "resolved_at", "status", "cancelled_by"));
+        TABLES.put("auction_watchlist", List.of("id", "owner_uuid", "listing_id"));
+        TABLES.put("auction_pending_exp", List.of("uuid", "levels"));
+        TABLES.put("trade_preferences", List.of("uuid", "accepting"));
+        TABLES.put("trade_escrow", List.of("session_id", "owner_uuid", "items", "money", "experience"));
+        TABLES.put("trade_claims", List.of("id", "owner_uuid", "item"));
+        TABLES.put("trade_pending_exp", List.of("uuid", "levels"));
+        TABLES.put("trade_history", List.of("id", "requester_uuid", "target_uuid", "requester_name", "target_name",
+                "requester_items", "target_items", "requester_money", "target_money", "requester_exp", "target_exp", "created_at", "status"));
     }
 
     private StorageMigrator() {
@@ -159,6 +183,10 @@ public final class StorageMigrator {
         new BlueprintStorage(database).init();
         new FactionUpgradeStorage(database).init();
         new FactionBankStorage(database).init();
+        new CoinflipStorage(database).init();
+        new ShopStorage(database).init();
+        new AuctionStorage(database).init();
+        new TradeStorage(database).init();
     }
 
     /**

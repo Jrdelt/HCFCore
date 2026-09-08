@@ -117,7 +117,7 @@ buff from the Portable Bard menu rather than handed out directly.
 | Mage: Wither / Slowness / Poison | Melee | Applies the named effect; doubled duration and amplifier when worn in the full Mage set, normal otherwise |
 | Portable Bard | Right-click | Opens a menu to pick one buff (see below) |
 | Bard buffs (Speed/Strength/Resistance/Regeneration/Jump Boost) | Right-click | Buffs everyone in `abilities.bard-share-radius-blocks` (default 30) of the same faction, same world; doubled duration/level in the full Bard set, halved otherwise (never below level I / 1s) |
-| Repair | Right-click | Grants temporary permission to repair gear, with a countdown shown on the scoreboard (needs LuckPerms) |
+| Repair | Right-click | Grants temporary permission to repair gear for a set duration (needs LuckPerms) |
 | Switcher Snowball | Throw | Swaps positions with whoever it hits |
 | Time Warp Pearl | Right-click | Teleports back to the last location you actually ender-pearled from |
 | Ninja Star | Right-click | Teleports to whoever hit you last, after a 5s warning to them — needs that hit within the last 15s and both of you currently in combat; grants Regeneration II, Strength III, Speed V for 3s on arrival. It fizzles if either player is in a configured no-pearl safezone when the countdown ends. |
