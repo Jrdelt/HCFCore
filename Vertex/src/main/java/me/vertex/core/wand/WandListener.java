@@ -8,6 +8,7 @@ import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.shop.ShopManager;
 import me.vertex.core.util.Numbers;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -92,14 +93,20 @@ public final class WandListener implements Listener {
             player.sendMessage(messages.get(player, "wand.container-busy"));
             return;
         }
-        try {
-            if (tier.type() == WandType.SELL) {
+        Location location = block.getLocation();
+        if (tier.type() == WandType.SELL) {
+            try {
                 runSell(player, held, tier, container);
-            } else {
-                runTnt(player, held, tier, container, block.getLocation());
+            } finally {
+                busy.remove(location);
             }
-        } finally {
-            busy.remove(block.getLocation());
+            return;
+        }
+        // The TNT path finishes inside an async bank write, so it releases the
+        // lock itself once that lands. Releasing here would drop the lock
+        // while the transaction was still open.
+        if (!runTnt(player, held, tier, container, location)) {
+            busy.remove(location);
         }
     }
 
@@ -137,11 +144,12 @@ public final class WandListener implements Listener {
                 + Numbers.moneyFull(payout) + " using tier " + tier.id() + ".");
     }
 
-    private void runTnt(Player player, ItemStack held, WandTier tier, WandContainer container, Location location) {
+    /** @return true when an async bank write took ownership of the container lock. */
+    private boolean runTnt(Player player, ItemStack held, WandTier tier, WandContainer container, Location location) {
         int factionId = FactionsHook.getFactionId(player);
         if (factionId == FactionsHook.NO_FACTION) {
             player.sendMessage(messages.get(player, "wand.no-faction"));
-            return;
+            return false;
         }
         long capacity = upgrades.tntCapacity(factionId);
         long room = capacity - bank.tnt(factionId);
@@ -150,52 +158,69 @@ public final class WandListener implements Listener {
             // taken, no partial conversion.
             player.sendMessage(messages.get(player, "wand.tnt-bank-full",
                     "max", Numbers.formatFull(capacity)));
-            return;
+            return false;
         }
 
-        Map<Material, Integer> contents = container.contents(wands::isPlainStack);
-        int gunpowder = contents.getOrDefault(Material.GUNPOWDER, 0);
-        int sandPer = wands.sandPerTnt();
-        int sand = sandPer > 0 ? contents.getOrDefault(Material.SAND, 0) : Integer.MAX_VALUE;
-
-        int possible = gunpowder / wands.gunpowderPerTnt();
-        if (sandPer > 0) {
-            possible = Math.min(possible, sand / sandPer);
-        }
-        int converted = (int) Math.min(possible, room);
+        int converted = convertibleTnt(container, room);
         if (converted <= 0) {
             player.sendMessage(messages.get(player, "wand.no-gunpowder"));
+            return false;
+        }
+
+        // The bank is credited before anything is taken. The deposit is the
+        // step that can fail or lose a race with another deposit, so doing it
+        // first means a failure costs the player nothing at all -- rather than
+        // taking their gunpowder and then discovering there was no room.
+        bank.depositTnt(factionId, converted, capacity).whenComplete((stored, error) ->
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    try {
+                        if (error != null || !Boolean.TRUE.equals(stored)) {
+                            player.sendMessage(messages.get(player, "wand.tnt-bank-full",
+                                    "max", Numbers.formatFull(capacity)));
+                            return;
+                        }
+                        settleTnt(player, held, tier, container, factionId, converted);
+                    } finally {
+                        busy.remove(location);
+                    }
+                }));
+        return true;
+    }
+
+    private void settleTnt(Player player, ItemStack held, WandTier tier, WandContainer container,
+            int factionId, int converted) {
+        // Re-checked against the container as it is now: the lock keeps other
+        // wands out, but a player can still empty a chest by hand during the
+        // bank write, and the gunpowder that was priced must still be there.
+        if (convertibleTnt(container, converted) < converted) {
+            bank.withdrawTnt(factionId, converted);
+            player.sendMessage(messages.get(player, "wand.container-changed"));
             return;
         }
 
         container.remove(Material.GUNPOWDER, converted * wands.gunpowderPerTnt(), wands::isPlainStack);
-        if (sandPer > 0) {
-            container.remove(Material.SAND, converted * sandPer, wands::isPlainStack);
+        if (wands.sandPerTnt() > 0) {
+            container.remove(Material.SAND, converted * wands.sandPerTnt(), wands::isPlainStack);
         }
         container.commit();
-
-        int amount = converted;
-        bank.depositTnt(factionId, amount, capacity).whenComplete((stored, error) ->
-                org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (error != null || !Boolean.TRUE.equals(stored)) {
-                        // The bank write failed after the gunpowder was taken,
-                        // so hand the TNT back as items rather than losing it.
-                        giveOrDrop(player, new ItemStack(Material.TNT, amount));
-                        player.sendMessage(messages.get(player, "wand.tnt-bank-failed"));
-                        return;
-                    }
-                    player.sendMessage(messages.get(player, "wand.tnt-converted",
-                            "amount", Numbers.formatFull(amount)));
-                    plugin.getLogger().info("TNT Wand: " + player.getName() + " banked " + amount
-                            + " TNT for faction " + factionId + " using tier " + tier.id() + ".");
-                }));
         spendUse(player, held, tier);
+        player.sendMessage(messages.get(player, "wand.tnt-converted",
+                "amount", Numbers.formatFull(converted)));
+        plugin.getLogger().info("TNT Wand: " + player.getName() + " banked " + converted
+                + " TNT for faction " + factionId + " using tier " + tier.id() + ".");
     }
 
-    private void giveOrDrop(Player player, ItemStack item) {
-        player.getInventory().addItem(item).values()
-                .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+    /** How much TNT the container's materials could make, capped by {@code limit}. */
+    private int convertibleTnt(WandContainer container, long limit) {
+        Map<Material, Integer> contents = container.contents(wands::isPlainStack);
+        int possible = contents.getOrDefault(Material.GUNPOWDER, 0) / wands.gunpowderPerTnt();
+        int sandPer = wands.sandPerTnt();
+        if (sandPer > 0) {
+            possible = Math.min(possible, contents.getOrDefault(Material.SAND, 0) / sandPer);
+        }
+        return (int) Math.min(possible, limit);
     }
+
 
     private void spendUse(Player player, ItemStack held, WandTier tier) {
         if (wands.consumeUse(held, tier)) {

@@ -56,13 +56,23 @@ is taken, and the container is not partially processed — the wand simply
 reports that the bank is full. If the bank has *some* room, only as much TNT
 as fits is converted.
 
-If the bank write fails after the Gunpowder was taken, the TNT is handed
-back as items rather than lost.
+The bank is credited **before** anything is taken from the container. The
+deposit is the step that can fail or lose a race with another deposit, so
+doing it first means a failure costs the player nothing — rather than taking
+their Gunpowder and only then discovering there was no room.
+
+Once the deposit lands, the container is re-checked before the Gunpowder is
+removed. The container lock keeps other wands out, but a player can still
+empty a chest by hand during the bank write; if the Gunpowder that was
+priced is no longer there, the banked TNT is withdrawn again and nothing is
+taken.
 
 ## Transaction safety
 
 - A container being processed is locked for the duration, so two players
   cannot empty the same chest at once and a click repeat cannot double-fire.
+  The TNT path holds that lock across its asynchronous bank write rather
+  than releasing it when the click handler returns.
 - Nothing is removed, no use is spent, and no money or TNT moves unless the
   whole operation can complete.
 - Sell Wand sales and TNT Wand conversions are logged to console with the

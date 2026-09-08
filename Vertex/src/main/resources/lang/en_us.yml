@@ -931,4 +931,4 @@ wand:
   no-gunpowder: "&d&lWANDS&r &7> <yellow>There isn't enough Gunpowder in there to make any TNT."
   tnt-bank-full: "&d&lWANDS&r &7> <red>Your faction's TNT bank is full ({max}), so the wand was not used."
   tnt-converted: "&d&lWANDS&r &7> <green>Banked <yellow>{amount}<green> TNT for your faction."
-  tnt-bank-failed: "&d&lWANDS&r &7> <red>The TNT bank could not be updated, so the TNT was returned to you."
+  container-changed: "&d&lWANDS&r &7> <red>The container changed while the wand was working, so nothing was taken."
