@@ -1,5 +1,6 @@
 package me.vertex.core.backpack;
 
+import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
@@ -30,7 +31,8 @@ public final class BackpackFilterCommand implements CommandExecutor, TabComplete
         }
         if (args.length == 0) {
             String listed = filters.filtered(player.getUniqueId()).stream().map(Material::name).sorted()
-                    .reduce((left, right) -> left + ", " + right).orElse(messages.getRaw(player, "backpack.filter-none"));
+                    .reduce((left, right) -> left + ", " + right)
+                    .orElse(MessageFormatter.plain(messages.getRaw(player, "backpack.filter-none")));
             player.sendMessage(messages.get(player, "backpack.filter-list", "items", listed));
             player.sendMessage(messages.get(player, "backpack.filter-usage"));
             return true;

@@ -22,6 +22,28 @@ public record MineKothDefinition(
         return enabled && world != null && !world.isBlank() && !(minX == 0 && maxX == 0 && minZ == 0 && maxZ == 0);
     }
 
+    /**
+     * Where the hologram floats: centred over the capture zone and lifted
+     * clear of the floor, matching how scheduled KOTHs place theirs.
+     *
+     * <p>Derived from the bounds every time rather than stored, so moving the
+     * zone moves the hologram with it instead of leaving one behind at the
+     * old coordinates.
+     */
+    public Location hologramLocation() {
+        if (!isDefined()) {
+            return null;
+        }
+        org.bukkit.World bukkitWorld = org.bukkit.Bukkit.getWorld(world);
+        return bukkitWorld == null ? null : new Location(bukkitWorld,
+                (minX + maxX + 1D) / 2D, minY + 3.5D, (minZ + maxZ + 1D) / 2D);
+    }
+
+    /** Stable per-mine name so a restart updates its hologram rather than adding another. */
+    public String hologramName() {
+        return "vertex_mine_koth_" + mineId;
+    }
+
     public boolean contains(Location location) {
         return location != null
                 && location.getWorld() != null

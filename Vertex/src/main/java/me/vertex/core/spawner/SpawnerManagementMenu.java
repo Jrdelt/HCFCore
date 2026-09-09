@@ -1,5 +1,6 @@
 package me.vertex.core.spawner;
 
+import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import net.kyori.adventure.text.Component;
@@ -34,19 +35,20 @@ public final class SpawnerManagementMenu {
         Component mobName = config != null ? MessageFormatter.deserialize(config.displayName())
                 : Component.text(data.mobType().name());
 
+        double unitPrice = config != null ? config.price() : 0;
         inventory.setItem(4, icon(Material.SPAWNER, mobName, List.of(
-                messages.get(player, "spawner.info-stack-size", "size", String.valueOf(data.stackSize())))));
+                messages.get(player, "spawner.info-stack-size", "size", String.valueOf(data.stackSize())),
+                messages.get(player, "spawner.info-value", "amount", EconomyHook.format(unitPrice)))));
         inventory.setItem(WITHDRAW_ONE_SLOT, icon(Material.CHEST,
                 messages.get(player, "spawner.withdraw-one"), List.of()));
         inventory.setItem(WITHDRAW_ALL_SLOT, icon(Material.ENDER_CHEST,
                 messages.get(player, "spawner.withdraw-all"), List.of()));
 
-        double price = config != null ? config.price() : 0;
-        double refund = price * manager.sellRefundPercent() / 100.0;
+        double refund = unitPrice * manager.sellRefundPercent() / 100.0;
         inventory.setItem(SELL_ONE_SLOT, icon(Material.GOLD_INGOT,
-                messages.get(player, "spawner.sell-one", "amount", String.valueOf((long) refund)), List.of()));
+                messages.get(player, "spawner.sell-one", "amount", EconomyHook.format(refund)), List.of()));
         inventory.setItem(SELL_ALL_SLOT, icon(Material.GOLD_BLOCK,
-                messages.get(player, "spawner.sell-all", "amount", String.valueOf((long) (refund * data.stackSize()))),
+                messages.get(player, "spawner.sell-all", "amount", EconomyHook.format(refund * data.stackSize())),
                 List.of()));
 
         player.openInventory(inventory);

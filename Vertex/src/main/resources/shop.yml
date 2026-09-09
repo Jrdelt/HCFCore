@@ -196,8 +196,8 @@ categories:
       RED_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
       BLACK_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
 
-  spawners_and_mob_drops:
-    display-name: "Spawners and Mob Drops"
+  spawners:
+    display-name: "Spawners"
     icon: SPAWNER
     items:
       COW_SPAWN_EGG: { base-price: 50.0 }
@@ -238,6 +238,11 @@ categories:
       WITHER_SKELETON_SPAWN_EGG: { base-price: 110.0 }
       STRAY_SPAWN_EGG: { base-price: 50.0 }
       HUSK_SPAWN_EGG: { base-price: 45.0 }
+
+  mob_drops:
+    display-name: "Mob Drops"
+    icon: BONE
+    items:
       BONE: { base-price: 1.5 }
       STRING: { base-price: 1.5 }
       GUNPOWDER: { base-price: 2.0 }

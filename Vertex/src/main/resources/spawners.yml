@@ -97,6 +97,15 @@ mobs:
         max: 1
         chance: 0.005
 
+  CREEPER:
+    display-name: '<green>ᴄʀᴇᴇᴘᴇʀ ꜱᴘᴀᴡɴᴇʀ'
+    price: 75000.0
+    drops:
+      - material: GUNPOWDER
+        min: 0
+        max: 2
+        chance: 1.0
+
 # ============================================
 # MOB STACKING
 # ============================================
@@ -122,6 +131,7 @@ mob-stacking:
     - BLAZE
     - IRON_GOLEM
     - EVOKER
+    - CREEPER
   # Nametag shown above a stacked mob. {count} and {name} placeholders.
   display-format: '<yellow>x{count} <gray>{name}'
   # A whole-stack kill (see below) batches its drops into stacks of at

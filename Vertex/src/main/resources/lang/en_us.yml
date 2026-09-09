@@ -286,6 +286,7 @@ faction-upgrades:
       spawner-rate: "<dark_aqua>ꜱᴘᴀᴡɴᴇʀ ʀᴀᴛᴇ"
       crop-growth: "<green>ᴄʀᴏᴘ ɢʀᴏᴡᴛʜ"
       mob-xp: "<yellow>ᴍᴏʙ ᴇxᴘᴇʀɪᴇɴᴄᴇ"
+      tnt-bank: "<dark_red>ᴛɴᴛ ʙᴀɴᴋ ᴄᴀᴘᴀᴄɪᴛʏ"
     effect:
       claim-damage: "+{bonus}%  ᴅᴀᴍᴀɢᴇ ɪɴ ʏᴏᴜʀ ᴄʟᴀɪᴍ"
       claim-protection: "{bonus}% ʟᴇꜱꜱ ᴅᴀᴍᴀɢᴇ ɪɴ ʏᴏᴜʀ ᴄʟᴀɪᴍ"
@@ -296,6 +297,7 @@ faction-upgrades:
       spawner-rate: "+{bonus}% ꜱᴘᴀᴡɴᴇʀ ʀᴀᴛᴇ ɪɴ ʏᴏᴜʀ ᴄʟᴀɪᴍ"
       crop-growth: "{bonus}% ᴄʜᴀɴᴄᴇ ꜰᴏʀ ᴀɴ ᴇxᴛʀᴀ ᴄʀᴏᴘ-ɢʀᴏᴡᴛʜ ꜱᴛᴀɢᴇ"
       mob-xp: "+{bonus}% ᴍᴏʙ ᴇxᴘᴇʀɪᴇɴᴄᴇ ɪɴ ʏᴏᴜʀ ᴄʟᴀɪᴍ"
+      tnt-bank: "{bonus} ᴛɴᴛ ʙᴀɴᴋ ᴄᴀᴘᴀᴄɪᴛʏ"
 
 faction-bank:
   gui-title: "<dark_gray>ꜰᴀᴄᴛɪᴏɴ ʙᴀɴᴋ"
@@ -370,6 +372,7 @@ spawner:
   stacked: "&3&lSPAWNERS&r &7> <green>Stacked {amount}x -- now {size} in this stack."
   management-title: "           ꜱᴘᴀᴡɴᴇʀ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ"
   info-stack-size: "<gray>ꜱᴛᴀᴄᴋ ꜱɪᴢᴇ:  <white>{size}"
+  info-value: "<gray>ᴠᴀʟᴜᴇ:  <white>{amount}"
   withdraw-one: "<green>ᴡɪᴛʜᴅʀᴀᴡ 1"
   withdraw-all: "<green>ᴡɪᴛʜᴅʀᴀᴡ ᴀʟʟ"
   sell-one: "<gold>ꜱᴇʟʟ 1 <gray>(+{amount})"
@@ -942,7 +945,7 @@ wand:
 
 mines:
   disabled: "&b&lMINES&r &7> <red>Mining worlds are disabled."
-  usage-admin: "&b&lMINES&r &7> <gray>Staff: <yellow>/mines wand <mine> [koth]<gray>, <yellow>/mines cancel<gray>, <yellow>/mines list"
+  usage-admin: "&b&lMINES&r &7> <gray>Staff: <yellow>/mines wand <mine> [koth]<gray>, <yellow>/mines fill <mine><gray>, <yellow>/mines cancel<gray>, <yellow>/mines list"
   unknown: "&b&lMINES&r &7> <red>Unknown mine. Available: <yellow>{mines}"
   none-defined: "&b&lMINES&r &7> <gray>No mining worlds have been placed yet."
   overview-entry: "&b&lMINES&r &7> <yellow>{mine} <dark_gray>({world}) <gray>-- {ores}"
@@ -965,6 +968,11 @@ mines:
   selection-none: "&b&lMINES&r &7> <red>You have no selection in progress."
   save-failed: "&b&lMINES&r &7> <red>Could not save mines.yml -- check the console."
   created: "&b&lMINES&r &7> <green>Placed <yellow>{mine}<green> in <yellow>{world}<green> ({volume} blocks)."
+  not-placed: "&b&lMINES&r &7> <red>{mine} has no region yet -- place it with <yellow>/mines wand {mine}<red> first."
+  fill-started: "&b&lMINES&r &7> <yellow>Seeding <white>{mine}<yellow> with ore. This runs in the background."
+  fill-complete: "&b&lMINES&r &7> <green>Finished seeding <yellow>{mine}<green> -- placed {placed} ore blocks."
+  fill-aborted: "&b&lMINES&r &7> <red>Seeding {mine} stopped early; its region or world is no longer available."
+  fill-busy: "&b&lMINES&r &7> <red>{mine} is already being seeded."
   koth-selection-started: "&b&lMINES&r &7> <yellow>Selecting the <white>KOTH capture zone<yellow> for <white>{mine}<yellow>. Left-click one corner, right-click the other, then sneak and click air."
   koth-created: "&b&lMINES&r &7> <green>Placed the KOTH zone for <yellow>{mine}<green> ({volume} blocks)."
   koth-captured: "&b&lMINE KOTH&r &7> <yellow>{faction}<green> now controls the <yellow>{mine}<green> KOTH!"
@@ -972,6 +980,11 @@ mines:
   hotzone-active-short: "<gold>ᴀᴄᴛɪᴠᴇ <green>(+{percent}%)"
   hotzone-inactive: "<dark_gray>ɪɴᴀᴄᴛɪᴠᴇ"
   koth-unclaimed: "<dark_gray>ᴜɴᴄʟᴀɪᴍᴇᴅ"
+  koth-state-idle: "Idle"
+  koth-state-capturing: "Being captured"
+  koth-state-contested: "Contested"
+  koth-state-defending: "Defending"
+  koth-state-held: "Held"
   pvp-everywhere: "<red>ᴇɴᴀʙʟᴇᴅ ᴇᴠᴇʀʏᴡʜᴇʀᴇ"
   pvp-koth-only: "<yellow>ᴋᴏᴛʜ ᴢᴏɴᴇ ᴏɴʟʏ"
   eligible-yes: "<green>ʏᴇꜱ"

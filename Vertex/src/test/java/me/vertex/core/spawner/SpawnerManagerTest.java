@@ -58,7 +58,10 @@ class SpawnerManagerTest {
 
     @Test
     void unconfiguredMobHasNoConfig() {
-        assertNull(manager.getMobConfig(EntityType.CREEPER));
+        // Deliberately a mob spawners.yml does not list. Creeper used to
+        // serve here and stopped being valid the moment it was added as a
+        // real spawner, which is exactly the trap to avoid repeating.
+        assertNull(manager.getMobConfig(EntityType.PIG));
     }
 
     @Test
@@ -94,7 +97,7 @@ class SpawnerManagerTest {
 
     @Test
     void rollDropsIsEmptyForAMobWithNoDropTable() {
-        assertTrue(manager.rollDrops(EntityType.CREEPER).isEmpty());
+        assertTrue(manager.rollDrops(EntityType.PIG).isEmpty());
     }
 
     @Test
@@ -105,10 +108,10 @@ class SpawnerManagerTest {
         assertEquals(64, manager.dropBatchSize());
         assertEquals("<yellow>x{count} <gray>{name}", manager.stackDisplayFormat());
         for (EntityType type : List.of(EntityType.ZOMBIE, EntityType.SKELETON, EntityType.BLAZE,
-                EntityType.IRON_GOLEM, EntityType.EVOKER)) {
+                EntityType.IRON_GOLEM, EntityType.EVOKER, EntityType.CREEPER)) {
             assertTrue(manager.stackableTypes().contains(type), type + " should be stackable per spawners.yml");
         }
-        assertFalse(manager.stackableTypes().contains(EntityType.CREEPER));
+        assertFalse(manager.stackableTypes().contains(EntityType.PIG));
     }
 
     @Test

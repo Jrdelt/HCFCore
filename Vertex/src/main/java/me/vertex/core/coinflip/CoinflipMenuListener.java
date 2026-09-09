@@ -114,8 +114,11 @@ public final class CoinflipMenuListener implements Listener {
         CoinflipManager.PlayOutcome outcome = manager.play(coinflipId, player);
         if (outcome.result() != CoinflipManager.PlayResult.OK) {
             player.sendMessage(messages.get(player, playFailureKey(outcome.result())));
+            CoinflipMenu.openBrowse(player, manager, messages, holder.page());
         }
-        CoinflipMenu.openBrowse(player, manager, messages, holder.page());
+        // On success, manager.play() has already opened the shared coinflip
+        // animation for both players -- reopening Browse here would instantly
+        // replace it, since a player can only have one inventory open at a time.
     }
 
     private void handleSelfBanClick(Player player) {

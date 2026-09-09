@@ -1,14 +1,18 @@
 package me.vertex.core.mine;
 
 import me.vertex.core.factions.FactionsHook;
+import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,6 +38,8 @@ public final class MineKothManager {
 
     private volatile long tickIntervalTicks = 20L;
     private BukkitTask task;
+    /** Warns once per failure streak instead of once per tick. */
+    private final java.util.Set<String> hologramFailures = ConcurrentHashMap.newKeySet();
 
     public MineKothManager(Plugin plugin, MineManager mines, MineKothStorage storage, Messages messages) {
         this.plugin = plugin;
@@ -91,6 +97,7 @@ public final class MineKothManager {
                     ownedSince, result.capturingFactionId(), result.state());
             states.put(definition.mineId(), after);
 
+            updateHologram(definition, after);
             announce(definition, before, result);
             if (result.ownerChanged() || result.lostControl() || result.crossedResetThreshold()) {
                 persist(definition.mineId(), after);
@@ -223,6 +230,94 @@ public final class MineKothManager {
             task = null;
         }
         flush();
+        // A Mine KOTH is permanent, but its hologram is not: leaving one
+        // behind on shutdown would strand a stale board in the world that
+        // nothing owns and nothing updates.
+        for (MineKothDefinition definition : mines.kothDefinitions()) {
+            removeHologram(definition);
+        }
+    }
+
+    /**
+     * Draws the point's board, in the same shape a scheduled KOTH uses.
+     *
+     * <p>Retried every tick regardless of a past failure, so a transient
+     * problem -- DecentHolograms still starting, the chunk briefly unloaded
+     * -- heals itself rather than leaving the board dead for good.
+     */
+    private void updateHologram(MineKothDefinition definition, State state) {
+        if (!mines.kothHologramsEnabled() || !hologramsAvailable()) {
+            return;
+        }
+        Location location = definition.hologramLocation();
+        if (location == null) {
+            return;
+        }
+        MineRegion region = mines.region(definition.mineId());
+        long held = state.owner == null || state.ownedSince <= 0L
+                ? 0L : (System.currentTimeMillis() - state.ownedSince) / 1000L;
+        double booster = state.owner == null || state.control < 100D
+                ? 0D : definition.booster().percentFor(held);
+        MineKothBooster.Tier next = definition.booster().nextTier(held);
+
+        List<String> lines = mines.kothHologramLines().stream()
+                .map(line -> MessageFormatter.legacyAmpersand(line
+                        .replace("{name}", region == null ? definition.mineId() : region.displayName())
+                        .replace("{owner}", state.owner == null
+                                ? messages.getRaw(null, "mines.koth-unclaimed") : factionName(state.owner))
+                        .replace("{control}", String.format("%.0f", state.control))
+                        .replace("{booster}", trimmed(booster))
+                        .replace("{held}", state.owner == null ? "-" : formatDuration(held))
+                        .replace("{next}", next == null ? "-" : "+" + trimmed(next.percent()) + "%")
+                        .replace("{status}", messages.getRaw(null, "mines.koth-state-" + state.state.name().toLowerCase(Locale.ROOT)))))
+                .toList();
+        try {
+            eu.decentsoftware.holograms.api.holograms.Hologram hologram =
+                    eu.decentsoftware.holograms.api.DHAPI.getHologram(definition.hologramName());
+            if (hologram == null) {
+                eu.decentsoftware.holograms.api.DHAPI.createHologram(definition.hologramName(), location, true, lines);
+            } else {
+                eu.decentsoftware.holograms.api.DHAPI.setHologramLines(hologram, lines);
+            }
+            hologramFailures.remove(definition.hologramName());
+        } catch (Throwable e) {
+            // Throwable, not Exception: an incompatible DecentHolograms
+            // upgrade throws LinkageError, which would otherwise escape and
+            // abort the whole shared tick for every other point too.
+            if (hologramFailures.add(definition.hologramName())) {
+                plugin.getLogger().log(Level.WARNING, "Failed to update the Mine KOTH hologram for "
+                        + definition.mineId() + " -- will keep retrying silently.", e);
+            }
+        }
+    }
+
+    private void removeHologram(MineKothDefinition definition) {
+        hologramFailures.remove(definition.hologramName());
+        if (!hologramsAvailable()) {
+            return;
+        }
+        try {
+            eu.decentsoftware.holograms.api.DHAPI.removeHologram(definition.hologramName());
+        } catch (Throwable ignored) {
+            // Already gone, or the API changed; either way it is not ours to update.
+        }
+    }
+
+    private boolean hologramsAvailable() {
+        return Bukkit.getPluginManager().isPluginEnabled("DecentHolograms");
+    }
+
+    private static String trimmed(double value) {
+        return value == Math.rint(value) ? String.valueOf((long) value) : String.valueOf(value);
+    }
+
+    private static String formatDuration(long seconds) {
+        if (seconds <= 0) {
+            return "-";
+        }
+        long hours = seconds / 3600;
+        long minutes = seconds % 3600 / 60;
+        return hours > 0 ? hours + "h " + minutes + "m" : minutes > 0 ? minutes + "m" : seconds + "s";
     }
 
     private record State(Integer owner, double control, long ownedSince, Integer capturing,

@@ -93,6 +93,7 @@ are available for staff testing. See [Player Trading](trading.md).
 |---|---|---|
 | `/mines` | Open to all | Overview of the placed mining worlds — see [Mining Worlds](mines.md). |
 | `/mines wand <mine>` | `vertex.mines.admin` | Blaze-rod corner selection; saving writes the world and bounds into `mines.yml`. |
+| `/mines fill <mine>` | `vertex.mines.admin` | Seeds the region with ore from its table. Runs automatically when a region is placed; use this after rebuilding the arena or changing the ore table. |
 | `/mines cancel` / `/mines list` | `vertex.mines.admin` | Abandon a selection, or show which mines are placed. Staff subcommands are never named to players who lack the permission. |
 
 ## Wands

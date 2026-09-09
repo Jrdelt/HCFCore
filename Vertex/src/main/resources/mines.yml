@@ -28,6 +28,11 @@ regeneration:
   # that were actually mined are ever visited.
   worker-interval-ticks: 5
   max-per-pass: 100
+  # Blocks seeded per pass when a mine is first filled (/mines fill, and
+  # automatically when a region is placed). Regeneration alone only touches
+  # blocks a player already mined, so this is what actually puts ore in the
+  # ground. Raise it to fill faster; lower it if filling causes lag.
+  fill-blocks-per-tick: 4000
 
 # Players inside a mine region may only break blocks the mine generates.
 # Structure, walls, floor, and decoration are therefore safe without listing
@@ -77,6 +82,15 @@ mines:
     koth:
       enabled: true
       capture-seconds: 180
+      # Floating board over the capture zone, same shape as a scheduled
+      # KOTH's. {name}, {owner}, {control}, {booster}, {held}, {next}, and
+      # {status} are available.
+      hologram:
+        enabled: true
+        lines:
+          - '&4&lMINE KOTH &f{name}'
+          - '&e{control}% &7• &7Owner: &b{owner}'
+          - '&7Booster: &a+{booster}% &7• Held: &f{held}'
       multiple-members-speed-up: true
       additional-member-speed: 0.25
       max-counted-members: 5
@@ -139,6 +153,15 @@ mines:
     koth:
       enabled: true
       capture-seconds: 180
+      # Floating board over the capture zone, same shape as a scheduled
+      # KOTH's. {name}, {owner}, {control}, {booster}, {held}, {next}, and
+      # {status} are available.
+      hologram:
+        enabled: true
+        lines:
+          - '&4&lMINE KOTH &f{name}'
+          - '&e{control}% &7• &7Owner: &b{owner}'
+          - '&7Booster: &a+{booster}% &7• Held: &f{held}'
       multiple-members-speed-up: true
       additional-member-speed: 0.25
       max-counted-members: 5

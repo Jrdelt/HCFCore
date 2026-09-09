@@ -30,6 +30,22 @@ its `world` stays blank and it is simply inactive.
 
 `/mines list` shows which are placed. `/mines cancel` abandons a selection.
 
+### Seeding the ore
+
+Placing a region **fills it with ore automatically** — regeneration alone
+only ever touches blocks a player has already mined, so without this a fresh
+mine stays solid stone until someone digs it out block by block.
+
+Run `/mines fill <mine>` to seed it again — after rebuilding the arena, or
+after changing the ore table. It only ever replaces the configured
+`base-blocks`, so structure, walls, and decoration inside the selection are
+left untouched, and it works through the region in bounded batches
+(`regeneration.fill-blocks-per-tick`) rather than setting everything at once.
+
+If ore is not appearing, check `/mines list` first: a mine with no region
+selected is inactive, and **claiming the land with factions does not place a
+mine** — only the blaze-rod selection does.
+
 ## Why player-placed ore is impossible
 
 Placing blocks inside a mine region is denied outright, and players may only
@@ -131,6 +147,18 @@ ladder can be any shape:
 Control falling below `booster-reset-threshold` (50%) wipes progression back
 to the first stage. Between that and 100% the booster is inactive but the
 earned stage is only paused.
+
+### Hologram
+
+Each placed KOTH zone shows a floating board in the same shape a scheduled
+KOTH uses — centred over the zone and lifted clear of the floor. It shows the
+owner, control percentage, current booster, and how long it has been held,
+and updates every tick alongside control.
+
+Lines are configured per mine under `koth.hologram.lines` in `mines.yml`,
+with `{name}`, `{owner}`, `{control}`, `{booster}`, `{held}`, `{next}`, and
+`{status}` available. It needs **DecentHolograms**; without that plugin the
+KOTH still works, it just has no board.
 
 ### Persistence
 

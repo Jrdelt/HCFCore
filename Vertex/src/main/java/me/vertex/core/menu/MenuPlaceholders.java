@@ -11,12 +11,18 @@ import java.util.Map;
 /**
  * Values a menu fills into its configured name and lore templates.
  *
- * <p>Two kinds, deliberately kept apart:
+ * <p>Three kinds, deliberately kept apart:
  *
  * <ul>
  *   <li><b>text</b> -- inline {@code {key}} substitutions. Escaped before
  *       insertion, because a value may be a player name or faction tag and
  *       must never smuggle formatting into an admin's template.
+ *   <li><b>trusted text</b> -- inline {@code {key}} substitutions inserted
+ *       verbatim, for admin-authored lang snippets (e.g. a colored "Yes"/
+ *       "No" or status label from en_us.yml) that are meant to carry their
+ *       own MiniMessage formatting into the surrounding template. Never use
+ *       this for a player name, faction tag, or anything else a player
+ *       controls the contents of.
  *   <li><b>blocks</b> -- a whole lore line replaced by several rendered
  *       lines, for genuinely variable-length content like "one line per
  *       booster source". These are built in code, so they are trusted and
@@ -26,6 +32,7 @@ import java.util.Map;
 public final class MenuPlaceholders {
 
     private final Map<String, String> text = new LinkedHashMap<>();
+    private final Map<String, String> trustedText = new LinkedHashMap<>();
     private final Map<String, List<Component>> blocks = new LinkedHashMap<>();
 
     public static MenuPlaceholders of() {
@@ -39,6 +46,12 @@ public final class MenuPlaceholders {
 
     public MenuPlaceholders put(String key, Number value) {
         return put(key, String.valueOf(value));
+    }
+
+    /** Like {@link #put(String, String)}, but inserted without escaping -- see the class doc. */
+    public MenuPlaceholders putTrusted(String key, String value) {
+        trustedText.put(key, value == null ? "" : value);
+        return this;
     }
 
     /** Replaces a lore line consisting solely of {@code {key}} with these lines. */
@@ -66,6 +79,9 @@ public final class MenuPlaceholders {
         for (Map.Entry<String, String> entry : text.entrySet()) {
             result = result.replace("{" + entry.getKey() + "}",
                     MessageFormatter.escapeForSubstitution(entry.getValue()));
+        }
+        for (Map.Entry<String, String> entry : trustedText.entrySet()) {
+            result = result.replace("{" + entry.getKey() + "}", entry.getValue());
         }
         return result;
     }

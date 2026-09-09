@@ -304,6 +304,7 @@ faction-upgrades:
       spawner-rate: "<dark_aqua>Spawner Rate"
       crop-growth: "<green>Crop Growth"
       mob-xp: "<yellow>Mob Experience"
+      tnt-bank: "<dark_red>TNT Bank Capacity"
     effect:
       claim-damage: "+{bonus}% damage in your claim"
       claim-protection: "{bonus}% less damage in your claim"
@@ -314,6 +315,7 @@ faction-upgrades:
       spawner-rate: "+{bonus}% spawner rate in your claim"
       crop-growth: "{bonus}% chance for an extra crop-growth stage"
       mob-xp: "+{bonus}% mob experience in your claim"
+      tnt-bank: "{bonus} TNT bank capacity"
 
 faction-bank:
   gui-title: "<dark_gray>Faction Bank"
@@ -384,6 +386,7 @@ spawner:
   stacked: '<green>Stacked {amount}x -- now {size} in this stack.'
   management-title: 'Spawner Management'
   info-stack-size: '<gray>Stack size: <white>{size}'
+  info-value: '<gray>Value: <white>{amount}'
   withdraw-one: '<green>Withdraw 1'
   withdraw-all: '<green>Withdraw All'
   sell-one: '<gold>Sell 1 <gray>(+{amount})'

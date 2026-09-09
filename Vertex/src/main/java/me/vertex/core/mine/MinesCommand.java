@@ -17,7 +17,7 @@ import java.util.Locale;
 public final class MinesCommand implements CommandExecutor, TabCompleter {
 
     public static final String ADMIN_PERMISSION = "vertex.mines.admin";
-    private static final List<String> ADMIN_ACTIONS = List.of("wand", "cancel", "list");
+    private static final List<String> ADMIN_ACTIONS = List.of("wand", "fill", "cancel", "list");
 
     private final MineManager mines;
     private final MineKothManager koths;
@@ -65,6 +65,22 @@ public final class MinesCommand implements CommandExecutor, TabCompleter {
                 boolean kothZone = args.length >= 3 && args[2].equalsIgnoreCase("koth");
                 mines.beginSelection(player, args[1], kothZone);
             }
+            case "fill" -> {
+                if (args.length < 2) {
+                    player.sendMessage(messages.get(player, "mines.usage-admin"));
+                    return true;
+                }
+                MineRegion region = mines.region(args[1]);
+                if (region == null || !region.isDefined()) {
+                    player.sendMessage(messages.get(player, "mines.not-placed", "mine", args[1]));
+                    return true;
+                }
+                if (!mines.beginFill(region, player.getUniqueId())) {
+                    player.sendMessage(messages.get(player, "mines.fill-busy", "mine", region.displayName()));
+                    return true;
+                }
+                player.sendMessage(messages.get(player, "mines.fill-started", "mine", region.displayName()));
+            }
             case "cancel" -> player.sendMessage(messages.get(player,
                     mines.cancelSelection(player) ? "mines.selection-cancelled" : "mines.selection-none"));
             case "list" -> {
@@ -98,7 +114,7 @@ public final class MinesCommand implements CommandExecutor, TabCompleter {
             }
             return options;
         }
-        if (args.length == 2 && args[0].equalsIgnoreCase("wand")) {
+        if (args.length == 2 && (args[0].equalsIgnoreCase("wand") || args[0].equalsIgnoreCase("fill"))) {
             return mines.regions().stream()
                     .map(MineRegion::id)
                     .filter(id -> id.startsWith(args[1].toLowerCase(Locale.ROOT)))

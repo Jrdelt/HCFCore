@@ -54,7 +54,7 @@ public final class BoostersMenu {
             BoosterCategory category = categories[index];
             BoosterStacking.Result result = service.result(subject, category);
             MenuPlaceholders placeholders = MenuPlaceholders.of()
-                    .put("category", messages.getRaw(viewer, "boosters.category-" + category.configKey()))
+                    .putTrusted("category", messages.getRaw(viewer, "boosters.category-" + category.configKey()))
                     .put("effective", percent(result.effective()))
                     .put("raw", percent(result.raw()))
                     .put("cap", percent(service.rules(category).cap()))
@@ -108,10 +108,10 @@ public final class BoostersMenu {
     private static MenuPlaceholders placeholdersFor(Player viewer, Messages messages,
             BoosterContribution contribution) {
         MenuPlaceholders placeholders = MenuPlaceholders.of()
-                .put("source", messages.getRaw(viewer, "boosters.source-" + contribution.sourceId()))
+                .putTrusted("source", messages.getRaw(viewer, "boosters.source-" + contribution.sourceId()))
                 .put("percent", percent(contribution.percent()));
         if (!contribution.active()) {
-            placeholders.put("reason",
+            placeholders.putTrusted("reason",
                     messages.getRaw(viewer, "boosters.reason-" + contribution.inactiveReasonKey()));
         }
         return placeholders;
@@ -123,7 +123,7 @@ public final class BoostersMenu {
         for (BoosterContribution contribution : service.contributions(subject, category)) {
             lines.add(MessageFormatter.deserialize(messages.getRaw(viewer,
                     contribution.active() ? "boosters.line-active" : "boosters.line-inactive",
-                    "source", messages.getRaw(viewer, "boosters.source-" + contribution.sourceId()),
+                    "source", MessageFormatter.plain(messages.getRaw(viewer, "boosters.source-" + contribution.sourceId())),
                     "percent", percent(contribution.percent()))));
         }
         if (lines.isEmpty()) {

@@ -59,6 +59,10 @@ public final class MineManager {
     private volatile long workerIntervalTicks;
     private volatile int maxRegenPerPass;
     private volatile long kothTickIntervalTicks;
+    private volatile int fillBlocksPerTick;
+    private volatile boolean kothHologramsEnabled;
+    private volatile List<String> kothHologramLines = List.of();
+    private final java.util.Deque<FillJob> fillJobs = new java.util.ArrayDeque<>();
     private BukkitTask regenTask;
     private volatile HotZoneManager hotZones;
 
@@ -82,6 +86,7 @@ public final class MineManager {
         workerIntervalTicks = Math.max(1L, config.getLong("regeneration.worker-interval-ticks", 5L));
         maxRegenPerPass = Math.max(1, config.getInt("regeneration.max-per-pass", 100));
         kothTickIntervalTicks = Math.max(1L, config.getLong("koth.tick-interval-ticks", 20L));
+        fillBlocksPerTick = Math.max(1, config.getInt("regeneration.fill-blocks-per-tick", 4000));
 
         regions.clear();
         kothDefinitions.clear();
@@ -97,9 +102,14 @@ public final class MineManager {
                 if (region != null) {
                     regions.put(region.id(), region);
                 }
-                MineKothDefinition koth = readKoth(mineId, region, section.getConfigurationSection("koth"));
+                ConfigurationSection kothSection = section.getConfigurationSection("koth");
+                MineKothDefinition koth = readKoth(mineId, region, kothSection);
                 if (koth != null) {
                     kothDefinitions.put(mineId, koth);
+                }
+                if (kothSection != null && kothHologramLines.isEmpty()) {
+                    kothHologramsEnabled = kothSection.getBoolean("hologram.enabled", true);
+                    kothHologramLines = List.copyOf(kothSection.getStringList("hologram.lines"));
                 }
             }
         }
@@ -190,6 +200,14 @@ public final class MineManager {
 
     public long kothTickIntervalTicks() {
         return kothTickIntervalTicks;
+    }
+
+    public boolean kothHologramsEnabled() {
+        return kothHologramsEnabled;
+    }
+
+    public List<String> kothHologramLines() {
+        return kothHologramLines;
     }
 
     public boolean isEnabled() {
@@ -332,6 +350,14 @@ public final class MineManager {
 
         selections.remove(player.getUniqueId());
         load();
+        // A newly placed mine is solid base block until something puts ore in
+        // it -- regeneration only ever touches blocks a player already mined.
+        if (!selection.kothZone) {
+            MineRegion placed = region(selection.mineId);
+            if (placed != null && beginFill(placed, player.getUniqueId())) {
+                player.sendMessage(messages.get(player, "mines.fill-started", "mine", placed.displayName()));
+            }
+        }
         player.sendMessage(messages.get(player, selection.kothZone ? "mines.koth-created" : "mines.created",
                 "mine", selection.mineId,
                 "world", selection.first.getWorld().getName(),
@@ -367,6 +393,131 @@ public final class MineManager {
         return regenQueue.size();
     }
 
+    /**
+     * Seeds every base block in the region from the ore table.
+     *
+     * <p>Regeneration alone only ever touches blocks a player has already
+     * mined, so a freshly built mine stays solid stone until someone digs it
+     * out one block at a time. This is what actually puts ore in the ground
+     * when a mine is first placed.
+     *
+     * <p>Spread over ticks in bounded batches: a selected region can be
+     * hundreds of blocks on a side, and setting that many blocks in one tick
+     * would stall the server outright.
+     *
+     * @return false when a fill is already running for this mine
+     */
+    public boolean beginFill(MineRegion region, UUID initiator) {
+        if (!region.isDefined() || region.ores().isEmpty()) {
+            return false;
+        }
+        synchronized (fillJobs) {
+            for (FillJob queued : fillJobs) {
+                if (queued.mineId.equals(region.id())) {
+                    return false;
+                }
+            }
+            fillJobs.add(new FillJob(region.id(), initiator));
+        }
+        return true;
+    }
+
+    public boolean isFilling(String mineId) {
+        synchronized (fillJobs) {
+            for (FillJob job : fillJobs) {
+                if (job.mineId.equals(mineId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Advances the current fill by one bounded batch. */
+    private void fillTick() {
+        FillJob job;
+        synchronized (fillJobs) {
+            job = fillJobs.peek();
+        }
+        if (job == null) {
+            return;
+        }
+        MineRegion region = region(job.mineId);
+        World world = region == null ? null : Bukkit.getWorld(region.world());
+        if (region == null || world == null || !region.isDefined()) {
+            finishFill(job, region, false);
+            return;
+        }
+
+        if (!job.started) {
+            job.start(region);
+        }
+        int budget = fillBlocksPerTick;
+        while (budget-- > 0) {
+            if (job.y > region.maxY()) {
+                finishFill(job, region, true);
+                return;
+            }
+            Block block = world.getBlockAt(job.x, job.y, job.z);
+            // Only ever replaces the configured base blocks, so structure,
+            // walls, and decoration inside the selection are left alone.
+            if (region.baseBlocks().contains(block.getType())) {
+                Material rolled = rollBlock(region);
+                if (rolled != null && rolled != block.getType()) {
+                    block.setType(rolled, false);
+                    job.placed++;
+                }
+            }
+            job.advance(region);
+        }
+    }
+
+    private void finishFill(FillJob job, MineRegion region, boolean completed) {
+        synchronized (fillJobs) {
+            fillJobs.remove(job);
+        }
+        Player player = job.initiator == null ? null : Bukkit.getPlayer(job.initiator);
+        if (player == null) {
+            return;
+        }
+        player.sendMessage(messages.get(player, completed ? "mines.fill-complete" : "mines.fill-aborted",
+                "mine", region == null ? job.mineId : region.displayName(),
+                "placed", String.format("%,d", job.placed)));
+    }
+
+    /** A fill walking the region one bounded batch at a time. */
+    private static final class FillJob {
+        private final String mineId;
+        private final UUID initiator;
+        private int x;
+        private int y;
+        private int z;
+        private long placed;
+        private boolean started;
+
+        private FillJob(String mineId, UUID initiator) {
+            this.mineId = mineId;
+            this.initiator = initiator;
+        }
+
+        private void start(MineRegion region) {
+            started = true;
+            x = region.minX();
+            y = region.minY();
+            z = region.minZ();
+        }
+
+        private void advance(MineRegion region) {
+            if (++z > region.maxZ()) {
+                z = region.minZ();
+                if (++x > region.maxX()) {
+                    x = region.minX();
+                    y++;
+                }
+            }
+        }
+    }
+
     private void restartWorker() {
         if (regenTask != null) {
             regenTask.cancel();
@@ -380,6 +531,7 @@ public final class MineManager {
     }
 
     private void regenTick() {
+        fillTick();
         for (MineRegenQueue.Key key : regenQueue.drainDue(System.currentTimeMillis(), maxRegenPerPass)) {
             World world = Bukkit.getWorld(key.world());
             if (world == null) {

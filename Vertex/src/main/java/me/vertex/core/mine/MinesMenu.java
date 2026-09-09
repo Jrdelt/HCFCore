@@ -89,17 +89,18 @@ public final class MinesMenu {
         long held = koths.heldSeconds(region.id());
         int factionId = FactionsHook.getFactionId(viewer);
 
-        return MenuPlaceholders.of()
+        MenuPlaceholders placeholders = MenuPlaceholders.of()
                 .put("mine", region.displayName())
                 .put("world", region.world())
-                .put("pvp", pvpLabel(region, messages, viewer))
-                .put("ores", oreList(region))
-                .put("koth_owner", ownerName(owner, messages, viewer))
+                .putTrusted("pvp", pvpLabel(region, messages, viewer))
+                .put("ores", oreList(region));
+        putOwnerName(placeholders, "koth_owner", owner, messages, viewer);
+        return placeholders
                 .put("koth_held", owner == null ? "-" : duration(held))
                 .put("koth_booster", kothBonus(koth, koths, region))
                 .put("koth_next", nextTier(koth, held))
-                .put("hotzone", hotZoneLabel(region, hotZones, messages, viewer))
-                .put("eligible", owner != null && factionId != FactionsHook.NO_FACTION && owner == factionId
+                .putTrusted("hotzone", hotZoneLabel(region, hotZones, messages, viewer))
+                .putTrusted("eligible", owner != null && factionId != FactionsHook.NO_FACTION && owner == factionId
                         ? messages.getRaw(viewer, "mines.eligible-yes")
                         : messages.getRaw(viewer, "mines.eligible-no"));
     }
@@ -110,9 +111,9 @@ public final class MinesMenu {
                 .count();
         return MenuPlaceholders.of()
                 .put("world", region.world())
-                .put("pvp", pvpLabel(region, messages, viewer))
+                .putTrusted("pvp", pvpLabel(region, messages, viewer))
                 .put("players", String.valueOf(here))
-                .put("inside", viewer.getWorld().getName().equalsIgnoreCase(region.world())
+                .putTrusted("inside", viewer.getWorld().getName().equalsIgnoreCase(region.world())
                         ? messages.getRaw(viewer, "mines.eligible-yes")
                         : messages.getRaw(viewer, "mines.eligible-no"))
                 .put("regen", String.valueOf(region.regenDelaySeconds()));
@@ -123,19 +124,35 @@ public final class MinesMenu {
         MineKothDefinition koth = mines.kothDefinition(region.id());
         Integer owner = koths.ownerOf(region.id());
         long held = koths.heldSeconds(region.id());
-        return MenuPlaceholders.of()
-                .put("koth_owner", ownerName(owner, messages, null))
+        MenuPlaceholders placeholders = MenuPlaceholders.of()
                 .put("koth_control", String.valueOf(Math.round(koths.controlOf(region.id()))))
                 .put("koth_held", owner == null ? "-" : duration(held))
                 .put("koth_booster", kothBonus(koth, koths, region))
                 .put("koth_next", nextTier(koth, held));
+        putOwnerName(placeholders, "koth_owner", owner, messages, null);
+        return placeholders;
+    }
+
+    /**
+     * A KOTH's owner is either the trusted, admin-colored "unclaimed" lang
+     * snippet or a player-chosen faction name -- only the former is safe to
+     * insert without escaping its formatting.
+     */
+    private static void putOwnerName(MenuPlaceholders placeholders, String key, Integer factionId,
+            Messages messages, Player viewer) {
+        if (factionId == null) {
+            placeholders.putTrusted(key, messages.getRaw(viewer, "mines.koth-unclaimed"));
+            return;
+        }
+        String name = FactionsHook.getFactionName(factionId);
+        placeholders.put(key, name == null ? String.valueOf(factionId) : name);
     }
 
     private static MenuPlaceholders hotZonePlaceholders(MineRegion region, HotZoneManager hotZones,
             Messages messages) {
         boolean active = hotZones.isActive(region.id());
         return MenuPlaceholders.of()
-                .put("hotzone", messages.getRaw(null, active ? "mines.hotzone-active" : "mines.hotzone-inactive"))
+                .putTrusted("hotzone", messages.getRaw(null, active ? "mines.hotzone-active" : "mines.hotzone-inactive"))
                 .put("hotzone_percent", trimmed(hotZones.oreDropPercent()))
                 .put("hotzone_remaining", active ? duration(hotZones.remainingSeconds()) : "-")
                 .put("hotzone_next", active ? "-" : duration(hotZones.secondsUntilNext()));
@@ -146,7 +163,7 @@ public final class MinesMenu {
         for (BoosterContribution contribution : boosters.contributions(viewer, BoosterCategory.ORE_DROP)) {
             lines.add(MessageFormatter.deserialize(messages.getRaw(viewer,
                     contribution.active() ? "boosters.line-active" : "boosters.line-inactive",
-                    "source", messages.getRaw(viewer, "boosters.source-" + contribution.sourceId()),
+                    "source", MessageFormatter.plain(messages.getRaw(viewer, "boosters.source-" + contribution.sourceId())),
                     "percent", trimmed(contribution.percent()))));
         }
         if (lines.isEmpty()) {
@@ -182,14 +199,6 @@ public final class MinesMenu {
         MineKothBooster.Tier next = koth.booster().nextTier(heldSeconds);
         return next == null ? "-" : "+" + trimmed(next.percent()) + "% in " + duration(
                 koth.booster().secondsUntilNextTier(heldSeconds));
-    }
-
-    private static String ownerName(Integer factionId, Messages messages, Player viewer) {
-        if (factionId == null) {
-            return messages.getRaw(viewer, "mines.koth-unclaimed");
-        }
-        String name = FactionsHook.getFactionName(factionId);
-        return name == null ? String.valueOf(factionId) : name;
     }
 
     private static String pvpLabel(MineRegion region, Messages messages, Player viewer) {
