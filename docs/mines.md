@@ -36,8 +36,38 @@ Placing a region **fills it with ore automatically** — regeneration alone
 only ever touches blocks a player has already mined, so without this a fresh
 mine stays solid stone until someone digs it out block by block.
 
-Run `/mines fill <mine>` to seed it again — after rebuilding the arena, or
-after changing the ore table. It only ever replaces the configured
+**Seeding is a one-time cost, not a chore.** Once a region is seeded,
+regeneration keeps it stocked forever: every block a player mines — ore or
+base block — is re-queued and rerolls the ore table when it comes back, so
+the mine restocks itself indefinitely. Seeded blocks are ordinary world
+blocks, so they survive restarts like anything else.
+
+Run `/mines fill <mine>` again only when you actually change something:
+after rebuilding the arena, or after editing the ore table (existing blocks
+keep whatever they already are; only re-seeding applies new weights to
+ground nobody has mined yet).
+
+### How long it takes
+
+The default rate is **4,000 blocks per pass, one pass every 5 ticks** — so
+16,000 blocks a second:
+
+| Region volume | Approximate time |
+|---|---|
+| 10,000,000 | ~10 minutes |
+| 40,000,000 | ~42 minutes |
+| 100,000,000 | ~1h 45m |
+
+Volume is the whole selected cuboid, including air and structure — those are
+scanned and skipped, which is cheap; only base blocks are ever written.
+
+A **progress bar** shows percentage, ETA, and ore placed so far while it
+runs. Running `/mines fill <mine>` again during a fill re-attaches you to
+that bar and reports the percentage rather than refusing.
+
+Raise `regeneration.fill-blocks-per-tick` to go faster, at the cost of more
+work per tick. The fill is **not resumed across a restart** — if the server
+stops mid-seed, re-run the command; already-seeded ground is simply rerolled. It only ever replaces the configured
 `base-blocks`, so structure, walls, and decoration inside the selection are
 left untouched, and it works through the region in bounded batches
 (`regeneration.fill-blocks-per-tick`) rather than setting everything at once.

@@ -417,9 +417,84 @@ public final class MineManager {
                     return false;
                 }
             }
-            fillJobs.add(new FillJob(region.id(), initiator));
+            FillJob job = new FillJob(region.id(), initiator);
+            job.total = (long) (region.maxX() - region.minX() + 1)
+                    * (region.maxY() - region.minY() + 1)
+                    * (region.maxZ() - region.minZ() + 1);
+            fillJobs.add(job);
+            showBar(job, initiator);
         }
         return true;
+    }
+
+    /**
+     * Adds a viewer to a fill already in progress.
+     *
+     * <p>Re-running the command during a fill shows the bar rather than
+     * refusing outright: on a large region a fill runs for tens of minutes,
+     * and "already being seeded" with no way to see how far along it is
+     * gives an admin no reason to believe it is still working.
+     *
+     * @return false when that mine is not currently being seeded
+     */
+    public boolean watchFill(String mineId, UUID viewer) {
+        synchronized (fillJobs) {
+            for (FillJob job : fillJobs) {
+                if (job.mineId.equalsIgnoreCase(mineId)) {
+                    job.watchers.add(viewer);
+                    showBar(job, viewer);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Percent complete for a running fill, or -1 when that mine is not being seeded. */
+    public double fillProgressPercent(String mineId) {
+        synchronized (fillJobs) {
+            for (FillJob job : fillJobs) {
+                if (job.mineId.equalsIgnoreCase(mineId)) {
+                    return job.fraction() * 100D;
+                }
+            }
+        }
+        return -1D;
+    }
+
+    private void showBar(FillJob job, UUID viewer) {
+        Player player = viewer == null ? null : Bukkit.getPlayer(viewer);
+        if (player != null) {
+            player.showBossBar(job.bar);
+        }
+    }
+
+    private void updateBar(FillJob job, MineRegion region) {
+        job.bar.progress((float) job.fraction());
+        long eta = job.etaSeconds();
+        job.bar.name(MessageFormatter.deserialize(messages.getRaw(null, "mines.fill-bar",
+                "mine", region == null ? job.mineId : region.displayName(),
+                "percent", String.format("%.1f", job.fraction() * 100D),
+                "eta", eta < 0 ? "?" : formatEta(eta),
+                "placed", String.format("%,d", job.placed))));
+    }
+
+    private void hideBar(FillJob job) {
+        for (UUID watcher : job.watchers) {
+            Player player = Bukkit.getPlayer(watcher);
+            if (player != null) {
+                player.hideBossBar(job.bar);
+            }
+        }
+    }
+
+    private static String formatEta(long seconds) {
+        long hours = seconds / 3600;
+        long minutes = seconds % 3600 / 60;
+        if (hours > 0) {
+            return hours + "h " + minutes + "m";
+        }
+        return minutes > 0 ? minutes + "m " + (seconds % 60) + "s" : seconds + "s";
     }
 
     public boolean isFilling(String mineId) {
@@ -468,36 +543,67 @@ public final class MineManager {
                     job.placed++;
                 }
             }
+            job.scanned++;
             job.advance(region);
         }
+        updateBar(job, region);
     }
 
     private void finishFill(FillJob job, MineRegion region, boolean completed) {
         synchronized (fillJobs) {
             fillJobs.remove(job);
         }
-        Player player = job.initiator == null ? null : Bukkit.getPlayer(job.initiator);
-        if (player == null) {
-            return;
+        hideBar(job);
+        for (UUID watcher : job.watchers) {
+            Player player = Bukkit.getPlayer(watcher);
+            if (player == null) {
+                continue;
+            }
+            player.sendMessage(messages.get(player, completed ? "mines.fill-complete" : "mines.fill-aborted",
+                    "mine", region == null ? job.mineId : region.displayName(),
+                    "placed", String.format("%,d", job.placed)));
         }
-        player.sendMessage(messages.get(player, completed ? "mines.fill-complete" : "mines.fill-aborted",
-                "mine", region == null ? job.mineId : region.displayName(),
-                "placed", String.format("%,d", job.placed)));
     }
 
     /** A fill walking the region one bounded batch at a time. */
     private static final class FillJob {
         private final String mineId;
         private final UUID initiator;
+        /** Everyone watching the progress bar, not just whoever started it. */
+        private final java.util.Set<UUID> watchers = new java.util.LinkedHashSet<>();
+        private final long startedAtMillis = System.currentTimeMillis();
+        private final net.kyori.adventure.bossbar.BossBar bar = net.kyori.adventure.bossbar.BossBar.bossBar(
+                net.kyori.adventure.text.Component.empty(), 0f,
+                net.kyori.adventure.bossbar.BossBar.Color.BLUE,
+                net.kyori.adventure.bossbar.BossBar.Overlay.PROGRESS);
         private int x;
         private int y;
         private int z;
         private long placed;
+        private long scanned;
+        private long total;
         private boolean started;
 
         private FillJob(String mineId, UUID initiator) {
             this.mineId = mineId;
             this.initiator = initiator;
+            if (initiator != null) {
+                watchers.add(initiator);
+            }
+        }
+
+        private double fraction() {
+            return total <= 0 ? 0D : Math.min(1D, scanned / (double) total);
+        }
+
+        /** Estimated seconds left, from the rate actually achieved so far. */
+        private long etaSeconds() {
+            long elapsed = Math.max(1L, (System.currentTimeMillis() - startedAtMillis) / 1000L);
+            if (scanned <= 0) {
+                return -1L;
+            }
+            double perSecond = scanned / (double) elapsed;
+            return perSecond <= 0D ? -1L : (long) ((total - scanned) / perSecond);
         }
 
         private void start(MineRegion region) {

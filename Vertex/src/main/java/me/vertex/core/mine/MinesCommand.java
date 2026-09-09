@@ -76,7 +76,12 @@ public final class MinesCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 if (!mines.beginFill(region, player.getUniqueId())) {
-                    player.sendMessage(messages.get(player, "mines.fill-busy", "mine", region.displayName()));
+                    // Already running: show the progress bar rather than
+                    // refusing, so a long fill can be checked on.
+                    mines.watchFill(region.id(), player.getUniqueId());
+                    player.sendMessage(messages.get(player, "mines.fill-busy",
+                            "mine", region.displayName(),
+                            "percent", String.format("%.1f", Math.max(0D, mines.fillProgressPercent(region.id())))));
                     return true;
                 }
                 player.sendMessage(messages.get(player, "mines.fill-started", "mine", region.displayName()));
