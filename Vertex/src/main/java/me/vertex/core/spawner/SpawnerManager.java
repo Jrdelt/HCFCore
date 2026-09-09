@@ -747,6 +747,79 @@ public final class SpawnerManager {
         }
     }
 
+    /**
+     * A plain-text report of why a spawner is or is not producing mobs.
+     *
+     * <p>Every condition vanilla checks before a spawner fires is invisible
+     * from in-game, so diagnosing a quiet spawner otherwise means guessing.
+     * This reads the live block state rather than Vertex's own records, so a
+     * spawner whose tuning never actually applied shows up as exactly that.
+     */
+    public List<String> describe(Location location) {
+        List<String> report = new ArrayList<>();
+        Block block = location.getBlock();
+        if (block.getType() != Material.SPAWNER) {
+            report.add("Not a spawner block (" + block.getType() + ").");
+            return report;
+        }
+        SpawnerData data = get(location);
+        report.add("Tracked by Vertex: " + (data != null
+                ? "yes -- " + data.mobType() + " x" + data.stackSize() + ", owner " + data.ownerFactionTag()
+                : "NO. It is an untracked vanilla spawner, so none of Vertex's tuning applies."));
+
+        if (!(block.getState() instanceof CreatureSpawner spawner)) {
+            report.add("Block state is not a CreatureSpawner -- nothing can spawn.");
+            return report;
+        }
+        EntityType spawned = spawner.getSpawnedType();
+        report.add("Live spawned type: " + (spawned == null
+                ? "NONE. An empty spawner never spawns anything." : spawned.name()));
+        report.add("Live spawn count: " + spawner.getSpawnCount()
+                + " | max nearby: " + spawner.getMaxNearbyEntities()
+                + " | player range: " + spawner.getRequiredPlayerRange()
+                + " | spawn range: " + spawner.getSpawnRange());
+        report.add("Live delay: " + spawner.getDelay() + " ticks (min "
+                + spawner.getMinSpawnDelay() + ", max " + spawner.getMaxSpawnDelay() + ")");
+
+        if (data != null && spawned != data.mobType()) {
+            report.add("MISMATCH: Vertex thinks this is " + data.mobType()
+                    + " but the block says " + spawned + ". Its tuning did not apply.");
+        }
+
+        EntityType counted = spawned != null ? spawned : (data != null ? data.mobType() : null);
+        if (counted != null) {
+            int nearby = 0;
+            for (org.bukkit.entity.Entity entity : location.getWorld().getNearbyEntities(location,
+                    spawner.getSpawnRange(), spawner.getSpawnRange(), spawner.getSpawnRange())) {
+                if (entity.getType() == counted) {
+                    nearby++;
+                }
+            }
+            report.add("Nearby " + counted + ": " + nearby + " of max " + spawner.getMaxNearbyEntities()
+                    + (nearby >= spawner.getMaxNearbyEntities()
+                            ? "  <-- AT THE CAP, so vanilla will not spawn more" : ""));
+        }
+
+        double nearestPlayer = Double.MAX_VALUE;
+        for (org.bukkit.entity.Player player : location.getWorld().getPlayers()) {
+            nearestPlayer = Math.min(nearestPlayer, player.getLocation().distance(location));
+        }
+        report.add("Nearest player: " + (nearestPlayer == Double.MAX_VALUE
+                ? "none in this world" : String.format("%.1f", nearestPlayer) + " blocks")
+                + " (needs to be within " + spawner.getRequiredPlayerRange() + ")");
+        if (nearestPlayer > spawner.getRequiredPlayerRange()) {
+            report.add("  <-- OUT OF RANGE, so vanilla will not spawn");
+        }
+
+        report.add("Sky light here: " + block.getLightFromSky()
+                + (isExposedToDaylight(location)
+                        ? " (daylight-exposed: uses Vertex's manual fallback)"
+                        : " (dark: uses vanilla's own spawn cycle)"));
+        report.add("Mob stacking: " + (mobStackingEnabled ? "on, merge radius "
+                + mergeRadiusBlocks + " blocks -- spawns may merge into a distant stack" : "off"));
+        return report;
+    }
+
     private double factionRateMultiplier(Location location) {
         FactionUpgradeManager upgrades = factionUpgradeManager;
         return upgrades == null ? 1D : Math.max(1D, upgrades.spawnerMultiplier(location));

@@ -902,6 +902,11 @@ combatManager.start();
         return true;
     }
 
+    /** Exposed for the /vertex spawnerinfo diagnostic. */
+    public me.vertex.core.spawner.SpawnerManager spawnerManager() {
+        return spawnerManager;
+    }
+
     public void reload() {
         reloadConfig();
         NumberFormatConfig.load(this);

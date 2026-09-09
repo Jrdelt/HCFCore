@@ -44,6 +44,27 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if (args.length == 1 && args[0].equalsIgnoreCase("spawnerinfo")) {
+            if (!(sender instanceof org.bukkit.entity.Player player)) {
+                sender.sendMessage(messages.getChat(sender, "general.players-only"));
+                return true;
+            }
+            org.bukkit.block.Block target = player.getTargetBlockExact(8);
+            if (target == null) {
+                player.sendMessage(net.kyori.adventure.text.Component.text(
+                        "Look at a spawner within 8 blocks and run this again.",
+                        net.kyori.adventure.text.format.NamedTextColor.RED));
+                return true;
+            }
+            player.sendMessage(net.kyori.adventure.text.Component.text(
+                    "--- Spawner report ---", net.kyori.adventure.text.format.NamedTextColor.AQUA));
+            for (String line : plugin.spawnerManager().describe(target.getLocation())) {
+                player.sendMessage(net.kyori.adventure.text.Component.text(
+                        line, net.kyori.adventure.text.format.NamedTextColor.GRAY));
+            }
+            return true;
+        }
+
         if (args.length >= 1 && args[0].equalsIgnoreCase("storage")) {
             return handleStorage(sender, args);
         }
@@ -140,7 +161,7 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String partial = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("reload", "clearmobstacks", "storage")
+            return Stream.of("reload", "clearmobstacks", "storage", "spawnerinfo")
                     .filter(sub -> sub.startsWith(partial))
                     .collect(Collectors.toList());
         }
