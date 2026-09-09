@@ -6,8 +6,9 @@ control for what they produce, and automatic loot collection.
 
 ## Spawner shop & stacking
 
-The **Spawners** category in [`/shop`](shop.md) — not a standalone
-command — lists every mob type configured under `spawners.yml`'s `mobs`
+Buyable spawner blocks are reached from the **Spawners & Mob Drops**
+category in [`/shop`](shop.md) — not a standalone command — via the button
+in that category's top row. It lists every mob type configured under `spawners.yml`'s `mobs`
 section, each with its own price and death-drop table (`drops` replaces
 the mob's vanilla drops entirely; leave it empty to keep vanilla drops).
 Buy one, place it inside your own faction's claimed land, and right-click
@@ -80,6 +81,19 @@ configured mob type spawns through the normal vanilla mechanism.
 - An overclaim **does not drop or destroy spawners**. They stay in place
   and ownership transfers to the faction that now owns the land, allowing
   the new faction to manage them normally.
+
+
+### Vertex has the final say over its own spawners
+
+`override-other-plugins` (default true) reinstates a spawn from a
+Vertex-tracked spawner that another plugin cancelled — a mob limiter, a
+rival stacker, a region protector. Without it a player's paid-for spawner
+can sit silently dead with nothing to point at.
+
+Only spawns from Vertex-tracked spawners are reinstated; other plugins'
+spawners are left alone, as is Vertex's own stacking merge — that cancel is
+*how* a merge happens, so undoing it would duplicate the mob alongside the
+stack it was just folded into.
 
 ## Mob stacking (`spawners.yml` → `mob-stacking`)
 

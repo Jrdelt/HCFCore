@@ -38,10 +38,49 @@ public final class SpawnerMobListener implements Listener {
     private final SpawnerManager spawnerManager;
     private final NamespacedKey mobTypeKey;
 
+    private MobStackListener mobStacking;
+
     public SpawnerMobListener(Plugin plugin, SpawnerManager spawnerManager) {
         this.plugin = plugin;
         this.spawnerManager = spawnerManager;
         this.mobTypeKey = new NamespacedKey(plugin, "spawner_mob_type");
+    }
+
+    /** Wired after construction; the two listeners are registered together. */
+    public void setMobStacking(MobStackListener mobStacking) {
+        this.mobStacking = mobStacking;
+    }
+
+    /**
+     * Reinstates a spawn from a Vertex-tracked spawner that another plugin
+     * cancelled.
+     *
+     * <p>Runs last and deliberately does not ignore cancelled events, so
+     * Vertex has the final say over its own spawners. Another mob-limiter,
+     * stacker, or region plugin suppressing them would otherwise leave a
+     * player's paid-for spawner silently dead with nothing to point at.
+     *
+     * <p>Vertex's own stacking merge is exempt: that cancel is how a merge
+     * is performed, so undoing it would produce a duplicate mob alongside
+     * the stack it was just folded into.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onSpawnOverride(CreatureSpawnEvent event) {
+        if (!event.isCancelled() || !spawnerManager.overrideOtherPlugins()) {
+            return;
+        }
+        if (event.getSpawnReason() != CreatureSpawnEvent.SpawnReason.SPAWNER) {
+            return;
+        }
+        if (mobStacking != null && mobStacking.wasMergedByStacking(event)) {
+            return;
+        }
+        if (spawnerManager.findNearby(event.getLocation(),
+                spawnerManager.spawnRangeBlocks() + SEARCH_MARGIN) == null) {
+            // Not one of ours; another plugin's spawner is its own business.
+            return;
+        }
+        event.setCancelled(false);
     }
 
     // This must run before generic mob stacking so a spawner-produced mob is

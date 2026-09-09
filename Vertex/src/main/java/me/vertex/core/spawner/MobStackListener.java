@@ -68,6 +68,18 @@ public final class MobStackListener implements Listener {
         this.playerDropRouter = playerDropRouter;
     }
 
+    /**
+     * The most recent spawn this listener cancelled in order to merge it.
+     * Safe as a single field: spawn events are fired one at a time on the
+     * main thread, and it is only read later in that same dispatch.
+     */
+    private CreatureSpawnEvent mergedEvent;
+
+    /** Whether this exact event was cancelled by stacking rather than by another plugin. */
+    boolean wasMergedByStacking(CreatureSpawnEvent event) {
+        return mergedEvent == event;
+    }
+
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void onSpawn(CreatureSpawnEvent event) {
         if (!spawnerManager.isMobStackingEnabled()) {
@@ -81,6 +93,9 @@ public final class MobStackListener implements Listener {
         Mob target = findMergeTarget(event.getLocation(), type, isSpawnerSourced(spawned));
         if (target != null) {
             event.setCancelled(true);
+            // Recorded so the override handler can tell this deliberate merge
+            // apart from another plugin suppressing the spawn outright.
+            mergedEvent = event;
             int newCount = currentStackCount(target) + 1;
             setStackCount(target, newCount);
             updateDisplay(target, newCount);

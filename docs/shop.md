@@ -12,6 +12,13 @@ Miscellaneous by default (configurable, up to 9 categories since it's a
 single row). Clicking a category opens its own paginated buy/sell browser,
 with a **Back** button (top-left) to return to the picker.
 
+Spawn eggs and mob drops share the single **Spawners & Mob Drops** category,
+and buyable spawner blocks are reached from a button in that category's top
+row rather than a separate picker entry — so everything spawner-related is
+in one place instead of split across the menu. Spawner blocks are priced per
+mob type rather than per material, which is why they open their own menu
+instead of appearing as ordinary entries.
+
 You can also trade directly by command, regardless of which category an
 item belongs to:
 

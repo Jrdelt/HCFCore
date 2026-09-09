@@ -22,7 +22,7 @@ methods Vertex uses. See
 Enables money costs. Specifically:
 
 - A kit's `cost.money` requirement (see [Kits & Abilities](kits-and-abilities.md#cost)).
-- Buying spawners from the Spawners category in `/shop` and selling them back.
+- Buying spawners from the Spawners & Mob Drops category in `/shop` and selling them back.
 - Buying Chunk Collector upgrade tiers.
 - Buying faction-upgrade levels through `/f upgrades`.
 - Depositing to or withdrawing from the faction **money** bank.

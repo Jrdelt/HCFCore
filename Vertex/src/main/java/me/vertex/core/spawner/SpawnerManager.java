@@ -74,6 +74,7 @@ public final class SpawnerManager {
     private volatile int spawnRangeBlocks;
     /** Whether exposed daytime spawners receive a manual, vanilla-rate fallback spawn. */
     private volatile boolean spawnInDaylight;
+    private volatile boolean overrideOtherPlugins = true;
     private volatile Map<EntityType, MobConfig> mobConfigs = Map.of();
 
     private volatile boolean mobStackingEnabled;
@@ -136,6 +137,7 @@ public final class SpawnerManager {
         requiredPlayerRangeBlocks = Math.max(1, config.getInt("required-player-range-blocks", 32));
         spawnRangeBlocks = Math.max(1, config.getInt("spawn-range-blocks", 4));
         spawnInDaylight = config.getBoolean("spawn-in-daylight", true);
+        overrideOtherPlugins = config.getBoolean("override-other-plugins", true);
 
         mobConfigs = readMobConfigs(config);
 
@@ -381,6 +383,11 @@ public final class SpawnerManager {
     }
 
     /** True when exposed spawners supplement vanilla spawning during the day. */
+    /** Whether Vertex reinstates its own spawns that another plugin cancelled. */
+    public boolean overrideOtherPlugins() {
+        return overrideOtherPlugins;
+    }
+
     public boolean spawnInDaylight() {
         return spawnInDaylight;
     }

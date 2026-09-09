@@ -59,6 +59,12 @@ public final class ShopMenuListener implements Listener {
             ShopMenu.openCategories(player, manager, spawnerManager, messages);
             return;
         }
+        // The buyable-spawner button now sits in the Spawners & Mob Drops
+        // control row rather than beside the categories.
+        if (ShopMenu.SPAWNERS_CATEGORY_ID.equals(holder.categoryIdAtSlot(slot))) {
+            SpawnerShopMenu.open(player, spawnerManager, messages);
+            return;
+        }
         if (slot == ShopMenu.SLOT_PREV_PAGE) {
             ShopMenu.openCategory(player, manager, spawnerManager, messages, holder.categoryId(), holder.page() - 1);
             return;

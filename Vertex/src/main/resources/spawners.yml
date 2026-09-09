@@ -35,6 +35,18 @@ spawn-range-blocks: 4
 # spawners continue using vanilla's normal spawn cycle.
 spawn-in-daylight: true
 
+# Vertex has the final say over spawns from its own spawners. If another
+# plugin -- a mob limiter, a rival stacker, a region protector -- cancels a
+# spawn from a spawner Vertex tracks, Vertex puts it back. Without this a
+# player's paid-for spawner can sit silently dead with nothing to point at.
+#
+# Only spawns from Vertex-tracked spawners are ever reinstated; other
+# plugins' spawners are left entirely alone, as is Vertex's own mob-stacking
+# merge (that cancel is how a merge happens, so undoing it would duplicate
+# the mob). Turn this off if another plugin must be able to veto Vertex
+# spawners.
+override-other-plugins: true
+
 # --- SHOP CATALOG & DROP TABLES ---
 # Each entry here is buyable from /spawners and placeable in claimed land.
 # "drops" replace the mob's vanilla death drops entirely -- leave it empty

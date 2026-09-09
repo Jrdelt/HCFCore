@@ -325,8 +325,9 @@ combatManager.start();
         spawnerManager.retuneAll();
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.spawner.SpawnerListener(spawnerManager, staffManager, messages, rallyManager), this);
-        Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.spawner.SpawnerMobListener(this, spawnerManager), this);
+        me.vertex.core.spawner.SpawnerMobListener spawnerMobListener =
+                new me.vertex.core.spawner.SpawnerMobListener(this, spawnerManager);
+        Bukkit.getPluginManager().registerEvents(spawnerMobListener, this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.spawner.SpawnerClaimListener(spawnerManager, messages), this);
         spawnerMenuListener = new me.vertex.core.spawner.SpawnerMenuListener(spawnerManager, staffManager, messages,
@@ -335,6 +336,9 @@ combatManager.start();
         Bukkit.getScheduler().runTaskTimer(this, spawnerManager::manualSpawnTick, 100L, 100L);
         mobStackListener = new me.vertex.core.spawner.MobStackListener(this, spawnerManager);
         Bukkit.getPluginManager().registerEvents(mobStackListener, this);
+        // Lets the spawn override tell a stacking merge apart from another
+        // plugin cancelling the spawn outright.
+        spawnerMobListener.setMobStacking(mobStackListener);
         Bukkit.getScheduler().runTaskTimer(this, mobStackListener::consolidateStacks, 40L, 40L);
 
         chunkCollectorManager = new me.vertex.core.collector.ChunkCollectorManager(this, chunkCollectorStorage,

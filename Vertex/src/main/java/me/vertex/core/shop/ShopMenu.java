@@ -43,6 +43,18 @@ public final class ShopMenu {
      */
     public static final String SPAWNERS_CATEGORY_ID = "__spawners__";
 
+    /**
+     * The shop.yml category the buyable-spawner button lives inside.
+     * Spawner blocks are priced per mob type rather than per Material, so
+     * they cannot be ordinary entries in that category -- the button sits in
+     * its control row instead, which keeps spawners and mob drops in one
+     * place without forcing them into a model that does not fit them.
+     */
+    public static final String SPAWNERS_HOST_CATEGORY = "spawners_and_mob_drops";
+
+    /** Control-row slot holding that button, opposite the Back button. */
+    public static final int SLOT_BUY_SPAWNERS = 8;
+
     public enum Mode {
         CATEGORIES, ITEMS
     }
@@ -63,10 +75,9 @@ public final class ShopMenu {
             inventory.setItem(slot, categoryIcon(player, messages, category));
             holder.slotCategoryIds.put(slot, category.id());
         }
-        if (slot < 9 && spawnerManager != null && !spawnerManager.getMobConfigs().isEmpty()) {
-            inventory.setItem(slot, spawnersCategoryIcon(player, messages));
-            holder.slotCategoryIds.put(slot, SPAWNERS_CATEGORY_ID);
-        }
+        // No separate Spawners button here: buyable spawners live inside the
+        // Spawners & Mob Drops category, so the two are not split across the
+        // menu.
 
         player.openInventory(inventory);
     }
@@ -104,6 +115,11 @@ public final class ShopMenu {
         }
         inventory.setItem(SLOT_BACK, backButton(player, messages));
         inventory.setItem(SLOT_BALANCE, balanceIcon(player, messages));
+        if (SPAWNERS_HOST_CATEGORY.equals(categoryId)
+                && spawnerManager != null && !spawnerManager.getMobConfigs().isEmpty()) {
+            inventory.setItem(SLOT_BUY_SPAWNERS, spawnersCategoryIcon(player, messages));
+            holder.slotCategoryIds.put(SLOT_BUY_SPAWNERS, SPAWNERS_CATEGORY_ID);
+        }
 
         int start = page * PAGE_SIZE;
         int end = Math.min(entries.size(), start + PAGE_SIZE);
