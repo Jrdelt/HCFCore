@@ -88,6 +88,31 @@ public final class ChunkCollectorListener implements Listener {
         }
     }
 
+    /**
+     * Strips the internal mob-drop marker as an item is picked up.
+     *
+     * <p>The marker is written into item NBT, so while it is present the
+     * item will not stack with an otherwise identical one that never came
+     * from a mob -- a bone from a grinder and a bone from a chest sat in
+     * separate slots. It also made every mob drop look like a custom item to
+     * anything that inspects item data, which is why Sell Wands refused to
+     * sell them and TNT Wands refused creeper gunpowder.
+     *
+     * <p>It is only ever needed while the item is on the ground waiting for
+     * a collector, so it is removed the moment it leaves that state.
+     */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onPickup(org.bukkit.event.entity.EntityPickupItemEvent event) {
+        ItemStack stack = event.getItem().getItemStack();
+        org.bukkit.inventory.meta.ItemMeta meta = stack.getItemMeta();
+        if (meta == null || !meta.getPersistentDataContainer().has(mobDropKey, PersistentDataType.BYTE)) {
+            return;
+        }
+        meta.getPersistentDataContainer().remove(mobDropKey);
+        stack.setItemMeta(meta);
+        event.getItem().setItemStack(stack);
+    }
+
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
         manager.reconcileChunk(event.getChunk());

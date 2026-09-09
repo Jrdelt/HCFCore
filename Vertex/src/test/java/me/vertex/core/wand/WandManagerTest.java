@@ -3,6 +3,8 @@ package me.vertex.core.wand;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.NamespacedKey;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.junit.jupiter.api.AfterEach;
@@ -123,4 +125,50 @@ class WandManagerTest {
         assertEquals(5, wands.gunpowderPerTnt());
         assertEquals(0, wands.sandPerTnt(), "sand is not required by default, so it costs none");
     }
+
+    /**
+     * Chunk Collectors tag mob drops for their own bookkeeping. That tag is
+     * item NBT, so treating any tagged item as custom made wands refuse
+     * ordinary loot -- a chest of grinder drops sold nothing, and a TNT Wand
+     * would not touch creeper gunpowder, which is the main source of it.
+     */
+    @Test
+    void sellsOrdinaryLootCarryingVertexInternalMarkers() {
+        ItemStack bone = new ItemStack(Material.BONE, 12);
+        ItemMeta meta = bone.getItemMeta();
+        meta.getPersistentDataContainer().set(
+                new NamespacedKey(plugin, "mob_drop"), PersistentDataType.BYTE, (byte) 1);
+        bone.setItemMeta(meta);
+
+        assertTrue(wands.isSellable(bone), "a tagged mob drop is still a plain bone");
+        assertTrue(wands.isPlainStack(bone));
+    }
+
+    @Test
+    void tntWandStillSeesTaggedGunpowder() {
+        ItemStack gunpowder = new ItemStack(Material.GUNPOWDER, 64);
+        ItemMeta meta = gunpowder.getItemMeta();
+        meta.getPersistentDataContainer().set(
+                new NamespacedKey(plugin, "mob_drop"), PersistentDataType.BYTE, (byte) 1);
+        gunpowder.setItemMeta(meta);
+
+        assertTrue(wands.isPlainStack(gunpowder), "creeper gunpowder must be convertible");
+    }
+
+    /**
+     * The exemption is an allowlist, not "anything Vertex tagged" -- Vertex's
+     * own items are identified by their own keys, so a blanket exemption
+     * would let a wand sell another wand.
+     */
+    @Test
+    void stillRefusesItemsCarryingUnknownData() {
+        ItemStack odd = new ItemStack(Material.COBBLESTONE, 8);
+        ItemMeta meta = odd.getItemMeta();
+        meta.getPersistentDataContainer().set(
+                new NamespacedKey(plugin, "some_other_marker"), PersistentDataType.BYTE, (byte) 1);
+        odd.setItemMeta(meta);
+
+        assertFalse(wands.isSellable(odd), "an unrecognised tag still means hands off");
+    }
+
 }

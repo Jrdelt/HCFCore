@@ -29,6 +29,8 @@ import java.util.Set;
 public final class WandManager {
 
     private final Plugin plugin;
+    /** Internal tags that do not make an item custom; see hasNoCustomData. */
+    private final java.util.Set<NamespacedKey> harmlessMarkers;
     private final NamespacedKey tierKey;
     private final NamespacedKey usesKey;
 
@@ -43,6 +45,7 @@ public final class WandManager {
 
     public WandManager(Plugin plugin) {
         this.plugin = plugin;
+        this.harmlessMarkers = java.util.Set.of(new NamespacedKey(plugin, "mob_drop"));
         this.tierKey = new NamespacedKey(plugin, "wand_tier");
         this.usesKey = new NamespacedKey(plugin, "wand_uses");
     }
@@ -164,8 +167,32 @@ public final class WandManager {
         }
         ItemMeta meta = item.getItemMeta();
         return !meta.hasDisplayName() && !meta.hasLore() && !meta.hasEnchants()
-                && !meta.hasCustomModelData() && meta.getPersistentDataContainer().isEmpty()
-                && !meta.hasAttributeModifiers();
+                && !meta.hasCustomModelData() && !meta.hasAttributeModifiers()
+                && hasNoCustomData(meta);
+    }
+
+    /**
+     * True when the only attached data is a harmless internal marker.
+     *
+     * <p>Vertex tags some perfectly ordinary items for its own bookkeeping --
+     * a mob drop waiting for a Chunk Collector, for instance. Those are still
+     * plain items to a player, and treating any tagged item as custom made
+     * wands refuse ordinary loot: a chest of grinder drops sold nothing, and
+     * a TNT Wand would not touch creeper gunpowder, which is the main way
+     * gunpowder is obtained at all.
+     *
+     * <p>Deliberately an allowlist of specific markers rather than "anything
+     * in Vertex's namespace". Vertex's own items -- wands, Backpacks, Chunk
+     * Collectors -- are identified by their own keys, and exempting the whole
+     * namespace would make a wand able to sell another wand.
+     */
+    private boolean hasNoCustomData(ItemMeta meta) {
+        for (NamespacedKey key : meta.getPersistentDataContainer().getKeys()) {
+            if (!harmlessMarkers.contains(key)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public ItemStack createWand(WandTier tier) {
