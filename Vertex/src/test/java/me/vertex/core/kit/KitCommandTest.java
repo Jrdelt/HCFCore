@@ -11,6 +11,7 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.plugin.PluginMock;
+import org.bukkit.Material;
 
 import java.util.Map;
 import java.util.UUID;
@@ -78,6 +79,21 @@ class KitCommandTest {
                 new String[]{"create", "Test", "", "0", "0", "DIAMOND:999999999"}));
 
         assertTrue(isChatMessage(messages, player, player.nextComponentMessage(), "kit.usage-create"));
+    }
+
+    @Test
+    void previewOpensReadOnlyKitContentsWithoutClaimingTheKit() {
+        PlayerMock player = server.addPlayer("Diana");
+        player.addAttachment(plugin, "vertex.kit.create", true);
+        player.getInventory().setItem(0, new org.bukkit.inventory.ItemStack(Material.DIAMOND, 3));
+        command.onCommand(player, null, "kit", new String[]{"create", "Scout"});
+        player.getInventory().clear();
+
+        command.onCommand(player, null, "kit", new String[]{"preview", "Scout"});
+
+        assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof KitPreviewMenu.Holder);
+        assertTrue(player.getOpenInventory().getTopInventory().contains(Material.DIAMOND));
+        assertTrue(player.getInventory().isEmpty(), "Previewing must not grant the kit's items.");
     }
 
     private static final class NoOpStorage implements Storage {

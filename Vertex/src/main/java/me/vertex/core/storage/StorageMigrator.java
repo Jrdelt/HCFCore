@@ -3,10 +3,13 @@ package me.vertex.core.storage;
 import me.vertex.core.auction.AuctionStorage;
 import me.vertex.core.blueprint.BlueprintStorage;
 import me.vertex.core.coinflip.CoinflipStorage;
+import me.vertex.core.preferences.AnnouncementPreferenceStorage;
 import me.vertex.core.trade.TradeStorage;
 import me.vertex.core.collector.ChunkCollectorStorage;
 import me.vertex.core.faction.FactionUpgradeStorage;
 import me.vertex.core.faction.FactionBankStorage;
+import me.vertex.core.faction.FTopStorage;
+import me.vertex.core.faction.PvpTopStorage;
 import me.vertex.core.shop.ShopStorage;
 import me.vertex.core.spawner.SpawnerStorage;
 
@@ -51,7 +54,12 @@ public final class StorageMigrator {
         TABLES.put("user_locale", List.of("uuid", "locale"));
         TABLES.put("player_deaths", List.of("uuid", "timestamp", "cause", "killer_name",
                 "items", "helmet", "chestplate", "leggings", "boots", "offhand"));
-        TABLES.put("spawners", List.of("world", "x", "y", "z", "mob_type", "stack_size", "owner_faction"));
+        TABLES.put("spawners", List.of("world", "x", "y", "z", "mob_type", "stack_size", "owner_faction",
+                "placed_at_data"));
+        TABLES.put("ftop_scores", List.of("faction_id", "current_value", "previous_rank", "current_rank", "updated_at"));
+        TABLES.put("ftop_schedule", List.of("singleton_key", "next_update_at"));
+        TABLES.put("pvptop_points", List.of("faction_id", "points", "updated_at"));
+        TABLES.put("pvptop_log", List.of("id", "faction_id", "points", "source", "actor_uuid", "created_at"));
         TABLES.put("chunk_collectors", List.of("world", "x", "y", "z", "owner_faction", "owner_uuid"));
         TABLES.put("blueprint_builds", List.of("id", "world", "x", "y", "z", "template", "owner_uuid",
                 "owner_faction", "current_index", "started_at"));
@@ -76,6 +84,7 @@ public final class StorageMigrator {
         TABLES.put("auction_watchlist", List.of("id", "owner_uuid", "listing_id"));
         TABLES.put("auction_pending_exp", List.of("uuid", "levels"));
         TABLES.put("trade_preferences", List.of("uuid", "accepting"));
+        TABLES.put("announcement_preferences", List.of("uuid", "category", "enabled"));
         TABLES.put("trade_escrow", List.of("session_id", "owner_uuid", "items", "money", "experience"));
         TABLES.put("trade_claims", List.of("id", "owner_uuid", "item"));
         TABLES.put("trade_pending_exp", List.of("uuid", "levels"));
@@ -186,12 +195,15 @@ public final class StorageMigrator {
         new BlueprintStorage(database).init();
         new FactionUpgradeStorage(database).init();
         new FactionBankStorage(database).init();
+        new FTopStorage(database).init();
+        new PvpTopStorage(database).init();
         new me.vertex.core.mine.MineKothStorage(database).init();
         new me.vertex.core.mine.HotZoneStorage(database).init();
         new CoinflipStorage(database).init();
         new ShopStorage(database).init();
         new AuctionStorage(database).init();
         new TradeStorage(database).init();
+        new AnnouncementPreferenceStorage(database).init();
     }
 
     /**

@@ -1,6 +1,7 @@
 package me.vertex.core.coinflip;
 
 import me.vertex.core.lang.Messages;
+import me.vertex.core.util.Numbers;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -248,28 +249,21 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
     }
 
     /**
-     * {@code /cf <amount> [exp|money] [player]}. "money" is accepted
+     * {@code /cf <amount> [exp|xp|money] [player]}. Amounts use the shared
+     * number grammar, so {@code 10k}, {@code 1.25m}, and {@code 1,000,000}
+     * are accepted everywhere the server accepts a price. "money" is accepted
      * explicitly alongside "exp" even though it's also the default with
      * no keyword at all, so both wager types are equally discoverable via
      * tab-completion instead of one being an undocumented implicit case.
      */
     private void handleWager(Player player, String[] args) {
-        double amount;
-        try {
-            amount = Double.parseDouble(args[0]);
-        } catch (NumberFormatException e) {
-            sendUsage(player);
-            return;
-        }
-        // Double.parseDouble accepts NaN and infinity. Neither is a real
-        // currency wager and comparisons alone do not reject NaN.
-        if (!Double.isFinite(amount) || amount <= 0) {
-            sendUsage(player);
-            return;
-        }
-
-        boolean isExp = args.length >= 2 && args[1].equalsIgnoreCase("exp");
+        boolean isExp = args.length >= 2 && isExperienceCurrency(args[1]);
         boolean isMoney = args.length >= 2 && args[1].equalsIgnoreCase("money");
+        Double amount = Numbers.parseDoublePositive(args[0]);
+        if (amount == null) {
+            sendUsage(player);
+            return;
+        }
         String targetArgName = null;
         if ((isExp || isMoney) && args.length >= 3) {
             targetArgName = args[2];
@@ -287,9 +281,17 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
             target = targetPlayer.getUniqueId();
         }
 
-        CoinflipManager.CreateOutcome outcome = isExp
-                ? manager.createExpCoinflip(player, (int) Math.round(amount), target)
-                : manager.createMoneyCoinflip(player, amount, target);
+        CoinflipManager.CreateOutcome outcome;
+        if (isExp) {
+            Long levels = Numbers.parseLongPositive(args[0]);
+            if (levels == null || levels > Integer.MAX_VALUE) {
+                sendUsage(player);
+                return;
+            }
+            outcome = manager.createExpCoinflip(player, levels.intValue(), target);
+        } else {
+            outcome = manager.createMoneyCoinflip(player, amount, target);
+        }
 
         if (outcome.result() != CoinflipManager.CreateResult.OK) {
             player.sendMessage(messages.get(player, createFailureKey(outcome.result())));
@@ -390,12 +392,15 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
             if ("exp".startsWith(partial)) {
                 matches.add("exp");
             }
+            if ("xp".startsWith(partial)) {
+                matches.add("xp");
+            }
             if ("money".startsWith(partial)) {
                 matches.add("money");
             }
             return matches;
         }
-        if (args.length == 3 && isNumeric(args[0]) && (args[1].equalsIgnoreCase("exp") || args[1].equalsIgnoreCase("money"))) {
+        if (args.length == 3 && isNumeric(args[0]) && (isExperienceCurrency(args[1]) || args[1].equalsIgnoreCase("money"))) {
             String partial = args[2].toLowerCase(Locale.ROOT);
             List<String> matches = new ArrayList<>();
             for (Player online : Bukkit.getOnlinePlayers()) {
@@ -418,10 +423,10 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
     }
 
     private static boolean isNumeric(String value) {
-        try {
-            return Double.isFinite(Double.parseDouble(value));
-        } catch (NumberFormatException e) {
-            return false;
-        }
+        return Numbers.parsePositive(value) != null;
+    }
+
+    private static boolean isExperienceCurrency(String value) {
+        return value.equalsIgnoreCase("exp") || value.equalsIgnoreCase("xp");
     }
 }

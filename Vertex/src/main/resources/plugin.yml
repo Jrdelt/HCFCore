@@ -20,14 +20,14 @@ softdepend:
 
 commands:
   kit:
-    description: Apply or manage kits.
-    usage: /<command> <name>
+    description: Claim, preview, or manage kits.
+    usage: /<command> <name>|preview <name>
   kits:
     description: Browse kits in a GUI -- left-click to claim, right-click to preview.
     usage: /<command>
   vertex:
     description: Vertex admin/reload command.
-    usage: /<command> reload|clearmobstacks|storage|spawnerinfo
+    usage: /<command> reload|clearmobstacks|storage|spawnerinfo|spawnerdebug
   uncombat:
     description: Clear a player's combat tag.
     usage: /<command> <player>
@@ -58,6 +58,10 @@ commands:
   tags:
     description: Browse and select server tags.
     usage: /<command>
+  settings:
+    description: Configure your personal optional server announcements.
+    usage: /<command>
+    aliases: [preferences]
   reboot:
     description: Start or cancel a server reboot countdown.
     usage: /<command> [minutes|cancel]
@@ -102,7 +106,7 @@ commands:
     usage: /<command> focus [name|off]|create|wand|cancel|start|stop|delete|list|validate
   cf:
     description: Browse, host, or play a coinflip.
-    usage: /<command> [amount [exp|money] [player]|hand [player]|review <id>|approve <id>|deny <id>|ban|unban|cancel <id>|logs [player]]
+    usage: /<command> [amount [exp|xp|money] [player]|hand [player]|review <id>|approve <id>|deny <id>|ban|unban|cancel <id>|logs [player]]
     aliases: [coinflip]
   boosters:
     description: View the bonuses currently applying to you.
@@ -138,16 +142,25 @@ commands:
   mines:
     description: View the mining worlds, or place their regions as staff.
     usage: /<command> [wand <mine>|cancel|list]
+  events:
+    description: View live Mine KOTH and Hot Zone events.
+    usage: /<command>
   wand:
     description: Give Sell Wands and TNT Wands.
     usage: /<command> give <player> <tier> [uses]
   tntfill:
     description: Fill dispensers in your claim with TNT from your faction's TNT bank or your own inventory.
     usage: /<command> <radius> <amount> bank|inventory
+  ftopforcecheck:
+    description: Immediately recalculate Vertex F Top without changing its automatic schedule.
+    usage: /<command>
 
 permissions:
   vertex.admin:
     description: Reload Vertex's config, clear stacked mobs, or switch the storage backend.
+    default: op
+  vertex.ftop.forcecheck:
+    description: Immediately recalculate Vertex F Top for every faction.
     default: op
   vertex.collector.give:
     description: Give a player a Chunk Collector.

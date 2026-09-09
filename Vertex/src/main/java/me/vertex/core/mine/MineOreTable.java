@@ -21,8 +21,40 @@ public final class MineOreTable {
      * @param material    the block generated
      * @param weight      relative frequency; normalised against the rest of the table
      * @param dropAmount  how much mining it yields before boosters
+     * @param dropMaterial the item granted to the miner
      */
-    public record Entry(Material material, double weight, int dropAmount) {
+    public record Entry(Material material, double weight, int dropAmount, Material dropMaterial) {
+
+        /** Backwards-compatible entry using the normal mining reward for its block. */
+        public Entry(Material material, double weight, int dropAmount) {
+            this(material, weight, dropAmount, defaultDropMaterial(material));
+        }
+
+        /**
+         * Uses the item form a mine should reward instead of an ore block.
+         * Custom ore materials deliberately fall back to themselves, while
+         * the vanilla mine ores always pay their resource, never a silk-touch
+         * block.
+         */
+        public static Material defaultDropMaterial(Material material) {
+            if (material == null) {
+                return Material.STONE;
+            }
+            return switch (material) {
+                case COAL_ORE, DEEPSLATE_COAL_ORE -> Material.COAL;
+                case IRON_ORE, DEEPSLATE_IRON_ORE -> Material.IRON_INGOT;
+                case COPPER_ORE, DEEPSLATE_COPPER_ORE -> Material.COPPER_INGOT;
+                case GOLD_ORE, DEEPSLATE_GOLD_ORE -> Material.GOLD_INGOT;
+                case NETHER_GOLD_ORE -> Material.GOLD_NUGGET;
+                case REDSTONE_ORE, DEEPSLATE_REDSTONE_ORE -> Material.REDSTONE;
+                case LAPIS_ORE, DEEPSLATE_LAPIS_ORE -> Material.LAPIS_LAZULI;
+                case DIAMOND_ORE, DEEPSLATE_DIAMOND_ORE -> Material.DIAMOND;
+                case EMERALD_ORE, DEEPSLATE_EMERALD_ORE -> Material.EMERALD;
+                case ANCIENT_DEBRIS -> Material.NETHERITE_SCRAP;
+                case NETHERITE_BLOCK -> Material.NETHERITE_INGOT;
+                default -> material;
+            };
+        }
     }
 
     private final List<Entry> entries;
@@ -110,7 +142,7 @@ public final class MineOreTable {
             double weight = override != null
                     ? entry.weight() * override
                     : entry.weight() * (1D + intensity * Math.pow(maxWeight / entry.weight(), rarityExponent));
-            boosted.add(new Entry(entry.material(), weight, entry.dropAmount()));
+            boosted.add(new Entry(entry.material(), weight, entry.dropAmount(), entry.dropMaterial()));
         }
         return new MineOreTable(boosted);
     }

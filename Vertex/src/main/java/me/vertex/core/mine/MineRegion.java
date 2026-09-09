@@ -50,11 +50,38 @@ public record MineRegion(
 
     /** True for a block the mine generates, and therefore one players may break. */
     public boolean isMineBlock(Material material) {
-        return ores.entry(material) != null || baseBlocks.contains(material);
+        return oreEntry(material) != null || baseBlocks.contains(material);
     }
 
     /** True for the ore blocks specifically -- base blocks pay nothing. */
     public boolean isOre(Material material) {
-        return ores.entry(material) != null && !baseBlocks.contains(material);
+        return oreEntry(material) != null && !baseBlocks.contains(material);
+    }
+
+    /**
+     * Resolves a physical ore block to its configured table entry.
+     *
+     * <p>Mine generation uses the configured normal ore material, but mines
+     * built with deepslate naturally contain variants such as
+     * {@code DEEPSLATE_DIAMOND_ORE}. Those are the same mine ore for
+     * protection, drops, and regeneration purposes; they must not be treated
+     * as unbreakable structure merely because the configured entry is
+     * {@code DIAMOND_ORE}.
+     */
+    public MineOreTable.Entry oreEntry(Material material) {
+        if (material == null) {
+            return null;
+        }
+        MineOreTable.Entry direct = ores.entry(material);
+        if (direct != null) {
+            return direct;
+        }
+
+        String name = material.name();
+        if (!name.startsWith("DEEPSLATE_") || !name.endsWith("_ORE")) {
+            return null;
+        }
+        Material regularVariant = Material.matchMaterial(name.substring("DEEPSLATE_".length()));
+        return regularVariant == null ? null : ores.entry(regularVariant);
     }
 }

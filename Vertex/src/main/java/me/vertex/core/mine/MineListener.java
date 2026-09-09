@@ -79,10 +79,10 @@ public final class MineListener implements Listener {
             return;
         }
 
-        MineOreTable.Entry entry = region.ores().entry(block.getType());
+        MineOreTable.Entry entry = region.oreEntry(block.getType());
         int amount = applyOreBooster(player, entry.dropAmount());
         if (amount > 0) {
-            giveOrDrop(player, new ItemStack(entry.material(), amount));
+            giveOrDrop(player, new ItemStack(entry.dropMaterial(), amount));
         }
         mines.scheduleRegen(region, block);
     }

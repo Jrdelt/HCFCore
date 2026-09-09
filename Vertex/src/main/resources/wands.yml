@@ -1,6 +1,7 @@
 # Sell Wands and TNT Wands.
 #
-# A wand is used by right-clicking a Chest or a Chunk Collector. Each wand
+# A wand is used by left-clicking a Chest or a Chunk Collector. Right-clicking
+# a Chunk Collector remains reserved for its normal management GUI. Each wand
 # carries its own remaining uses on the item itself, so the count survives
 # restarts, trades, and storage without any server-side bookkeeping.
 #
@@ -29,7 +30,7 @@ sell-wands:
       # custom-model-data: 1001
       name: "<gray>ɪʀᴏɴ sᴇʟʟ ᴡᴀɴᴅ"
       lore:
-        - "<dark_gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴀ ᴄʜᴇsᴛ ᴏʀ ᴄᴏʟʟᴇᴄᴛᴏʀ"
+        - "<dark_gray>ʟᴇꜰᴛ-ᴄʟɪᴄᴋ ᴀ ᴄʜᴇsᴛ ᴏʀ ᴄᴏʟʟᴇᴄᴛᴏʀ"
         - ""
         - "<gray>ᴜsᴇs ʟᴇꜰᴛ: <yellow>{uses}"
       uses: 50
@@ -38,7 +39,7 @@ sell-wands:
       material: GOLDEN_HOE
       name: "<yellow>ɢᴏʟᴅ sᴇʟʟ ᴡᴀɴᴅ"
       lore:
-        - "<dark_gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴀ ᴄʜᴇsᴛ ᴏʀ ᴄᴏʟʟᴇᴄᴛᴏʀ"
+        - "<dark_gray>ʟᴇꜰᴛ-ᴄʟɪᴄᴋ ᴀ ᴄʜᴇsᴛ ᴏʀ ᴄᴏʟʟᴇᴄᴛᴏʀ"
         - ""
         - "<gray>ᴜsᴇs ʟᴇꜰᴛ: <yellow>{uses}"
       uses: 150
@@ -47,7 +48,7 @@ sell-wands:
       material: DIAMOND_HOE
       name: "<aqua>ᴅɪᴀᴍᴏɴᴅ sᴇʟʟ ᴡᴀɴᴅ"
       lore:
-        - "<dark_gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴀ ᴄʜᴇsᴛ ᴏʀ ᴄᴏʟʟᴇᴄᴛᴏʀ"
+        - "<dark_gray>ʟᴇꜰᴛ-ᴄʟɪᴄᴋ ᴀ ᴄʜᴇsᴛ ᴏʀ ᴄᴏʟʟᴇᴄᴛᴏʀ"
         - ""
         - "<gray>ᴜsᴇs ʟᴇꜰᴛ: <yellow>{uses}"
       uses: 500
@@ -68,7 +69,7 @@ tnt-wands:
       material: BLAZE_ROD
       name: "<red>ᴛɴᴛ ᴡᴀɴᴅ"
       lore:
-        - "<dark_gray>ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴀ ᴄʜᴇsᴛ ᴏʀ ᴄᴏʟʟᴇᴄᴛᴏʀ"
+        - "<dark_gray>ʟᴇꜰᴛ-ᴄʟɪᴄᴋ ᴀ ᴄʜᴇsᴛ ᴏʀ ᴄᴏʟʟᴇᴄᴛᴏʀ"
         - "<dark_gray>ᴄᴏɴᴠᴇʀᴛs ɢᴜɴᴘᴏᴡᴅᴇʀ ɪɴᴛᴏ ʙᴀɴᴋᴇᴅ ᴛɴᴛ"
         - ""
         - "<gray>ᴜsᴇs ʟᴇꜰᴛ: <yellow>{uses}"

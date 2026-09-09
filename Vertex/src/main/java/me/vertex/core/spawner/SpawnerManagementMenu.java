@@ -1,6 +1,7 @@
 package me.vertex.core.spawner;
 
 import me.vertex.core.economy.EconomyHook;
+import me.vertex.core.faction.FTopManager;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import net.kyori.adventure.text.Component;
@@ -36,9 +37,14 @@ public final class SpawnerManagementMenu {
                 : Component.text(data.mobType().name());
 
         double unitPrice = config != null ? config.price() : 0;
+        FTopManager.StackValue fTop = manager.getFTopValue(location, data);
         inventory.setItem(4, icon(Material.SPAWNER, mobName, List.of(
                 messages.get(player, "spawner.info-stack-size", "size", String.valueOf(data.stackSize())),
-                messages.get(player, "spawner.info-value", "amount", EconomyHook.format(unitPrice)))));
+                messages.get(player, "spawner.info-value", "amount", EconomyHook.format(unitPrice)),
+                messages.get(player, "spawner.ftop-current", "amount", EconomyHook.format(fTop.currentValue()),
+                        "percent", String.format(java.util.Locale.ROOT, "%.1f", fTop.percent())),
+                messages.get(player, "spawner.ftop-full", "amount", EconomyHook.format(fTop.fullValue())),
+                messages.get(player, "spawner.ftop-remaining", "time", formatDuration(fTop.longestRemainingMillis())))));
         inventory.setItem(WITHDRAW_ONE_SLOT, icon(Material.CHEST,
                 messages.get(player, "spawner.withdraw-one"), List.of()));
         inventory.setItem(WITHDRAW_ALL_SLOT, icon(Material.ENDER_CHEST,
@@ -61,6 +67,11 @@ public final class SpawnerManagementMenu {
         meta.lore(lore);
         item.setItemMeta(meta);
         return item;
+    }
+
+    private static String formatDuration(long millis) {
+        long seconds = Math.max(0L, (millis + 999L) / 1_000L);
+        return (seconds / 3_600L) + "h " + ((seconds / 60L) % 60L) + "m";
     }
 
     public static final class Holder implements InventoryHolder {

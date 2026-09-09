@@ -110,6 +110,10 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private LegacyCombatManager legacyCombatManager;
     private me.vertex.core.spawner.SpawnerStorage spawnerStorage;
     private me.vertex.core.spawner.SpawnerManager spawnerManager;
+    private me.vertex.core.faction.FTopStorage fTopStorage;
+    private me.vertex.core.faction.FTopManager fTopManager;
+    private me.vertex.core.faction.PvpTopStorage pvpTopStorage;
+    private me.vertex.core.faction.PvpTopManager pvpTopManager;
     private me.vertex.core.spawner.SpawnerMenuListener spawnerMenuListener;
     private me.vertex.core.spawner.MobStackListener mobStackListener;
     private me.vertex.core.collector.ChunkCollectorStorage chunkCollectorStorage;
@@ -160,6 +164,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private org.bukkit.scheduler.BukkitTask auctionSweepTask;
     private me.vertex.core.trade.TradeStorage tradeStorage;
     private me.vertex.core.trade.TradeManager tradeManager;
+    private me.vertex.core.preferences.AnnouncementPreferenceStorage announcementPreferenceStorage;
+    private me.vertex.core.preferences.AnnouncementPreferenceManager announcementPreferenceManager;
     private GhostPlayerManager ghostPlayerManager;
 
     @Override
@@ -194,6 +200,10 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             storage.init();
             spawnerStorage = new me.vertex.core.spawner.SpawnerStorage(database);
             spawnerStorage.init();
+            fTopStorage = new me.vertex.core.faction.FTopStorage(database);
+            fTopStorage.init();
+            pvpTopStorage = new me.vertex.core.faction.PvpTopStorage(database);
+            pvpTopStorage.init();
             chunkCollectorStorage = new me.vertex.core.collector.ChunkCollectorStorage(database);
             chunkCollectorStorage.init();
             blueprintStorage = new me.vertex.core.blueprint.BlueprintStorage(database);
@@ -210,6 +220,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             auctionStorage.init();
             tradeStorage = new me.vertex.core.trade.TradeStorage(database);
             tradeStorage.init();
+            announcementPreferenceStorage = new me.vertex.core.preferences.AnnouncementPreferenceStorage(database);
+            announcementPreferenceStorage.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize the database, disabling.", e);
             Bukkit.getPluginManager().disablePlugin(this);
@@ -219,6 +231,16 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         userManager = new UserManager(this, storage);
         messages = new Messages(this, userManager);
         messages.load();
+        announcementPreferenceManager = new me.vertex.core.preferences.AnnouncementPreferenceManager(this,
+                announcementPreferenceStorage, messages);
+        Bukkit.getPluginManager().registerEvents(announcementPreferenceManager, this);
+        for (org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
+            announcementPreferenceManager.loadPlayer(player.getUniqueId());
+        }
+        me.vertex.core.preferences.SettingsCommand settingsCommand = new me.vertex.core.preferences.SettingsCommand(
+                announcementPreferenceManager, messages);
+        getCommand("settings").setExecutor(settingsCommand);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.preferences.SettingsMenuListener(), this);
         chatAmountPrompt = new me.vertex.core.util.ChatAmountPrompt(this);
         Bukkit.getPluginManager().registerEvents(chatAmountPrompt, this);
         abilityManager = new AbilityManager(this, storage);
@@ -250,7 +272,7 @@ combatManager.start();
         itemRestrictionListener = new me.vertex.core.listener.ItemRestrictionListener(this, messages);
         Bukkit.getPluginManager().registerEvents(itemRestrictionListener, this);
 
-        rebootManager = new RebootManager(this, messages);
+        rebootManager = new RebootManager(this, messages, announcementPreferenceManager);
         rebootManager.start();
 
         deathManager = new DeathManager(this, storage);
@@ -286,8 +308,15 @@ combatManager.start();
 
         staffManager = new StaffManager(this);
 
-        captureEventManager = new CaptureEventManager(this, messages, rallyManager, staffManager);
+        pvpTopManager = new me.vertex.core.faction.PvpTopManager(this, pvpTopStorage);
+        pvpTopManager.load();
+        pvpTopManager.loadState();
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.faction.PvpTopCommand(this, pvpTopManager, messages), this);
+
+        captureEventManager = new CaptureEventManager(this, messages, rallyManager, staffManager,
+                announcementPreferenceManager);
         captureEventManager.load();
+        captureEventManager.setPvpTopManager(pvpTopManager);
         captureEventManager.start();
         Bukkit.getPluginManager().registerEvents(captureEventManager, this);
         CaptureCommand kothCommand = new CaptureCommand(captureEventManager, messages, CaptureEventType.KOTH);
@@ -321,10 +350,19 @@ combatManager.start();
         spawnerManager.setFactionUpgradeManager(factionUpgradeManager);
         spawnerManager.load();
         spawnerManager.loadSpawnersFromDatabase();
+        fTopManager = new me.vertex.core.faction.FTopManager(this, spawnerManager, fTopStorage);
+        fTopManager.load();
+        fTopManager.loadState();
+        spawnerManager.setFTopManager(fTopManager);
+        fTopManager.start();
+        me.vertex.core.faction.FTopCommand fTopCommand = new me.vertex.core.faction.FTopCommand(this, fTopManager, messages);
+        getCommand("ftopforcecheck").setExecutor(fTopCommand);
+        Bukkit.getPluginManager().registerEvents(fTopCommand, this);
         factionUpgradeManager.setSpawnerRetune(spawnerManager::retuneAll);
         spawnerManager.retuneAll();
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.spawner.SpawnerListener(spawnerManager, staffManager, messages, rallyManager), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.spawner.SpawnerItemProtectionListener(), this);
         me.vertex.core.spawner.SpawnerMobListener spawnerMobListener =
                 new me.vertex.core.spawner.SpawnerMobListener(this, spawnerManager);
         Bukkit.getPluginManager().registerEvents(spawnerMobListener, this);
@@ -372,7 +410,8 @@ combatManager.start();
         // player receives.
         menuRegistry = new me.vertex.core.menu.MenuRegistry(this,
                 java.util.List.of(me.vertex.core.booster.BoostersMenu.MENU_ID,
-                        me.vertex.core.mine.MinesMenu.MENU_ID));
+                        me.vertex.core.mine.MinesMenu.MENU_ID,
+                        me.vertex.core.event.EventsMenu.MENU_ID));
         menuRegistry.load();
 
         boosterService = new me.vertex.core.booster.BoosterService(this);
@@ -406,7 +445,8 @@ combatManager.start();
         getCommand("filter").setExecutor(backpackFilterCommand);
         getCommand("filter").setTabCompleter(backpackFilterCommand);
 
-        coinflipManager = new me.vertex.core.coinflip.CoinflipManager(this, coinflipStorage, messages, combatManager);
+        coinflipManager = new me.vertex.core.coinflip.CoinflipManager(this, coinflipStorage, messages, combatManager,
+                announcementPreferenceManager);
         coinflipManager.load();
         coinflipManager.loadState();
         Bukkit.getPluginManager().registerEvents(
@@ -449,7 +489,8 @@ combatManager.start();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialise Mine KOTH storage.", e);
         }
-        mineKothManager = new me.vertex.core.mine.MineKothManager(this, mineManager, mineKothStorage, messages);
+        mineKothManager = new me.vertex.core.mine.MineKothManager(this, mineManager, mineKothStorage, messages,
+                announcementPreferenceManager);
         mineKothManager.load();
         boosterService.register(new me.vertex.core.mine.MineKothBoosterSource(mineKothManager));
 
@@ -459,7 +500,8 @@ combatManager.start();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialise Hot Zone storage.", e);
         }
-        hotZoneManager = new me.vertex.core.mine.HotZoneManager(this, mineManager, hotZoneStorage, messages);
+        hotZoneManager = new me.vertex.core.mine.HotZoneManager(this, mineManager, hotZoneStorage, messages,
+                announcementPreferenceManager);
         hotZoneManager.load();
         mineManager.setHotZones(hotZoneManager);
         boosterService.register(new me.vertex.core.mine.HotZoneBoosterSource(mineManager, hotZoneManager));
@@ -470,6 +512,22 @@ combatManager.start();
         getCommand("mines").setTabCompleter(minesCommand);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.mine.MinesMenuListener(
                 mineManager, mineKothManager, hotZoneManager, boosterService, messages, menuRegistry), this);
+        me.vertex.core.event.EventsCommand eventsCommand = new me.vertex.core.event.EventsCommand(
+                mineManager, mineKothManager, hotZoneManager, messages, menuRegistry);
+        getCommand("events").setExecutor(eventsCommand);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.event.EventsMenuListener(), this);
+        Bukkit.getScheduler().runTaskTimer(this, new Runnable() {
+            private long ticks;
+
+            @Override
+            public void run() {
+                ticks += 20L;
+                for (org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
+                    me.vertex.core.event.EventsMenu.refreshOpen(player, mineManager, mineKothManager,
+                            hotZoneManager, messages, menuRegistry, ticks);
+                }
+            }
+        }, 20L, 20L);
 
         wandManager = new me.vertex.core.wand.WandManager(this);
         wandManager.load();
@@ -789,6 +847,9 @@ combatManager.start();
         if (tradeManager != null) {
             tradeManager.shutdown();
         }
+        if (announcementPreferenceManager != null) {
+            announcementPreferenceManager.awaitWrites();
+        }
         FakePearlListener.clearAll();
         if (storage != null) {
             storage.close();
@@ -927,6 +988,12 @@ combatManager.start();
         }
         if (spawnerManager != null) {
             spawnerManager.load();
+        }
+        if (fTopManager != null) {
+            fTopManager.load();
+        }
+        if (pvpTopManager != null) {
+            pvpTopManager.load();
         }
         if (factionUpgradeManager != null) {
             factionUpgradeManager.reloadConfig();

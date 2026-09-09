@@ -3,6 +3,8 @@ package me.vertex.core.coinflip;
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.pvp.CombatManager;
+import me.vertex.core.preferences.AnnouncementCategory;
+import me.vertex.core.preferences.AnnouncementPreferenceManager;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
@@ -45,6 +47,7 @@ public final class CoinflipManager {
     private final CoinflipStorage storage;
     private final Messages messages;
     private final CombatManager combatManager;
+    private final AnnouncementPreferenceManager announcements;
     private final File file;
 
     private volatile boolean enabled;
@@ -80,10 +83,16 @@ public final class CoinflipManager {
     private final AtomicLong browserVersion = new AtomicLong();
 
     public CoinflipManager(Plugin plugin, CoinflipStorage storage, Messages messages, CombatManager combatManager) {
+        this(plugin, storage, messages, combatManager, null);
+    }
+
+    public CoinflipManager(Plugin plugin, CoinflipStorage storage, Messages messages, CombatManager combatManager,
+            AnnouncementPreferenceManager announcements) {
         this.plugin = plugin;
         this.storage = storage;
         this.messages = messages;
         this.combatManager = combatManager;
+        this.announcements = announcements;
         this.file = new File(plugin.getDataFolder(), "coinflips.yml");
     }
 
@@ -393,8 +402,13 @@ public final class CoinflipManager {
                 }
                 return;
             }
-            activeCoinflips.put(id, new Coinflip(id, host.getUniqueId(), targetUuid, type, amount, items, createdAt));
+            Coinflip created = new Coinflip(id, host.getUniqueId(), targetUuid, type, amount, items, createdAt);
+            activeCoinflips.put(id, created);
             browserChanged();
+            if (announcements != null) {
+                announcements.broadcast(AnnouncementCategory.COINFLIPS, "coinflip.public-created",
+                        "player", host.getName(), "wager", summarize(created));
+            }
         }));
 
         return new CreateOutcome(CreateResult.OK, placeholder);

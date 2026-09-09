@@ -1,0 +1,7 @@
+# Separate faction PvP-objective leaderboard. These points never affect F Top.
+display-limit: 10
+
+# Explicit award values; set an entry to 0 to disable that source.
+awards:
+  koth-capture: 10
+  outpost-capture: 5

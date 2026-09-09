@@ -29,7 +29,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Right-clicking a Chest or Chunk Collector with a wand.
+ * Left-clicking a Chest or Chunk Collector with a wand. Right-click remains
+ * available for the Chunk Collector's normal management GUI.
  *
  * <p>Both wands are all-or-nothing: nothing is removed, no use is spent, and
  * no money or TNT moves unless the whole operation can complete. A container
@@ -62,7 +63,7 @@ public final class WandListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent event) {
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getHand() != EquipmentSlot.HAND) {
+        if (event.getAction() != Action.LEFT_CLICK_BLOCK || event.getHand() != EquipmentSlot.HAND) {
             return;
         }
         Block block = event.getClickedBlock();

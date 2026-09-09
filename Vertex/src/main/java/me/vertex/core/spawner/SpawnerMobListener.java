@@ -73,6 +73,7 @@ public final class SpawnerMobListener implements Listener {
             return;
         }
         if (mobStacking != null && mobStacking.wasMergedByStacking(event)) {
+            spawnerManager.trace(event.getLocation(), "spawn merged into an existing mob stack (expected)");
             return;
         }
         if (spawnerManager.findNearby(event.getLocation(),
@@ -80,6 +81,7 @@ public final class SpawnerMobListener implements Listener {
             // Not one of ours; another plugin's spawner is its own business.
             return;
         }
+        spawnerManager.trace(event.getLocation(), "another plugin cancelled this tracked spawn; Vertex restored it");
         event.setCancelled(false);
     }
 
@@ -116,6 +118,19 @@ public final class SpawnerMobListener implements Listener {
         } else if (mob instanceof AbstractSkeleton skeleton) {
             skeleton.setShouldBurnInDay(false);
         }
+    }
+
+    /** Records the final event state after every other listener has had a chance to veto it. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onSpawnTrace(CreatureSpawnEvent event) {
+        if (event.getSpawnReason() != CreatureSpawnEvent.SpawnReason.SPAWNER
+                || spawnerManager.findNearby(event.getLocation(),
+                spawnerManager.spawnRangeBlocks() + SEARCH_MARGIN) == null) {
+            return;
+        }
+        spawnerManager.trace(event.getLocation(), event.isCancelled()
+                ? "final spawn event: CANCELLED (check a later-priority mob limiter/region plugin)"
+                : "final spawn event: allowed for " + event.getEntityType());
     }
 
     @EventHandler(ignoreCancelled = true)

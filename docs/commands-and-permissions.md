@@ -87,6 +87,19 @@ are available for staff testing. See [Player Trading](trading.md).
 | `/cf cancel <id>` | `vertex.coinflip.remove` for someone else's; open to the host for their own | Cancels an unplayed coinflip and refunds its wager. |
 | `/cf logs [player] [page]` | `vertex.coinflip.logs` | Reads the permanent staff audit log. |
 
+## Personal settings
+
+| Command | Permission | What it does |
+|---|---|---|
+| `/settings` (alias `/preferences`) | — | Opens personal toggles for optional Coinflip, KOTH, Outpost, Mining Event, and Server announcements. |
+
+## Spawner diagnostics
+
+| Command | Permission | What it does |
+|---|---|---|
+| `/vertex spawnerinfo` | `vertex.admin` | Look at a nearby spawner for its live type, delay, nearby-mob cap, player range, light state, and tracking/tuning report. |
+| `/vertex spawnerdebug` | `vertex.admin` | Toggles live spawn traces for tracked spawners within 64 blocks, including manual-fallback skips and final event cancellation. |
+
 ## Mining Worlds
 
 | Command | Permission | Notes |
@@ -141,6 +154,9 @@ button. This replaces the old standalone `/spawners` command.
 | `/f upgrades` / `/f upgrade` | Faction role needs FactionsUUID's native `UPGRADE` action allowed | Opens Vertex's persistent faction-upgrades GUI. Set `faction-upgrades.leader-only: true` to restrict purchases further. FactionsUUID's native upgrade administration remains separate. |
 | `/f bank` | Faction member; role permissions apply to deposits/withdrawals | Opens the six-row faction bank for money, experience, and TNT. |
 | `/tntfill <radius> <amount> bank\|inventory` | `vertex.tntfill.use` (default: everyone) | Fills every dispenser within `radius` blocks (max 100) of you, inside your own faction's claim, with up to `amount` TNT — drawn from the faction's Vertex TNT bank (the same one `/f bank` manages) or your own inventory. The bank is debited before any dispenser is filled, and anything the dispensers cannot take is returned immediately. |
+| `/f top` (or any `factions.command-aliases` alias) | Open to all | Vertex's claimed, individually-aged spawner-value leaderboard — replaces FactionsUUID's power-based `/f top`. See [Faction Leaderboards](faction-leaderboards.md#f-top-claimed-spawner-value). |
+| `/ftopforcecheck` | `vertex.ftop.forcecheck` | Immediately recalculates F Top for every faction without moving the regular scheduled deadline. |
+| `/f pvptop` (or any `factions.command-aliases` alias) | Open to all | Faction leaderboard ranked by persisted KOTH/Outpost capture points, independent of F Top. See [Faction Leaderboards](faction-leaderboards.md#pvp-top-objective-points). |
 
 ## KOTH & Outposts
 

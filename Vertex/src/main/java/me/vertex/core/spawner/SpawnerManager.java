@@ -44,6 +44,7 @@ import java.util.logging.Level;
 public final class SpawnerManager {
 
     public enum BreakMode { DROP_ALL, DECREMENT }
+    private static final double DEBUG_RANGE_BLOCKS = 64D;
 
     private final Plugin plugin;
     private final SpawnerStorage storage;
@@ -52,6 +53,7 @@ public final class SpawnerManager {
     private final NamespacedKey mobTypeKey;
     private final NamespacedKey stackSizeKey;
     private final NamespacedKey ownerFactionKey;
+    private final NamespacedKey placedAtDataKey;
     private final Random random = new Random();
     private final Map<String, SpawnerData> spawners = new ConcurrentHashMap<>();
     private final java.util.Set<CompletableFuture<Void>> pendingWrites = ConcurrentHashMap.newKeySet();
@@ -59,6 +61,8 @@ public final class SpawnerManager {
     private final Map<String, CompletableFuture<Void>> writeChains = new ConcurrentHashMap<>();
     /** Next manual fallback cycle for each spawner, matching its configured vanilla delay. */
     private final Map<String, Long> nextManualSpawnTicks = new ConcurrentHashMap<>();
+    /** Staff currently receiving nearby live spawn diagnostics. */
+    private final java.util.Set<java.util.UUID> debugPlayers = ConcurrentHashMap.newKeySet();
 
     private volatile int maxStackSize;
     private volatile boolean silkTouchRequired;
@@ -74,6 +78,8 @@ public final class SpawnerManager {
     private volatile int spawnRangeBlocks;
     /** Whether exposed daytime spawners receive a manual, vanilla-rate fallback spawn. */
     private volatile boolean spawnInDaylight;
+    /** Whether a grinder with no valid floor receives a manual in-air fallback spawn. */
+    private volatile boolean spawnInAir;
     private volatile boolean overrideOtherPlugins = true;
     private volatile Map<EntityType, MobConfig> mobConfigs = Map.of();
 
@@ -85,6 +91,8 @@ public final class SpawnerManager {
     private volatile int dropBatchSize;
     /** Optional because spawners are also usable when faction upgrades are disabled. */
     private volatile FactionUpgradeManager factionUpgradeManager;
+    /** Optional because F Top loads after spawner state during plugin startup. */
+    private volatile me.vertex.core.faction.FTopManager fTopManager;
 
     public SpawnerManager(Plugin plugin, SpawnerStorage storage) {
         this.plugin = plugin;
@@ -94,6 +102,7 @@ public final class SpawnerManager {
         this.mobTypeKey = new NamespacedKey(plugin, "spawner_mob_type");
         this.stackSizeKey = new NamespacedKey(plugin, "spawner_stack_size");
         this.ownerFactionKey = new NamespacedKey(plugin, "spawner_owner_faction");
+        this.placedAtDataKey = new NamespacedKey(plugin, "spawner_placed_at_data");
     }
 
     public void load() {
@@ -137,6 +146,7 @@ public final class SpawnerManager {
         requiredPlayerRangeBlocks = Math.max(1, config.getInt("required-player-range-blocks", 32));
         spawnRangeBlocks = Math.max(1, config.getInt("spawn-range-blocks", 4));
         spawnInDaylight = config.getBoolean("spawn-in-daylight", true);
+        spawnInAir = config.getBoolean("spawn-in-air", true);
         overrideOtherPlugins = config.getBoolean("override-other-plugins", true);
 
         mobConfigs = readMobConfigs(config);
@@ -167,6 +177,16 @@ public final class SpawnerManager {
     /** Lets faction-rate bonuses retune existing spawners immediately after a purchase. */
     public void setFactionUpgradeManager(FactionUpgradeManager factionUpgradeManager) {
         this.factionUpgradeManager = factionUpgradeManager;
+    }
+
+    public void setFTopManager(me.vertex.core.faction.FTopManager fTopManager) {
+        this.fTopManager = fTopManager;
+    }
+
+    public me.vertex.core.faction.FTopManager.StackValue getFTopValue(Location location, SpawnerData data) {
+        me.vertex.core.faction.FTopManager manager = fTopManager;
+        return manager == null ? new me.vertex.core.faction.FTopManager.StackValue(0D, 0D, 0D, 0L)
+                : manager.stackValue(location, data);
     }
 
     /** Re-applies the current tuning to every tracked spawner whose chunk is loaded right now. */
@@ -270,7 +290,7 @@ public final class SpawnerManager {
                     continue;
                 }
                 Location location = new Location(world, stored.x(), stored.y(), stored.z());
-                SpawnerData data = new SpawnerData(stored.mobType(), Math.max(1, stored.stackSize()),
+                SpawnerData data = new SpawnerData(stored.mobType(), stored.placedAtMillis(),
                         stored.ownerFactionTag());
                 spawners.put(key(location), data);
                 if (world.isChunkLoaded(stored.x() >> 4, stored.z() >> 4)) {
@@ -312,7 +332,7 @@ public final class SpawnerManager {
             }
             found.add(locationKey);
             spawners.put(locationKey, resolved);
-            if (pdcData == null) {
+            if (pdcData == null || !spawner.getPersistentDataContainer().has(placedAtDataKey, PersistentDataType.STRING)) {
                 writeData(spawner.getPersistentDataContainer(), resolved);
                 spawner.update(true, false);
             }
@@ -392,6 +412,11 @@ public final class SpawnerManager {
         return spawnInDaylight;
     }
 
+    /** True when floorless grinders may use Vertex's in-air fallback spawns. */
+    public boolean spawnInAir() {
+        return spawnInAir;
+    }
+
     public boolean isMobStackingEnabled() {
         return mobStackingEnabled;
     }
@@ -457,7 +482,7 @@ public final class SpawnerManager {
                 || ownerFactionTag.equalsIgnoreCase(current.ownerFactionTag())) {
             return;
         }
-        SpawnerData transferred = new SpawnerData(current.mobType(), current.stackSize(), ownerFactionTag);
+        SpawnerData transferred = new SpawnerData(current.mobType(), current.placedAtMillis(), ownerFactionTag);
         spawners.put(key(location), transferred);
         writeData(location, transferred);
         applyTuning(location, transferred);
@@ -472,8 +497,9 @@ public final class SpawnerManager {
         if (data == null) {
             return 0;
         }
-        int newSize = Math.min(maxStackSize, data.stackSize() + Math.max(0, amount));
-        data.setStackSize(newSize);
+        int actuallyAdded = Math.min(Math.max(0, amount), maxStackSize - data.stackSize());
+        data.addFresh(actuallyAdded);
+        int newSize = data.stackSize();
         writeData(location, data);
         applyTuning(location, data);
         persist(location, data);
@@ -491,12 +517,12 @@ public final class SpawnerManager {
         if (data == null) {
             return 0;
         }
-        int newSize = Math.max(0, data.stackSize() - Math.max(0, amount));
+        data.removeYoungest(amount);
+        int newSize = data.stackSize();
         if (newSize <= 0) {
             remove(location);
             return 0;
         }
-        data.setStackSize(newSize);
         writeData(location, data);
         applyTuning(location, data);
         persist(location, data);
@@ -535,7 +561,8 @@ public final class SpawnerManager {
         }
         int stackSize = Math.max(1, Math.min(maxStackSize,
                 pdc.getOrDefault(stackSizeKey, PersistentDataType.INTEGER, 1)));
-        return new SpawnerData(mobType, stackSize, pdc.get(ownerFactionKey, PersistentDataType.STRING));
+        return new SpawnerData(mobType, parseAges(pdc.get(placedAtDataKey, PersistentDataType.STRING), stackSize),
+                pdc.get(ownerFactionKey, PersistentDataType.STRING));
     }
 
     private void writeData(Location location, SpawnerData data) {
@@ -550,6 +577,7 @@ public final class SpawnerManager {
         pdc.set(markerKey, PersistentDataType.BYTE, (byte) 1);
         pdc.set(mobTypeKey, PersistentDataType.STRING, data.mobType().name());
         pdc.set(stackSizeKey, PersistentDataType.INTEGER, data.stackSize());
+        pdc.set(placedAtDataKey, PersistentDataType.STRING, encodeAges(data.placedAtMillis()));
         if (data.ownerFactionTag() == null || data.ownerFactionTag().isBlank()) {
             pdc.remove(ownerFactionKey);
         } else {
@@ -557,8 +585,33 @@ public final class SpawnerManager {
         }
     }
 
+    private static String encodeAges(List<Long> ages) {
+        return ages.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+    }
+
+    private static List<Long> parseAges(String encoded, int stackSize) {
+        List<Long> ages = new ArrayList<>();
+        if (encoded != null && !encoded.isBlank()) {
+            for (String token : encoded.split(",")) {
+                try {
+                    ages.add(Long.parseLong(token));
+                } catch (NumberFormatException ignored) {
+                    // A malformed PDC value is repaired as a new spawner
+                    // below, not trusted as an unknown historical age.
+                }
+            }
+        }
+        while (ages.size() < Math.max(1, stackSize)) {
+            ages.add(System.currentTimeMillis());
+        }
+        if (ages.size() > Math.max(1, stackSize)) {
+            return new ArrayList<>(ages.subList(0, Math.max(1, stackSize)));
+        }
+        return ages;
+    }
+
     private void persist(Location location, SpawnerData data) {
-        SpawnerData snapshot = new SpawnerData(data.mobType(), data.stackSize(), data.ownerFactionTag());
+        SpawnerData snapshot = new SpawnerData(data.mobType(), data.placedAtMillis(), data.ownerFactionTag());
         queue(location, () -> {
             try {
                 storage.save(location, snapshot);
@@ -639,6 +692,8 @@ public final class SpawnerManager {
      * never satisfy. They always use the manual fallback. Exposed spawners
      * additionally use it in daylight because hostile mobs reject vanilla's
      * bright-light spawn check even when they came from a player spawner.
+     * A floorless grinder receives the same fallback, so its mobs can appear
+     * in the air and fall rather than requiring an artificial platform.
      */
     private static final java.util.Set<EntityType> MANUAL_SPAWN_TYPES = java.util.Set.of(EntityType.IRON_GOLEM);
 
@@ -673,8 +728,10 @@ public final class SpawnerManager {
             if (spawnerLocation.getBlock().getType() != Material.SPAWNER) {
                 continue;
             }
+            boolean floorlessGrinder = spawnInAir && hasNoVanillaSpawnFloor(spawnerLocation);
             if (!MANUAL_SPAWN_TYPES.contains(data.mobType())
-                    && !(spawnInDaylight && isExposedToDaylight(spawnerLocation))) {
+                    && !(spawnInDaylight && isExposedToDaylight(spawnerLocation))
+                    && !floorlessGrinder) {
                 continue;
             }
             if (!isManualSpawnDue(entry.getKey(), nowTicks)) {
@@ -711,11 +768,35 @@ public final class SpawnerManager {
         return spawnerLocation.getBlock().getLightFromSky() >= DAYLIGHT_SKY_LIGHT;
     }
 
+    /**
+     * Vanilla mob spawners need a solid floor beneath a clear two-block-tall
+     * position. When a grinder deliberately has none, use Vertex's direct
+     * spawn path instead of leaving the cage permanently at delay zero.
+     */
+    private boolean hasNoVanillaSpawnFloor(Location spawnerLocation) {
+        World world = spawnerLocation.getWorld();
+        int centerX = spawnerLocation.getBlockX();
+        int y = spawnerLocation.getBlockY();
+        int centerZ = spawnerLocation.getBlockZ();
+        for (int x = centerX - spawnRangeBlocks; x <= centerX + spawnRangeBlocks; x++) {
+            for (int z = centerZ - spawnRangeBlocks; z <= centerZ + spawnRangeBlocks; z++) {
+                Block ground = world.getBlockAt(x, y - 1, z);
+                Block feet = world.getBlockAt(x, y, z);
+                Block head = world.getBlockAt(x, y + 1, z);
+                if (ground.getType().isSolid() && feet.isPassable() && head.isPassable()) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private void manualSpawnAt(World world, Location spawnerLocation, SpawnerData data) {
         double rangeSquared = (double) requiredPlayerRangeBlocks * requiredPlayerRangeBlocks;
         boolean playerNearby = world.getPlayers().stream()
                 .anyMatch(player -> player.getLocation().distanceSquared(spawnerLocation) <= rangeSquared);
         if (!playerNearby) {
+            trace(spawnerLocation, "manual fallback skipped: no player within " + requiredPlayerRangeBlocks + " blocks");
             return;
         }
 
@@ -731,20 +812,32 @@ public final class SpawnerManager {
                 scaledCount(maxNearbyEntitiesPerStack * data.stackSize(), rateMultiplier));
         int toSpawn = Math.min(nearbyCap - nearbyCount, Math.min(scaledLimit(maxSpawnCount, rateMultiplier),
                 scaledCount(spawnCountPerStack * data.stackSize(), rateMultiplier)));
+        if (toSpawn <= 0) {
+            trace(spawnerLocation, "manual fallback skipped: " + nearbyCount + " " + data.mobType()
+                    + " nearby (cap " + nearbyCap + ")");
+            return;
+        }
         Class<? extends Entity> entityClass = data.mobType().getEntityClass();
         if (entityClass == null || !LivingEntity.class.isAssignableFrom(entityClass)) {
+            trace(spawnerLocation, "manual fallback skipped: " + data.mobType() + " is not a living spawnable entity");
             return;
         }
         @SuppressWarnings("unchecked")
         Class<? extends LivingEntity> livingEntityClass = (Class<? extends LivingEntity>) entityClass;
+        int spawned = 0;
+        int blockedLocations = 0;
         for (int i = 0; i < toSpawn; i++) {
             Location spawnAt = randomSpawnLocation(spawnerLocation);
             if (spawnAt == null) {
+                blockedLocations++;
                 continue;
             }
             world.spawn(spawnAt, livingEntityClass,
                     org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.SPAWNER, false, entity -> { });
+            spawned++;
         }
+        trace(spawnerLocation, "manual fallback requested " + toSpawn + " " + data.mobType() + "; created "
+                + spawned + (blockedLocations == 0 ? "" : " (" + blockedLocations + " had no clear in-air space)"));
     }
 
     /**
@@ -766,6 +859,9 @@ public final class SpawnerManager {
         report.add("Tracked by Vertex: " + (data != null
                 ? "yes -- " + data.mobType() + " x" + data.stackSize() + ", owner " + data.ownerFactionTag()
                 : "NO. It is an untracked vanilla spawner, so none of Vertex's tuning applies."));
+        if (data != null && getMobConfig(data.mobType()) == null) {
+            report.add("MISSING CONFIG: " + data.mobType() + " is not in spawners.yml mobs, so its custom drops are unavailable.");
+        }
 
         if (!(block.getState() instanceof CreatureSpawner spawner)) {
             report.add("Block state is not a CreatureSpawner -- nothing can spawn.");
@@ -815,9 +911,35 @@ public final class SpawnerManager {
                 + (isExposedToDaylight(location)
                         ? " (daylight-exposed: uses Vertex's manual fallback)"
                         : " (dark: uses vanilla's own spawn cycle)"));
+        if (data != null && (MANUAL_SPAWN_TYPES.contains(data.mobType()) || isExposedToDaylight(location)
+                || (spawnInAir && hasNoVanillaSpawnFloor(location)))) {
+            report.add("Manual fallback: active for this spawner; use /vertex spawnerdebug for its next attempt.");
+        }
         report.add("Mob stacking: " + (mobStackingEnabled ? "on, merge radius "
                 + mergeRadiusBlocks + " blocks -- spawns may merge into a distant stack" : "off"));
         return report;
+    }
+
+    /** Toggles a staff member's live trace for tracked spawners within 64 blocks. */
+    public boolean toggleDebug(java.util.UUID playerUuid) {
+        if (debugPlayers.remove(playerUuid)) {
+            return false;
+        }
+        debugPlayers.add(playerUuid);
+        return true;
+    }
+
+    /** Emits concise diagnostics only to staff who opted in and are near the affected spawner. */
+    public void trace(Location location, String detail) {
+        for (java.util.UUID uuid : debugPlayers) {
+            org.bukkit.entity.Player player = Bukkit.getPlayer(uuid);
+            if (player == null || !player.isOnline() || player.getWorld() != location.getWorld()
+                    || player.getLocation().distanceSquared(location) > DEBUG_RANGE_BLOCKS * DEBUG_RANGE_BLOCKS) {
+                continue;
+            }
+            player.sendMessage(net.kyori.adventure.text.Component.text("[Spawner Debug] " + detail,
+                    net.kyori.adventure.text.format.NamedTextColor.GRAY));
+        }
     }
 
     private double factionRateMultiplier(Location location) {
@@ -834,16 +956,15 @@ public final class SpawnerManager {
         return Math.max(1, (int) Math.min(Integer.MAX_VALUE, Math.ceil(baseline * multiplier)));
     }
 
-    /** A random offset within spawn-range-blocks that has solid ground and headroom, or null if none found nearby. */
+    /** A random clear two-block-high air position within range, or null if the cage is obstructed. */
     private Location randomSpawnLocation(Location spawnerLocation) {
-        for (int attempt = 0; attempt < 4; attempt++) {
+        for (int attempt = 0; attempt < 12; attempt++) {
             double dx = (random.nextDouble() * 2 - 1) * spawnRangeBlocks;
             double dz = (random.nextDouble() * 2 - 1) * spawnRangeBlocks;
             Location candidate = spawnerLocation.clone().add(dx + 0.5, 0, dz + 0.5);
-            Block ground = candidate.clone().add(0, -1, 0).getBlock();
             Block feet = candidate.getBlock();
             Block head = candidate.clone().add(0, 1, 0).getBlock();
-            if (ground.getType().isSolid() && !feet.getType().isSolid() && !head.getType().isSolid()) {
+            if (feet.isPassable() && head.isPassable() && !feet.isLiquid() && !head.isLiquid()) {
                 return candidate;
             }
         }
@@ -919,6 +1040,25 @@ public final class SpawnerManager {
             }
             found.add(Map.entry(new Location(world, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]),
                     Integer.parseInt(parts[3])), data));
+        }
+        return found;
+    }
+
+    /**
+     * Snapshot of every tracked stack, used only by bounded administration
+     * tasks such as the ten-minute F Top validation. Callers must not mutate
+     * the returned entries or use this in a tick loop.
+     */
+    public List<Map.Entry<Location, SpawnerData>> getAllSpawners() {
+        List<Map.Entry<Location, SpawnerData>> found = new ArrayList<>();
+        for (Map.Entry<String, SpawnerData> entry : spawners.entrySet()) {
+            String[] parts = entry.getKey().split(":", 4);
+            World world = plugin.getServer().getWorld(parts[0]);
+            if (world == null) {
+                continue;
+            }
+            found.add(Map.entry(new Location(world, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]),
+                    Integer.parseInt(parts[3])), entry.getValue()));
         }
         return found;
     }

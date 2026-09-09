@@ -1,6 +1,7 @@
 package me.vertex.core.auction;
 
 import me.vertex.core.lang.Messages;
+import me.vertex.core.util.Numbers;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -57,16 +58,14 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
             sendUsage(player);
             return;
         }
-        double price;
-        try {
-            price = Double.parseDouble(args[1]);
-        } catch (NumberFormatException e) {
+        Double price = Numbers.parseDoublePositive(args[1]);
+        if (price == null) {
             sendUsage(player);
             return;
         }
         AuctionCurrency currency = AuctionCurrency.MONEY;
         if (args.length >= 3) {
-            if (args[2].equalsIgnoreCase("exp")) {
+            if (isExperienceCurrency(args[2])) {
                 currency = AuctionCurrency.EXP;
             } else if (!args[2].equalsIgnoreCase("money")) {
                 sendUsage(player);
@@ -209,8 +208,15 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
             if ("exp".startsWith(partial)) {
                 matches.add("exp");
             }
+            if ("xp".startsWith(partial)) {
+                matches.add("xp");
+            }
             return matches;
         }
         return List.of();
+    }
+
+    private static boolean isExperienceCurrency(String value) {
+        return value.equalsIgnoreCase("exp") || value.equalsIgnoreCase("xp");
     }
 }

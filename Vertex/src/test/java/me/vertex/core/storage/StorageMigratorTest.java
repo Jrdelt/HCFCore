@@ -74,7 +74,8 @@ class StorageMigratorTest {
 
         SpawnerStorage sourceSpawners = new SpawnerStorage(source);
         sourceSpawners.init();
-        sourceSpawners.save(location, new SpawnerData(EntityType.BLAZE, 7, "Raiders"));
+        sourceSpawners.save(location, new SpawnerData(EntityType.BLAZE,
+                List.of(101L, 102L, 103L, 104L, 105L, 106L, 107L), "Raiders"));
 
         ChunkCollectorStorage sourceCollectors = new ChunkCollectorStorage(source);
         sourceCollectors.init();
@@ -102,6 +103,7 @@ class StorageMigratorTest {
         assertEquals(EntityType.BLAZE, spawners.get(0).mobType());
         assertEquals(7, spawners.get(0).stackSize());
         assertEquals("Raiders", spawners.get(0).ownerFactionTag());
+        assertEquals(List.of(101L, 102L, 103L, 104L, 105L, 106L, 107L), spawners.get(0).placedAtMillis());
 
         List<ChunkCollectorStorage.StoredCollector> collectors = new ChunkCollectorStorage(target).loadAll();
         assertEquals(1, collectors.size());

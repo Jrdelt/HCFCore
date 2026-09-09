@@ -1,6 +1,6 @@
 package me.vertex.core.wand;
 
-/** What a wand does when a container is right-clicked with it. */
+/** What a wand does when a container is left-clicked with it. */
 public enum WandType {
     /** Sells the container's eligible contents, paying the user directly. */
     SELL,

@@ -1,6 +1,8 @@
 package me.vertex.core.reboot;
 
 import me.vertex.core.lang.Messages;
+import me.vertex.core.preferences.AnnouncementCategory;
+import me.vertex.core.preferences.AnnouncementPreferenceManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -14,6 +16,7 @@ public final class RebootManager {
 
     private final Plugin plugin;
     private final Messages messages;
+    private final AnnouncementPreferenceManager announcements;
     private final Set<Integer> sentReminders = new HashSet<>();
     private final Set<Integer> sentFinalCountdownSeconds = new HashSet<>();
     private int defaultDelayMinutes;
@@ -22,8 +25,13 @@ public final class RebootManager {
     private int taskId = -1;
 
     public RebootManager(Plugin plugin, Messages messages) {
+        this(plugin, messages, null);
+    }
+
+    public RebootManager(Plugin plugin, Messages messages, AnnouncementPreferenceManager announcements) {
         this.plugin = plugin;
         this.messages = messages;
+        this.announcements = announcements;
         reconfigure();
     }
 
@@ -119,6 +127,10 @@ public final class RebootManager {
     }
 
     private void broadcast(String key, String... placeholders) {
+        if (announcements != null) {
+            announcements.broadcast(AnnouncementCategory.SERVER, key, placeholders);
+            return;
+        }
         for (Player player : Bukkit.getOnlinePlayers()) {
             player.sendMessage(messages.getChat(player, key, placeholders));
         }
@@ -126,6 +138,10 @@ public final class RebootManager {
     }
 
     private void broadcastDuration(String key, long seconds) {
+        if (announcements != null) {
+            announcements.broadcast(AnnouncementCategory.SERVER, key, durationPlaceholders(seconds));
+            return;
+        }
         for (Player player : Bukkit.getOnlinePlayers()) {
             player.sendMessage(messages.getChat(player, key, durationPlaceholders(seconds)));
         }

@@ -59,17 +59,21 @@ mines:
     # amount mined before any booster.
     ores:
       STONE:
-        weight: 90.0
+        # 40% total ore: four times the previous 10% ore density.
+        weight: 60.0
         drop: 1
       COAL_ORE:
-        weight: 4.5
+        weight: 18.0
         drop: 1
+        drop-material: COAL
       IRON_ORE:
-        weight: 3.5
+        weight: 14.0
         drop: 1
+        drop-material: IRON_INGOT
       REDSTONE_ORE:
-        weight: 2.0
+        weight: 8.0
         drop: 1
+        drop-material: REDSTONE
 
     # The Mine KOTH capture zone, a sub-region of this mine. Place it with
     #   /mines wand stonewake koth
@@ -123,24 +127,30 @@ mines:
       - BLACKSTONE
     ores:
       STONE:
-        weight: 96.195
+        # 15.22% total ore: four times the previous 3.805% ore density.
+        weight: 84.78
         drop: 1
       GOLD_ORE:
-        weight: 1.5
+        weight: 6.0
         drop: 1
+        drop-material: GOLD_INGOT
       LAPIS_ORE:
-        weight: 1.0
+        weight: 4.0
         drop: 1
+        drop-material: LAPIS_LAZULI
       DIAMOND_ORE:
-        weight: 0.8
+        weight: 3.2
         drop: 1
+        drop-material: DIAMOND
       EMERALD_ORE:
-        weight: 0.5
+        weight: 2.0
         drop: 1
-      # Intentionally extreme: roughly one in twenty thousand blocks.
+        drop-material: EMERALD
+      # Intentionally extreme: roughly one in five thousand blocks.
       NETHERITE_BLOCK:
-        weight: 0.005
+        weight: 0.02
         drop: 1
+        drop-material: NETHERITE_INGOT
 
     # The Mine KOTH capture zone, a sub-region of this mine. Place it with
     #   /mines wand bloodvein koth

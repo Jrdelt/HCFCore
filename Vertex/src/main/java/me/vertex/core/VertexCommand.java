@@ -65,6 +65,20 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if (args.length == 1 && args[0].equalsIgnoreCase("spawnerdebug")) {
+            if (!(sender instanceof org.bukkit.entity.Player player)) {
+                sender.sendMessage(messages.getChat(sender, "general.players-only"));
+                return true;
+            }
+            boolean enabled = plugin.spawnerManager().toggleDebug(player.getUniqueId());
+            player.sendMessage(net.kyori.adventure.text.Component.text(enabled
+                    ? "Spawner debugging enabled. Stand within 64 blocks of the spawner; run it again to turn it off."
+                    : "Spawner debugging disabled.", enabled
+                    ? net.kyori.adventure.text.format.NamedTextColor.GREEN
+                    : net.kyori.adventure.text.format.NamedTextColor.GRAY));
+            return true;
+        }
+
         if (args.length >= 1 && args[0].equalsIgnoreCase("storage")) {
             return handleStorage(sender, args);
         }
@@ -161,7 +175,7 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String partial = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("reload", "clearmobstacks", "storage", "spawnerinfo")
+            return Stream.of("reload", "clearmobstacks", "storage", "spawnerinfo", "spawnerdebug")
                     .filter(sub -> sub.startsWith(partial))
                     .collect(Collectors.toList());
         }

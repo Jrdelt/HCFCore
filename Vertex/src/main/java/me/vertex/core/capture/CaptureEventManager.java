@@ -8,6 +8,8 @@ import me.vertex.core.faction.RallyManager;
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.preferences.AnnouncementCategory;
+import me.vertex.core.preferences.AnnouncementPreferenceManager;
 import me.vertex.core.staff.StaffManager;
 import net.kyori.adventure.bossbar.BossBar;
 import org.bukkit.Bukkit;
@@ -69,9 +71,11 @@ public final class CaptureEventManager implements Listener {
     private final Messages messages;
     private final RallyManager rallyManager;
     private final StaffManager staffManager;
+    private final AnnouncementPreferenceManager announcements;
     private final File file;
     private final NamespacedKey wandKey;
     private final FactionXpBoosterManager xpBoosters;
+    private volatile me.vertex.core.faction.PvpTopManager pvpTopManager;
     private final Map<String, CaptureDefinition> definitions = new HashMap<>();
     private final Map<String, ActiveCapture> active = new HashMap<>();
     private final Map<UUID, Selection> selections = new HashMap<>();
@@ -96,10 +100,16 @@ public final class CaptureEventManager implements Listener {
     private long directionUpdateTicks;
 
     public CaptureEventManager(Plugin plugin, Messages messages, RallyManager rallyManager, StaffManager staffManager) {
+        this(plugin, messages, rallyManager, staffManager, null);
+    }
+
+    public CaptureEventManager(Plugin plugin, Messages messages, RallyManager rallyManager, StaffManager staffManager,
+            AnnouncementPreferenceManager announcements) {
         this.plugin = plugin;
         this.messages = messages;
         this.rallyManager = rallyManager;
         this.staffManager = staffManager;
+        this.announcements = announcements;
         this.file = new File(plugin.getDataFolder(), "capture-events.yml");
         this.wandKey = new NamespacedKey(plugin, "capture_selection_wand");
         this.xpBoosters = new FactionXpBoosterManager(plugin);
@@ -141,6 +151,11 @@ public final class CaptureEventManager implements Listener {
         }
         removeStaleConfiguredHolograms();
         xpBoosters.load();
+    }
+
+    /** Wired after faction leaderboard state is available. */
+    public void setPvpTopManager(me.vertex.core.faction.PvpTopManager pvpTopManager) {
+        this.pvpTopManager = pvpTopManager;
     }
 
     public void start() {
@@ -775,6 +790,10 @@ public final class CaptureEventManager implements Listener {
         if (definition.type() == CaptureEventType.OUTPOST) {
             xpBoosters.grant(completion.factionId, definition.outpostXpMultiplier(), definition.outpostXpDurationSeconds());
         }
+        me.vertex.core.faction.PvpTopManager pvpTop = pvpTopManager;
+        if (pvpTop != null) {
+            pvpTop.awardCapture(definition.type(), completion.factionId, completion.player, definition.id());
+        }
         removeHologram(capture);
         clearFocusFor(definition.id());
         broadcast(definition, "claimed", "name", definition.displayName(), "player", completion.player.getName(),
@@ -952,6 +971,11 @@ public final class CaptureEventManager implements Listener {
 
     private void broadcast(CaptureDefinition definition, String action, String... placeholders) {
         String key = "capture." + definition.type().id() + "." + action;
+        if (announcements != null) {
+            announcements.broadcast(definition.type() == CaptureEventType.KOTH
+                    ? AnnouncementCategory.KOTH : AnnouncementCategory.OUTPOST, key, placeholders);
+            return;
+        }
         for (Player player : Bukkit.getOnlinePlayers()) {
             player.sendMessage(messages.get(player, key, placeholders));
         }

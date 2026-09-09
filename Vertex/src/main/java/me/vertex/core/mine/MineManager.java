@@ -126,9 +126,21 @@ public final class MineManager {
                     plugin.getLogger().warning("mines.yml: " + id + " lists unknown ore '" + key + "', ignoring it.");
                     continue;
                 }
+                Material dropMaterial = MineOreTable.Entry.defaultDropMaterial(material);
+                String rawDropMaterial = ores.getString(key + ".drop-material", "");
+                if (rawDropMaterial != null && !rawDropMaterial.isBlank()) {
+                    Material configuredDrop = Material.matchMaterial(rawDropMaterial.trim().toUpperCase(Locale.ROOT));
+                    if (configuredDrop == null || configuredDrop.isAir()) {
+                        plugin.getLogger().warning("mines.yml: " + id + " lists invalid drop material '"
+                                + rawDropMaterial + "' for " + key + "; using " + dropMaterial + ".");
+                    } else {
+                        dropMaterial = configuredDrop;
+                    }
+                }
                 entries.add(new MineOreTable.Entry(material,
                         ores.getDouble(key + ".weight", 0D),
-                        Math.max(1, ores.getInt(key + ".drop", 1))));
+                        Math.max(1, ores.getInt(key + ".drop", 1)),
+                        dropMaterial));
             }
         }
 

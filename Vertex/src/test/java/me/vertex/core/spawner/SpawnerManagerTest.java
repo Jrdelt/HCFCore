@@ -54,6 +54,7 @@ class SpawnerManagerTest {
         assertEquals(50, manager.maxStackSize());
         assertFalse(manager.isSilkTouchRequired());
         assertTrue(manager.spawnInDaylight());
+        assertTrue(manager.spawnInAir());
     }
 
     @Test

@@ -12,20 +12,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MineOreTableTest {
 
-    /** The shipped Mining World 1 shape: 90% base, 10% ore. */
+    /** The shipped Mining World 1 shape: 60% base, 40% ore. */
     private static MineOreTable world1() {
         return MineOreTable.of(List.of(
-                new MineOreTable.Entry(Material.STONE, 90.0, 1),
-                new MineOreTable.Entry(Material.COAL_ORE, 4.5, 1),
-                new MineOreTable.Entry(Material.IRON_ORE, 3.5, 1),
-                new MineOreTable.Entry(Material.REDSTONE_ORE, 2.0, 1)));
+                new MineOreTable.Entry(Material.STONE, 60.0, 1),
+                new MineOreTable.Entry(Material.COAL_ORE, 18.0, 1),
+                new MineOreTable.Entry(Material.IRON_ORE, 14.0, 1),
+                new MineOreTable.Entry(Material.REDSTONE_ORE, 8.0, 1)));
     }
 
     @Test
     void reportsConfiguredChancesAsPercentages() {
         MineOreTable table = world1();
-        assertEquals(90.0, table.chancePercent(Material.STONE), 0.0001);
-        assertEquals(4.5, table.chancePercent(Material.COAL_ORE), 0.0001);
+        assertEquals(60.0, table.chancePercent(Material.STONE), 0.0001);
+        assertEquals(18.0, table.chancePercent(Material.COAL_ORE), 0.0001);
         assertEquals(0.0, table.chancePercent(Material.DIAMOND_ORE), 0.0001);
     }
 
@@ -44,9 +44,9 @@ class MineOreTableTest {
     void picksAcrossTheWholeRangeInWeightOrder() {
         MineOreTable table = world1();
         assertEquals(Material.STONE, table.pick(0.0));
-        assertEquals(Material.STONE, table.pick(0.89));
-        assertEquals(Material.COAL_ORE, table.pick(0.92));
-        assertEquals(Material.IRON_ORE, table.pick(0.96));
+        assertEquals(Material.STONE, table.pick(0.59));
+        assertEquals(Material.COAL_ORE, table.pick(0.70));
+        assertEquals(Material.IRON_ORE, table.pick(0.85));
         assertEquals(Material.REDSTONE_ORE, table.pick(0.99));
     }
 
@@ -69,7 +69,7 @@ class MineOreTableTest {
             }
         }
         double orePercent = ore * 100D / diamondsWorth;
-        assertEquals(10.0, orePercent, 0.1, "the table should yield its configured 10% ore rate");
+        assertEquals(40.0, orePercent, 0.1, "the table should yield its configured 40% ore rate");
     }
 
     @Test
@@ -80,6 +80,24 @@ class MineOreTableTest {
 
         assertNull(table.entry(Material.DIAMOND_ORE), "a zero weight means the ore is off, not merely rare");
         assertEquals(Material.STONE, table.pick(0.99));
+    }
+
+    @Test
+    void usesResourcesRatherThanOreBlocksForMineDrops() {
+        assertEquals(Material.COAL, new MineOreTable.Entry(Material.COAL_ORE, 1D, 1).dropMaterial());
+        assertEquals(Material.IRON_INGOT, new MineOreTable.Entry(Material.IRON_ORE, 1D, 1).dropMaterial());
+        assertEquals(Material.REDSTONE, new MineOreTable.Entry(Material.REDSTONE_ORE, 1D, 1).dropMaterial());
+        assertEquals(Material.DIAMOND, new MineOreTable.Entry(Material.DEEPSLATE_DIAMOND_ORE, 1D, 1).dropMaterial());
+        assertEquals(Material.NETHERITE_INGOT, new MineOreTable.Entry(Material.NETHERITE_BLOCK, 1D, 1).dropMaterial());
+    }
+
+    @Test
+    void preservesAnExplicitlyConfiguredDropMaterialDuringHotZones() {
+        MineOreTable table = MineOreTable.of(List.of(
+                new MineOreTable.Entry(Material.IRON_ORE, 1D, 1, Material.GOLD_INGOT)));
+
+        assertEquals(Material.GOLD_INGOT,
+                table.withHotZone(0.20D, 0.5D, Map.of()).entry(Material.IRON_ORE).dropMaterial());
     }
 
     @Test
@@ -107,10 +125,11 @@ class MineOreTableTest {
     @Test
     void hotZoneOverrideWinsOverTheCurve() {
         MineOreTable base = world1();
+        MineOreTable curveOnly = base.withHotZone(0.20, 0.5, Map.of());
         MineOreTable hot = base.withHotZone(0.20, 0.5, Map.of(Material.COAL_ORE, 10.0));
 
-        assertTrue(hot.chancePercent(Material.COAL_ORE) > base.chancePercent(Material.COAL_ORE) * 5,
-                "an explicit 10x override should dominate the rarity curve");
+        assertTrue(hot.chancePercent(Material.COAL_ORE) > curveOnly.chancePercent(Material.COAL_ORE) * 3,
+                "an explicit 10x override should dominate the normal rarity curve after normalisation");
     }
 
     @Test

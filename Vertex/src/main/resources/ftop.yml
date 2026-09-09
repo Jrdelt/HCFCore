@@ -1,0 +1,24 @@
+# Vertex F Top is calculated from tracked spawners in valid faction claims.
+# Each physical spawner ages independently; stacking a new one never grants
+# it the older stack's value.
+
+# Time for an individual spawner to reach 100% of its listed value.
+aging-seconds: 86400
+
+# Full validation cadence. The deadline is persisted, so restart resumes the
+# remaining time instead of starting a new interval.
+update-interval-seconds: 600
+
+# Entries rendered by /f top.
+display-limit: 10
+
+# Full F Top value per individual spawner. A missing type falls back to its
+# configured shop purchase price, but defining every enabled type here is
+# recommended so economy changes never alter leaderboard value unexpectedly.
+values:
+  ZOMBIE: 10000.0
+  SKELETON: 15000.0
+  BLAZE: 30000.0
+  IRON_GOLEM: 50000.0
+  EVOKER: 100000.0
+  CREEPER: 75000.0

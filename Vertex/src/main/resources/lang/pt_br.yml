@@ -1,7 +1,7 @@
 # Bumped whenever a bundled message changes. On startup Vertex replaces an
 # older on-disk copy of this file with the new bundled one, moving the
 # previous file into lang/backup/ first so customizations can be re-applied.
-lang-version: 2
+lang-version: 3
 
 general:
   no-permission: '<red>✖ Voce nao tem acesso a esse comando.'
@@ -128,7 +128,7 @@ language:
   changed: '<green>Idioma definido para {locale}.'
 
 kit:
-  usage: '<red>Uso: /kit <nome> | /kit create <nome> | /kit delete <nome>'
+  usage: '<red>Uso: /kit <nome> | /kit preview <nome> | /kit create <nome> | /kit delete <nome>'
   usage-delete: '<red>Uso: /kit delete <nome>'
   usage-create: '<red>Uso: /kit create <nome> [permissao] [segundosDeEspera] [custo] [itemDeCusto[:quantidade]]'
   deleted: '<green>Kit {kit} excluido.'

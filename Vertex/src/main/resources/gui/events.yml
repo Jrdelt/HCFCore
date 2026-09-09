@@ -1,0 +1,45 @@
+# Central read-only event board. Mine KOTH and Hot Zone state is rendered
+# directly from their running managers; this file controls presentation only.
+size: 27
+title: "ᴇᴠᴇɴᴛꜱ"
+refresh-ticks: 40
+
+filler:
+  enabled: true
+  material: BLACK_STAINED_GLASS_PANE
+  name: " "
+
+items:
+  artifact-unavailable:
+    material: END_CRYSTAL
+    slot: 4
+    name: "<light_purple>ᴀʀᴛɪꜰᴀᴄᴛ"
+    lore:
+      - "<gray>ᴄᴏᴍɪɴɢ ꜱᴏᴏɴ"
+      - "<dark_gray>Artifact events will appear here."
+
+  # Available: {mine} {world} {owner} {control} {held} {bonus}
+  mine-koth:
+    name: "<aqua>ᴍɪɴᴇ ᴋᴏᴛʜ: <white>{mine}"
+    lore:
+      - "<dark_gray>{world}"
+      - "<gray>ᴏᴡɴᴇʀ: <white>{owner}"
+      - "<gray>ᴄᴏɴᴛʀᴏʟ: <white>{control}%"
+      - "<gray>ʜᴇʟᴅ: <white>{held}"
+      - "<gray>ʙᴏɴᴜꜱ: <green>{bonus}"
+
+  # Available: {state} {mine} {world} {bonus} {remaining} {next}
+  hot-zone:
+    material: BLAZE_POWDER
+    slot: 22
+    name: "<gold>ʜᴏᴛ ᴢᴏɴᴇ"
+    lore:
+      - "<gray>ꜱᴛᴀᴛᴜꜱ: <white>{state}"
+      - "<gray>ᴍɪɴᴇ: <white>{mine}"
+      - "<gray>ᴡᴏʀʟᴅ: <white>{world}"
+      - "<gray>ʙᴏɴᴜꜱ: <green>{bonus}"
+      - "<gray>ʀᴇᴍᴀɪɴɪɴɢ: <white>{remaining}"
+      - "<gray>ɴᴇxᴛ: <white>{next}"
+
+layout:
+  mine-koth-slots: [10, 12, 14, 16]

@@ -24,12 +24,14 @@ integration behavior.
 | [PvP & Combat](pvp-and-combat.md) | Combat tag, action bar, item cooldowns, no-pearl zones, Legacy Combat (1.8 PvP), Archer Tag |
 | [Kits & Abilities](kits-and-abilities.md) | Kit classes, class effects, kit costs, the full ability item catalog and their mechanics |
 | [Factions Integration](factions-integration.md) | FactionsUUID compatibility, chat placeholders, nametags, rallies, permissions, upgrades, bank, leader-leave protection |
+| [Faction Leaderboards](faction-leaderboards.md) | `/f top`'s claimed, individually-aged spawner-value F Top, and `/f pvptop`'s KOTH/Outpost objective points |
 | [Spawners & Collectors](spawners-and-collectors.md) | Spawner shop/economy, daylight and lava behavior, stacking, mob stacks, and Chunk Collectors |
 | [Blueprint Base Builder](blueprints.md) | Automated `.schem` base building with FastAsyncWorldEdit + DecentHolograms |
 | [Backpacks](backpacks.md) | Tiered offhand auto-storage: drop bonuses, filters, leveling, and custom models |
 | [Player Trading](trading.md) | Secure two-player item, money, and XP escrow trades |
 | [Sand Bots](sandbots.md) | Automated falling-block column filling |
 | [Coinflips](coinflips.md) | 50/50 money, experience, and item wagers, claim stashes, self-ban, and the staff audit log |
+| [Personal settings](settings.md) | Per-player optional announcement preferences |
 | [Shop](shop.md) | Categorized, dynamic-price item trading |
 | [Boosters](boosters.md) | How every bonus stacks into one effective figure, and `/boosters` |
 | [Wands](wands.md) | Sell Wands and TNT Wands: dynamic-priced container selling and Gunpowder banking |

@@ -87,6 +87,28 @@ public final class MineKothControl {
     }
 
     /**
+     * Returns the holder warning milestone crossed while control is falling,
+     * or {@code 0} when no new warning is due.  Checking the transition,
+     * rather than the current value alone, prevents a capture tick from
+     * repeating the same warning every interval.
+     */
+    static int theftWarningThreshold(double previousControl, double currentControl) {
+        if (currentControl >= previousControl) {
+            return 0;
+        }
+        if (previousControl >= 100D && currentControl < 100D) {
+            return 100;
+        }
+        if (previousControl > 75D && currentControl <= 75D) {
+            return 75;
+        }
+        if (previousControl > 50D && currentControl <= 50D) {
+            return 50;
+        }
+        return previousControl > 10D && currentControl <= 10D ? 10 : 0;
+    }
+
+    /**
      * @param membersInZone eligible members per faction currently inside the zone
      */
     public static Result tick(Snapshot current, Map<Integer, Integer> membersInZone,

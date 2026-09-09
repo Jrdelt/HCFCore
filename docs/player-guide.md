@@ -113,6 +113,11 @@ never cancels, rerolls, or duplicates anything.
 
 See [Coinflips](coinflips.md).
 
+## Notification preferences
+
+Use `/settings` (or `/preferences`) to choose which optional server-wide
+announcements you want to receive. Your choices persist between sessions.
+
 ## Trading
 
 `/trade <player>` opens a secure two-sided trade: money, experience, and

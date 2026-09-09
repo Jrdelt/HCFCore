@@ -32,6 +32,12 @@ player-range and nearby-mob-capped fallback spawn cycle during daylight.
 This keeps hostile spawners working outside without doubling normal
 covered/dark-room spawning.
 
+Floorless grinder cages are supported too. With `spawn-in-air: true` (the
+default), Vertex detects when there is no clear, solid-floor vanilla spawn
+position in the configured range and switches that tracked spawner to the
+same capped fallback. Mobs then spawn in clear air and can fall to a water,
+lava, or collection system below; no platform is required.
+
 ### Faction Spawner Rate upgrade
 
 The **Spawner Rate** entry in `/f upgrades` scales both of those counts
@@ -47,6 +53,10 @@ works for members of the claim's owning faction (or staff-build) —
 everyone else is blocked outright. `break-mode: drop-all` drops the whole
 stack at once; `decrement` drops one spawner at a time, leaving the block
 if any remain.
+
+Dropped spawner items are protected from lava and fire. This covers spawners
+broken or withdrawn near a grinder; normal dropped items retain their usual
+lava behavior.
 
 ### Spawned mobs are AFK-farm safe
 

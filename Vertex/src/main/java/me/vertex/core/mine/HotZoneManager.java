@@ -1,6 +1,8 @@
 package me.vertex.core.mine;
 
 import me.vertex.core.lang.Messages;
+import me.vertex.core.preferences.AnnouncementCategory;
+import me.vertex.core.preferences.AnnouncementPreferenceManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
@@ -33,6 +35,7 @@ public final class HotZoneManager {
     private final MineManager mines;
     private final HotZoneStorage storage;
     private final Messages messages;
+    private final AnnouncementPreferenceManager announcements;
 
     private volatile boolean enabled;
     private volatile long minimumMinutes;
@@ -57,10 +60,16 @@ public final class HotZoneManager {
     private BukkitTask task;
 
     public HotZoneManager(Plugin plugin, MineManager mines, HotZoneStorage storage, Messages messages) {
+        this(plugin, mines, storage, messages, null);
+    }
+
+    public HotZoneManager(Plugin plugin, MineManager mines, HotZoneStorage storage, Messages messages,
+            AnnouncementPreferenceManager announcements) {
         this.plugin = plugin;
         this.mines = mines;
         this.storage = storage;
         this.messages = messages;
+        this.announcements = announcements;
     }
 
     public void load() {
@@ -151,9 +160,8 @@ public final class HotZoneManager {
         }
         if (preAnnounceMinutes > 0 && !preAnnounced && now >= nextStartAt - preAnnounceMinutes * 60_000L) {
             preAnnounced = true;
-            Bukkit.broadcast(messages.get(Bukkit.getConsoleSender(), "mines.hotzone-soon",
-                    "minutes", String.valueOf(preAnnounceMinutes),
-                    "world", revealWorldEarly ? displayNameOf(peekNextMine()) : "???"));
+            broadcast("mines.hotzone-soon", "minutes", String.valueOf(preAnnounceMinutes),
+                    "world", revealWorldEarly ? displayNameOf(peekNextMine()) : "???");
         }
         if (now >= nextStartAt) {
             start();
@@ -193,10 +201,8 @@ public final class HotZoneManager {
         lastMineId = chosen;
         persist(chosen, now, activeEndsAt);
 
-        Bukkit.broadcast(messages.get(Bukkit.getConsoleSender(), "mines.hotzone-started",
-                "world", displayNameOf(chosen),
-                "percent", trimmed(oreDropPercent),
-                "minutes", String.valueOf(durationMinutes)));
+        broadcast("mines.hotzone-started", "world", displayNameOf(chosen),
+                "percent", trimmed(oreDropPercent), "minutes", String.valueOf(durationMinutes));
     }
 
     private void end() {
@@ -205,8 +211,15 @@ public final class HotZoneManager {
         activeEndsAt = 0L;
         scheduleNext();
         if (ended != null) {
-            Bukkit.broadcast(messages.get(Bukkit.getConsoleSender(), "mines.hotzone-ended",
-                    "world", displayNameOf(ended)));
+            broadcast("mines.hotzone-ended", "world", displayNameOf(ended));
+        }
+    }
+
+    private void broadcast(String key, String... placeholders) {
+        if (announcements != null) {
+            announcements.broadcast(AnnouncementCategory.MINING, key, placeholders);
+        } else {
+            Bukkit.broadcast(messages.get(Bukkit.getConsoleSender(), key, placeholders));
         }
     }
 

@@ -1,7 +1,7 @@
 # Bumped whenever a bundled message changes. On startup Vertex replaces an
 # older on-disk copy of this file with the new bundled one, moving the
 # previous file into lang/backup/ first so customizations can be re-applied.
-lang-version: 2
+lang-version: 7
 
 general:
   no-permission: "<red>✖ You do not have access to that command."
@@ -106,7 +106,7 @@ language:
   changed: "<green>✔ <green>Language set to {locale}."
 
 kit:
-  usage: "&c&lKITS&r &7> <yellow>Use /kits to see all server kits<gray>."
+  usage: "&c&lKITS&r &7> <yellow>Use /kits to browse kits or /kit preview <name> to view one<gray>."
   usage-delete: "&c&lKITS&r &7> <red>Usage: /kit delete <name>"
   usage-create: "&c&lKITS&r &7> <red>Usage: /kit create <name> [permission] [cooldownseconds] [cost] [costitem[:amount]]"
   deleted: "&c&lKITS&r &7> <green>Deleted kit {kit}."
@@ -134,6 +134,12 @@ kit:
   gui-previous-page: "<yellow>ᴘʀᴇᴠɪᴏᴜꜱ ᴘᴀɢᴇ"
   gui-next-page: "<yellow>ɴᴇxᴛ ᴘᴀɢᴇ"
   preview-title: "ᴘʀᴇᴠɪᴇᴡ: {kit}"
+
+events:
+  unclaimed: "Unclaimed"
+  hotzone-active: "Active"
+  hotzone-scheduled: "Scheduled"
+  none: "-"
 
 combat:
   no-longer-in-combat: "<green>ʏᴏᴜ ᴀʀᴇ ɴᴏ ʟᴏɴɢᴇʀ ɪɴ ᴄᴏᴍʙᴀᴛ."
@@ -232,6 +238,17 @@ factions:
   rally-cleared: "&a&lRALLY &r&8» Faction rally has been cleared!"
   rally-bossbar-title: "<green><bold>ꜰᴀᴄᴛɪᴏɴ ʀᴀʟʟʏ"
   rally-bossbar-distance: "<white>ʙʟᴏᴄᴋꜱ ᴀᴡᴀʏ"
+
+ftop:
+  header: "<gold><bold>ꜰ ᴛᴏᴘ <gray>• <yellow>next check in <white>{time}"
+  empty: "<gray>No valid claimed spawner value has been recorded yet."
+  entry: "<gray>#{rank} <white>{faction} <gray>— <green>{value} <gray>{movement}"
+  forcecheck: "<green>✔ <yellow>Recalculated Vertex F Top. The automatic schedule was not changed."
+
+pvptop:
+  header: "<red><bold>ᴘᴠᴘ ᴛᴏᴘ"
+  empty: "<gray>No faction has earned PvP objective points yet."
+  entry: "<gray>#{rank} <white>{faction} <gray>— <red>{points} points"
 
 faction-upgrades:
   no-faction: "<red>✖ <yellow>You must be in a faction to view faction upgrades."
@@ -373,6 +390,9 @@ spawner:
   management-title: "           ꜱᴘᴀᴡɴᴇʀ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ"
   info-stack-size: "<gray>ꜱᴛᴀᴄᴋ ꜱɪᴢᴇ:  <white>{size}"
   info-value: "<gray>ᴠᴀʟᴜᴇ:  <white>{amount}"
+  ftop-current: "<gray>ꜰ ᴛᴏᴘ ᴠᴀʟᴜᴇ: <green>{amount} <gray>({percent}%)"
+  ftop-full: "<gray>ꜰᴜʟʟ ᴠᴀʟᴜᴇ: <green>{amount}"
+  ftop-remaining: "<gray>ᴍᴀx ᴀɢɪɴɢ ʟᴇꜰᴛ: <white>{time}"
   withdraw-one: "<green>ᴡɪᴛʜᴅʀᴀᴡ 1"
   withdraw-all: "<green>ᴡɪᴛʜᴅʀᴀᴡ ᴀʟʟ"
   sell-one: "<gold>ꜱᴇʟʟ 1 <gray>(+{amount})"
@@ -662,7 +682,8 @@ coinflip:
   wager-too-many-items-generic: "&6&lCOINFLIP&r &7> <red>That wager has too many item stacks."
   create-failed: "&6&lCOINFLIP&r &7> <red>Something went wrong creating that coinflip. You've been refunded."
   created: "&6&lCOINFLIP&r &7> <green>Your coinflip has been posted!"
-  command-usage: "&6&lCOINFLIP&r &7> <gray>Usage: /cf <amount> [exp|money] [player], /cf hand [player], /cf review|approve|deny <id>, /cf ban"
+  public-created: "&6&lCOINFLIP&r &7> <yellow>{player}<gray> created a coinflip for <yellow>{wager}<gray>! <green>Use <white>/cf<green> to view it."
+  command-usage: "&6&lCOINFLIP&r &7> <gray>Usage: /cf <amount> [exp|xp|money] [player] <dark_gray>(e.g. 10k)</dark_gray>, /cf hand [player], /cf review|approve|deny <id>, /cf ban"
   command-usage-admin: "&6&lCOINFLIP&r &7> <gray>Staff: /cf logs [player]"
   cancelled: "&6&lCOINFLIP&r &7> <yellow>Coinflip cancelled and refunded."
   play-gone: "&6&lCOINFLIP&r &7> <red>That coinflip is no longer available."
@@ -858,7 +879,7 @@ auction:
   watch-added: "&6&lAUCTION HOUSE&r &7> <green>Added to your watchlist."
   watch-removed: "&6&lAUCTION HOUSE&r &7> <yellow>Removed from your watchlist."
   disabled: "&6&lAUCTION HOUSE&r &7> <red>The Auction House is currently disabled."
-  command-usage: "&6&lAUCTION HOUSE&r &7> <gray>Usage: /ah [sell <price> [money|exp]|cancel <id>|collect]"
+  command-usage: "&6&lAUCTION HOUSE&r &7> <gray>Usage: /ah [sell <price> [money|exp|xp] <dark_gray>(e.g. 1.25m)</dark_gray>|cancel <id>|collect]"
   command-usage-admin: "&6&lAUCTION HOUSE&r &7> <gray>Staff: /ah logs [player]"
   empty-hand: "&6&lAUCTION HOUSE&r &7> <red>Hold the item you want to list first."
   price-out-of-range: "&6&lAUCTION HOUSE&r &7> <red>That price is outside the allowed range."
@@ -942,6 +963,18 @@ wand:
   tnt-bank-full: "&d&lWANDS&r &7> <red>Your faction's TNT bank is full ({max}), so the wand was not used."
   tnt-converted: "&d&lWANDS&r &7> <green>Banked <yellow>{amount}<green> TNT for your faction."
   container-changed: "&d&lWANDS&r &7> <red>The container changed while the wand was working, so nothing was taken."
+
+settings:
+  title: "<dark_gray>ꜱᴇᴛᴛɪɴɢꜱ"
+  coinflips: "<gold><bold>Coinflip Announcements"
+  koth: "<red><bold>KOTH Announcements"
+  outpost: "<gold><bold>Outpost Announcements"
+  mining: "<aqua><bold>Mining Event Announcements"
+  server: "<light_purple><bold>Server Announcements"
+  enabled: "<green>● Enabled"
+  disabled: "<red>● Disabled"
+  toggle-hint: "<yellow>Click to toggle"
+  updated-prefix: "&b&lSETTINGS&r &7> <gray>"
 
 mines:
   disabled: "&b&lMINES&r &7> <red>Mining worlds are disabled."

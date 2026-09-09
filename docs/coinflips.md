@@ -11,12 +11,15 @@ Winner takes both sides' stake.
 | `/cf <amount>` | Money, open to anyone |
 | `/cf <amount> money` | Money, explicit keyword (identical to the plain form above) |
 | `/cf <amount> <player>` | Money, only that player can play it |
-| `/cf <amount> exp` | Experience levels, open to anyone |
-| `/cf <amount> exp <player>` | Experience levels, targeted |
+| `/cf <amount> exp` or `/cf <amount> xp` | Experience levels, open to anyone |
+| `/cf <amount> exp <player>` or `/cf <amount> xp <player>` | Experience levels, targeted |
 | `/cf hand` | Items — opens a picker GUI to choose up to `max-item-stacks-per-wager` stacks |
 | `/cf hand <player>` | Same, targeted |
 
-`exp` and `money` both tab-complete right after `<amount>`; a player name
+Amounts accept the server's normal formatted-number syntax: `10k`, `1.25m`,
+`1,000,000`, and the configured suffixes in `number-formatting.yml`.
+
+`exp`/`xp` and `money` both tab-complete right after `<amount>`; a player name
 never tab-completes there, only right after an explicit `exp`/`money`
 (or as the second word of `/cf hand <player>`) — so a targeted wager
 always needs the wager type typed first. Typing a name never changes
@@ -26,6 +29,10 @@ immediately when the command runs — money via Vault, levels via
 "reserved": if creation fails partway (a database hiccup), the host is
 refunded automatically. Successfully hosting one opens the Active
 Coinflips browser right after, so you can see your own listing land.
+
+Once the listing is saved, the server announces its creator and wager in
+public chat. Players can disable only these notices in `/settings` (also
+`/preferences`) without hiding other server announcements.
 
 **One coinflip open at a time.** A player who already has an unresolved
 coinflip listed can't host a second one — cancel or resolve the first

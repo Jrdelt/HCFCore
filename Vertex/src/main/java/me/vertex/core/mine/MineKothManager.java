@@ -3,6 +3,8 @@ package me.vertex.core.mine;
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.preferences.AnnouncementCategory;
+import me.vertex.core.preferences.AnnouncementPreferenceManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -32,6 +34,7 @@ public final class MineKothManager {
     private final MineManager mines;
     private final MineKothStorage storage;
     private final Messages messages;
+    private final AnnouncementPreferenceManager announcements;
 
     private final Map<String, State> states = new ConcurrentHashMap<>();
     private final java.util.Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
@@ -42,10 +45,16 @@ public final class MineKothManager {
     private final java.util.Set<String> hologramFailures = ConcurrentHashMap.newKeySet();
 
     public MineKothManager(Plugin plugin, MineManager mines, MineKothStorage storage, Messages messages) {
+        this(plugin, mines, storage, messages, null);
+    }
+
+    public MineKothManager(Plugin plugin, MineManager mines, MineKothStorage storage, Messages messages,
+            AnnouncementPreferenceManager announcements) {
         this.plugin = plugin;
         this.mines = mines;
         this.storage = storage;
         this.messages = messages;
+        this.announcements = announcements;
     }
 
     public void load() {
@@ -125,19 +134,35 @@ public final class MineKothManager {
         String mine = mines.region(definition.mineId()) == null
                 ? definition.mineId() : mines.region(definition.mineId()).displayName();
         if (result.ownerChanged()) {
-            Bukkit.broadcast(messages.get(Bukkit.getConsoleSender(), "mines.koth-captured",
-                    "mine", mine, "faction", factionName(result.ownerFactionId())));
+            if (announcements != null) {
+                announcements.broadcast(AnnouncementCategory.KOTH, "mines.koth-captured",
+                        "mine", mine, "faction", factionName(result.ownerFactionId()));
+            } else {
+                Bukkit.broadcast(messages.get(Bukkit.getConsoleSender(), "mines.koth-captured",
+                        "mine", mine, "faction", factionName(result.ownerFactionId())));
+            }
             return;
         }
-        // Tell the holder they are being taken from, once per contest rather
-        // than every tick: only when the state actually turns to an attack.
-        boolean nowUnderAttack = result.state() == MineKothControl.State.CAPTURING
-                && before.state != MineKothControl.State.CAPTURING
-                && result.ownerFactionId() != null;
-        if (nowUnderAttack) {
-            FactionsHook.messageFaction(result.ownerFactionId(),
-                    messages.get(Bukkit.getConsoleSender(), "mines.koth-contested",
-                            "mine", mine, "control", String.valueOf(Math.round(result.controlPercent()))));
+        // Warn the holder only as their control crosses each theft milestone.
+        // A per-tick state check would keep sending the same alert while an
+        // attacker remains in the zone.
+        boolean holderIsBeingTaken = before.owner != null
+                && before.owner.equals(result.ownerFactionId())
+                && result.state() == MineKothControl.State.CAPTURING;
+        int warningThreshold = MineKothControl.theftWarningThreshold(before.control, result.controlPercent());
+        if (holderIsBeingTaken && warningThreshold > 0) {
+            if (announcements == null) {
+                FactionsHook.messageFaction(result.ownerFactionId(),
+                        messages.get(Bukkit.getConsoleSender(), "mines.koth-contested",
+                                "mine", mine, "control", String.valueOf(Math.round(result.controlPercent()))));
+            } else {
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    if (FactionsHook.getFactionId(player) == result.ownerFactionId()) {
+                        announcements.send(player, AnnouncementCategory.KOTH, "mines.koth-contested",
+                                "mine", mine, "control", String.valueOf(Math.round(result.controlPercent())));
+                    }
+                }
+            }
         }
     }
 

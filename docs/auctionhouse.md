@@ -9,10 +9,13 @@ gets it immediately — no bidding, no waiting for an auction to end.
 | Command | Effect |
 |---|---|
 | `/ah` | Opens the browser |
-| `/ah sell <price> [money\|exp]` | Lists the item in your main hand at that price. "money" is the default if omitted |
+| `/ah sell <price> [money\|exp\|xp]` | Lists the item in your main hand at that price. "money" is the default if omitted; `xp` aliases `exp` |
 | `/ah cancel <id>` | Cancels your own listing (or any listing, with `vertex.auction.remove`) and returns the item |
 | `/ah collect` | Opens the claim GUI for items waiting on you |
 | `/ah logs [player] [page]` | Staff audit log (`vertex.auction.logs`) |
+
+Prices accept the same formatted-number syntax as every other Vertex economy
+surface: `/ah sell 10k money`, `/ah sell 1.25m exp`, and `/ah sell 1,000,000`.
 
 In the browser: **left-click** a listing to buy it; **shift-click** your
 own listing (or anyone's, with `vertex.auction.remove`) to cancel it and

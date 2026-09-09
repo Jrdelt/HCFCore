@@ -168,6 +168,20 @@ class MineKothControlTest {
     }
 
     @Test
+    void warnsTheHolderOnlyWhenControlCrossesTheftMilestones() {
+        assertEquals(100, MineKothControl.theftWarningThreshold(100D, 99.5D));
+        assertEquals(75, MineKothControl.theftWarningThreshold(76D, 75D));
+        assertEquals(50, MineKothControl.theftWarningThreshold(51D, 50D));
+        assertEquals(10, MineKothControl.theftWarningThreshold(11D, 10D));
+
+        assertEquals(0, MineKothControl.theftWarningThreshold(75D, 74D),
+                "the 75% notice was already sent when 75% was reached");
+        assertEquals(0, MineKothControl.theftWarningThreshold(50D, 50D));
+        assertEquals(0, MineKothControl.theftWarningThreshold(40D, 45D),
+                "defending must not emit a theft notice");
+    }
+
+    @Test
     void controlNeverLeavesTheZeroToOneHundredRange() {
         MineKothControl.Result overshoot = tick(MineKothControl.Snapshot.UNOWNED, Map.of(RED, 5), 10_000D);
         assertEquals(100D, overshoot.controlPercent(), 0.0001);

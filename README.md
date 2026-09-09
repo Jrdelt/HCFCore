@@ -72,6 +72,7 @@ cd Vertex
 | [Backpacks](docs/backpacks.md) | Hidden auto-storage, drop bonuses, filters, leveling, and custom models |
 | [Player Trading](docs/trading.md) | Secure item, money, and XP trades with escrow and recovery |
 | [Coinflips](docs/coinflips.md) | 50/50 money, experience, and item wagers, self-ban, and staff audit log |
+| [Personal settings](docs/settings.md) | Per-player optional announcement preferences |
 | [Shop](docs/shop.md) | Categorized, dynamic-price item trading |
 | [Auction House](docs/auctionhouse.md) | Buy-it-now listings for any item, claim stashes, and staff audit log |
 | [Wands](docs/wands.md) | Sell Wands and TNT Wands: container selling through the live market, Gunpowder banking |

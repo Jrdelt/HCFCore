@@ -49,6 +49,20 @@ public final class Numbers {
         return parsed == null || parsed.signum() <= 0 ? null : parsed;
     }
 
+    /**
+     * @return a finite positive {@code double}, or {@code null} when the
+     *         input is malformed, non-positive, or cannot be represented by
+     *         a double-backed economy transaction.
+     */
+    public static Double parseDoublePositive(String raw) {
+        BigDecimal parsed = parsePositive(raw);
+        if (parsed == null) {
+            return null;
+        }
+        double value = parsed.doubleValue();
+        return Double.isFinite(value) && value > 0D ? value : null;
+    }
+
     /** @return the parsed value rounded to a whole unit, or {@code null} if malformed or out of {@code long} range. */
     public static Long parseLong(String raw) {
         return toLong(parse(raw, settings));

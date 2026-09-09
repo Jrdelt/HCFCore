@@ -1,6 +1,7 @@
 # Sell Wands & TNT Wands
 
-Right-click a **Chest** or a **Chunk Collector** with a wand. Wands work in
+Left-click a **Chest** or a **Chunk Collector** with a wand. Right-clicking a
+Chunk Collector still opens its normal management GUI. Wands work in
 your own claims, neutral claims, and enemy claims alike.
 
 Remaining uses are stored on the item itself, so the count follows the wand

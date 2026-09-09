@@ -96,6 +96,15 @@ class NumbersTest {
     }
 
     @Test
+    void parsesFormattedPositiveDoublesForMoneyAndAuctionPrices() {
+        assertEquals(10_000D, Numbers.parseDoublePositive("10k"));
+        assertEquals(1_250.50D, Numbers.parseDoublePositive("1.2505k"));
+        assertEquals(1_000_000D, Numbers.parseDoublePositive("1,000,000"));
+        assertNull(Numbers.parseDoublePositive("0"));
+        assertNull(Numbers.parseDoublePositive("10kk"));
+    }
+
+    @Test
     void parseLongRoundsToWholeUnits() {
         assertEquals(1L, Numbers.parseLong("0.6"));
         assertEquals(1001L, Numbers.parseLong("1.0005k"));

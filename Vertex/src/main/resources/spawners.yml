@@ -35,6 +35,12 @@ spawn-range-blocks: 4
 # spawners continue using vanilla's normal spawn cycle.
 spawn-in-daylight: true
 
+# A floorless grinder is intentional: its mobs should appear in the clear air
+# around the cage and fall into the collection/killing area. When no valid
+# vanilla floor-based spawn position exists within spawn-range-blocks, Vertex
+# uses its capped/manual fallback instead of requiring a platform.
+spawn-in-air: true
+
 # Vertex has the final say over spawns from its own spawners. If another
 # plugin -- a mob limiter, a rival stacker, a region protector -- cancels a
 # spawn from a spawner Vertex tracks, Vertex puts it back. Without this a

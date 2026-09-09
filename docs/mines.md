@@ -95,8 +95,11 @@ Vertex owns the drop completely inside a mine:
 - **Silk Touch does nothing** — it cannot yield the ore block itself.
 - **Fortune does nothing** — per the finalized spec, it has no effect on
   Vertex-generated ore.
-- Only the configured base drop and the **Ore Drop** booster decide the
-  amount. See [Boosters](boosters.md).
+- Ores grant their resource form, never the ore block: coal, redstone dust,
+  iron/gold/copper ingots, lapis, diamonds, emeralds, and Netherite ingots.
+  `drop-material` can override the reward per ore entry when needed.
+- Only the configured base `drop` amount and the **Ore Drop** booster decide
+  quantity. See [Boosters](boosters.md).
 
 A bonus above 100% becomes guaranteed extra drops plus a chance at one more,
 so +150% is always at least 2.5x and averages exactly that rather than
@@ -104,15 +107,24 @@ rounding the fraction away.
 
 Base blocks (Stone, Deepslate) regenerate but pay nothing.
 
+Configured ores are mineable in either their normal or deepslate form. For
+example, a mine configured with `DIAMOND_ORE` also permits and pays out for
+`DEEPSLATE_DIAMOND_ORE`; it regenerates using that mine's configured ore
+table. Unconfigured ore types remain protected as structure.
+
 ## Ore tables
 
 Weights are relative and do **not** have to total 100 — editing one ore
 never means rebalancing the rest. Shipped defaults:
 
-**Stonewake** — 90% base, 4.5% coal, 3.5% iron, 2% redstone (10% ore).
+Each ore entry supports `weight`, `drop` (the base quantity), and optional
+`drop-material`. When `drop-material` is omitted, Vertex uses the standard
+resource reward for vanilla ores instead of their block form.
 
-**Bloodvein** — 96.195% base, 1.5% gold, 1% lapis, 0.8% diamond, 0.5%
-emerald, **0.005% Netherite Block** (roughly one in twenty thousand).
+**Stonewake** — 60% base, 18% coal, 14% iron, 8% redstone (40% ore).
+
+**Bloodvein** — 84.78% base, 6% gold, 4% lapis, 3.2% diamond, 2%
+emerald, **0.02% Netherite Block** (roughly one in five thousand).
 
 ## Regeneration
 
@@ -160,6 +172,9 @@ faction separately.
 - **Owner present:** they defend and push control back toward 100%, however
   many attackers there are.
 - **Factionless players cannot capture.**
+- **Theft alerts:** the holding faction is notified once when its control
+  first falls below 100%, then once when it crosses 75%, 50%, and 10% while
+  being taken. It is not notified again on every capture tick.
 
 ### Booster
 

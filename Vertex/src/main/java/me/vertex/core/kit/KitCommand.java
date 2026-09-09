@@ -37,6 +37,23 @@ public final class KitCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if (args[0].equalsIgnoreCase("preview")) {
+            if (args.length != 2) {
+                player.sendMessage(messages.getChat(player, "kit.usage"));
+                return true;
+            }
+            Kit kit = kitManager.get(args[1]);
+            if (kit == null) {
+                player.sendMessage(messages.getChat(player, "kit.not-found", "kit", args[1]));
+                return true;
+            }
+            // Previews intentionally use the same behavior as right-clicking
+            // a kit in /kits: they never claim a kit, charge its cost, or
+            // start its cooldown, including for kits the viewer cannot claim.
+            KitPreviewMenu.open(player, kit, messages);
+            return true;
+        }
+
         if (args[0].equalsIgnoreCase("delete")) {
             if (!player.hasPermission("vertex.kit.delete")) {
                 player.sendMessage(messages.getChat(player, "general.no-permission"));
@@ -147,10 +164,14 @@ public final class KitCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (args.length == 2 && args[0].equalsIgnoreCase("preview")) {
+            return matchingKitNames(args[1]);
+        }
         if (args.length != 1) {
             return List.of();
         }
         List<String> options = new ArrayList<>(kitManager.getKits().keySet());
+        options.add("preview");
         // Only suggest these to whoever could actually use them -- a
         // regular player has no business being tipped off that they exist.
         if (sender.hasPermission("vertex.kit.create") || sender.hasPermission("vertex.kit.save")) {
@@ -165,6 +186,17 @@ public final class KitCommand implements CommandExecutor, TabCompleter {
         for (String option : options) {
             if (option.startsWith(partial)) {
                 matches.add(option);
+            }
+        }
+        return matches;
+    }
+
+    private List<String> matchingKitNames(String partialInput) {
+        String partial = partialInput.toLowerCase(Locale.ROOT);
+        List<String> matches = new ArrayList<>();
+        for (String kitName : kitManager.getKits().keySet()) {
+            if (kitName.startsWith(partial)) {
+                matches.add(kitName);
             }
         }
         return matches;
