@@ -8,6 +8,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
+import org.bukkit.Bukkit;
 import org.bukkit.block.CreatureSpawner;
 import org.bukkit.entity.Entity;
 import org.bukkit.configuration.ConfigurationSection;
@@ -422,7 +423,18 @@ public final class SpawnerManager {
         spawners.put(key(location), data);
         nextManualSpawnTicks.remove(key(location));
         writeData(location, data);
-        applyTuning(location, data);
+        // Deferred a tick on purpose. place() runs inside BlockPlaceEvent, and
+        // the server writes the item's own block-entity data to the new
+        // spawner after the event returns -- so tuning applied here was being
+        // overwritten by the item's defaults, leaving the spawner running at
+        // vanilla rates (or worse, an unset type) no matter what was
+        // configured. Tuning after the placement has settled is what actually
+        // sticks.
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (spawners.containsKey(key(location))) {
+                applyTuning(location, data);
+            }
+        });
         persist(location, data);
     }
 

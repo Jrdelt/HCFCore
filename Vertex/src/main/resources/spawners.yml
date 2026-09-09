@@ -121,6 +121,14 @@ mob-stacking:
   # merges once it settles near the collection point, not just mobs that
   # happen to spawn within range of each other. Set this generously enough
   # to cover your tallest shaft's height.
+  #
+  # The trade-off: this range is why a spawner can look completely dead.
+  # A new spawner within range of an existing stack sends its mobs into
+  # that stack instead of producing visible mobs of its own, so you see
+  # nothing appear locally while a distant mob's x-counter climbs. If a
+  # spawner seems to produce nothing, look for a stacked mob nearby before
+  # assuming it is broken -- or lower this to roughly a single room (8-16)
+  # if you are not building tall shaft grinders.
   merge-radius-blocks: 75
   # A stack already at this size lets a new spawn become its own separate
   # stack instead of being lost.
