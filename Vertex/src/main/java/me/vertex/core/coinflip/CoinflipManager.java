@@ -1,10 +1,13 @@
 package me.vertex.core.coinflip;
 
 import me.vertex.core.economy.EconomyHook;
+import me.vertex.core.gc.GcAction;
+import me.vertex.core.gc.GcManager;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.pvp.CombatManager;
 import me.vertex.core.preferences.AnnouncementCategory;
 import me.vertex.core.preferences.AnnouncementPreferenceManager;
+import me.vertex.core.util.Numbers;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
@@ -49,12 +52,16 @@ public final class CoinflipManager {
     private final CombatManager combatManager;
     private final AnnouncementPreferenceManager announcements;
     private final File file;
+    /** Set post-construction, mirroring {@code captureEventManager.setPvpTopManager}; null means GC wagers refuse cleanly. */
+    private volatile GcManager gcManager;
 
     private volatile boolean enabled;
     private volatile double minMoneyWager;
     private volatile double maxMoneyWager;
     private volatile int minExpWager;
     private volatile int maxExpWager;
+    private volatile long minGcWager;
+    private volatile long maxGcWager;
     private volatile int maxItemStacksPerWager;
     private volatile double houseFeePercent;
     private volatile int selfBanDays;
@@ -96,6 +103,11 @@ public final class CoinflipManager {
         this.file = new File(plugin.getDataFolder(), "coinflips.yml");
     }
 
+    /** Wired in after construction, once {@code GcManager} exists -- same pattern as {@code setPvpTopManager}. */
+    public void setGcManager(GcManager gcManager) {
+        this.gcManager = gcManager;
+    }
+
     public void load() {
         if (!file.exists()) {
             plugin.saveResource("coinflips.yml", false);
@@ -107,6 +119,8 @@ public final class CoinflipManager {
         maxMoneyWager = Math.max(minMoneyWager, config.getDouble("max-money-wager", 1000000.0));
         minExpWager = Math.max(1, config.getInt("min-exp-wager", 1));
         maxExpWager = Math.max(minExpWager, config.getInt("max-exp-wager", 500));
+        minGcWager = Math.max(1L, config.getLong("min-gc-wager", 1L));
+        maxGcWager = Math.max(minGcWager, config.getLong("max-gc-wager", 1_000_000L));
         maxItemStacksPerWager = Math.max(1, config.getInt("max-item-stacks-per-wager", 9));
         houseFeePercent = Math.max(0, Math.min(100, config.getDouble("house-fee-percent", 0.0)));
         selfBanDays = Math.max(1, config.getInt("self-ban-days", 30));
@@ -167,6 +181,14 @@ public final class CoinflipManager {
 
     public int maxExpWager() {
         return maxExpWager;
+    }
+
+    public long minGcWager() {
+        return minGcWager;
+    }
+
+    public long maxGcWager() {
+        return maxGcWager;
     }
 
     public int maxItemStacksPerWager() {
@@ -279,7 +301,8 @@ public final class CoinflipManager {
     // ---- Creation ----
 
     public enum CreateResult {
-        OK, DISABLED, BANNED, OUT_OF_RANGE, NO_ECONOMY, CANNOT_AFFORD, EMPTY_WAGER, TOO_MANY_ITEMS, ALREADY_HOSTING
+        OK, DISABLED, BANNED, OUT_OF_RANGE, NO_ECONOMY, CANNOT_AFFORD, EMPTY_WAGER, TOO_MANY_ITEMS, ALREADY_HOSTING,
+        GC_UNAVAILABLE
     }
 
     public record CreateOutcome(CreateResult result, Coinflip coinflip) {
@@ -342,6 +365,32 @@ public final class CoinflipManager {
         host.setLevel(host.getLevel() - levels);
         return finishCreate(host, targetUuid, CoinflipType.EXP, levels, new ItemStack[0],
                 () -> host.setLevel(host.getLevel() + levels));
+    }
+
+    /** GC wagers move through {@code GcManager} the same way a money wager moves through {@code EconomyHook}. */
+    public CreateOutcome createGcCoinflip(Player host, long amount, UUID targetUuid) {
+        if (!enabled) {
+            return CreateOutcome.failure(CreateResult.DISABLED);
+        }
+        if (isBanned(host.getUniqueId())) {
+            return CreateOutcome.failure(CreateResult.BANNED);
+        }
+        if (hasActiveCoinflip(host.getUniqueId())) {
+            return CreateOutcome.failure(CreateResult.ALREADY_HOSTING);
+        }
+        if (amount < minGcWager || amount > maxGcWager) {
+            return CreateOutcome.failure(CreateResult.OUT_OF_RANGE);
+        }
+        GcManager gc = gcManager;
+        if (gc == null) {
+            return CreateOutcome.failure(CreateResult.GC_UNAVAILABLE);
+        }
+        boolean debited = gc.tryDebit(host.getUniqueId(), host.getUniqueId(), GcAction.COINFLIP_WAGER, amount, null);
+        if (!debited) {
+            return CreateOutcome.failure(CreateResult.CANNOT_AFFORD);
+        }
+        return finishCreate(host, targetUuid, CoinflipType.GC, amount, new ItemStack[0],
+                () -> gc.credit(host.getUniqueId(), host.getUniqueId(), GcAction.COINFLIP_REFUND, amount, null));
     }
 
     /** {@code items} must already be removed from the host's real inventory (e.g. taken out of a wager-builder GUI). */
@@ -458,13 +507,20 @@ public final class CoinflipManager {
             }
             case EXP -> creditExp(coinflip.hostUuid(), (int) coinflip.amount());
             case ITEMS -> queueClaim(coinflip.hostUuid(), coinflip.items());
+            case GC -> {
+                GcManager gc = gcManager;
+                if (gc != null) {
+                    gc.credit(coinflip.hostUuid(), coinflip.hostUuid(), GcAction.COINFLIP_REFUND, (long) coinflip.amount(), null);
+                }
+            }
         }
     }
 
     // ---- Resolution ----
 
     public enum PlayResult {
-        OK, GONE, BANNED, IS_HOST, NOT_TARGETED, CANNOT_AFFORD, NEEDS_ITEM_WAGER, ALREADY_PENDING_MATCH, ALREADY_TAKING_ONE
+        OK, GONE, BANNED, IS_HOST, NOT_TARGETED, CANNOT_AFFORD, NEEDS_ITEM_WAGER, ALREADY_PENDING_MATCH,
+        ALREADY_TAKING_ONE, GC_UNAVAILABLE
     }
 
     public record PlayOutcome(PlayResult result, boolean opponentWon) {
@@ -501,9 +557,17 @@ public final class CoinflipManager {
         if (coinflip.type() == CoinflipType.ITEMS) {
             return PlayOutcome.failure(PlayResult.NEEDS_ITEM_WAGER);
         }
+        GcManager gc = gcManager;
+        if (coinflip.type() == CoinflipType.GC && gc == null) {
+            return PlayOutcome.failure(PlayResult.GC_UNAVAILABLE);
+        }
 
         if (coinflip.type() == CoinflipType.MONEY) {
             if (!EconomyHook.isAvailable() || !EconomyHook.getEconomy().has(opponent, coinflip.amount())) {
+                return PlayOutcome.failure(PlayResult.CANNOT_AFFORD);
+            }
+        } else if (coinflip.type() == CoinflipType.GC) {
+            if (!gc.has(opponent.getUniqueId(), (long) coinflip.amount())) {
                 return PlayOutcome.failure(PlayResult.CANNOT_AFFORD);
             }
         } else if (opponent.getLevel() < coinflip.amount()) {
@@ -523,6 +587,13 @@ public final class CoinflipManager {
                 browserChanged();
                 return PlayOutcome.failure(PlayResult.CANNOT_AFFORD);
             }
+        } else if (coinflip.type() == CoinflipType.GC) {
+            if (!gc.tryDebit(opponent.getUniqueId(), opponent.getUniqueId(), GcAction.COINFLIP_WAGER,
+                    (long) coinflip.amount(), null)) {
+                activeCoinflips.put(coinflipId, coinflip);
+                browserChanged();
+                return PlayOutcome.failure(PlayResult.CANNOT_AFFORD);
+            }
         } else {
             opponent.setLevel(opponent.getLevel() - (int) coinflip.amount());
         }
@@ -537,6 +608,9 @@ public final class CoinflipManager {
         if (!persistResolution(coinflip, opponent.getUniqueId(), winnerUuid, resolvedAt)) {
             if (coinflip.type() == CoinflipType.MONEY) {
                 EconomyHook.getEconomy().depositPlayer(opponent, coinflip.amount());
+            } else if (coinflip.type() == CoinflipType.GC) {
+                gc.credit(opponent.getUniqueId(), opponent.getUniqueId(), GcAction.COINFLIP_REFUND,
+                        (long) coinflip.amount(), null);
             } else {
                 opponent.setLevel(opponent.getLevel() + (int) coinflip.amount());
             }
@@ -549,6 +623,8 @@ public final class CoinflipManager {
         double payout = coinflip.amount() + coinflip.amount() * keepFraction;
         if (coinflip.type() == CoinflipType.MONEY) {
             EconomyHook.getEconomy().depositPlayer(Bukkit.getOfflinePlayer(winnerUuid), payout);
+        } else if (coinflip.type() == CoinflipType.GC) {
+            gc.credit(winnerUuid, null, GcAction.COINFLIP_PAYOUT, Math.round(payout), null);
         } else {
             creditExp(winnerUuid, (int) Math.round(payout));
         }
@@ -884,6 +960,7 @@ public final class CoinflipManager {
             case MONEY -> EconomyHook.format(coinflip.amount());
             case EXP -> (int) coinflip.amount() + " levels";
             case ITEMS -> summarizeItems(coinflip.items());
+            case GC -> Numbers.formatFull((long) coinflip.amount()) + " GC";
         };
     }
 

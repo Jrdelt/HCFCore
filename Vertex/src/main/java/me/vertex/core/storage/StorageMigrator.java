@@ -10,6 +10,7 @@ import me.vertex.core.faction.FactionUpgradeStorage;
 import me.vertex.core.faction.FactionBankStorage;
 import me.vertex.core.faction.FTopStorage;
 import me.vertex.core.faction.PvpTopStorage;
+import me.vertex.core.gc.GcStorage;
 import me.vertex.core.shop.ShopStorage;
 import me.vertex.core.spawner.SpawnerStorage;
 
@@ -90,6 +91,10 @@ public final class StorageMigrator {
         TABLES.put("trade_pending_exp", List.of("uuid", "levels"));
         TABLES.put("trade_history", List.of("id", "requester_uuid", "target_uuid", "requester_name", "target_name",
                 "requester_items", "target_items", "requester_money", "target_money", "requester_exp", "target_exp", "created_at", "status"));
+        TABLES.put("gc_balances", List.of("uuid", "balance", "updated_at"));
+        TABLES.put("gc_log", List.of("id", "actor_uuid", "target_uuid", "action", "amount", "balance_after", "note", "created_at"));
+        TABLES.put("gc_redeem_codes", List.of("code", "amount", "uses_remaining", "created_by_uuid", "created_at",
+                "expires_at", "status"));
     }
 
     private StorageMigrator() {
@@ -204,6 +209,7 @@ public final class StorageMigrator {
         new AuctionStorage(database).init();
         new TradeStorage(database).init();
         new AnnouncementPreferenceStorage(database).init();
+        new GcStorage(database).init();
     }
 
     /**

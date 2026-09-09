@@ -1,7 +1,7 @@
 # Coinflips
 
 `/cf` (alias `/coinflip`) lets a player host a 50/50 wager — money,
-experience levels, or items — against anyone, or a specific player.
+experience levels, GC, or items — against anyone, or a specific player.
 Winner takes both sides' stake.
 
 ## Hosting one
@@ -13,6 +13,8 @@ Winner takes both sides' stake.
 | `/cf <amount> <player>` | Money, only that player can play it |
 | `/cf <amount> exp` or `/cf <amount> xp` | Experience levels, open to anyone |
 | `/cf <amount> exp <player>` or `/cf <amount> xp <player>` | Experience levels, targeted |
+| `/cf <amount> gc` | Vertex's own self-hosted GC balance — see [GC (Gift Card / Credit)](gc-currency.md#gc-as-a-coinflipauction-house-currency) |
+| `/cf <amount> gc <player>` | Same, targeted |
 | `/cf hand` | Items — opens a picker GUI to choose up to `max-item-stacks-per-wager` stacks |
 | `/cf hand <player>` | Same, targeted |
 
@@ -48,8 +50,10 @@ re-renders in place on a short interval (`gui-refresh-interval-ticks`,
 state show up live for everyone with it open, not just after your own
 next click. Left-click a listing to play it:
 
-- **Money/experience**: your matching stake is taken immediately and the
-  coin is flipped right there.
+- **Money/experience/GC**: your matching stake is taken immediately and
+  the coin is flipped right there. A GC stake moves through Vertex's own
+  self-hosted ledger rather than Vault or vanilla levels — see
+  [GC (Gift Card / Credit)](gc-currency.md).
 - **Items**: clicking Play opens the same picker GUI the host used —
   choose whatever you're willing to risk (no requirement to match the
   host's value or item count) and confirm. This does **not** flip the
@@ -190,6 +194,7 @@ stake.
 | `enabled` | Master on/off switch |
 | `min-money-wager` / `max-money-wager` | Bounds for `/cf <amount>` |
 | `min-exp-wager` / `max-exp-wager` | Bounds (in levels) for `/cf <amount> exp` |
+| `min-gc-wager` / `max-gc-wager` | Bounds for `/cf <amount> gc` — see [GC (Gift Card / Credit)](gc-currency.md) |
 | `max-item-stacks-per-wager` | Cap on distinct item stacks per side of an item coinflip -- the picker GUI itself only has 9 slots, so a value above 9 has no effect |
 | `item-match-approval-timeout-seconds` | How long an item wager waits for the host's approval before auto-denying and refunding (minimum 30) |
 | `house-fee-percent` | Percentage of the *loser's* wager the winner doesn't get back (destroyed, not paid to anyone); 0 by default |

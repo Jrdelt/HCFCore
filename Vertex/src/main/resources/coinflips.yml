@@ -19,6 +19,10 @@ max-money-wager: 1000000.0
 min-exp-wager: 1
 max-exp-wager: 500
 
+# GC wagers (/cf <amount> gc), via Vertex's own self-hosted GC ledger.
+min-gc-wager: 1
+max-gc-wager: 1000000
+
 # Item wagers (/cf hand), built in the wager GUI. Caps how many distinct
 # item stacks one coinflip can carry.
 max-item-stacks-per-wager: 9

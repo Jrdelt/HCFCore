@@ -1,6 +1,8 @@
 package me.vertex.core.auction;
 
 import me.vertex.core.economy.EconomyHook;
+import me.vertex.core.gc.GcAction;
+import me.vertex.core.gc.GcManager;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
@@ -34,6 +36,8 @@ public final class AuctionManager {
 
     private final Plugin plugin;
     private final AuctionStorage storage;
+    /** Set post-construction, mirroring {@code captureEventManager.setPvpTopManager}; null means GC listings refuse cleanly. */
+    private volatile GcManager gcManager;
 
     private volatile boolean enabled;
     private volatile double minPrice;
@@ -58,6 +62,11 @@ public final class AuctionManager {
     }
 
     private final File file;
+
+    /** Wired in after construction, once {@code GcManager} exists -- same pattern as {@code setPvpTopManager}. */
+    public void setGcManager(GcManager gcManager) {
+        this.gcManager = gcManager;
+    }
 
     public void load() {
         if (!file.exists()) {
@@ -128,7 +137,7 @@ public final class AuctionManager {
     // ---- Listing ----
 
     public enum ListResult {
-        OK, DISABLED, OUT_OF_RANGE, TOO_MANY_LISTINGS, NO_ECONOMY, CANNOT_AFFORD_FEE
+        OK, DISABLED, OUT_OF_RANGE, TOO_MANY_LISTINGS, NO_ECONOMY, CANNOT_AFFORD_FEE, NO_GC
     }
 
     public record ListOutcome(ListResult result, AuctionListing listing) {
@@ -160,6 +169,17 @@ public final class AuctionManager {
                     return ListOutcome.failure(ListResult.CANNOT_AFFORD_FEE);
                 }
                 refundFee = () -> EconomyHook.getEconomy().depositPlayer(seller, fee);
+            } else if (currency == AuctionCurrency.GC) {
+                GcManager gc = gcManager;
+                if (gc == null) {
+                    return ListOutcome.failure(ListResult.NO_GC);
+                }
+                long feeGc = (long) Math.ceil(fee);
+                UUID sellerUuid = seller.getUniqueId();
+                if (!gc.tryDebit(sellerUuid, sellerUuid, GcAction.AUCTION_FEE, feeGc, null)) {
+                    return ListOutcome.failure(ListResult.CANNOT_AFFORD_FEE);
+                }
+                refundFee = () -> gc.credit(sellerUuid, sellerUuid, GcAction.AUCTION_FEE_REFUND, feeGc, null);
             } else {
                 int feeLevels = (int) Math.ceil(fee);
                 if (seller.getLevel() < feeLevels) {
@@ -213,7 +233,7 @@ public final class AuctionManager {
     // ---- Buying ----
 
     public enum BuyResult {
-        OK, GONE, IS_SELLER, NO_ECONOMY, CANNOT_AFFORD
+        OK, GONE, IS_SELLER, NO_ECONOMY, CANNOT_AFFORD, NO_GC
     }
 
     public BuyResult buy(int listingId, Player buyer) {
@@ -226,12 +246,21 @@ public final class AuctionManager {
         if (listing.sellerUuid().equals(buyer.getUniqueId())) {
             return BuyResult.IS_SELLER;
         }
+        GcManager gc = gcManager;
+        if (listing.currency() == AuctionCurrency.GC && gc == null) {
+            return BuyResult.NO_GC;
+        }
         int priceLevels = (int) Math.ceil(listing.price());
+        long priceGc = (long) Math.ceil(listing.price());
         if (listing.currency() == AuctionCurrency.MONEY) {
             if (!EconomyHook.isAvailable()) {
                 return BuyResult.NO_ECONOMY;
             }
             if (!EconomyHook.getEconomy().has(buyer, listing.price())) {
+                return BuyResult.CANNOT_AFFORD;
+            }
+        } else if (listing.currency() == AuctionCurrency.GC) {
+            if (!gc.has(buyer.getUniqueId(), priceGc)) {
                 return BuyResult.CANNOT_AFFORD;
             }
         } else if (buyer.getLevel() < priceLevels) {
@@ -248,6 +277,11 @@ public final class AuctionManager {
                 activeListings.put(listingId, listing);
                 return BuyResult.CANNOT_AFFORD;
             }
+        } else if (listing.currency() == AuctionCurrency.GC) {
+            if (!gc.tryDebit(buyer.getUniqueId(), buyer.getUniqueId(), GcAction.AUCTION_PURCHASE, priceGc, null)) {
+                activeListings.put(listingId, listing);
+                return BuyResult.CANNOT_AFFORD;
+            }
         } else {
             buyer.setLevel(buyer.getLevel() - priceLevels);
         }
@@ -258,6 +292,8 @@ public final class AuctionManager {
         if (!settle(listing, buyer.getUniqueId(), AuctionLogEntry.Status.SOLD, null)) {
             if (listing.currency() == AuctionCurrency.MONEY) {
                 EconomyHook.getEconomy().depositPlayer(buyer, listing.price());
+            } else if (listing.currency() == AuctionCurrency.GC) {
+                gc.credit(buyer.getUniqueId(), buyer.getUniqueId(), GcAction.AUCTION_REFUND, priceGc, null);
             } else {
                 buyer.setLevel(buyer.getLevel() + priceLevels);
             }
@@ -269,6 +305,8 @@ public final class AuctionManager {
         double proceeds = listing.price() - tax;
         if (listing.currency() == AuctionCurrency.MONEY) {
             EconomyHook.getEconomy().depositPlayer(Bukkit.getOfflinePlayer(listing.sellerUuid()), proceeds);
+        } else if (listing.currency() == AuctionCurrency.GC) {
+            gc.credit(listing.sellerUuid(), null, GcAction.AUCTION_SALE, Math.round(proceeds), null);
         } else {
             creditExp(listing.sellerUuid(), (int) Math.round(proceeds));
         }

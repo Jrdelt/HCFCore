@@ -30,14 +30,15 @@ integration behavior.
 | [Backpacks](backpacks.md) | Tiered offhand auto-storage: drop bonuses, filters, leveling, and custom models |
 | [Player Trading](trading.md) | Secure two-player item, money, and XP escrow trades |
 | [Sand Bots](sandbots.md) | Automated falling-block column filling |
-| [Coinflips](coinflips.md) | 50/50 money, experience, and item wagers, claim stashes, self-ban, and the staff audit log |
+| [Coinflips](coinflips.md) | 50/50 money, experience, GC, and item wagers, claim stashes, self-ban, and the staff audit log |
+| [GC (Gift Card / Credit)](gc-currency.md) | Vertex's self-hosted third currency: the wallet GUI, the sign-based deposit/withdraw flow, redeem codes, and staff tools |
 | [Personal settings](settings.md) | Per-player optional announcement preferences |
 | [Shop](shop.md) | Categorized, dynamic-price item trading |
 | [Boosters](boosters.md) | How every bonus stacks into one effective figure, and `/boosters` |
 | [Wands](wands.md) | Sell Wands and TNT Wands: dynamic-priced container selling and Gunpowder banking |
 | [Mining Worlds](mines.md) | Stonewake and Bloodvein: region selection, ore generation, and regeneration |
 | [GUI framework](gui-framework.md) | Configuring new menus: sizes, slots, materials, lore, sounds |
-| [Auction House](auctionhouse.md) | Buy-it-now listings for any item, claim stashes, expiry, fees, and the staff audit log |
+| [Auction House](auctionhouse.md) | Buy-it-now listings for any item (money, experience, or GC), claim stashes, expiry, fees, and the staff audit log |
 | [KOTH & Outposts](koth-and-outposts.md) | Faction capture rules, directions/focus, schedules, staff selection, holograms, rewards, and Outpost XP boosters |
 | [Tags & Cosmetics](tags-and-cosmetics.md) | The `/tags` system: unlocking, equipping, nickname-match, the GUI |
 | [Staff Tools](staff-tools.md) | Vanish, staff chat, staff-build, freeze, invsee/endersee, and death rollback |

@@ -1,0 +1,55 @@
+# ============================================
+# GC (GIFT CARD / CREDIT)
+# ============================================
+# GC is a third currency alongside money and experience. It is 100%
+# self-hosted -- Vertex's own database (the gc_* tables) is the sole
+# balance authority. It never reads from or defers to Tebex,
+# PlaceholderAPI, or any other external plugin. A new player's GC balance
+# is 0; nothing seeds it.
+#
+# GC is a persistent wallet: unlike Coinflip/Auction House state, it is
+# never touched by a season reset.
+
+# Vault-money-to-GC deposit bounds, via /gc's Deposit button.
+min-deposit: 1
+max-deposit: 1000000000
+
+# GC-to-Vault-money withdrawal bounds, via /gc's Withdraw button.
+min-withdraw: 1
+max-withdraw: 1000000000
+
+# Staff-generated redeem codes (/gc redeem create <amount> [uses]).
+# Default: single-use, 12 characters, no expiry unless staff sets one at
+# creation time.
+redeem-code-length: 12
+redeem-code-charset: "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+# Deposit/withdraw amounts are typed on one shared, admin-configured
+# physical sign (set with /gc setsigninput) rather than in chat or an
+# anvil -- see docs/gc-currency.md for why. Only one player may use it at
+# a time; this is how long an opened prompt waits before the block is
+# force-restored and the lock released, in case a player disconnects
+# mid-edit or simply never finishes (pressing Escape on a sign fires no
+# event at all in vanilla, so this timeout is the only way back for that).
+sign-prompt-timeout-seconds: 45
+
+# The shared sign-input block location, set via /gc setsigninput. Left
+# blank until an admin configures it -- Deposit/Withdraw refuse with a
+# message until then.
+sign-input:
+  world: ""
+  x: 0
+  y: 0
+  z: 0
+
+# Optional, config-gated console command fired whenever a player's own
+# action credits their GC balance (a deposit or a redeemed code) -- for
+# example to notify a future Tebex webstore integration or a Discord
+# webhook. Tokens: {player}, {amount}, {reason} (e.g. "deposit"/"redeem").
+# Blank (the default) means this never fires; GC's ledger is fully
+# internal regardless of whether this is configured.
+interop-command: ""
+
+# Player-facing transaction log (/gc's Logs button) and the staff-only
+# /gc admin logs command both page results this many rows at a time.
+log-page-size: 8

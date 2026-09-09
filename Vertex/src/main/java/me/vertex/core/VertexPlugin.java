@@ -167,6 +167,11 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.preferences.AnnouncementPreferenceStorage announcementPreferenceStorage;
     private me.vertex.core.preferences.AnnouncementPreferenceManager announcementPreferenceManager;
     private GhostPlayerManager ghostPlayerManager;
+    private me.vertex.core.gc.GcStorage gcStorage;
+    private me.vertex.core.gc.GcManager gcManager;
+    private me.vertex.core.gc.GcSignPrompt gcSignPrompt;
+    private me.vertex.core.gc.GcInteropHook gcInteropHook;
+    private me.vertex.core.gc.GcMenu gcMenu;
 
     @Override
     public void onLoad() {
@@ -222,6 +227,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             tradeStorage.init();
             announcementPreferenceStorage = new me.vertex.core.preferences.AnnouncementPreferenceStorage(database);
             announcementPreferenceStorage.init();
+            gcStorage = new me.vertex.core.gc.GcStorage(database);
+            gcStorage.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize the database, disabling.", e);
             Bukkit.getPluginManager().disablePlugin(this);
@@ -411,8 +418,30 @@ combatManager.start();
         menuRegistry = new me.vertex.core.menu.MenuRegistry(this,
                 java.util.List.of(me.vertex.core.booster.BoostersMenu.MENU_ID,
                         me.vertex.core.mine.MinesMenu.MENU_ID,
-                        me.vertex.core.event.EventsMenu.MENU_ID));
+                        me.vertex.core.event.EventsMenu.MENU_ID,
+                        me.vertex.core.gc.GcMenu.MENU_ID));
         menuRegistry.load();
+
+        // GC is a self-hosted, third currency -- its own database is the sole
+        // balance authority, wired up the same way the other self-contained
+        // economy-like features above are (storage -> manager -> menu ->
+        // command -> listeners), then handed to Coinflip/Auction House so
+        // they can offer it as a wager/listing currency.
+        gcManager = new me.vertex.core.gc.GcManager(this, gcStorage);
+        gcManager.load();
+        gcManager.loadState();
+        gcSignPrompt = new me.vertex.core.gc.GcSignPrompt(this);
+        gcSignPrompt.loadLocation();
+        gcInteropHook = new me.vertex.core.gc.GcInteropHook(this);
+        gcInteropHook.configure(gcManager.interopCommandTemplate());
+        gcMenu = new me.vertex.core.gc.GcMenu(this, gcManager, gcSignPrompt, gcInteropHook, messages, menuRegistry);
+        Bukkit.getPluginManager().registerEvents(gcMenu, this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.gc.GcLogMenuListener(gcManager, gcMenu, messages), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.gc.GcSignListener(gcSignPrompt), this);
+        me.vertex.core.gc.GcCommand gcCommand = new me.vertex.core.gc.GcCommand(this, gcManager, gcMenu, gcSignPrompt,
+                gcInteropHook, messages);
+        getCommand("gc").setExecutor(gcCommand);
+        getCommand("gc").setTabCompleter(gcCommand);
 
         boosterService = new me.vertex.core.booster.BoosterService(this);
         boosterService.reloadConfig();
@@ -449,6 +478,7 @@ combatManager.start();
                 announcementPreferenceManager);
         coinflipManager.load();
         coinflipManager.loadState();
+        coinflipManager.setGcManager(gcManager);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.coinflip.CoinflipMenuListener(coinflipManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
@@ -566,6 +596,7 @@ combatManager.start();
 
         auctionManager = new me.vertex.core.auction.AuctionManager(this, auctionStorage);
         auctionManager.load();
+        auctionManager.setGcManager(gcManager);
         auctionManager.loadState();
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.auction.AuctionMenuListener(this, auctionManager, messages), this);
@@ -850,6 +881,9 @@ combatManager.start();
         if (announcementPreferenceManager != null) {
             announcementPreferenceManager.awaitWrites();
         }
+        if (gcManager != null) {
+            gcManager.awaitWrites();
+        }
         FakePearlListener.clearAll();
         if (storage != null) {
             storage.close();
@@ -1064,6 +1098,11 @@ combatManager.start();
         if (tradeManager != null) {
             tradeManager.load();
         }
+        if (gcManager != null) {
+            gcManager.load();
+            gcSignPrompt.loadLocation();
+            gcInteropHook.configure(gcManager.interopCommandTemplate());
+        }
         if (kitManager != null) {
             kitManager.load();
         }
@@ -1167,6 +1206,8 @@ combatManager.start();
             auctionManager.awaitWrites();
         if (tradeManager != null)
             tradeManager.awaitWrites();
+        if (gcManager != null)
+            gcManager.awaitWrites();
     }
 
     public void finishStorageMigration() {

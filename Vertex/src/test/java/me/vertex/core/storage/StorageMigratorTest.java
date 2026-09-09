@@ -3,6 +3,8 @@ package me.vertex.core.storage;
 import me.vertex.core.blueprint.BlueprintStorage;
 import me.vertex.core.collector.ChunkCollectorStorage;
 import me.vertex.core.faction.FactionUpgradeStorage;
+import me.vertex.core.gc.GcAction;
+import me.vertex.core.gc.GcStorage;
 import me.vertex.core.spawner.SpawnerData;
 import me.vertex.core.spawner.SpawnerStorage;
 import org.bukkit.Location;
@@ -89,9 +91,14 @@ class StorageMigratorTest {
         sourceUpgrades.init();
         sourceUpgrades.save(42, "spawner-rate", 3);
 
+        GcStorage sourceGc = new GcStorage(source);
+        sourceGc.init();
+        sourceGc.applyDelta(player, player, GcAction.DEPOSIT, 500L, null, 1_000L);
+        sourceGc.insertRedeemCode("TESTCODE123", 250L, 1, player, 1_000L, null);
+
         StorageMigrator.Result result = StorageMigrator.migrate(source, target);
 
-        assertEquals(7, result.total(), "one row per populated table should have been copied");
+        assertEquals(10, result.total(), "one row per populated table should have been copied");
 
         SqlStorage migrated = new SqlStorage(target);
         assertEquals(Map.of("archer", 1_234L), migrated.loadCooldowns(player));
@@ -117,6 +124,11 @@ class StorageMigratorTest {
 
         List<FactionUpgradeStorage.StoredLevel> upgrades = new FactionUpgradeStorage(target).loadAll();
         assertEquals(List.of(new FactionUpgradeStorage.StoredLevel(42, "spawner-rate", 3)), upgrades);
+
+        GcStorage targetGc = new GcStorage(target);
+        assertEquals(500L, targetGc.loadAllBalances().get(player),
+                "a GC balance must survive a /vertex storage dialect migration");
+        assertTrue(targetGc.codeExists("TESTCODE123"), "a GC redeem code must survive the migration too");
     }
 
     @Test

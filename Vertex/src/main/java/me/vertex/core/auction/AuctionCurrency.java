@@ -1,11 +1,11 @@
 package me.vertex.core.auction;
 
 /**
- * What a listing is priced in. GC (gift-card store credit) is a planned
- * third option -- deliberately not added here until it's actually wired
- * up to something real, so the GUI shows it as a visible but disabled
- * "coming soon" choice instead of a half-built currency nothing backs.
+ * What a listing is priced in. {@link #GC} is Vertex's own self-hosted
+ * currency (see {@code me.vertex.core.gc.GcManager}) -- listing fees,
+ * purchase prices, and sale proceeds all move through {@code GcManager}
+ * the same way a money listing moves through {@code EconomyHook}.
  */
 public enum AuctionCurrency {
-    MONEY, EXP
+    MONEY, EXP, GC
 }

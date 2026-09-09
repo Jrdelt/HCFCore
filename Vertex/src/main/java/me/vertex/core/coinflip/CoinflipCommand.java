@@ -259,15 +259,17 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
     private void handleWager(Player player, String[] args) {
         boolean isExp = args.length >= 2 && isExperienceCurrency(args[1]);
         boolean isMoney = args.length >= 2 && args[1].equalsIgnoreCase("money");
+        boolean isGc = args.length >= 2 && args[1].equalsIgnoreCase("gc");
+        boolean hasCurrencyKeyword = isExp || isMoney || isGc;
         Double amount = Numbers.parseDoublePositive(args[0]);
         if (amount == null) {
             sendUsage(player);
             return;
         }
         String targetArgName = null;
-        if ((isExp || isMoney) && args.length >= 3) {
+        if (hasCurrencyKeyword && args.length >= 3) {
             targetArgName = args[2];
-        } else if (!isExp && !isMoney && args.length >= 2) {
+        } else if (!hasCurrencyKeyword && args.length >= 2) {
             targetArgName = args[1];
         }
 
@@ -289,6 +291,13 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
                 return;
             }
             outcome = manager.createExpCoinflip(player, levels.intValue(), target);
+        } else if (isGc) {
+            Long gcAmount = Numbers.parseLongPositive(args[0]);
+            if (gcAmount == null) {
+                sendUsage(player);
+                return;
+            }
+            outcome = manager.createGcCoinflip(player, gcAmount, target);
         } else {
             outcome = manager.createMoneyCoinflip(player, amount, target);
         }
@@ -311,6 +320,7 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
             case EMPTY_WAGER -> "coinflip.wager-empty";
             case TOO_MANY_ITEMS -> "coinflip.wager-too-many-items-generic";
             case ALREADY_HOSTING -> "coinflip.already-hosting";
+            case GC_UNAVAILABLE -> "gc.no-economy";
             case OK -> "coinflip.created";
         };
     }
@@ -398,9 +408,13 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
             if ("money".startsWith(partial)) {
                 matches.add("money");
             }
+            if ("gc".startsWith(partial)) {
+                matches.add("gc");
+            }
             return matches;
         }
-        if (args.length == 3 && isNumeric(args[0]) && (isExperienceCurrency(args[1]) || args[1].equalsIgnoreCase("money"))) {
+        if (args.length == 3 && isNumeric(args[0]) && (isExperienceCurrency(args[1])
+                || args[1].equalsIgnoreCase("money") || args[1].equalsIgnoreCase("gc"))) {
             String partial = args[2].toLowerCase(Locale.ROOT);
             List<String> matches = new ArrayList<>();
             for (Player online : Bukkit.getOnlinePlayers()) {

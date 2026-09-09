@@ -9,7 +9,7 @@ gets it immediately — no bidding, no waiting for an auction to end.
 | Command | Effect |
 |---|---|
 | `/ah` | Opens the browser |
-| `/ah sell <price> [money\|exp\|xp]` | Lists the item in your main hand at that price. "money" is the default if omitted; `xp` aliases `exp` |
+| `/ah sell <price> [money\|exp\|xp\|gc]` | Lists the item in your main hand at that price. "money" is the default if omitted; `xp` aliases `exp` |
 | `/ah cancel <id>` | Cancels your own listing (or any listing, with `vertex.auction.remove`) and returns the item |
 | `/ah collect` | Opens the claim GUI for items waiting on you |
 | `/ah logs [player] [page]` | Staff audit log (`vertex.auction.logs`) |
@@ -27,8 +27,7 @@ get the item back; **right-click** toggles it on your
   Price, shift-click to flip the direction (oldest/lowest first vs.
   newest/highest first).
 - A **Currency** filter (paper) — click to cycle All → Money →
-  Experience → All, narrowing the grid to just that currency. GC is
-  shown as a visible but disabled "coming soon" option.
+  Experience → GC → All, narrowing the grid to just that currency.
 - Your own head, opening [Your Auction Page](#watchlist-and-your-auction-page).
 
 `/ah sell` takes the item straight out of your hand the moment you list
@@ -38,15 +37,17 @@ limbo.
 
 ## Currency
 
-A listing is priced in **money** (the default) or **experience levels**.
-Buying an experience-priced listing takes levels from the buyer and
-credits levels to the seller instead of touching Vault at all — if the
-seller is offline when it sells, the levels wait for their next login
-(persisted, not held only in memory, the same as every other in-flight
-payout in this plugin). GC (gift-card store credit) is a planned third
-currency, visible in the picker as "coming soon" but not usable yet —
-nothing about listing or buying references it until it's actually wired
-up to something real.
+A listing is priced in **money** (the default), **experience levels**,
+or **GC**. Buying an experience-priced listing takes levels from the
+buyer and credits levels to the seller instead of touching Vault at all
+— if the seller is offline when it sells, the levels wait for their next
+login (persisted, not held only in memory, the same as every other
+in-flight payout in this plugin). A GC-priced listing works the same way
+but through Vertex's own self-hosted GC ledger instead of Vault or vanilla
+levels — see [GC (Gift Card / Credit)](gc-currency.md#gc-as-a-coinflipauction-house-currency)
+— and, since GC is a persistent database balance rather than something
+tied to being online, a GC sale credits the seller immediately regardless
+of whether they're connected.
 
 ## Watchlist and Your Auction Page
 

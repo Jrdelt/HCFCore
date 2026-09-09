@@ -3,6 +3,7 @@ package me.vertex.core.auction;
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.lang.MessageFormatter;
+import me.vertex.core.util.Numbers;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -218,8 +219,11 @@ public final class AuctionMenu {
             lore.add(Component.empty());
         }
         lore.add(noItalic(messages.get(viewer, "auction.listing-seller", "player", sellerName)));
-        String priceText = listing.currency() == AuctionCurrency.MONEY
-                ? EconomyHook.format(listing.price()) : (int) Math.ceil(listing.price()) + " levels";
+        String priceText = switch (listing.currency()) {
+            case MONEY -> EconomyHook.format(listing.price());
+            case EXP -> (int) Math.ceil(listing.price()) + " levels";
+            case GC -> Numbers.formatFull((long) Math.ceil(listing.price())) + " GC";
+        };
         lore.add(noItalic(messages.get(viewer, "auction.listing-price", "price", priceText)));
         lore.add(noItalic(messages.get(viewer, "auction.listing-expires", "time", relativeTime(listing.expiresAtMillis()))));
         boolean isSeller = listing.sellerUuid().equals(viewer.getUniqueId());
@@ -266,14 +270,18 @@ public final class AuctionMenu {
     private static ItemStack currencyButton(Player player, Messages messages, Holder holder) {
         ItemStack item = new ItemStack(Material.LECTERN);
         ItemMeta meta = item.getItemMeta();
-        String currentKey = holder.currencyFilter == null ? "auction.currency-all"
-                : holder.currencyFilter == AuctionCurrency.MONEY ? "auction.currency-money" : "auction.currency-exp";
+        String currentKey = switch (holder.currencyFilter) {
+            case null -> "auction.currency-all";
+            case MONEY -> "auction.currency-money";
+            case EXP -> "auction.currency-exp";
+            case GC -> "auction.currency-gc-coming-soon";
+        };
         meta.displayName(noItalic(messages.get(player, "auction.currency-title", "currency", messages.getRaw(player, currentKey))));
         meta.lore(List.of(
                 option(player, messages, "auction.currency-all", holder.currencyFilter == null),
                 option(player, messages, "auction.currency-money", holder.currencyFilter == AuctionCurrency.MONEY),
                 option(player, messages, "auction.currency-exp", holder.currencyFilter == AuctionCurrency.EXP),
-                option(player, messages, "auction.currency-gc-coming-soon", false),
+                option(player, messages, "auction.currency-gc-coming-soon", holder.currencyFilter == AuctionCurrency.GC),
                 Component.empty(),
                 noItalic(messages.get(player, "auction.currency-click-hint"))));
         item.setItemMeta(meta);
@@ -386,8 +394,12 @@ public final class AuctionMenu {
         }
 
         void cycleCurrencyFilter() {
-            currencyFilter = currencyFilter == null ? AuctionCurrency.MONEY
-                    : currencyFilter == AuctionCurrency.MONEY ? AuctionCurrency.EXP : null;
+            currencyFilter = switch (currencyFilter) {
+                case null -> AuctionCurrency.MONEY;
+                case MONEY -> AuctionCurrency.EXP;
+                case EXP -> AuctionCurrency.GC;
+                case GC -> null;
+            };
         }
 
         public Integer listingIdAtSlot(int slot) {

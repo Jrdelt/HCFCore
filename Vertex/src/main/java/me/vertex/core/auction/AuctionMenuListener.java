@@ -165,6 +165,7 @@ public final class AuctionMenuListener implements Listener {
             case GONE -> "auction.gone";
             case IS_SELLER -> "auction.is-seller";
             case NO_ECONOMY -> "spawner.no-economy";
+            case NO_GC -> "gc.no-economy";
             case CANNOT_AFFORD -> "auction.cannot-afford";
             case OK -> "auction.bought";
         };

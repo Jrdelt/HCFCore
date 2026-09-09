@@ -80,12 +80,30 @@ are available for staff testing. See [Player Trading](trading.md).
 | `/cf` (alias `/coinflip`) | — | Opens the Active Coinflips browser. |
 | `/cf <amount> [money] [player]` | — | Hosts a money coinflip, optionally targeted at one player. "money" is an optional explicit keyword. |
 | `/cf <amount> exp [player]` | — | Hosts an experience-level coinflip. |
+| `/cf <amount> gc [player]` | — | Hosts a GC coinflip — see [GC (Gift Card / Credit)](gc-currency.md#gc-as-a-coinflipauction-house-currency). |
 | `/cf hand [player]` | — | Opens the item wager picker GUI. |
 | `/cf review <id>` | Open to the coinflip's host only | Opens the match-review GUI: the host's wager above, the proposed items below, Accept/Deny buttons — see [Item wager approval](coinflips.md#item-wager-approval). |
 | `/cf approve <id>` / `/cf deny <id>` | Open to the coinflip's host only | Accepts or rejects a pending item-wager match straight from chat, without opening the review GUI. |
 | `/cf ban` / `/cf ban confirm` / `/cf unban` | — | Self-exclusion — see [Coinflips](coinflips.md#self-ban). Confirmation is required within 30 seconds; the ban itself cannot be lifted early. |
 | `/cf cancel <id>` | `vertex.coinflip.remove` for someone else's; open to the host for their own | Cancels an unplayed coinflip and refunds its wager. |
 | `/cf logs [player] [page]` | `vertex.coinflip.logs` | Reads the permanent staff audit log. |
+
+## GC (Gift Card / Credit)
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/gc` | `vertex.gc.use` (default: true) | Opens the GC wallet GUI (balance, Deposit, Withdraw, Redeem, Logs). |
+| `/gc redeem <code>` | `vertex.gc.use` | Consumes a staff-generated redeem code. |
+| `/gc redeem create <amount> [uses] [expires-in]` | `vertex.gc.redeem.create` | Generates a new redeem code (default: single-use, no expiry). |
+| `/gc admin balance <player>` | `vertex.gc.view` | Views another player's GC balance. |
+| `/gc admin give\|remove\|set\|zero <player> <amount>` | `vertex.gc.adjust` | Mutates a balance directly. Every attempt — permitted or not — is logged to console. |
+| `/gc admin logs [player] [page]` | `vertex.gc.logs` | Reads the permanent GC audit log. |
+| `/gc setsigninput` | `vertex.gc.adjust` | Sets the shared physical sign Deposit/Withdraw amounts are typed on. |
+
+GC is also a third wager/listing currency in Coinflip (`/cf <amount> gc
+[player]`) and the Auction House (`/ah sell <price> gc`) — see
+[GC (Gift Card / Credit)](gc-currency.md) for the full picture, including
+the sign-based amount-entry flow.
 
 ## Personal settings
 
@@ -140,7 +158,7 @@ button. This replaces the old standalone `/spawners` command.
 | Command | Permission | Notes |
 |---|---|---|
 | `/ah` (alias `/auctionhouse`) | — | Opens the browse GUI. |
-| `/ah sell <price> [money\|exp]` | — | Lists the item in your main hand at a fixed buy-it-now price, in money (default) or experience levels. |
+| `/ah sell <price> [money\|exp\|gc]` | — | Lists the item in your main hand at a fixed buy-it-now price, in money (default), experience levels, or GC. |
 | `/ah cancel <id>` | `vertex.auction.remove` for someone else's; open to the seller for their own | Cancels an unsold listing and returns the item. |
 | `/ah collect` | — | Opens the claim GUI for items waiting on you (sold, expired, or cancelled while you couldn't receive them directly). |
 | `/ah logs [player] [page]` | `vertex.auction.logs` | Reads the permanent staff audit log. |

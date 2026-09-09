@@ -67,6 +67,8 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
         if (args.length >= 3) {
             if (isExperienceCurrency(args[2])) {
                 currency = AuctionCurrency.EXP;
+            } else if (args[2].equalsIgnoreCase("gc")) {
+                currency = AuctionCurrency.GC;
             } else if (!args[2].equalsIgnoreCase("money")) {
                 sendUsage(player);
                 return;
@@ -164,6 +166,7 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
             case OUT_OF_RANGE -> "auction.price-out-of-range";
             case TOO_MANY_LISTINGS -> "auction.too-many-listings";
             case NO_ECONOMY -> "spawner.no-economy";
+            case NO_GC -> "gc.no-economy";
             case CANNOT_AFFORD_FEE -> "auction.cannot-afford-fee";
             case OK -> "auction.listed";
         };
@@ -210,6 +213,9 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
             }
             if ("xp".startsWith(partial)) {
                 matches.add("xp");
+            }
+            if ("gc".startsWith(partial)) {
+                matches.add("gc");
             }
             return matches;
         }

@@ -2,6 +2,7 @@ package me.vertex.core.coinflip;
 
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.util.Numbers;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
@@ -173,7 +174,7 @@ public final class CoinflipMenu {
     private static ItemStack listingIcon(Player viewer, CoinflipManager manager, Messages messages, Coinflip coinflip) {
         OfflinePlayer host = Bukkit.getOfflinePlayer(coinflip.hostUuid());
         ItemStack icon = switch (coinflip.type()) {
-            case MONEY, EXP -> headOf(host);
+            case MONEY, EXP, GC -> headOf(host);
             case ITEMS -> currentCycledItem(coinflip, manager).clone();
         };
         ItemMeta meta = icon.getItemMeta();
@@ -226,6 +227,7 @@ public final class CoinflipMenu {
             case MONEY -> EconomyHook.format(coinflip.amount());
             case EXP -> (int) coinflip.amount() + " levels";
             case ITEMS -> coinflip.items().length + (coinflip.items().length == 1 ? " item" : " items");
+            case GC -> Numbers.formatFull((long) coinflip.amount()) + " GC";
         };
     }
 

@@ -106,7 +106,7 @@ commands:
     usage: /<command> focus [name|off]|create|wand|cancel|start|stop|delete|list|validate
   cf:
     description: Browse, host, or play a coinflip.
-    usage: /<command> [amount [exp|xp|money] [player]|hand [player]|review <id>|approve <id>|deny <id>|ban|unban|cancel <id>|logs [player]]
+    usage: /<command> [amount [exp|xp|money|gc] [player]|hand [player]|review <id>|approve <id>|deny <id>|ban|unban|cancel <id>|logs [player]]
     aliases: [coinflip]
   boosters:
     description: View the bonuses currently applying to you.
@@ -154,6 +154,9 @@ commands:
   ftopforcecheck:
     description: Immediately recalculate Vertex F Top without changing its automatic schedule.
     usage: /<command>
+  gc:
+    description: Open your GC wallet, redeem a code, or manage GC as staff.
+    usage: /<command> [redeem <code>|redeem create <amount> [uses] [expires-in]|admin balance|give|remove|set|zero|logs <player> [amount]|setsigninput]
 
 permissions:
   vertex.admin:
@@ -294,3 +297,18 @@ permissions:
   vertex.tntfill.use:
     description: Fill dispensers in your claim with TNT from your faction bank or inventory.
     default: true
+  vertex.gc.use:
+    description: Open the GC wallet and redeem codes.
+    default: true
+  vertex.gc.view:
+    description: View another player's GC balance (/gc admin balance).
+    default: op
+  vertex.gc.logs:
+    description: View the GC staff audit log (/gc admin logs).
+    default: op
+  vertex.gc.adjust:
+    description: Give, remove, set, or zero a player's GC balance, and set the shared sign-input location. Every use is logged.
+    default: op
+  vertex.gc.redeem.create:
+    description: Generate a GC redeem code (/gc redeem create).
+    default: op

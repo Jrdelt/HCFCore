@@ -1,38 +1,10 @@
 # Remaining Vertex Addons Work
 
-This is the active backlog after reconciling the original request with the
-current codebase. Completed work has been removed rather than duplicated here.
-
-Already delivered includes the configurable Coinflip animation and per-player
-announcement preferences, Spawners & Mob Drops shop category (including
-Creepers), Auction House sorting/refresh/tie handling, collector item data,
-claim-safe Sandbots, faction TNT banking/upgrades, Sell/TNT Wands, KOTH and
-rally navigation, stale-inventory protection, combat-safe staff punishments,
-mining worlds/Mine KOTHs/Hot Zones, shared boosters, compact number parsing,
-lava-safe spawner items, floorless spawner fallback, mine ore drop handling,
-and left-click wand activation.
-
-## 1. Faction Map
-
-`/f map` is supplied by FactionsUUID, rather than Vertex. Investigate the live
-FactionsUUID map-width/map-height configuration and document the supported
-safe defaults. Do not replace or intercept the native command unless its
-configuration cannot constrain the output.
-
-## 2. GC Currency Integration
-
-`money` and `exp`/`xp` already use the shared exact amount parser in `/cf` and
-`/ah sell`. GC must stay unavailable until there is an authoritative Gift
-Card/Credit balance provider.
-
-When that provider is selected, add GC as a third currency to Coinflips and
-the Auction House:
-
-- Parse compact values through the existing number service.
-- Validate, debit, credit, refund, and persist GC atomically.
-- Render GC in menus, audit records, claims, and player-facing messages.
-- Never treat an item, PlaceholderAPI value, or client GUI state as a GC
-  balance source.
+GC Currency Integration is done: a self-hosted GC ledger with a balance GUI,
+sign-based deposit/withdraw, staff-generated redeem codes, a player-facing
+transaction log, full staff balance tooling (view/adjust/zero, all logged),
+and GC as a third currency in Coinflips and the Auction House. See
+docs/gc-currency.md.
 
 ## 3. Suspected-Dupe Investigation and Unique Item IDs
 
@@ -51,6 +23,8 @@ their holder while investigated, never automatically deleted or confiscated.
   survive inventory, storage, trade, restart, and normal transfers.
 - Detect the same tracked ID on two independent item instances and open a
   suspected-dupe case with the relevant location/holder evidence.
+- If an item has a certian ntbtag id only staff can see it will show if duplicated or whatever is the best way to find duped items.
+- Im unsure how well tag these items? Mayve every time an item is first introduced to the game do it on specific items like netherite armor tools, spawnewrs, chunk collecrtosa wands etc etc high value items.
 
 ## 4. F Top: Claimed, Individually-Aged Spawner Value
 
@@ -91,7 +65,7 @@ Extend the existing right-click stack menu:
 
 Create a leaderboard independent from F Top.
 
-- `/f pvptop` ranks factions by persisted PvP points. Configurable KOTH,
+- `/pvptop` ranks factions by persisted PvP points. Configurable KOTH,
   Outpost, Artifact, and future objective awards feed it.
 - Prevent allied/same-faction farming; handle disband, rename, merge, and
   reset intentionally. Every award/removal is logged with its source.
@@ -150,20 +124,6 @@ Add a scheduled Warzone Artifact event and a central `/events` GUI.
 - Keep title, size, layout, item lore, refresh interval, and sounds in GUI
   configuration. Do not refresh every tick.
 
-## 8. Resource Rush
-
-Create a configurable temporary sell-value event:
-
-- Select one eligible configured resource with weighted, server-side random
-  selection, pre-announcement, active/end announcements, and absolute
-  timestamps that survive restarts.
-- Apply its Sell bonus through the shared booster/economy service. A sale must
-  recalculate dynamic price and the Rush bonus per configured batch, never use
-  one frozen container price.
-- Integrate with shop selling, Sell Wands, and Chunk Collectors while leaving
-  Vertex Filter-protected/unsellable items untouched.
-- Provide staff schedule/start/stop/inspect controls and event-ID audit logs.
-- Show its active/upcoming state in `/boosters` and `/events`.
 
 ## 9. Remaining Coinflip Audit Detail
 
