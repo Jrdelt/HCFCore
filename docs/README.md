@@ -6,7 +6,11 @@ ability items, 1.8-style legacy combat, a combat-tag system,
 faction-aware chat and nametags, rallies, a faction permission matrix,
 faction upgrades, a shared faction bank, cosmetic tags, stackable
 spawners, Chunk Collectors, a progressive schematic base-builder,
-KOTH/Outpost captures, and a staff toolkit.
+KOTH/Outpost captures, a staff toolkit, a self-hosted GC currency,
+automatic duplicate-item detection, Base and Raid Claims with a
+schedule-based Faction Shield, Chunk Busters, claim-aware Source
+Buckets, a full Rune-based Custom Enchantment system, and an opt-in
+performance-monitoring framework.
 
 This is the detailed, developer-facing reference. If you just want a
 quick tour of what the plugin does, see the [main README](../README.md)
@@ -63,12 +67,17 @@ integration behavior.
 - "No effect without X installed" means the feature quietly does nothing
   rather than erroring — Vertex never requires an optional integration to
   boot.
-- `/vertex reload` reloads `config.yml`, language files, kits, abilities,
-  tags, spawner tuning, collector tuning, Backpack tiers, Blueprint
-  templates, capture-event definitions, and Vertex upgrade definitions. It also rechecks all required
-  and optional integrations, enabling Blueprints or Ghost Players if their
-  dependencies became available after Vertex started. A full restart is
-  still required after replacing a jar or switching the storage backend.
+- `/vertex reload` reloads every feature's own config: `config.yml`,
+  language files, kits, abilities, tags, spawner and collector tuning,
+  Backpack tiers, Blueprint templates, capture-event definitions, Vertex
+  upgrade definitions, F Top/PvP Top, Base and Raid Claims, Faction
+  Shield, Chunk Busters, Source Buckets, Custom Enchantments, GC, dupe
+  detection, the Performance framework, and the rest of the shop/
+  auction/trade/booster/mine feature set. It also rechecks all required
+  and optional integrations, enabling Blueprints or Ghost Players if
+  their dependencies became available after Vertex started. A full
+  restart is still required after replacing a jar or switching the
+  storage backend.
 
 Found something these docs don't cover, or something that's out of date?
 Check [issues.md](../issues.md) at the repo root for known open items, or
