@@ -169,6 +169,11 @@ The category picker's last icon is **Spawners** — a separate catalog
 dynamic-price system the rest of the shop uses) with its own Back
 button. This replaces the old standalone `/spawners` command.
 
+The **Raiding Materials** category's control row similarly has a "Buy
+Chunk Busters" button opening a small catalog of the 4 Chunk Buster types
+(priced from `chunkbuster.yml`, same reasoning as Spawners above). See
+[Chunk Busters](chunk-busters.md#acquisition).
+
 ## Auction House
 
 | Command | Permission | Notes |
@@ -197,6 +202,19 @@ button. This replaces the old standalone `/spawners` command.
 | `/f shield set <HH:mm> <minutes>` | `vertex.shield.set` | Leader/Co-Leader only; submits a new Shield schedule (takes effect after the configured activation delay). Rejected until the New-Faction Shield Delay has passed. |
 | `/f shield admin <faction> active\|inactive\|clear` | `vertex.admin.claims` | Staff force a faction's Shield state, or clear an existing override. Every attempt is console-logged; silent to the affected faction. |
 | `/f who <faction-or-player>` | *(native FactionsUUID permission)* | Native command untouched; Vertex appends a one-tick-delayed Shield status follow-up message. |
+
+## Chunk Busters
+
+Chunk Busters have no dedicated `/f` subcommand — they're triggered by
+right-clicking a block with the item, purchased from `/shop`'s Raiding
+Materials category. See [Chunk Busters](chunk-busters.md) for the
+confirmation flow, zone rules, and the batched/restart-safe removal
+mechanics.
+
+| Command | Permission | Notes |
+|---|---|---|
+| Right-click a block with a Chunk Buster | *(none — gated by zone/combat/role checks in-code)* | Opens the confirmation GUI. |
+| `/chunkbuster permission <role> <allow\|deny>` | `vertex.chunkbuster.permission` | Faction Leader/Co-Leader only; edits only the caller's own faction's role permissions. |
 
 ## KOTH & Outposts
 

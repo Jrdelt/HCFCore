@@ -115,6 +115,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.claims.RaidClaimManager raidClaimManager;
     private me.vertex.core.shield.ShieldStorage shieldStorage;
     private me.vertex.core.shield.ShieldManager shieldManager;
+    private me.vertex.core.chunkbuster.ChunkBusterStorage chunkBusterStorage;
+    private me.vertex.core.chunkbuster.ChunkBusterManager chunkBusterManager;
     private me.vertex.core.faction.FTopStorage fTopStorage;
     private me.vertex.core.faction.FTopManager fTopManager;
     private me.vertex.core.faction.PvpTopStorage pvpTopStorage;
@@ -242,6 +244,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             claimStorage.init();
             shieldStorage = new me.vertex.core.shield.ShieldStorage(database);
             shieldStorage.init();
+            chunkBusterStorage = new me.vertex.core.chunkbuster.ChunkBusterStorage(database);
+            chunkBusterStorage.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize the database, disabling.", e);
             Bukkit.getPluginManager().disablePlugin(this);
@@ -433,7 +437,8 @@ combatManager.start();
                         me.vertex.core.mine.MinesMenu.MENU_ID,
                         me.vertex.core.event.EventsMenu.MENU_ID,
                         me.vertex.core.gc.GcMenu.MENU_ID,
-                        me.vertex.core.claims.BaseClaimMenu.MENU_ID));
+                        me.vertex.core.claims.BaseClaimMenu.MENU_ID,
+                        me.vertex.core.chunkbuster.ChunkBusterMenu.MENU_ID));
         menuRegistry.load();
 
         // Base Claims / Raid Claims: Base Claim state is loaded fully into
@@ -484,6 +489,31 @@ combatManager.start();
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.claims.ExplosionProtectionListener(baseClaimManager::isBaseClaim), this);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.listener.WitherPreventionListener(), this);
+
+        // Chunk Busters (Phase 4): every live-FactionsUUID/combat lookup is
+        // injected as a plain functional reference -- see the class doc for
+        // why (mirrors ExplosionProtectionListener's Predicate<Location>
+        // decoupling above). Wired after CombatManager/SpawnerManager
+        // (both already exist by here) and before Shop, since Shop's own
+        // listener needs a reference to open the Chunk Buster shop
+        // sub-menu -- see the Shop section below for the other half of
+        // that wiring.
+        chunkBusterManager = new me.vertex.core.chunkbuster.ChunkBusterManager(this, chunkBusterStorage,
+                spawnerManager,
+                me.vertex.core.factions.FactionsHook::getClaimFactionId,
+                me.vertex.core.factions.FactionsHook::getClaimFactionTag,
+                me.vertex.core.factions.FactionsHook::getFactionId,
+                me.vertex.core.faction.RallyManager::roleId,
+                combatManager::isTagged);
+        chunkBusterManager.load();
+        chunkBusterManager.loadState();
+        chunkBusterManager.recoverAbandonedOperations();
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.chunkbuster.ChunkBusterListener(chunkBusterManager, messages, menuRegistry), this);
+        me.vertex.core.chunkbuster.ChunkBusterCommand chunkBusterCommand =
+                new me.vertex.core.chunkbuster.ChunkBusterCommand(this, chunkBusterManager, messages);
+        getCommand("chunkbuster").setExecutor(chunkBusterCommand);
+        getCommand("chunkbuster").setTabCompleter(chunkBusterCommand);
 
         // GC is a self-hosted, third currency -- its own database is the sole
         // balance authority, wired up the same way the other self-contained
@@ -581,7 +611,14 @@ combatManager.start();
         shopManager.load();
         shopManager.loadState();
         Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.shop.ShopMenuListener(shopManager, spawnerManager, messages), this);
+                new me.vertex.core.shop.ShopMenuListener(shopManager, spawnerManager, chunkBusterManager, messages),
+                this);
+        // Chunk Busters' own confirmation-GUI + shop-sub-menu listener --
+        // needs ShopManager (for its "back to shop" button), which is why
+        // this is wired here rather than alongside the rest of the Chunk
+        // Buster setup above.
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.chunkbuster.ChunkBusterMenuListener(
+                chunkBusterManager, shopManager, spawnerManager, messages, menuRegistry), this);
         mineManager = new me.vertex.core.mine.MineManager(this, messages);
         mineManager.load();
         Bukkit.getPluginManager().registerEvents(
@@ -1120,6 +1157,9 @@ combatManager.start();
         }
         if (shieldManager != null) {
             shieldManager.load();
+        }
+        if (chunkBusterManager != null) {
+            chunkBusterManager.load();
         }
         if (factionUpgradeManager != null) {
             factionUpgradeManager.reloadConfig();

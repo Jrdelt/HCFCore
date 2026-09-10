@@ -1,0 +1,100 @@
+# Chunk Busters -- see docs/chunk-busters.md.
+#
+# Four independently-configurable destructive area-clear items, usable in
+# the player's own faction claims (including their own Base Claims and Raid
+# Claims -- both are just "your faction's claim" from here) and in
+# Wilderness (no faction required, no permission check there at all).
+# Never usable in another faction's claim, and never in SafeZone/WarZone
+# even for admins -- there is no bypass for those two zones for this
+# feature, by design.
+
+types:
+  upward:
+    enabled: true
+    price: 5000
+    material: TNT
+    name: "<red>Upward Chunk Buster"
+    lore:
+      - "<gray>Removes every block above where you"
+      - "<gray>use this, across the whole chunk."
+      - "<gray>Requires confirmation. No drops."
+  downward:
+    enabled: true
+    price: 5000
+    material: TNT
+    name: "<red>Downward Chunk Buster"
+    lore:
+      - "<gray>Removes every block below where you"
+      - "<gray>use this, across the whole chunk."
+      - "<gray>Requires confirmation. No drops."
+  full:
+    enabled: true
+    price: 12000
+    material: TNT
+    name: "<dark_red>Full Chunk Buster"
+    lore:
+      - "<gray>Removes every block in the entire"
+      - "<gray>chunk you use this in, top to bottom."
+      - "<gray>Requires confirmation. No drops."
+  single-column:
+    enabled: true
+    price: 1500
+    material: TNT
+    name: "<yellow>Single-Column Buster"
+    lore:
+      - "<gray>Removes only the single 1x1 column"
+      - "<gray>of blocks where you use this."
+      - "<gray>Requires confirmation. No drops."
+
+# Always protected, on top of bedrock -- which no Chunk Buster type may
+# EVER remove, no matter what confirmation says. This list is for every
+# other indestructible/system block an admin wants to add the same
+# protection to.
+protected-blocks:
+  - BEDROCK
+  - BARRIER
+  - COMMAND_BLOCK
+  - CHAIN_COMMAND_BLOCK
+  - REPEATING_COMMAND_BLOCK
+  - STRUCTURE_BLOCK
+  - STRUCTURE_VOID
+  - JIGSAW
+  - END_PORTAL
+  - END_PORTAL_FRAME
+  - END_GATEWAY
+  - NETHER_PORTAL
+  - LIGHT
+  - REINFORCED_DEEPSLATE
+
+# Faction claim names Chunk Busters are always blocked in -- matches
+# whatever you named your system factions via /f safezone and /f warzone.
+# Unlike abilities.disabled-claim-names (config.yml), there is no admin
+# bypass for this list at all: staff cannot use a Chunk Buster in a listed
+# claim either, per spec.
+disabled-claim-names:
+  - safezone
+  - warzone
+
+# Batched removal, so a huge area is never cleared in a single tick.
+# blocks-per-tick every period-ticks is the removal rate. The defaults
+# clear a full 16x16-column, full-world-height chunk (roughly 98,000
+# blocks in a -64..320 world -- the worst case, for Full/Upward/Downward)
+# in about 100 ticks, i.e. ~5 seconds at 20 TPS; Single-Column Busters
+# (at most 384 blocks) finish in well under a second either way. Raise
+# blocks-per-tick for faster clears at a higher per-tick cost, or lower it
+# if a large clear causes a noticeable tick-time spike on your hardware.
+processing:
+  blocks-per-tick: 1000
+  period-ticks: 1
+
+# Which faction roles may use a Chunk Buster inside a faction claim, before
+# a faction's leader customizes it via /chunkbuster permission <role>
+# <allow|deny>. Wilderness use needs no role permission at all -- these
+# defaults only ever apply inside a faction's own claim. Roles: admin
+# (leader), mod (co-leader/moderator), member (normal), recruit.
+role-permissions:
+  defaults:
+    admin: true
+    mod: true
+    member: false
+    recruit: false

@@ -55,6 +55,27 @@ public final class ShopMenu {
     /** Control-row slot holding that button, opposite the Back button. */
     public static final int SLOT_BUY_SPAWNERS = 8;
 
+    /**
+     * Sentinel category id for the Chunk Busters button -- same reasoning
+     * as {@link #SPAWNERS_CATEGORY_ID}: a Chunk Buster is priced per type
+     * in {@code chunkbuster.yml}, not per Material, so it cannot be a real
+     * {@code ShopEntry} row either. Clicking it opens {@link
+     * me.vertex.core.chunkbuster.ChunkBusterShopMenu} directly.
+     */
+    public static final String CHUNK_BUSTERS_CATEGORY_ID = "__chunk_busters__";
+
+    /**
+     * The shop.yml category the buyable-Chunk-Buster button lives inside.
+     * Raiding Materials already holds every other destructive/raiding
+     * consumable (TNT, obsidian, flint and steel, ...), so Chunk Busters
+     * fit thematically without needing a whole new category slot in the
+     * 9-wide /shop picker.
+     */
+    public static final String CHUNK_BUSTERS_HOST_CATEGORY = "raiding";
+
+    /** Control-row slot holding that button -- the one border slot neither Back nor Balance occupies. */
+    public static final int SLOT_BUY_CHUNK_BUSTERS = 7;
+
     public enum Mode {
         CATEGORIES, ITEMS
     }
@@ -91,6 +112,15 @@ public final class ShopMenu {
         return icon;
     }
 
+    private static ItemStack chunkBustersCategoryIcon(Player player, Messages messages) {
+        ItemStack icon = new ItemStack(Material.TNT);
+        ItemMeta meta = icon.getItemMeta();
+        meta.displayName(noItalic(messages.get(player, "shop.chunkbusters-category-title")));
+        meta.lore(List.of(noItalic(messages.get(player, "shop.category-open-lore"))));
+        icon.setItemMeta(meta);
+        return icon;
+    }
+
     public static void openCategory(Player player, ShopManager manager, SpawnerManager spawnerManager,
                                      Messages messages, String categoryId, int requestedPage) {
         ShopCategory category = manager.category(categoryId);
@@ -119,6 +149,10 @@ public final class ShopMenu {
                 && spawnerManager != null && !spawnerManager.getMobConfigs().isEmpty()) {
             inventory.setItem(SLOT_BUY_SPAWNERS, spawnersCategoryIcon(player, messages));
             holder.slotCategoryIds.put(SLOT_BUY_SPAWNERS, SPAWNERS_CATEGORY_ID);
+        }
+        if (CHUNK_BUSTERS_HOST_CATEGORY.equals(categoryId)) {
+            inventory.setItem(SLOT_BUY_CHUNK_BUSTERS, chunkBustersCategoryIcon(player, messages));
+            holder.slotCategoryIds.put(SLOT_BUY_CHUNK_BUSTERS, CHUNK_BUSTERS_CATEGORY_ID);
         }
 
         int start = page * PAGE_SIZE;

@@ -108,6 +108,9 @@ public final class StorageMigrator {
         TABLES.put("faction_shield_overrides", List.of("faction_id", "forced_state", "frozen_remaining_millis",
                 "set_by_uuid", "set_at"));
         TABLES.put("faction_shield_log", List.of("id", "faction_id", "action", "actor_uuid", "details", "created_at"));
+        TABLES.put("chunk_buster_operations", List.of("id", "world", "chunk_x", "chunk_z", "type", "started_at", "status"));
+        TABLES.put("chunk_buster_role_permissions", List.of("faction_id", "role", "allowed"));
+        TABLES.put("chunk_buster_log", List.of("id", "player_uuid", "type", "world", "x", "y", "z", "created_at"));
     }
 
     private StorageMigrator() {
@@ -226,6 +229,7 @@ public final class StorageMigrator {
         new DupeStorage(database).init();
         new me.vertex.core.claims.ClaimStorage(database).init();
         new me.vertex.core.shield.ShieldStorage(database).init();
+        new me.vertex.core.chunkbuster.ChunkBusterStorage(database).init();
     }
 
     /**

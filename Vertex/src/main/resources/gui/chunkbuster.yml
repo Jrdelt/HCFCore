@@ -1,0 +1,63 @@
+# Chunk Buster confirmation. Confirm (green, or the flashy red variant
+# below) starts the batched removal; cancel (red) or simply closing the
+# inventory both leave the world untouched.
+size: 27
+title: "ᴄʜᴜɴᴋ ʙᴜꜱᴛᴇʀ"
+
+# Shown instead of the normal title whenever the affected chunk contains
+# any tracked spawner -- paired with the spawner-warning-banner item and
+# the confirm-spawner-warning button below for a much more noticeable
+# confirmation than the plain case.
+titles:
+  spawner-warning: "<red><bold>⚠ ꜱᴘᴀᴡɴᴇʀꜱ ᴡɪʟʟ ʙᴇ ᴅᴇꜱᴛʀᴏʏᴇᴅ ⚠"
+
+filler:
+  enabled: true
+  material: BLACK_STAINED_GLASS_PANE
+  name: " "
+
+items:
+  # Available: {type} {world} {x} {y} {z}
+  info:
+    material: TNT
+    slot: 13
+    name: "<gold>{type}"
+    lore:
+      - "<gray>ᴡᴏʀʟᴅ: <white>{world}"
+      - "<gray>ʟᴏᴄᴀᴛɪᴏɴ: <white>{x}, {y}, {z}"
+      - "<gray>This permanently removes blocks."
+      - "<gray>No drops. No undo."
+
+  spawner-warning-banner:
+    material: SPAWNER
+    slot: 4
+    name: "<red><bold>⚠ ᴛʜɪꜱ ᴀʀᴇᴀ ᴄᴏɴᴛᴀɪɴꜱ ꜱᴘᴀᴡɴᴇʀꜱ"
+    lore:
+      - "<red>Any tracked spawners here will be destroyed"
+      - "<red>along with everything else. No refund."
+    sound: entity.wither.ambient
+
+  confirm:
+    material: LIME_STAINED_GLASS_PANE
+    slot: 20
+    name: "<green>ᴄᴏɴꜰɪʀᴍ"
+    lore:
+      - "<gray>Permanently clears the area."
+    sound: block.note_block.pling
+
+  confirm-spawner-warning:
+    material: TNT
+    slot: 20
+    name: "<red><bold>ᴄᴏɴꜰɪʀᴍ ᴀɴʏᴡᴀʏ"
+    lore:
+      - "<red>Spawners in this area will be destroyed too."
+      - "<gray>Permanently clears the area."
+    sound: entity.generic.explode
+
+  cancel:
+    material: RED_STAINED_GLASS_PANE
+    slot: 24
+    name: "<red>ᴄᴀɴᴄᴇʟ"
+    lore:
+      - "<gray>Closes this menu; nothing changes."
+    sound: block.note_block.bass

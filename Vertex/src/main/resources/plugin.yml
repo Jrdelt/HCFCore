@@ -46,6 +46,9 @@ commands:
   chunkcollector:
     description: Give a player a Chunk Collector (Green Shulker Box).
     usage: /<command> give <player>
+  chunkbuster:
+    description: Manage which faction roles can use Chunk Busters.
+    usage: /<command> permission <role> <allow|deny>
   blueprint:
     description: Give Blueprint items or manage Blueprint placement cooldowns.
     usage: /<command> give <player> <template>|cooldown remove <player>
@@ -176,6 +179,9 @@ permissions:
     default: true
   vertex.baseclaim.remove:
     description: Remove an existing Base Claim via /f baseclaim.
+    default: true
+  vertex.chunkbuster.permission:
+    description: Manage which faction roles can use Chunk Busters via /chunkbuster permission (also requires being your faction's Leader/Co-Leader).
     default: true
   vertex.baseclaim.purchaseslot:
     description: Purchase an additional Base Claim slot.

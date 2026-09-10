@@ -1,5 +1,7 @@
 package me.vertex.core.shop;
 
+import me.vertex.core.chunkbuster.ChunkBusterManager;
+import me.vertex.core.chunkbuster.ChunkBusterShopMenu;
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.spawner.SpawnerManager;
@@ -16,11 +18,14 @@ public final class ShopMenuListener implements Listener {
 
     private final ShopManager manager;
     private final SpawnerManager spawnerManager;
+    private final ChunkBusterManager chunkBusterManager;
     private final Messages messages;
 
-    public ShopMenuListener(ShopManager manager, SpawnerManager spawnerManager, Messages messages) {
+    public ShopMenuListener(ShopManager manager, SpawnerManager spawnerManager, ChunkBusterManager chunkBusterManager,
+            Messages messages) {
         this.manager = manager;
         this.spawnerManager = spawnerManager;
+        this.chunkBusterManager = chunkBusterManager;
         this.messages = messages;
     }
 
@@ -49,6 +54,8 @@ public final class ShopMenuListener implements Listener {
             String categoryId = holder.categoryIdAtSlot(slot);
             if (ShopMenu.SPAWNERS_CATEGORY_ID.equals(categoryId)) {
                 SpawnerShopMenu.open(player, spawnerManager, messages);
+            } else if (ShopMenu.CHUNK_BUSTERS_CATEGORY_ID.equals(categoryId)) {
+                ChunkBusterShopMenu.open(player, chunkBusterManager, messages);
             } else if (categoryId != null) {
                 ShopMenu.openCategory(player, manager, spawnerManager, messages, categoryId, 0);
             }
@@ -60,9 +67,14 @@ public final class ShopMenuListener implements Listener {
             return;
         }
         // The buyable-spawner button now sits in the Spawners & Mob Drops
-        // control row rather than beside the categories.
+        // control row rather than beside the categories; the buyable-Chunk-
+        // Buster button similarly sits in Raiding Materials' control row.
         if (ShopMenu.SPAWNERS_CATEGORY_ID.equals(holder.categoryIdAtSlot(slot))) {
             SpawnerShopMenu.open(player, spawnerManager, messages);
+            return;
+        }
+        if (ShopMenu.CHUNK_BUSTERS_CATEGORY_ID.equals(holder.categoryIdAtSlot(slot))) {
+            ChunkBusterShopMenu.open(player, chunkBusterManager, messages);
             return;
         }
         if (slot == ShopMenu.SLOT_PREV_PAGE) {
