@@ -1,5 +1,6 @@
 package me.vertex.core.dupe;
 
+import me.vertex.core.item.TrackedItemIds;
 import me.vertex.core.lang.Messages;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -44,6 +45,7 @@ public final class DupeManager {
     private final Plugin plugin;
     private final DupeStorage storage;
     private final Messages messages;
+    private final TrackedItemIds trackedItemIds;
     private final File file;
     private final NamespacedKey identityKey;
     private final NamespacedKey wandKey;
@@ -63,10 +65,11 @@ public final class DupeManager {
     private volatile int pageSize;
     private volatile int loadedChunksPerPass;
 
-    public DupeManager(Plugin plugin, DupeStorage storage, Messages messages) {
+    public DupeManager(Plugin plugin, DupeStorage storage, Messages messages, TrackedItemIds trackedItemIds) {
         this.plugin = plugin;
         this.storage = storage;
         this.messages = messages;
+        this.trackedItemIds = trackedItemIds;
         this.file = new File(plugin.getDataFolder(), "dupes.yml");
         this.identityKey = new NamespacedKey(plugin, "tracked_item_id");
         this.wandKey = new NamespacedKey(plugin, "wand_tier");
@@ -438,7 +441,16 @@ public final class DupeManager {
         return pdc.has(wandKey, PersistentDataType.STRING)
                 || pdc.has(blueprintKey, PersistentDataType.STRING)
                 || pdc.has(collectorKey, PersistentDataType.BYTE)
-                || pdc.has(spawnerKey, PersistentDataType.STRING);
+                || pdc.has(spawnerKey, PersistentDataType.STRING)
+                // Generic hook for every future item-identity feature: rather
+                // than this method accumulating one more hardcoded key per
+                // feature forever (as the four checks above did), anything
+                // tagged with a real (non-GENERIC) ItemKind through the
+                // shared TrackedItemIds utility is automatically considered
+                // worth tracking. Custom Enchantments (Runes and physical/
+                // applied enchantment items) is the first feature to rely on
+                // this rather than adding its own key here.
+                || trackedItemIds.kind(item).isPresent();
     }
 
     private record Evidence(String holderUuid, String holderName, String source, int slot, String material) {

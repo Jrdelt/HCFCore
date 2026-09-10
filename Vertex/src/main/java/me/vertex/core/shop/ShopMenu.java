@@ -96,6 +96,26 @@ public final class ShopMenu {
     /** Control-row slot holding that button -- the same "opposite border slot" convention Spawners uses. */
     public static final int SLOT_BUY_SOURCE_BUCKETS = 8;
 
+    /**
+     * Sentinel category id for the Runes button -- same reasoning as {@link
+     * #CHUNK_BUSTERS_CATEGORY_ID}: a Rune is priced per tier in {@code
+     * runes.yml}, not per Material, so it cannot be a real {@code
+     * ShopEntry} row either. Clicking it opens {@link
+     * me.vertex.core.enchant.RuneShopMenu} directly.
+     */
+    public static final String RUNES_CATEGORY_ID = "__runes__";
+
+    /**
+     * The shop.yml category the buyable-Rune button lives inside.
+     * Miscellaneous already hosts Source Buckets' own buy button (slot 8);
+     * Runes take the one remaining free control-row slot there rather than
+     * needing a whole new category slot in the 9-wide /shop picker.
+     */
+    public static final String RUNES_HOST_CATEGORY = "miscellaneous";
+
+    /** Control-row slot holding that button -- the one border slot neither Back, Balance, nor Source Buckets occupies. */
+    public static final int SLOT_BUY_RUNES = 7;
+
     public enum Mode {
         CATEGORIES, ITEMS
     }
@@ -150,6 +170,15 @@ public final class ShopMenu {
         return icon;
     }
 
+    private static ItemStack runesCategoryIcon(Player player, Messages messages) {
+        ItemStack icon = new ItemStack(Material.AMETHYST_SHARD);
+        ItemMeta meta = icon.getItemMeta();
+        meta.displayName(noItalic(messages.get(player, "shop.runes-category-title")));
+        meta.lore(List.of(noItalic(messages.get(player, "shop.category-open-lore"))));
+        icon.setItemMeta(meta);
+        return icon;
+    }
+
     public static void openCategory(Player player, ShopManager manager, SpawnerManager spawnerManager,
                                      Messages messages, String categoryId, int requestedPage) {
         ShopCategory category = manager.category(categoryId);
@@ -186,6 +215,10 @@ public final class ShopMenu {
         if (SOURCE_BUCKETS_HOST_CATEGORY.equals(categoryId)) {
             inventory.setItem(SLOT_BUY_SOURCE_BUCKETS, sourceBucketsCategoryIcon(player, messages));
             holder.slotCategoryIds.put(SLOT_BUY_SOURCE_BUCKETS, SOURCE_BUCKETS_CATEGORY_ID);
+        }
+        if (RUNES_HOST_CATEGORY.equals(categoryId)) {
+            inventory.setItem(SLOT_BUY_RUNES, runesCategoryIcon(player, messages));
+            holder.slotCategoryIds.put(SLOT_BUY_RUNES, RUNES_CATEGORY_ID);
         }
 
         int start = page * PAGE_SIZE;

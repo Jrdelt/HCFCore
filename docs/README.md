@@ -37,6 +37,7 @@ integration behavior.
 | [Faction Shield](faction-shield.md) | Schedule-based Base Claim PvP protection, activation delay, New-Faction Shield Delay, and staff overrides |
 | [Chunk Busters](chunk-busters.md) | The 4 destructive area-clear items: batched removal, the persisted restart-safe lock, faction role permissions, and the confirmation GUI |
 | [Source Buckets](source-buckets.md) | Reusable water/lava-flow items: flow patterns, the claim-boundary rule, per-variant combat/base-claim gates, and the charge-after-success economics |
+| [Custom Enchantments](custom-enchantments.md) | Rune tiers and rolling, physical enchant items, the Enchant Application GUI, level-replacement rules, Lucky Gems, world restrictions, and persistence through anvils/smithing |
 | [Personal settings](settings.md) | Per-player optional announcement preferences |
 | [Shop](shop.md) | Categorized, dynamic-price item trading |
 | [Boosters](boosters.md) | How every bonus stacks into one effective figure, and `/boosters` |

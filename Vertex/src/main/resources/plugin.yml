@@ -163,6 +163,9 @@ commands:
   dupe:
     description: Staff-only suspected-duplicate item case inspection and resolution.
     usage: /<command> inspect list [page]|inspect <id>|resolve <id> [reason]|dismiss <id> [reason]|confirm <id> [reason]
+  enchant:
+    description: Give Runes or Lucky Gems. Runes are also purchasable in /shop.
+    usage: /<command> give <player> rune <tier> [amount]|give <player> gem [amount]
 
 permissions:
   vertex.admin:
@@ -347,4 +350,7 @@ permissions:
     default: op
   vertex.dupe.alert:
     description: Receive live staff alerts and a join-time summary when a suspected duplicate is detected.
+    default: op
+  vertex.enchant.give:
+    description: Give a player a Rune or a Lucky Gem.
     default: op

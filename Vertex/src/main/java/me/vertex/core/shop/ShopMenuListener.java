@@ -5,6 +5,8 @@ import me.vertex.core.bucket.SourceBucketShopMenu;
 import me.vertex.core.chunkbuster.ChunkBusterManager;
 import me.vertex.core.chunkbuster.ChunkBusterShopMenu;
 import me.vertex.core.economy.EconomyHook;
+import me.vertex.core.enchant.EnchantManager;
+import me.vertex.core.enchant.RuneShopMenu;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.spawner.SpawnerManager;
 import me.vertex.core.spawner.SpawnerShopMenu;
@@ -22,14 +24,16 @@ public final class ShopMenuListener implements Listener {
     private final SpawnerManager spawnerManager;
     private final ChunkBusterManager chunkBusterManager;
     private final SourceBucketManager sourceBucketManager;
+    private final EnchantManager enchantManager;
     private final Messages messages;
 
     public ShopMenuListener(ShopManager manager, SpawnerManager spawnerManager, ChunkBusterManager chunkBusterManager,
-            SourceBucketManager sourceBucketManager, Messages messages) {
+            SourceBucketManager sourceBucketManager, EnchantManager enchantManager, Messages messages) {
         this.manager = manager;
         this.spawnerManager = spawnerManager;
         this.chunkBusterManager = chunkBusterManager;
         this.sourceBucketManager = sourceBucketManager;
+        this.enchantManager = enchantManager;
         this.messages = messages;
     }
 
@@ -62,6 +66,8 @@ public final class ShopMenuListener implements Listener {
                 ChunkBusterShopMenu.open(player, chunkBusterManager, messages);
             } else if (ShopMenu.SOURCE_BUCKETS_CATEGORY_ID.equals(categoryId)) {
                 SourceBucketShopMenu.open(player, sourceBucketManager, messages);
+            } else if (ShopMenu.RUNES_CATEGORY_ID.equals(categoryId)) {
+                RuneShopMenu.open(player, enchantManager, messages);
             } else if (categoryId != null) {
                 ShopMenu.openCategory(player, manager, spawnerManager, messages, categoryId, 0);
             }
@@ -86,6 +92,11 @@ public final class ShopMenuListener implements Listener {
         // The buyable-Source-Bucket button similarly sits in Miscellaneous's control row.
         if (ShopMenu.SOURCE_BUCKETS_CATEGORY_ID.equals(holder.categoryIdAtSlot(slot))) {
             SourceBucketShopMenu.open(player, sourceBucketManager, messages);
+            return;
+        }
+        // The buyable-Rune button also sits in Miscellaneous's control row, one slot over from Source Buckets.
+        if (ShopMenu.RUNES_CATEGORY_ID.equals(holder.categoryIdAtSlot(slot))) {
+            RuneShopMenu.open(player, enchantManager, messages);
             return;
         }
         if (slot == ShopMenu.SLOT_PREV_PAGE) {

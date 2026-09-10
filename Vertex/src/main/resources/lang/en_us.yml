@@ -324,6 +324,27 @@ sourcebucket:
   purchased: "<green>✔ Purchased a Source Bucket <green>for <white>{amount}<green>."
   cannot-afford: "<red>You can't afford that Source Bucket (<white>{amount}<red>)."
 
+rune:
+  table-empty: "<red>That Rune's roll table is empty -- ask staff to configure runes.yml."
+  rolled: "<green>✔ Rolled <white>{enchant} {level}<green>!"
+  unknown-tier: "<red>Unknown Rune tier. Valid tiers: simple, elite, rare, legendary."
+  shop-title: "<light_purple>ʀᴜɴᴇꜱ"
+  shop-price: "<yellow>Price: <white>{amount}"
+  shop-hint: "<gray>Click to purchase"
+  purchased: "<green>✔ Purchased a {tier} Rune <green>for <white>{amount}<green>."
+  cannot-afford: "<red>You can't afford that Rune (<white>{amount}<red>)."
+  no-economy: "<red>No economy plugin is available to charge for that."
+
+enchant:
+  usage: "<red>Usage: /enchant give <player> rune <tier> [amount]|give <player> gem [amount]"
+  given: "<green>✔ Gave <white>{amount}x {kind}<green> to <white>{player}<green>."
+  apply-missing-items: "<red>Place both your gear and an enchant item before confirming."
+  apply-success: "<green>✔ Applied <white>{enchant} {level}<green>!"
+  apply-failure: "<red>The application failed. The enchant item is gone -- nothing changed on your gear."
+  apply-incompatible: "<red>That enchant can't be applied to that item type."
+  apply-equal-level: "<red>Your gear already has that exact enchant level."
+  apply-higher-exists: "<red>Your gear already has a higher level of that enchant."
+
 pvptop:
   header: "<red><bold>ᴘᴠᴘ ᴛᴏᴘ"
   empty: "<gray>No faction has earned PvP objective points yet."
@@ -809,6 +830,7 @@ shop:
   spawners-category-title: "<yellow>Spawners"
   chunkbusters-category-title: "<red>Chunk Busters"
   sourcebuckets-category-title: "<aqua>Source Buckets"
+  runes-category-title: "<light_purple>Runes"
   category-open-lore: "<green>✔ Click to Open ✔"
   back-button: "<red>← Back to Categories"
   balance-title: "<gold><bold>ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ"

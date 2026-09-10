@@ -30,9 +30,15 @@ public final class MenuItemTemplate {
     private final int[] slots;
     private final boolean enabled;
     private final Sound sound;
+    private final boolean glow;
 
     MenuItemTemplate(String id, Material material, Integer customModelData, int amount, String name,
             List<String> lore, int[] slots, boolean enabled, Sound sound) {
+        this(id, material, customModelData, amount, name, lore, slots, enabled, sound, false);
+    }
+
+    MenuItemTemplate(String id, Material material, Integer customModelData, int amount, String name,
+            List<String> lore, int[] slots, boolean enabled, Sound sound, boolean glow) {
         this.id = id;
         this.material = material;
         this.customModelData = customModelData;
@@ -42,6 +48,7 @@ public final class MenuItemTemplate {
         this.slots = slots.clone();
         this.enabled = enabled;
         this.sound = sound;
+        this.glow = glow;
     }
 
     public String id() {
@@ -91,6 +98,9 @@ public final class MenuItemTemplate {
         }
         if (customModelData != null) {
             meta.setCustomModelData(customModelData);
+        }
+        if (glow) {
+            meta.setEnchantmentGlintOverride(true);
         }
         item.setItemMeta(meta);
         return item;

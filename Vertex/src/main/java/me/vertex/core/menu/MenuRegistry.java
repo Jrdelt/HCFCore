@@ -122,8 +122,9 @@ public final class MenuRegistry {
         List<String> lore = section.getStringList("lore");
         boolean enabled = section.getBoolean("enabled", true);
         Sound sound = readSound(where, key, section.getString("sound"));
+        boolean glow = section.getBoolean("glow", false);
         return new MenuItemTemplate(key, material, customModelData, amount, name, lore,
-                readSlots(where, key, section), enabled, sound);
+                readSlots(where, key, section), enabled, sound, glow);
     }
 
     private Material readMaterial(String where, String key, String raw) {

@@ -182,6 +182,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.gc.GcMenu gcMenu;
     private me.vertex.core.dupe.DupeStorage dupeStorage;
     private me.vertex.core.dupe.DupeManager dupeManager;
+    private me.vertex.core.item.TrackedItemIds trackedItemIds;
+    private me.vertex.core.enchant.EnchantManager enchantManager;
 
     @Override
     public void onLoad() {
@@ -439,7 +441,8 @@ combatManager.start();
                         me.vertex.core.event.EventsMenu.MENU_ID,
                         me.vertex.core.gc.GcMenu.MENU_ID,
                         me.vertex.core.claims.BaseClaimMenu.MENU_ID,
-                        me.vertex.core.chunkbuster.ChunkBusterMenu.MENU_ID));
+                        me.vertex.core.chunkbuster.ChunkBusterMenu.MENU_ID,
+                        me.vertex.core.enchant.EnchantApplyGui.MENU_ID));
         menuRegistry.load();
 
         // Base Claims / Raid Claims: Base Claim state is loaded fully into
@@ -555,14 +558,36 @@ combatManager.start();
 
         // Dupe investigation: reuses the item-identity + suspected-duplicate
         // queue built as the anti-dupe framework other item-tagging features
-        // (starting with Custom Enchantments) will route detected
-        // duplicates through, rather than building a second detector.
-        dupeManager = new me.vertex.core.dupe.DupeManager(this, dupeStorage, messages);
+        // (Custom Enchantments, below) route detected duplicates through,
+        // rather than building a second detector. TrackedItemIds is shared
+        // with EnchantManager below -- DupeManager#shouldTrack treats any
+        // item carrying a real ItemKind as worth tracking, so tagging is the
+        // entire integration a new feature needs.
+        trackedItemIds = new me.vertex.core.item.TrackedItemIds(this);
+        dupeManager = new me.vertex.core.dupe.DupeManager(this, dupeStorage, messages, trackedItemIds);
         dupeManager.load();
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.dupe.DupeListener(dupeManager), this);
         me.vertex.core.dupe.DupeCommand dupeCommand = new me.vertex.core.dupe.DupeCommand(this, dupeManager, messages);
         getCommand("dupe").setExecutor(dupeCommand);
         getCommand("dupe").setTabCompleter(dupeCommand);
+
+        // Custom Enchantments (Phase 6): Rune rolling is a direct right-click
+        // action with a result message (no GUI -- see RuneListener's class
+        // doc for why); applying a physical enchant item opens
+        // EnchantApplyGui, whose menu id was added to MenuRegistry's bundle
+        // above. The Rune shop sub-menu needs ShopManager, so that listener
+        // is registered further down alongside ChunkBusterMenuListener/
+        // SourceBucketListener, once ShopManager exists.
+        enchantManager = new me.vertex.core.enchant.EnchantManager(this, trackedItemIds);
+        enchantManager.load();
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.enchant.RuneListener(enchantManager, messages, menuRegistry), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.enchant.EnchantApplyGuiListener(this, enchantManager, messages, menuRegistry), this);
+        me.vertex.core.enchant.EnchantCommand enchantCommand =
+                new me.vertex.core.enchant.EnchantCommand(enchantManager, messages);
+        getCommand("enchant").setExecutor(enchantCommand);
+        getCommand("enchant").setTabCompleter(enchantCommand);
 
         boosterService = new me.vertex.core.booster.BoosterService(this);
         boosterService.reloadConfig();
@@ -629,7 +654,7 @@ combatManager.start();
         shopManager.loadState();
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.shop.ShopMenuListener(shopManager, spawnerManager, chunkBusterManager,
-                        sourceBucketManager, messages),
+                        sourceBucketManager, enchantManager, messages),
                 this);
         // Chunk Busters' own confirmation-GUI + shop-sub-menu listener --
         // needs ShopManager (for its "back to shop" button), which is why
@@ -641,6 +666,10 @@ combatManager.start();
         // ShopManager for the same "back to shop" button reason above.
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.bucket.SourceBucketListener(
                 sourceBucketManager, shopManager, spawnerManager, messages), this);
+        // Runes' own shop sub-menu listener -- same "needs ShopManager"
+        // reason above.
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.enchant.RuneShopMenuListener(
+                enchantManager, shopManager, spawnerManager, messages), this);
         mineManager = new me.vertex.core.mine.MineManager(this, messages);
         mineManager.load();
         Bukkit.getPluginManager().registerEvents(
@@ -1262,6 +1291,9 @@ combatManager.start();
         }
         if (dupeManager != null) {
             dupeManager.load();
+        }
+        if (enchantManager != null) {
+            enchantManager.load();
         }
         if (kitManager != null) {
             kitManager.load();

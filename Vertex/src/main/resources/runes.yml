@@ -1,0 +1,101 @@
+# ============================================
+# CUSTOM ENCHANTMENTS -- RUNES & LUCKY GEMS
+# ============================================
+# Right-clicking a Rune rolls it immediately (no GUI) using its tier's
+# table below and gives you the resulting physical enchant item. See
+# enchants.yml for what each (enchant, level) combo referenced in a table
+# actually looks like and does -- this file only controls which combos are
+# reachable per tier, their relative weights, each tier's Rune cosmetics
+# and shop price, and Lucky Gem effectiveness.
+#
+# Rune lore supports {tier} {roll_chance} {success_rate} {failure_rate}
+# {proc_chance} {ability_value} placeholders -- but since a Rune's own
+# cosmetics apply to the whole tier (not one specific combo), only {tier}
+# actually resolves to anything meaningful on the Rune item itself; the
+# rest are for enchants.yml's per-level lore instead.
+
+lucky-gem:
+  material: EMERALD
+  name: "<green>Lucky Gem"
+  glow: true
+  lore:
+    - "<gray>Boosts your next enchant application's"
+    - "<gray>success chance. Consumed when used."
+    - "<gray>Use as many as you like in the enchant"
+    - "<gray>menu -- chance never exceeds 100%."
+
+# Percent success-rate boost granted per Lucky Gem used, keyed by the
+# ORIGIN TIER of the physical enchant item being applied (not the target
+# item, which has no tier of its own). Higher tiers get a smaller per-gem
+# boost on purpose, so gems can meaningfully help a Simple application but
+# cannot gem a Legendary application up to a guaranteed success.
+lucky-gem-effectiveness:
+  SIMPLE: 8.0
+  ELITE: 5.0
+  RARE: 3.0
+  LEGENDARY: 1.5
+
+runes:
+  SIMPLE:
+    material: AMETHYST_SHARD
+    name: "<white>Simple Rune"
+    glow: false
+    shop-price: 250.0
+    lore:
+      - "<gray>Tier: <white>{tier}"
+      - "<gray>Right-click to roll a random enchantment."
+    # Which (enchant, level) combos this tier's table can roll, and their
+    # weights (need not sum to 100 -- normalised automatically). A higher
+    # level intentionally has a smaller weight than a lower one of the same
+    # enchant, so it rolls less often.
+    table:
+      - { enchant: haste_pickaxe, level: 1, weight: 55 }
+      - { enchant: haste_pickaxe, level: 2, weight: 20 }
+      - { enchant: sharpened_edge, level: 1, weight: 55 }
+      - { enchant: sharpened_edge, level: 2, weight: 20 }
+
+  ELITE:
+    material: QUARTZ
+    name: "<aqua>Elite Rune"
+    glow: false
+    shop-price: 900.0
+    lore:
+      - "<gray>Tier: <white>{tier}"
+      - "<gray>Right-click to roll a random enchantment."
+    table:
+      - { enchant: haste_pickaxe, level: 1, weight: 25 }
+      - { enchant: haste_pickaxe, level: 2, weight: 45 }
+      - { enchant: haste_pickaxe, level: 3, weight: 15 }
+      - { enchant: sharpened_edge, level: 1, weight: 25 }
+      - { enchant: sharpened_edge, level: 2, weight: 45 }
+      - { enchant: sharpened_edge, level: 3, weight: 15 }
+
+  RARE:
+    material: AMETHYST_CLUSTER
+    name: "<light_purple>Rare Rune"
+    glow: true
+    shop-price: 2500.0
+    lore:
+      - "<gray>Tier: <white>{tier}"
+      - "<gray>Right-click to roll a random enchantment."
+    table:
+      - { enchant: haste_pickaxe, level: 2, weight: 30 }
+      - { enchant: haste_pickaxe, level: 3, weight: 45 }
+      - { enchant: haste_pickaxe, level: 4, weight: 10 }
+      - { enchant: sharpened_edge, level: 2, weight: 30 }
+      - { enchant: sharpened_edge, level: 3, weight: 45 }
+      - { enchant: sharpened_edge, level: 4, weight: 10 }
+
+  LEGENDARY:
+    material: NETHER_STAR
+    name: "<gold><bold>Legendary Rune"
+    glow: true
+    shop-price: 7500.0
+    lore:
+      - "<gray>Tier: <white>{tier}"
+      - "<gray>Right-click to roll a random enchantment."
+    table:
+      - { enchant: haste_pickaxe, level: 3, weight: 40 }
+      - { enchant: haste_pickaxe, level: 4, weight: 35 }
+      - { enchant: sharpened_edge, level: 3, weight: 40 }
+      - { enchant: sharpened_edge, level: 4, weight: 35 }

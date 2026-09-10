@@ -1,5 +1,6 @@
 package me.vertex.core.dupe;
 
+import me.vertex.core.item.TrackedItemIds;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.storage.Database;
 import me.vertex.core.storage.SqlStorage;
@@ -51,7 +52,7 @@ class DupeManagerTest {
         SqlStorage sqlStorage = new SqlStorage(database);
         sqlStorage.init();
         Messages messages = new Messages(plugin, new UserManager(plugin, sqlStorage));
-        manager = new DupeManager(plugin, storage, messages);
+        manager = new DupeManager(plugin, storage, messages, new TrackedItemIds(plugin));
         manager.load();
     }
 

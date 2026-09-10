@@ -179,6 +179,11 @@ Buckets" button opening a small catalog of every enabled Source Bucket
 variant (priced from `sourcebuckets.yml`, same reasoning as Spawners
 above). See [Source Buckets](source-buckets.md#acquisition).
 
+The same **Miscellaneous** category's control row also has a "Buy Runes"
+button opening a small catalog of the 4 Rune tiers (priced from
+`runes.yml`, same reasoning as Spawners above). See
+[Custom Enchantments](custom-enchantments.md#acquisition).
+
 ## Auction House
 
 | Command | Permission | Notes |
@@ -232,6 +237,21 @@ success economics.
 | Command | Permission | Notes |
 |---|---|---|
 | Right-click a block with a Source Bucket | *(none — usable by everyone; gated by zone/combat/economy checks in-code)* | Places water/lava following the item's configured flow pattern. |
+
+## Custom Enchantments
+
+Rolling a Rune is a direct right-click action with no GUI; applying a
+physical enchant item opens the Enchant Application GUI. Runes are
+purchased from `/shop`'s Miscellaneous category, or given by staff. See
+[Custom Enchantments](custom-enchantments.md) for tiers, roll tables, the
+level-replacement rules, and Lucky Gems.
+
+| Command | Permission | Notes |
+|---|---|---|
+| Right-click a Rune | *(none)* | Rolls it immediately against its tier's table and gives you the resulting physical enchant item. Consumes one Rune. |
+| Right-click a physical enchant item | *(none)* | Opens the Enchant Application GUI with that item pre-placed. |
+| `/enchant give <player> rune <tier> [amount]` | `vertex.enchant.give` | Gives a Rune of the given tier (`simple`/`elite`/`rare`/`legendary`). |
+| `/enchant give <player> gem [amount]` | `vertex.enchant.give` | Gives Lucky Gems. |
 
 ## KOTH & Outposts
 

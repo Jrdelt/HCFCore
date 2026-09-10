@@ -74,7 +74,15 @@ public final class MenuPlaceholders {
         return blocks.containsKey(key) ? key : null;
     }
 
-    String apply(String template) {
+    /**
+     * Public so any feature that renders {@code {key}}-templated item lore
+     * outside a menu icon -- Custom Enchantments' physical Rune/enchant
+     * items and applied-enchant lore, none of which are {@link
+     * me.vertex.core.menu.MenuItemTemplate} slots -- can reuse the exact
+     * same substitution/escaping rules a menu icon gets, rather than the
+     * codebase growing a second {@code {key}} template engine.
+     */
+    public String apply(String template) {
         String result = template;
         for (Map.Entry<String, String> entry : text.entrySet()) {
             result = result.replace("{" + entry.getKey() + "}",
@@ -86,8 +94,11 @@ public final class MenuPlaceholders {
         return result;
     }
 
-    /** Renders one template line, expanding it to several when it is a block. */
-    List<Component> render(String template) {
+    /**
+     * Renders one template line, expanding it to several when it is a
+     * block. Public for the same reason {@link #apply(String)} is.
+     */
+    public List<Component> render(String template) {
         String blockKey = soleBlockKey(template);
         if (blockKey != null) {
             return new ArrayList<>(blocks.get(blockKey));

@@ -42,6 +42,19 @@ public final class MessageFormatter {
     }
 
     /**
+     * The reverse of {@link #deserialize(String)}: a legacy-ampersand
+     * rendering of an already-built {@link Component}, round-trippable back
+     * through {@link #deserialize(String)}. Used to snapshot pre-existing
+     * item lore into PDC as plain strings (Custom Enchantments' "preserve
+     * whatever lore was already on the item" base-lore capture) so it can be
+     * carried through a rewrite without needing a live {@link Component} to
+     * persist directly.
+     */
+    public static String serialize(Component component) {
+        return LEGACY_AMPERSAND.serialize(component);
+    }
+
+    /**
      * Neutralizes untrusted text (a player's faction tag, LuckPerms group
      * name, etc.) before it's substituted into a template that will later
      * go through {@link #deserialize}. MiniMessage's own {@code

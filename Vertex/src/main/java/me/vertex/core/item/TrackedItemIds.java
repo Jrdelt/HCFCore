@@ -112,4 +112,36 @@ public final class TrackedItemIds {
         Optional<String> secondId = instanceId(second);
         return firstId.isPresent() && firstId.equals(secondId);
     }
+
+    /**
+     * Copies {@code from}'s instance ID and {@link ItemKind}, verbatim (not
+     * reassigning a new ID), onto {@code to} -- for a legitimate vanilla
+     * item transformation (an anvil rename/repair, a smithing-table
+     * upgrade) whose platform-computed result is a distinct {@code
+     * ItemStack} that cannot be assumed to already carry {@code from}'s
+     * PDC. Without this, a duplication investigation would lose an item's
+     * identity across a transformation nothing about it should treat as
+     * suspicious.
+     *
+     * @return true when {@code from} was tagged and something was copied
+     */
+    public boolean copy(ItemStack from, ItemStack to) {
+        Optional<String> id = instanceId(from);
+        Optional<ItemKind> kind = kind(from);
+        if (id.isEmpty() && kind.isEmpty()) {
+            return false;
+        }
+        if (to == null || to.getType().isAir()) {
+            return false;
+        }
+        ItemMeta meta = to.getItemMeta();
+        if (meta == null) {
+            return false;
+        }
+        PersistentDataContainer pdc = meta.getPersistentDataContainer();
+        id.ifPresent(value -> pdc.set(instanceIdKey, PersistentDataType.STRING, value));
+        kind.ifPresent(value -> pdc.set(kindKey, PersistentDataType.STRING, value.name()));
+        to.setItemMeta(meta);
+        return true;
+    }
 }
