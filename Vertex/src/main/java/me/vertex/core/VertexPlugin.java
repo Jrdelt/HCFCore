@@ -113,6 +113,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.claims.ClaimStorage claimStorage;
     private me.vertex.core.claims.BaseClaimManager baseClaimManager;
     private me.vertex.core.claims.RaidClaimManager raidClaimManager;
+    private me.vertex.core.shield.ShieldStorage shieldStorage;
+    private me.vertex.core.shield.ShieldManager shieldManager;
     private me.vertex.core.faction.FTopStorage fTopStorage;
     private me.vertex.core.faction.FTopManager fTopManager;
     private me.vertex.core.faction.PvpTopStorage pvpTopStorage;
@@ -238,6 +240,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             dupeStorage.init();
             claimStorage = new me.vertex.core.claims.ClaimStorage(database);
             claimStorage.init();
+            shieldStorage = new me.vertex.core.shield.ShieldStorage(database);
+            shieldStorage.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize the database, disabling.", e);
             Bukkit.getPluginManager().disablePlugin(this);
@@ -451,6 +455,23 @@ combatManager.start();
                 new me.vertex.core.claims.BaseClaimMenuListener(baseClaimManager, messages, menuRegistry), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.claims.ClaimEventListener(baseClaimManager, raidClaimManager, messages), this);
+
+        // Faction Shield: schedule/override state is loaded fully into
+        // memory (bounded by the number of factions that have ever had a
+        // Shield row), same "durable table, live cache" split as
+        // BaseClaimManager above -- see ShieldManager's class doc for the
+        // "let the current window finish" and override freeze/resume logic.
+        shieldManager = new me.vertex.core.shield.ShieldManager(this, shieldStorage, baseClaimManager);
+        shieldManager.load();
+        shieldManager.loadState();
+        shieldManager.start();
+        baseClaimManager.setShieldActiveQuery(shieldManager::isShieldActive);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.shield.ShieldCommand(this, shieldManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.shield.ShieldCombatListener(shieldManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.shield.ShieldFactionLifecycleListener(shieldManager), this);
 
         // GC is a self-hosted, third currency -- its own database is the sole
         // balance authority, wired up the same way the other self-contained
@@ -849,6 +870,9 @@ combatManager.start();
         if (raidClaimManager != null) {
             raidClaimManager.shutdown();
         }
+        if (shieldManager != null) {
+            shieldManager.shutdown();
+        }
         if (placeholderExpansion != null) {
             placeholderExpansion.unregister();
         }
@@ -1075,6 +1099,15 @@ combatManager.start();
         }
         if (pvpTopManager != null) {
             pvpTopManager.load();
+        }
+        if (baseClaimManager != null) {
+            baseClaimManager.load();
+        }
+        if (raidClaimManager != null) {
+            raidClaimManager.load();
+        }
+        if (shieldManager != null) {
+            shieldManager.load();
         }
         if (factionUpgradeManager != null) {
             factionUpgradeManager.reloadConfig();

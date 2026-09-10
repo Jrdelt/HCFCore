@@ -41,6 +41,18 @@ public final class BaseClaimManager {
     private volatile double slot2Price;
     private volatile double slot3Price;
 
+    /**
+     * Set once by {@code VertexPlugin} after both managers exist (Shield is
+     * built after Base Claims). Left null-safe so this class never needs a
+     * hard compile dependency on the {@code shield} package beyond this one
+     * functional query.
+     */
+    private volatile java.util.function.IntPredicate shieldActiveQuery = factionId -> false;
+
+    public void setShieldActiveQuery(java.util.function.IntPredicate shieldActiveQuery) {
+        this.shieldActiveQuery = shieldActiveQuery == null ? factionId -> false : shieldActiveQuery;
+    }
+
     /** One entry per unlocked Base Claim anchor, keyed by faction id then slot index. */
     private final Map<Integer, Map<Integer, Region>> regionsByFaction = new ConcurrentHashMap<>();
     /** O(1) chunk -> region lookup, rebuilt whenever a region's membership changes. */
@@ -217,17 +229,16 @@ public final class BaseClaimManager {
 
     /**
      * Removes a Base Claim entirely (all connected chunks revert to being
-     * plain faction claims, i.e. Raid Claims). Phase 2 will replace the
-     * {@code false} below with a real "is this faction's Shield currently
-     * active" check once Shield exists.
+     * plain faction claims, i.e. Raid Claims). Blocked while the faction's
+     * Shield is active, via the query {@code VertexPlugin} wires in with
+     * {@link #setShieldActiveQuery}.
      */
     public RemoveResult removeAnchor(int factionId, int slotIndex) {
         Region region = regionsByFaction.getOrDefault(factionId, Map.of()).get(slotIndex);
         if (region == null) {
             return RemoveResult.NOT_FOUND;
         }
-        boolean shieldActive = false; // Phase 2: wire real Shield-active detection here.
-        if (shieldActive) {
+        if (shieldActiveQuery.test(factionId)) {
             return RemoveResult.SHIELDED;
         }
         if (regionHasSpawners(region)) {

@@ -193,6 +193,10 @@ button. This replaces the old standalone `/spawners` command.
 | `/f baseclaim` (or any `factions.command-aliases` alias) | `vertex.baseclaim.view` | Opens the Base Claim info/removal GUI if standing on one; otherwise attempts to create one (Leader/Co-Leader + `vertex.baseclaim.create` only). See [Base and Raid Claims](base-and-raid-claims.md). |
 | `/f baseclaim buy` | `vertex.baseclaim.purchaseslot` | Any member purchases their faction's next Base Claim slot (#2/#3), paid from their own balance. |
 | `/f pvptop` (or any `factions.command-aliases` alias) | Open to all | Faction leaderboard ranked by persisted KOTH/Outpost capture points, independent of F Top. See [Faction Leaderboards](faction-leaderboards.md#pvp-top-objective-points). |
+| `/f shield` (or any `factions.command-aliases` alias) | Open to all | Shows the caller's faction's Faction Shield status: active/inactive, countdown, current/pending schedule, admin override. See [Faction Shield](faction-shield.md). |
+| `/f shield set <HH:mm> <minutes>` | `vertex.shield.set` | Leader/Co-Leader only; submits a new Shield schedule (takes effect after the configured activation delay). Rejected until the New-Faction Shield Delay has passed. |
+| `/f shield admin <faction> active\|inactive\|clear` | `vertex.admin.claims` | Staff force a faction's Shield state, or clear an existing override. Every attempt is console-logged; silent to the affected faction. |
+| `/f who <faction-or-player>` | *(native FactionsUUID permission)* | Native command untouched; Vertex appends a one-tick-delayed Shield status follow-up message. |
 
 ## KOTH & Outposts
 

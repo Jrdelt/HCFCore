@@ -29,9 +29,10 @@ expiration.
 - Removing a Base Claim requires confirming in a GUI (green confirm /
   red cancel / closing the inventory without clicking either both count
   as cancel — see `gui/baseclaim.yml`). Removal is blocked while:
-  - the faction's Shield is active (stubbed as `false` for now —
-    `BaseClaimManager.removeAnchor` has a one-line TODO-free comment
-    marking where Phase 2 wires in the real check), or
+  - the faction's Shield is active (now wired to the real check —
+    `BaseClaimManager.setShieldActiveQuery` is set by `VertexPlugin` to
+    `ShieldManager::isShieldActive` once both managers exist; see
+    [Faction Shield](faction-shield.md)), or
   - any chunk in the region still contains a tracked spawner.
 - Removing a Base Claim converts every one of its chunks back into plain
   (Raid Claim) claims.
@@ -114,8 +115,8 @@ single anchor row per slot.
 - `BaseClaimManager.isBaseClaim(Location)` /
   `isPartOfBaseClaimRegion(Location)` — the query API Shield, TNT rules,
   Chunk Busters, and Source Buckets will call.
-- `BaseClaimManager.removeAnchor` — the exact line Phase 2's Shield-active
-  check replaces.
+- `BaseClaimManager.removeAnchor` — now backed by Phase 2's real
+  Shield-active check (see above).
 
 ## Commands & permissions
 

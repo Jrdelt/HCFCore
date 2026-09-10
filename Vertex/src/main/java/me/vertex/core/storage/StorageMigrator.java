@@ -102,6 +102,12 @@ public final class StorageMigrator {
         TABLES.put("base_claim_region_chunks", List.of("faction_id", "slot_index", "world", "chunk_x", "chunk_z"));
         TABLES.put("base_claim_slot_purchases", List.of("faction_id", "slot_index", "purchased_at"));
         TABLES.put("raid_claim_expirations", List.of("world", "chunk_x", "chunk_z", "faction_id", "expires_at_millis"));
+        TABLES.put("faction_shields", List.of("faction_id", "schedule_start_minute", "schedule_duration_minutes",
+                "pending_start_minute", "pending_duration_minutes", "pending_activates_at", "frozen_resume_until",
+                "new_faction_eligible_at"));
+        TABLES.put("faction_shield_overrides", List.of("faction_id", "forced_state", "frozen_remaining_millis",
+                "set_by_uuid", "set_at"));
+        TABLES.put("faction_shield_log", List.of("id", "faction_id", "action", "actor_uuid", "details", "created_at"));
     }
 
     private StorageMigrator() {
@@ -219,6 +225,7 @@ public final class StorageMigrator {
         new GcStorage(database).init();
         new DupeStorage(database).init();
         new me.vertex.core.claims.ClaimStorage(database).init();
+        new me.vertex.core.shield.ShieldStorage(database).init();
     }
 
     /**

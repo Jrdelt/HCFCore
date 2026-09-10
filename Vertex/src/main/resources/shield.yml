@@ -1,0 +1,19 @@
+# Faction Shield -- see docs/faction-shield.md.
+shield:
+  # How long a newly submitted Shield schedule waits before it takes effect
+  # server-wide, in real elapsed seconds -- continues counting during
+  # downtime. If a Shield window from the OLD schedule is still active when
+  # this delay completes, the old window is allowed to finish first; the
+  # new schedule takes over the moment that window ends.
+  activation-delay-seconds: 86400
+  # How long a brand new faction must wait, in real elapsed seconds
+  # (continues counting during downtime), before it may submit its first
+  # Shield schedule. A disbanded-and-recreated faction gets a fresh wait.
+  new-faction-delay-seconds: 21600
+  # How often the bounded pending-schedule-activation sweep runs. It only
+  # ever iterates factions with a pending schedule swap outstanding, never
+  # a full scan.
+  sweep-interval-seconds: 30
+  # Whether an active Shield disables PvP inside that faction's Base Claims.
+  # Raid Claims are never protected by Shield regardless of this setting.
+  combat-protection-enabled: true

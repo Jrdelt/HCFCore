@@ -266,6 +266,25 @@ baseclaim:
 raidclaim:
   claimed: "<yellow>Raid claimed <gray>— <white>expires in {time}"
 
+shield:
+  no-faction: "<red>You must be in a faction to use the Faction Shield."
+  leader-only: "<red>Only your faction's Leader or Co-Leader can set the Shield schedule."
+  set-usage: "<red>Usage: /f shield set <HH:mm> <duration-minutes>"
+  submitted: "<green>✔ Shield schedule submitted: <white>{schedule}<green>. It will take effect after the configured activation delay."
+  not-eligible-yet: "<red>Your faction can't set a Shield schedule yet -- try again in <white>{time}<red>."
+  status-active: "<green>Shield: <white>ACTIVE"
+  status-inactive: "<red>Shield: <white>INACTIVE"
+  time-remaining: "<gray>Time remaining: <white>{time}"
+  next-activation: "<gray>Next activation: <white>{time}"
+  current-schedule: "<gray>Current schedule: <white>{schedule}"
+  pending-schedule: "<gray>Pending schedule: <white>{schedule} <gray>(takes effect in <white>{time}<gray>)"
+  override-active: "<yellow>⚠ ADMIN OVERRIDE in effect -- forced <white>{state}"
+  combat-blocked: "<red>PvP is disabled here -- this faction's Shield is active."
+  admin-usage: "<red>Usage: /f shield admin <faction> active|inactive|clear"
+  admin-unknown-faction: "<red>No faction with that tag was found."
+  admin-forced: "<green>✔ Forced {faction}'s Shield to <white>{state}<green>. This is silent to the faction."
+  admin-cleared: "<green>✔ Cleared {faction}'s Shield override. Its normal schedule resumes."
+
 pvptop:
   header: "<red><bold>ᴘᴠᴘ ᴛᴏᴘ"
   empty: "<gray>No faction has earned PvP objective points yet."

@@ -180,6 +180,12 @@ permissions:
   vertex.baseclaim.purchaseslot:
     description: Purchase an additional Base Claim slot.
     default: true
+  vertex.shield.set:
+    description: Submit your faction's Shield schedule via /f shield set.
+    default: true
+  vertex.admin.claims:
+    description: Force a faction's Faction Shield ACTIVE/INACTIVE via /f shield admin, and bypass Shield-locked Base Claim removal.
+    default: op
   vertex.collector.give:
     description: Give a player a Chunk Collector.
     default: op
