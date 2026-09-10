@@ -190,6 +190,8 @@ button. This replaces the old standalone `/spawners` command.
 | `/tntfill <radius> <amount> bank\|inventory` | `vertex.tntfill.use` (default: everyone) | Fills every dispenser within `radius` blocks (max 100) of you, inside your own faction's claim, with up to `amount` TNT — drawn from the faction's Vertex TNT bank (the same one `/f bank` manages) or your own inventory. The bank is debited before any dispenser is filled, and anything the dispensers cannot take is returned immediately. |
 | `/f top` (or any `factions.command-aliases` alias) | Open to all | Vertex's claimed, individually-aged spawner-value leaderboard — replaces FactionsUUID's power-based `/f top`. See [Faction Leaderboards](faction-leaderboards.md#f-top-claimed-spawner-value). |
 | `/ftopforcecheck` | `vertex.ftop.forcecheck` | Immediately recalculates F Top for every faction without moving the regular scheduled deadline. |
+| `/f baseclaim` (or any `factions.command-aliases` alias) | `vertex.baseclaim.view` | Opens the Base Claim info/removal GUI if standing on one; otherwise attempts to create one (Leader/Co-Leader + `vertex.baseclaim.create` only). See [Base and Raid Claims](base-and-raid-claims.md). |
+| `/f baseclaim buy` | `vertex.baseclaim.purchaseslot` | Any member purchases their faction's next Base Claim slot (#2/#3), paid from their own balance. |
 | `/f pvptop` (or any `factions.command-aliases` alias) | Open to all | Faction leaderboard ranked by persisted KOTH/Outpost capture points, independent of F Top. See [Faction Leaderboards](faction-leaderboards.md#pvp-top-objective-points). |
 
 ## KOTH & Outposts

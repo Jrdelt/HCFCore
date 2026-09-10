@@ -98,6 +98,10 @@ public final class StorageMigrator {
                 "expires_at", "status"));
         TABLES.put("dupe_cases", List.of("id", "fingerprint", "holder_uuid", "holder_name", "item_id", "material",
                 "source", "details", "status", "created_at", "resolved_by", "resolved_at", "resolution"));
+        TABLES.put("base_claims", List.of("faction_id", "slot_index", "anchor_world", "anchor_x", "anchor_z", "created_at"));
+        TABLES.put("base_claim_region_chunks", List.of("faction_id", "slot_index", "world", "chunk_x", "chunk_z"));
+        TABLES.put("base_claim_slot_purchases", List.of("faction_id", "slot_index", "purchased_at"));
+        TABLES.put("raid_claim_expirations", List.of("world", "chunk_x", "chunk_z", "faction_id", "expires_at_millis"));
     }
 
     private StorageMigrator() {
@@ -214,6 +218,7 @@ public final class StorageMigrator {
         new AnnouncementPreferenceStorage(database).init();
         new GcStorage(database).init();
         new DupeStorage(database).init();
+        new me.vertex.core.claims.ClaimStorage(database).init();
     }
 
     /**

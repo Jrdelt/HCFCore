@@ -110,6 +110,9 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private LegacyCombatManager legacyCombatManager;
     private me.vertex.core.spawner.SpawnerStorage spawnerStorage;
     private me.vertex.core.spawner.SpawnerManager spawnerManager;
+    private me.vertex.core.claims.ClaimStorage claimStorage;
+    private me.vertex.core.claims.BaseClaimManager baseClaimManager;
+    private me.vertex.core.claims.RaidClaimManager raidClaimManager;
     private me.vertex.core.faction.FTopStorage fTopStorage;
     private me.vertex.core.faction.FTopManager fTopManager;
     private me.vertex.core.faction.PvpTopStorage pvpTopStorage;
@@ -233,6 +236,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             gcStorage.init();
             dupeStorage = new me.vertex.core.dupe.DupeStorage(database);
             dupeStorage.init();
+            claimStorage = new me.vertex.core.claims.ClaimStorage(database);
+            claimStorage.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize the database, disabling.", e);
             Bukkit.getPluginManager().disablePlugin(this);
@@ -423,8 +428,29 @@ combatManager.start();
                 java.util.List.of(me.vertex.core.booster.BoostersMenu.MENU_ID,
                         me.vertex.core.mine.MinesMenu.MENU_ID,
                         me.vertex.core.event.EventsMenu.MENU_ID,
-                        me.vertex.core.gc.GcMenu.MENU_ID));
+                        me.vertex.core.gc.GcMenu.MENU_ID,
+                        me.vertex.core.claims.BaseClaimMenu.MENU_ID));
         menuRegistry.load();
+
+        // Base Claims / Raid Claims: Base Claim state is loaded fully into
+        // memory (anchors + connected regions), Raid Claims are a bounded
+        // set of currently-tracked chunk timers -- see ClaimStorage's class
+        // doc and RaidClaimManager's "persist the deadline, catch up on
+        // restart" doc for why.
+        baseClaimManager = new me.vertex.core.claims.BaseClaimManager(this, claimStorage, spawnerManager);
+        baseClaimManager.load();
+        baseClaimManager.loadState();
+        raidClaimManager = new me.vertex.core.claims.RaidClaimManager(this, claimStorage);
+        raidClaimManager.load();
+        raidClaimManager.loadState();
+        raidClaimManager.recoverState();
+        me.vertex.core.claims.BaseClaimCommand baseClaimCommand =
+                new me.vertex.core.claims.BaseClaimCommand(this, baseClaimManager, messages, menuRegistry);
+        Bukkit.getPluginManager().registerEvents(baseClaimCommand, this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.claims.BaseClaimMenuListener(baseClaimManager, messages, menuRegistry), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.claims.ClaimEventListener(baseClaimManager, raidClaimManager, messages), this);
 
         // GC is a self-hosted, third currency -- its own database is the sole
         // balance authority, wired up the same way the other self-contained
@@ -820,6 +846,9 @@ combatManager.start();
 
     @Override
     public void onDisable() {
+        if (raidClaimManager != null) {
+            raidClaimManager.shutdown();
+        }
         if (placeholderExpansion != null) {
             placeholderExpansion.unregister();
         }

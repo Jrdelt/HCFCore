@@ -1,0 +1,38 @@
+# Base Claim info + removal confirmation. Confirm (green) actually removes
+# the Base Claim; cancel (red) or simply closing the inventory both leave
+# it untouched.
+size: 27
+title: "ʙᴀꜱᴇ ᴄʟᴀɪᴍ"
+
+filler:
+  enabled: true
+  material: BLACK_STAINED_GLASS_PANE
+  name: " "
+
+items:
+  # Available: {faction} {world} {chunk-x} {chunk-z} {chunks}
+  info:
+    material: BEACON
+    slot: 13
+    name: "<aqua>ʙᴀꜱᴇ ᴄʟᴀɪᴍ"
+    lore:
+      - "<gray>ꜰᴀᴄᴛɪᴏɴ: <white>{faction}"
+      - "<gray>ᴀɴᴄʜᴏʀ: <white>{world} {chunk-x}, {chunk-z}"
+      - "<gray>ᴄᴏɴɴᴇᴄᴛᴇᴅ ᴄʜᴜɴᴋꜱ: <white>{chunks}"
+
+  confirm-remove:
+    material: LIME_STAINED_GLASS_PANE
+    slot: 20
+    name: "<green>ᴄᴏɴꜰɪʀᴍ ʀᴇᴍᴏᴠᴀʟ"
+    lore:
+      - "<gray>Removes this Base Claim permanently."
+      - "<gray>Its chunks become plain Raid Claims."
+    sound: block.note_block.pling
+
+  cancel-remove:
+    material: RED_STAINED_GLASS_PANE
+    slot: 24
+    name: "<red>ᴄᴀɴᴄᴇʟ"
+    lore:
+      - "<gray>Closes this menu; nothing changes."
+    sound: block.note_block.bass

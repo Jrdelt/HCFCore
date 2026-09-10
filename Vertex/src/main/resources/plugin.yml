@@ -168,6 +168,18 @@ permissions:
   vertex.ftop.forcecheck:
     description: Immediately recalculate Vertex F Top for every faction.
     default: op
+  vertex.baseclaim.view:
+    description: View a faction's Base Claim info via /f baseclaim.
+    default: true
+  vertex.baseclaim.create:
+    description: Create a new Base Claim anchor via /f baseclaim.
+    default: true
+  vertex.baseclaim.remove:
+    description: Remove an existing Base Claim via /f baseclaim.
+    default: true
+  vertex.baseclaim.purchaseslot:
+    description: Purchase an additional Base Claim slot.
+    default: true
   vertex.collector.give:
     description: Give a player a Chunk Collector.
     default: op

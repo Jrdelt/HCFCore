@@ -245,6 +245,27 @@ ftop:
   entry: "<gray>#{rank} <white>{faction} <gray>— <green>{value} <gray>{movement}"
   forcecheck: "<green>✔ <yellow>Recalculated Vertex F Top. The automatic schedule was not changed."
 
+baseclaim:
+  no-faction: "<red>You must be in a faction to use Base Claims."
+  not-your-claim: "<red>That claim doesn't belong to your faction."
+  leader-only: "<red>Only your faction's Leader or Co-Leader can do that."
+  already-base: "<red>This chunk is already part of a Base Claim."
+  no-slot: "<red>Your faction has no free Base Claim slot. The next one costs <white>{price}<red>."
+  persist-failed: "<red>Something went wrong saving that Base Claim. Nothing changed -- try again."
+  created: "<green>✔ This claim is now your faction's Base Claim."
+  removed: "<green>✔ The Base Claim was removed. Its chunks are now Raid Claims."
+  remove-shielded: "<red>You can't remove a Base Claim while your faction's Shield is active."
+  remove-has-spawners: "<red>You can't remove a Base Claim that still contains spawners."
+  not-found: "<red>That Base Claim no longer exists."
+  region-full: "<red>That claim couldn't join your Base Claim -- it already has the maximum {limit} connected chunks. It will stay a Raid Claim."
+  purchase-ok: "<green>✔ Unlocked Base Claim slot #{slot} for <white>{price}<green>."
+  purchase-all-unlocked: "<red>Your faction has already unlocked every Base Claim slot."
+  purchase-no-economy: "<red>No economy plugin is available to charge for that."
+  purchase-cannot-afford: "<red>You can't afford the <white>{price}<red> slot price."
+
+raidclaim:
+  claimed: "<yellow>Raid claimed <gray>— <white>expires in {time}"
+
 pvptop:
   header: "<red><bold>ᴘᴠᴘ ᴛᴏᴘ"
   empty: "<gray>No faction has earned PvP objective points yet."

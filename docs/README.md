@@ -33,6 +33,7 @@ integration behavior.
 | [Coinflips](coinflips.md) | 50/50 money, experience, GC, and item wagers, claim stashes, self-ban, and the staff audit log |
 | [GC (Gift Card / Credit)](gc-currency.md) | Vertex's self-hosted third currency: the wallet GUI, the sign-based deposit/withdraw flow, redeem codes, and staff tools |
 | [Dupe investigation](dupe-investigation.md) | The staff-only suspected-duplicate item scanner, case lifecycle, `/dupe` commands, and the shared item-identity utility |
+| [Base and Raid Claims](base-and-raid-claims.md) | `/f baseclaim`'s permanent, connectable safe regions vs. Raid Claims' real-time-expiring faction land |
 | [Personal settings](settings.md) | Per-player optional announcement preferences |
 | [Shop](shop.md) | Categorized, dynamic-price item trading |
 | [Boosters](boosters.md) | How every bonus stacks into one effective figure, and `/boosters` |
