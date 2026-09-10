@@ -11,6 +11,7 @@ import me.vertex.core.faction.FactionBankStorage;
 import me.vertex.core.faction.FTopStorage;
 import me.vertex.core.faction.PvpTopStorage;
 import me.vertex.core.gc.GcStorage;
+import me.vertex.core.dupe.DupeStorage;
 import me.vertex.core.shop.ShopStorage;
 import me.vertex.core.spawner.SpawnerStorage;
 
@@ -95,6 +96,8 @@ public final class StorageMigrator {
         TABLES.put("gc_log", List.of("id", "actor_uuid", "target_uuid", "action", "amount", "balance_after", "note", "created_at"));
         TABLES.put("gc_redeem_codes", List.of("code", "amount", "uses_remaining", "created_by_uuid", "created_at",
                 "expires_at", "status"));
+        TABLES.put("dupe_cases", List.of("id", "fingerprint", "holder_uuid", "holder_name", "item_id", "material",
+                "source", "details", "status", "created_at", "resolved_by", "resolved_at", "resolution"));
     }
 
     private StorageMigrator() {
@@ -210,6 +213,7 @@ public final class StorageMigrator {
         new TradeStorage(database).init();
         new AnnouncementPreferenceStorage(database).init();
         new GcStorage(database).init();
+        new DupeStorage(database).init();
     }
 
     /**

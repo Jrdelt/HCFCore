@@ -157,6 +157,9 @@ commands:
   gc:
     description: Open your GC wallet, redeem a code, or manage GC as staff.
     usage: /<command> [redeem <code>|redeem create <amount> [uses] [expires-in]|admin balance|give|remove|set|zero|logs <player> [amount]|setsigninput]
+  dupe:
+    description: Staff-only suspected-duplicate item case inspection and resolution.
+    usage: /<command> inspect list [page]|inspect <id>|resolve <id> [reason]|dismiss <id> [reason]|confirm <id> [reason]
 
 permissions:
   vertex.admin:
@@ -311,4 +314,13 @@ permissions:
     default: op
   vertex.gc.redeem.create:
     description: Generate a GC redeem code (/gc redeem create).
+    default: op
+  vertex.dupe.inspect:
+    description: List and view suspected-duplicate item cases (/dupe inspect).
+    default: op
+  vertex.dupe.resolve:
+    description: Resolve, dismiss, or confirm a suspected-duplicate item case. Every attempt is logged.
+    default: op
+  vertex.dupe.alert:
+    description: Receive live staff alerts and a join-time summary when a suspected duplicate is detected.
     default: op

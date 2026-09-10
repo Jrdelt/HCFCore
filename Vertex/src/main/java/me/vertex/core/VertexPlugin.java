@@ -172,6 +172,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.gc.GcSignPrompt gcSignPrompt;
     private me.vertex.core.gc.GcInteropHook gcInteropHook;
     private me.vertex.core.gc.GcMenu gcMenu;
+    private me.vertex.core.dupe.DupeStorage dupeStorage;
+    private me.vertex.core.dupe.DupeManager dupeManager;
 
     @Override
     public void onLoad() {
@@ -229,6 +231,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             announcementPreferenceStorage.init();
             gcStorage = new me.vertex.core.gc.GcStorage(database);
             gcStorage.init();
+            dupeStorage = new me.vertex.core.dupe.DupeStorage(database);
+            dupeStorage.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize the database, disabling.", e);
             Bukkit.getPluginManager().disablePlugin(this);
@@ -442,6 +446,17 @@ combatManager.start();
                 gcInteropHook, messages);
         getCommand("gc").setExecutor(gcCommand);
         getCommand("gc").setTabCompleter(gcCommand);
+
+        // Dupe investigation: reuses the item-identity + suspected-duplicate
+        // queue built as the anti-dupe framework other item-tagging features
+        // (starting with Custom Enchantments) will route detected
+        // duplicates through, rather than building a second detector.
+        dupeManager = new me.vertex.core.dupe.DupeManager(this, dupeStorage, messages);
+        dupeManager.load();
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.dupe.DupeListener(dupeManager), this);
+        me.vertex.core.dupe.DupeCommand dupeCommand = new me.vertex.core.dupe.DupeCommand(this, dupeManager, messages);
+        getCommand("dupe").setExecutor(dupeCommand);
+        getCommand("dupe").setTabCompleter(dupeCommand);
 
         boosterService = new me.vertex.core.booster.BoosterService(this);
         boosterService.reloadConfig();
@@ -884,6 +899,9 @@ combatManager.start();
         if (gcManager != null) {
             gcManager.awaitWrites();
         }
+        if (dupeManager != null) {
+            dupeManager.awaitWrites();
+        }
         FakePearlListener.clearAll();
         if (storage != null) {
             storage.close();
@@ -1103,6 +1121,9 @@ combatManager.start();
             gcSignPrompt.loadLocation();
             gcInteropHook.configure(gcManager.interopCommandTemplate());
         }
+        if (dupeManager != null) {
+            dupeManager.load();
+        }
         if (kitManager != null) {
             kitManager.load();
         }
@@ -1208,6 +1229,8 @@ combatManager.start();
             tradeManager.awaitWrites();
         if (gcManager != null)
             gcManager.awaitWrites();
+        if (dupeManager != null)
+            dupeManager.awaitWrites();
     }
 
     public void finishStorageMigration() {

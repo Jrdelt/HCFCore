@@ -105,6 +105,22 @@ GC is also a third wager/listing currency in Coinflip (`/cf <amount> gc
 [GC (Gift Card / Credit)](gc-currency.md) for the full picture, including
 the sign-based amount-entry flow.
 
+## Dupe investigation
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/dupe inspect list [page]` | `vertex.dupe.inspect` | Lists open suspected-duplicate cases. |
+| `/dupe inspect <id>` | `vertex.dupe.inspect` | Shows one case's full evidence and (once closed) resolution detail. |
+| `/dupe resolve <id> [reason]` | `vertex.dupe.resolve` | Closes a case as resolved. Every attempt — permitted or not — is logged to console. |
+| `/dupe dismiss <id> [reason]` | `vertex.dupe.resolve` | Closes a case as a false positive. Every attempt is logged. |
+| `/dupe confirm <id> [reason]` | `vertex.dupe.resolve` | Closes a case as a confirmed duplicate. Every attempt is logged. |
+
+Cases open automatically — there is no manual "create case" command — the
+moment the same tracked item identity is observed in two places at once.
+`vertex.dupe.alert` grants a live alert when a new case opens and a
+join-time summary of any still-open cases. See
+[Dupe investigation](dupe-investigation.md) for the full detection model.
+
 ## Personal settings
 
 | Command | Permission | What it does |

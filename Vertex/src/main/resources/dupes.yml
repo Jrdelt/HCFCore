@@ -1,0 +1,27 @@
+# Staff-only suspected-dupe investigation and persistent item IDs.
+# IDs are hidden PDC data: normal players never see them in an item's lore.
+enabled: true
+
+# The periodic scan is deliberately bounded. It scans online player/ender
+# inventories plus every already-loaded chunk over multiple passes. It never
+# forces chunks to load; opened containers are also checked after interaction.
+scan-interval-ticks: 100
+# Number of currently loaded chunks inspected in one scheduled pass. Lower
+# this on a busy server; a full reconciliation continues on later passes.
+loaded-chunks-per-pass: 8
+staff-list-page-size: 10
+
+# Opt-in normal materials. These should normally be unstackable high-value
+# gear. Vertex custom Wands, Blueprints, Chunk Collectors, and spawner items
+# are recognized by their own internal marker even when their material is not
+# listed here.
+tracked-materials:
+  - NETHERITE_HELMET
+  - NETHERITE_CHESTPLATE
+  - NETHERITE_LEGGINGS
+  - NETHERITE_BOOTS
+  - NETHERITE_SWORD
+  - NETHERITE_PICKAXE
+  - NETHERITE_AXE
+  - NETHERITE_SHOVEL
+  - NETHERITE_HOE
