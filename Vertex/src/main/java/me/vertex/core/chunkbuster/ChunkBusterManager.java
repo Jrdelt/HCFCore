@@ -2,6 +2,7 @@ package me.vertex.core.chunkbuster;
 
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.MessageFormatter;
+import me.vertex.core.performance.PerformanceManager;
 import me.vertex.core.spawner.SpawnerManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -114,6 +115,7 @@ public final class ChunkBusterManager {
     private volatile Map<String, Boolean> defaultRolePermissions = Map.of();
     private volatile int blocksPerTick = 1000;
     private volatile long periodTicks = 1L;
+    private volatile PerformanceManager performance = PerformanceManager.disabled();
 
     /** Per-faction, per-role overrides of the configured defaults -- loaded fully into memory, bounded by faction count. */
     private final Map<Integer, Map<String, Boolean>> rolePermissions = new ConcurrentHashMap<>();
@@ -134,6 +136,15 @@ public final class ChunkBusterManager {
         this.playerFactionId = playerFactionId;
         this.playerRoleId = playerRoleId;
         this.isCombatTagged = isCombatTagged;
+    }
+
+    /**
+     * Wired once from {@code VertexPlugin}; left at {@link PerformanceManager#disabled()}
+     * for any caller (including every unit test) that never sets one, so
+     * this is purely additive and never required for correctness.
+     */
+    public void setPerformanceManager(PerformanceManager performance) {
+        this.performance = performance == null ? PerformanceManager.disabled() : performance;
     }
 
     // ---- Config ----
@@ -173,6 +184,7 @@ public final class ChunkBusterManager {
 
         blocksPerTick = Math.max(1, config.getInt("processing.blocks-per-tick", 1000));
         periodTicks = Math.max(1L, config.getLong("processing.period-ticks", 1L));
+        performance.registerScheduledTask("chunkbuster.batch-removal", periodTicks);
     }
 
     private TypeConfig readTypeConfig(ChunkBusterType type, ConfigurationSection section) {
@@ -420,7 +432,7 @@ public final class ChunkBusterManager {
         int batchSize = blocksPerTick;
 
         BukkitTask[] taskHolder = new BukkitTask[1];
-        taskHolder[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+        taskHolder[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> performance.time("chunkbuster.batch-removal", () -> {
             World liveWorld = Bukkit.getWorld(area.world());
             if (liveWorld == null) {
                 taskHolder[0].cancel();
@@ -437,7 +449,7 @@ public final class ChunkBusterManager {
                 taskHolder[0].cancel();
                 finishOperation(operationId, area, playerId, type, logLocation);
             }
-        }, periodTicks, periodTicks);
+        }), periodTicks, periodTicks);
 
         return UseResult.OK;
     }

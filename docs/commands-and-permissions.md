@@ -309,6 +309,7 @@ rewards, and the `capture-events.yml` reference.
 | `/vertex clearmobstacks` | `vertex.admin` | Clears every tracked stacked mob. |
 | `/vertex storage` | `vertex.admin` | Shows which storage backend is currently in use. |
 | `/vertex storage <local\|mysql> [confirm]` | `vertex.admin` | Copies all data into the other backend and switches `storage.type` to it. Takes effect on the next restart. `confirm` is required if the target database already has data in it, since it gets overwritten. See [Installation](installation.md#switching-backends-in-game). |
+| `/vertex performance` | `vertex.admin` | Reports the performance framework's current OFF/BASIC/DETAILED monitoring state — see [Performance](performance.md). |
 
 ## Permission node reference
 

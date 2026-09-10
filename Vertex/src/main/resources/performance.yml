@@ -1,0 +1,42 @@
+# Vertex's performance/profiling framework. This exists purely to help a
+# server operator answer "what is running, how often, and how long does it
+# take" when troubleshooting -- it never changes gameplay behavior, no
+# matter what it's set to.
+#
+# Keep this simple: the goal is sensible defaults you rarely need to touch,
+# not a tuning knob for every subsystem. Most servers should never need to
+# change anything in this file.
+
+# How much profiling overhead Vertex is allowed to add, one of:
+#   OFF      - monitoring is completely inactive. No timers run, nothing is
+#              recorded, and there is no meaningful overhead beyond a single
+#              cheap check per call site -- this is the correct setting for
+#              a normal production server.
+#   BASIC    - tracks which periodic/scheduled operations exist and how
+#              often they're configured to run (e.g. Chunk Buster's batch
+#              removal interval, the dupe-investigation reconciliation
+#              scan). No per-execution timing, so the overhead is still
+#              negligible. Use this if you just want a quick sanity check
+#              of what's scheduled and at what interval after changing a
+#              config file.
+#   DETAILED - additionally times individual operations (execution time,
+#              how many samples have been taken, the average/last/worst
+#              time seen) via /vertex performance. This adds real, if
+#              small, per-call overhead -- only turn it on temporarily
+#              while actively investigating a performance problem, then
+#              switch back to OFF or BASIC.
+#
+# Changing this only affects what Vertex measures and reports through
+# /vertex performance -- it never changes what any feature actually does.
+# Takes effect on /vertex reload.
+monitoring-level: "OFF"
+
+# Safety cap on how many distinct DETAILED-level timing labels Vertex will
+# keep statistics for at once (clamped to 10-2000). Every label Vertex
+# times today comes from a small, fixed set of call sites, so this should
+# never realistically be reached -- it exists only so a future call site
+# (or a mistake introducing a dynamically-generated label) can never grow
+# this list without bound. Once the cap is reached, a brand-new label is
+# simply not tracked until the next reload; existing labels are unaffected.
+# Most servers will never need to change this.
+max-tracked-labels: 200

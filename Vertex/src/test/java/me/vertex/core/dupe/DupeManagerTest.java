@@ -16,6 +16,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.plugin.PluginMock;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -83,6 +85,17 @@ class DupeManagerTest {
     }
 
     @Test
+    void ensureIdentityIgnoresAnItemTaggedWithTheGenericPlaceholderKind() {
+        // ItemKind.GENERIC is documented (see its class doc and
+        // DupeManager#shouldTrack's own comment) as a placeholder that must
+        // never make an item trackable on its own -- only a real kind
+        // (RUNE/ENCHANTMENT_ITEM/ENCHANTED_ITEM today) should.
+        ItemStack dirt = new ItemStack(Material.DIRT);
+        new TrackedItemIds(plugin).ensureInstanceId(dirt, me.vertex.core.item.ItemKind.GENERIC);
+        assertNull(manager.ensureIdentity(dirt));
+    }
+
+    @Test
     void ensureIdentityNeverWritesVisibleLoreOrDisplayName() {
         ItemStack sword = new ItemStack(Material.NETHERITE_SWORD);
         manager.ensureIdentity(sword);
@@ -92,6 +105,21 @@ class DupeManagerTest {
         // The identity only exists as hidden PDC data.
         assertNotNull(meta.getPersistentDataContainer().get(
                 new org.bukkit.NamespacedKey(plugin, "tracked_item_id"), PersistentDataType.STRING));
+    }
+
+    @Test
+    void loadRegistersTheReconciliationPassTaskWithTheWiredPerformanceManager() throws Exception {
+        me.vertex.core.performance.PerformanceManager performance =
+                new me.vertex.core.performance.PerformanceManager(plugin);
+        java.io.File file = new java.io.File(plugin.getDataFolder(), "performance.yml");
+        Files.writeString(file.toPath(), "monitoring-level: BASIC\n", StandardCharsets.UTF_8);
+        performance.load();
+
+        manager.setPerformanceManager(performance);
+        manager.load();
+
+        var tasks = performance.scheduledTasks();
+        assertTrue(tasks.stream().anyMatch(task -> task.label().equals("dupe.reconciliation-pass")));
     }
 
     @Test

@@ -206,7 +206,7 @@ public final class BaseClaimManager {
         if (chunkIndex.containsKey(anchorKey)) {
             return CreateResult.ALREADY_BASE_CLAIM;
         }
-        int slotIndex = anchoredCount(factionId) + 1;
+        int slotIndex = nextAvailableSlot(factionId);
         try {
             storage.insertBaseClaim(factionId, slotIndex, anchorKey.world(), anchorKey.x(), anchorKey.z(),
                     System.currentTimeMillis());
@@ -223,6 +223,30 @@ public final class BaseClaimManager {
         // Immediately try to absorb any already-claimed same-faction chunks touching the new anchor.
         growFromSeed(region, anchorKey);
         return CreateResult.OK;
+    }
+
+    /**
+     * The lowest slot number (1..{@link #unlockedSlots}) not currently
+     * occupied by an anchored region. Deliberately not just {@code
+     * anchoredCount(factionId) + 1} -- {@link #removeAnchor} can free any
+     * specific slot, not only the highest-numbered one (e.g. removing slot
+     * 1 while slot 2/3 stay anchored), and {@code anchoredCount + 1} would
+     * then recompute a slot number that is still occupied instead of
+     * reusing the one that was actually freed, permanently colliding with
+     * {@code base_claims}' {@code (faction_id, slot_index)} primary key on
+     * every subsequent attempt.
+     */
+    int nextAvailableSlot(int factionId) {
+        Map<Integer, Region> existing = regionsByFaction.getOrDefault(factionId, Map.of());
+        int unlocked = unlockedSlots(factionId);
+        for (int candidate = 1; candidate <= unlocked; candidate++) {
+            if (!existing.containsKey(candidate)) {
+                return candidate;
+            }
+        }
+        // Defensive only -- the anchoredCount < unlockedSlots guard in
+        // createAnchor should make this unreachable.
+        return unlocked + 1;
     }
 
     public enum RemoveResult { OK, SHIELDED, HAS_SPAWNERS, NOT_FOUND }

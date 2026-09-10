@@ -1,7 +1,9 @@
 package me.vertex.core.dupe;
 
+import me.vertex.core.item.ItemKind;
 import me.vertex.core.item.TrackedItemIds;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.performance.PerformanceManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
@@ -64,6 +66,7 @@ public final class DupeManager {
     private volatile int scanIntervalTicks;
     private volatile int pageSize;
     private volatile int loadedChunksPerPass;
+    private volatile PerformanceManager performance = PerformanceManager.disabled();
 
     public DupeManager(Plugin plugin, DupeStorage storage, Messages messages, TrackedItemIds trackedItemIds) {
         this.plugin = plugin;
@@ -78,6 +81,15 @@ public final class DupeManager {
         this.spawnerKey = new NamespacedKey(plugin, "spawner_type");
     }
 
+    /**
+     * Wired once from {@code VertexPlugin}; left at {@link PerformanceManager#disabled()}
+     * for any caller (including every unit test) that never sets one, so
+     * this is purely additive and never required for correctness.
+     */
+    public void setPerformanceManager(PerformanceManager performance) {
+        this.performance = performance == null ? PerformanceManager.disabled() : performance;
+    }
+
     public void load() {
         if (!file.exists()) {
             plugin.saveResource("dupes.yml", false);
@@ -87,6 +99,7 @@ public final class DupeManager {
         scanIntervalTicks = Math.max(20, Math.min(20 * 60, config.getInt("scan-interval-ticks", 100)));
         pageSize = Math.max(1, Math.min(50, config.getInt("staff-list-page-size", 10)));
         loadedChunksPerPass = Math.max(1, Math.min(64, config.getInt("loaded-chunks-per-pass", 8)));
+        performance.registerScheduledTask("dupe.reconciliation-pass", scanIntervalTicks);
         reconciliationObserved.clear();
         reconciliationChunks = List.of();
         reconciliationCursor = 0;
@@ -195,6 +208,10 @@ public final class DupeManager {
         if (!enabled) {
             return;
         }
+        performance.time("dupe.reconciliation-pass", this::runReconciliationPass);
+    }
+
+    private void runReconciliationPass() {
         if (reconciliationChunks.isEmpty()) {
             reconciliationObserved.clear();
             reconciliationCursor = 0;
@@ -449,8 +466,11 @@ public final class DupeManager {
                 // shared TrackedItemIds utility is automatically considered
                 // worth tracking. Custom Enchantments (Runes and physical/
                 // applied enchantment items) is the first feature to rely on
-                // this rather than adding its own key here.
-                || trackedItemIds.kind(item).isPresent();
+                // this rather than adding its own key here. GENERIC itself is
+                // explicitly excluded -- see ItemKind's class doc -- since it
+                // is documented as a placeholder never meant to make an item
+                // trackable on its own.
+                || trackedItemIds.kind(item).filter(kind -> kind != ItemKind.GENERIC).isPresent();
     }
 
     private record Evidence(String holderUuid, String holderName, String source, int slot, String material) {

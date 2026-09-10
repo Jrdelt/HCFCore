@@ -1,7 +1,7 @@
 # Bumped whenever a bundled message changes. On startup Vertex replaces an
 # older on-disk copy of this file with the new bundled one, moving the
 # previous file into lang/backup/ first so customizations can be re-applied.
-lang-version: 7
+lang-version: 8
 
 general:
   no-permission: "<red>✖ You do not have access to that command."
@@ -32,6 +32,15 @@ admin:
   storage-failed: "&c&lSTAFF&r &7> <red>Migration failed, nothing was switched: {error}"
   storage-requires-idle-server: "&c&lSTAFF&r &7> <red>Storage migration requires no online players and no active Blueprints."
   storage-login-blocked: "<red>A brief storage migration is in progress. Please reconnect shortly."
+
+performance:
+  off: "&c&lSTAFF&r &7> <gray>Performance monitoring is <white>OFF<gray>. Set <white>monitoring-level<gray> to <white>BASIC<gray> or <white>DETAILED<gray> in <white>performance.yml<gray> and run <white>/vertex reload<gray> to enable it."
+  header: "&c&lSTAFF&r &7> <gray>Performance monitoring: <white>{level}<gray>, active for <white>{duration}<gray>."
+  no-scheduled-tasks: "<gray>  No scheduled tasks are registered yet."
+  scheduled-task: "<gray>  - <white>{label}<gray>: every <white>{interval}<gray> ticks"
+  detailed-hint: "<gray>Run at <white>DETAILED<gray> to also see execution-time stats."
+  no-stats: "<gray>  No execution-time samples recorded yet."
+  stat-line: "<gray>  - <white>{label}<gray>: <white>{count}<gray> samples, avg <white>{avg}ms<gray>, last <white>{last}ms<gray>, max <white>{max}ms"
 
 tntfill:
   filled-partial: "&<red>✖ Filled &e{filled} &7dispensers (&cinsufficient funds/TNT&7)."

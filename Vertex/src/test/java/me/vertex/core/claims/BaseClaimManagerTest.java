@@ -177,4 +177,31 @@ class BaseClaimManagerTest {
         manager.loadState();
         assertEquals(BaseClaimManager.RemoveResult.NOT_FOUND, manager.removeAnchor(1, 1));
     }
+
+    @Test
+    void nextAvailableSlotReusesAFreedLowerSlotInsteadOfCollidingWithAHigherOne() throws Exception {
+        withMaxChunksPerRegion(2000);
+        int factionId = 5;
+        storage.insertPurchasedSlot(factionId, 2, System.currentTimeMillis());
+        storage.insertPurchasedSlot(factionId, 3, System.currentTimeMillis());
+        storage.insertBaseClaim(factionId, 1, "world", 0, 0, System.currentTimeMillis());
+        storage.insertRegionChunk(factionId, 1, "world", 0, 0);
+        storage.insertBaseClaim(factionId, 2, "world", 10, 0, System.currentTimeMillis());
+        storage.insertRegionChunk(factionId, 2, "world", 10, 0);
+        storage.insertBaseClaim(factionId, 3, "world", 20, 0, System.currentTimeMillis());
+        storage.insertRegionChunk(factionId, 3, "world", 20, 0);
+        manager.loadState();
+        assertEquals(3, manager.anchoredCount(factionId));
+        assertEquals(3, manager.unlockedSlots(factionId));
+
+        // Free the lowest slot while a higher one (3) stays anchored -- before
+        // the fix, the next anchor always recomputed anchoredCount()+1 (=3
+        // here), which collides with the still-live slot 3 instead of
+        // reoccupying the slot that was actually freed.
+        assertEquals(BaseClaimManager.RemoveResult.OK, manager.removeAnchor(factionId, 1));
+        assertEquals(2, manager.anchoredCount(factionId));
+
+        assertEquals(1, manager.nextAvailableSlot(factionId),
+                "the freed slot 1 must be reused rather than colliding with the still-anchored slot 3");
+    }
 }

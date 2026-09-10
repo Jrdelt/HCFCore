@@ -88,6 +88,25 @@ class ChunkBusterManagerTest {
         assertTrue(manager.isProtected(Material.BEDROCK));
     }
 
+    // ---- Performance framework wiring ----
+
+    @Test
+    void loadRegistersTheBatchRemovalTaskWithTheWiredPerformanceManager() throws Exception {
+        me.vertex.core.performance.PerformanceManager performance =
+                new me.vertex.core.performance.PerformanceManager(plugin);
+        java.io.File file = new java.io.File(plugin.getDataFolder(), "performance.yml");
+        java.nio.file.Files.writeString(file.toPath(), "monitoring-level: BASIC\n",
+                java.nio.charset.StandardCharsets.UTF_8);
+        performance.load();
+
+        manager.setPerformanceManager(performance);
+        manager.load();
+
+        var tasks = performance.scheduledTasks();
+        assertTrue(tasks.stream().anyMatch(task -> task.label().equals("chunkbuster.batch-removal")
+                && task.intervalTicks() == 1L), "chunkbuster.yml's default period-ticks (1) must be reflected");
+    }
+
     @Test
     void configuredProtectedBlocksAreProtected() {
         // BARRIER ships in the default chunkbuster.yml protected-blocks list.

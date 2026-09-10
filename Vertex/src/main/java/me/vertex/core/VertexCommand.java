@@ -83,8 +83,68 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
             return handleStorage(sender, args);
         }
 
+        if (args.length == 1 && args[0].equalsIgnoreCase("performance")) {
+            handlePerformance(sender);
+            return true;
+        }
+
         sender.sendMessage(messages.getChat(sender, "admin.usage"));
         return true;
+    }
+
+    /** Reports the {@code PerformanceManager}'s current OFF/BASIC/DETAILED state -- see its class doc. */
+    private void handlePerformance(CommandSender sender) {
+        me.vertex.core.performance.PerformanceManager performance = plugin.performanceManager();
+        if (performance == null || performance.level() == me.vertex.core.performance.PerformanceManager.Level.OFF) {
+            sender.sendMessage(messages.getChat(sender, "performance.off"));
+            return;
+        }
+
+        sender.sendMessage(messages.getChat(sender, "performance.header",
+                "level", performance.level().name(),
+                "duration", formatDuration(System.currentTimeMillis() - performance.monitoringSinceMillis())));
+
+        List<me.vertex.core.performance.PerformanceManager.ScheduledTaskInfo> tasks = performance.scheduledTasks();
+        if (tasks.isEmpty()) {
+            sender.sendMessage(messages.getChat(sender, "performance.no-scheduled-tasks"));
+        } else {
+            for (var task : tasks) {
+                sender.sendMessage(messages.getChat(sender, "performance.scheduled-task",
+                        "label", task.label(), "interval", String.valueOf(task.intervalTicks())));
+            }
+        }
+
+        if (performance.level() != me.vertex.core.performance.PerformanceManager.Level.DETAILED) {
+            sender.sendMessage(messages.getChat(sender, "performance.detailed-hint"));
+            return;
+        }
+
+        List<me.vertex.core.performance.PerformanceManager.TaskStatsSnapshot> stats = performance.taskStats();
+        if (stats.isEmpty()) {
+            sender.sendMessage(messages.getChat(sender, "performance.no-stats"));
+            return;
+        }
+        for (var stat : stats) {
+            sender.sendMessage(messages.getChat(sender, "performance.stat-line",
+                    "label", stat.label(), "count", String.valueOf(stat.count()),
+                    "avg", String.format(java.util.Locale.ROOT, "%.2f", stat.avgMillis()),
+                    "last", String.format(java.util.Locale.ROOT, "%.2f", stat.lastMillis()),
+                    "max", String.format(java.util.Locale.ROOT, "%.2f", stat.maxMillis())));
+        }
+    }
+
+    private static String formatDuration(long millis) {
+        long totalSeconds = Math.max(0L, millis) / 1000L;
+        long hours = totalSeconds / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        long seconds = totalSeconds % 60L;
+        if (hours > 0) {
+            return hours + "h " + minutes + "m";
+        }
+        if (minutes > 0) {
+            return minutes + "m " + seconds + "s";
+        }
+        return seconds + "s";
     }
 
     private boolean handleStorage(CommandSender sender, String[] args) {
@@ -175,7 +235,7 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String partial = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("reload", "clearmobstacks", "storage", "spawnerinfo", "spawnerdebug")
+            return Stream.of("reload", "clearmobstacks", "storage", "spawnerinfo", "spawnerdebug", "performance")
                     .filter(sub -> sub.startsWith(partial))
                     .collect(Collectors.toList());
         }

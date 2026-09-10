@@ -128,15 +128,21 @@ otherwise-identical empty Backpacks from stacking. It exposes:
 - `isSameInstance(ItemStack, ItemStack)` — true only when both stacks
   carry the same instance ID.
 
-`ItemKind` is currently just a placeholder enum (`GENERIC`) — nothing is
-tagged with it yet. Real values get added when a later feature actually
-needs to tag physical items with an identity (Custom Enchantments' Runes
-and enchanted items are the first planned consumer). `DupeManager` itself
-still keeps its own, separate PDC key for the materials/Vertex-item
-identities it tracks today; the two are independent identity schemes that
-happen to share the same shape, and unifying them is a decision for
-whichever phase first needs `TrackedItemIds` to point at real dupe
-evidence.
+`ItemKind` started as a placeholder enum (`GENERIC` only, nothing tagged
+with it). Custom Enchantments is the first real consumer: every physical
+Rune (`ItemKind.RUNE`) and physical enchant item (`ItemKind.ENCHANTMENT_ITEM`)
+is tagged at creation, and every target item is tagged
+(`ItemKind.ENCHANTED_ITEM`) the moment it first receives a successful
+application — see [Custom Enchantments](custom-enchantments.md) for the
+full mechanics. `DupeManager#shouldTrack` treats any item carrying a real
+(non-`GENERIC`) `ItemKind` as automatically worth tracking, which is the
+entire integration a new feature needs — no second detection system.
+
+`DupeManager` still keeps its own, separate PDC key for the actual
+duplicate-detection identity it assigns and compares (distinct from
+`TrackedItemIds`' own instance-ID key); an item only needs to carry a real
+`ItemKind` to become eligible for that identity, it doesn't need to share
+the same underlying key.
 
 A cautionary precedent shaped `TrackedItemIds`' design: a previous bug let
 a Chunk Collector's mob-drop marker leak onto every dropped item, which

@@ -23,6 +23,7 @@ All code lives under `me.vertex.core`, one package per feature area:
 | `listener` | Cross-cutting listeners (combat, player connection) |
 | `luckperms` | LuckPerms wrapper |
 | `nametag` | Per-viewer nametag teams |
+| `performance` | OFF/BASIC/DETAILED profiling framework (`PerformanceManager`), `/vertex performance` |
 | `placeholderapi` | PlaceholderAPI expansion hook |
 | `pvp` | Combat tag, Legacy Combat, Archer Tag, vanilla item cooldowns |
 | `reboot` | Scheduled shutdown |

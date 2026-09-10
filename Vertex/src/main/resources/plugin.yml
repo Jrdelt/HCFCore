@@ -27,7 +27,7 @@ commands:
     usage: /<command>
   vertex:
     description: Vertex admin/reload command.
-    usage: /<command> reload|clearmobstacks|storage|spawnerinfo|spawnerdebug
+    usage: /<command> reload|clearmobstacks|storage|spawnerinfo|spawnerdebug|performance
   uncombat:
     description: Clear a player's combat tag.
     usage: /<command> <player>

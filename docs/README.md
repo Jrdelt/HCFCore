@@ -52,6 +52,7 @@ integration behavior.
 | [Commands & Permissions](commands-and-permissions.md) | Every command and permission node in one place |
 | [Integrations](integrations.md) | Exactly what each supported plugin unlocks, and what happens without it |
 | [Placeholders](placeholders.md) | Every `%vertex_...%` PlaceholderAPI token Vertex provides for other plugins to read |
+| [Performance](performance.md) | The OFF/BASIC/DETAILED monitoring framework, `performance.yml`, and `/vertex performance` |
 | [Architecture](architecture.md) | Package layout, internal design notes, and testing — for contributors |
 
 ## Conventions used throughout

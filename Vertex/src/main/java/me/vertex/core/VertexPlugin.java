@@ -184,6 +184,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.dupe.DupeManager dupeManager;
     private me.vertex.core.item.TrackedItemIds trackedItemIds;
     private me.vertex.core.enchant.EnchantManager enchantManager;
+    private me.vertex.core.performance.PerformanceManager performanceManager;
 
     @Override
     public void onLoad() {
@@ -258,6 +259,15 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         userManager = new UserManager(this, storage);
         messages = new Messages(this, userManager);
         messages.load();
+
+        // Performance framework: OFF by default, diagnostic-only, never
+        // changes gameplay -- see PerformanceManager's class doc. Loaded
+        // this early so every manager constructed below can be wired to it
+        // (via an optional setPerformanceManager setter) before its own
+        // first load() call.
+        performanceManager = new me.vertex.core.performance.PerformanceManager(this);
+        performanceManager.load();
+
         announcementPreferenceManager = new me.vertex.core.preferences.AnnouncementPreferenceManager(this,
                 announcementPreferenceStorage, messages);
         Bukkit.getPluginManager().registerEvents(announcementPreferenceManager, this);
@@ -509,6 +519,7 @@ combatManager.start();
                 me.vertex.core.factions.FactionsHook::getFactionId,
                 me.vertex.core.faction.RallyManager::roleId,
                 combatManager::isTagged);
+        chunkBusterManager.setPerformanceManager(performanceManager);
         chunkBusterManager.load();
         chunkBusterManager.loadState();
         chunkBusterManager.recoverAbandonedOperations();
@@ -565,6 +576,7 @@ combatManager.start();
         // entire integration a new feature needs.
         trackedItemIds = new me.vertex.core.item.TrackedItemIds(this);
         dupeManager = new me.vertex.core.dupe.DupeManager(this, dupeStorage, messages, trackedItemIds);
+        dupeManager.setPerformanceManager(performanceManager);
         dupeManager.load();
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.dupe.DupeListener(dupeManager), this);
         me.vertex.core.dupe.DupeCommand dupeCommand = new me.vertex.core.dupe.DupeCommand(this, dupeManager, messages);
@@ -1173,11 +1185,23 @@ combatManager.start();
         return spawnerManager;
     }
 
+    /** Exposed for the /vertex performance diagnostic. */
+    public me.vertex.core.performance.PerformanceManager performanceManager() {
+        return performanceManager;
+    }
+
     public void reload() {
         reloadConfig();
         NumberFormatConfig.load(this);
         validateRuntimeDependencies();
 
+        // Loaded before any manager that reports through it (Chunk Busters,
+        // dupe investigation) re-runs its own load() below, so a
+        // level change this reload is already in effect when they
+        // re-register their scheduled-task info.
+        if (performanceManager != null) {
+            performanceManager.load();
+        }
         if (messages != null) {
             messages.load();
         }
