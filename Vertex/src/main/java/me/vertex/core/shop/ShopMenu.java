@@ -76,6 +76,26 @@ public final class ShopMenu {
     /** Control-row slot holding that button -- the one border slot neither Back nor Balance occupies. */
     public static final int SLOT_BUY_CHUNK_BUSTERS = 7;
 
+    /**
+     * Sentinel category id for the Source Buckets button -- same reasoning
+     * as {@link #CHUNK_BUSTERS_CATEGORY_ID}: a Source Bucket is priced per
+     * variant in {@code sourcebuckets.yml}, not per Material, so it cannot
+     * be a real {@code ShopEntry} row either. Clicking it opens {@link
+     * me.vertex.core.bucket.SourceBucketShopMenu} directly.
+     */
+    public static final String SOURCE_BUCKETS_CATEGORY_ID = "__source_buckets__";
+
+    /**
+     * The shop.yml category the buyable-Source-Bucket button lives inside.
+     * Miscellaneous already sells a plain vanilla {@code BUCKET}, so a
+     * reusable water/lava Source Bucket fits thematically there without
+     * needing a whole new category slot in the 9-wide /shop picker.
+     */
+    public static final String SOURCE_BUCKETS_HOST_CATEGORY = "miscellaneous";
+
+    /** Control-row slot holding that button -- the same "opposite border slot" convention Spawners uses. */
+    public static final int SLOT_BUY_SOURCE_BUCKETS = 8;
+
     public enum Mode {
         CATEGORIES, ITEMS
     }
@@ -121,6 +141,15 @@ public final class ShopMenu {
         return icon;
     }
 
+    private static ItemStack sourceBucketsCategoryIcon(Player player, Messages messages) {
+        ItemStack icon = new ItemStack(Material.WATER_BUCKET);
+        ItemMeta meta = icon.getItemMeta();
+        meta.displayName(noItalic(messages.get(player, "shop.sourcebuckets-category-title")));
+        meta.lore(List.of(noItalic(messages.get(player, "shop.category-open-lore"))));
+        icon.setItemMeta(meta);
+        return icon;
+    }
+
     public static void openCategory(Player player, ShopManager manager, SpawnerManager spawnerManager,
                                      Messages messages, String categoryId, int requestedPage) {
         ShopCategory category = manager.category(categoryId);
@@ -153,6 +182,10 @@ public final class ShopMenu {
         if (CHUNK_BUSTERS_HOST_CATEGORY.equals(categoryId)) {
             inventory.setItem(SLOT_BUY_CHUNK_BUSTERS, chunkBustersCategoryIcon(player, messages));
             holder.slotCategoryIds.put(SLOT_BUY_CHUNK_BUSTERS, CHUNK_BUSTERS_CATEGORY_ID);
+        }
+        if (SOURCE_BUCKETS_HOST_CATEGORY.equals(categoryId)) {
+            inventory.setItem(SLOT_BUY_SOURCE_BUCKETS, sourceBucketsCategoryIcon(player, messages));
+            holder.slotCategoryIds.put(SLOT_BUY_SOURCE_BUCKETS, SOURCE_BUCKETS_CATEGORY_ID);
         }
 
         int start = page * PAGE_SIZE;

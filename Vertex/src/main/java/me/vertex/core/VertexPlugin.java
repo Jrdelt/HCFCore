@@ -117,6 +117,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.shield.ShieldManager shieldManager;
     private me.vertex.core.chunkbuster.ChunkBusterStorage chunkBusterStorage;
     private me.vertex.core.chunkbuster.ChunkBusterManager chunkBusterManager;
+    private me.vertex.core.bucket.SourceBucketManager sourceBucketManager;
     private me.vertex.core.faction.FTopStorage fTopStorage;
     private me.vertex.core.faction.FTopManager fTopManager;
     private me.vertex.core.faction.PvpTopStorage pvpTopStorage;
@@ -515,6 +516,22 @@ combatManager.start();
         getCommand("chunkbuster").setExecutor(chunkBusterCommand);
         getCommand("chunkbuster").setTabCompleter(chunkBusterCommand);
 
+        // Source Buckets (Phase 5): same injected-functional-reference
+        // testability shape as Chunk Busters above, plus BaseClaimManager's
+        // own query for the per-variant base-claim-only gate. Unlike Chunk
+        // Busters there is no persisted state at all -- a Source Bucket is
+        // a physical, permanently-reusable item, so possession of the item
+        // *is* the record; see SourceBucketManager's class doc for why no
+        // new table exists. The listener needs ShopManager (for its "back
+        // to shop" button), so it's registered further down, alongside
+        // ChunkBusterMenuListener, once ShopManager exists.
+        sourceBucketManager = new me.vertex.core.bucket.SourceBucketManager(this,
+                me.vertex.core.factions.FactionsHook::getClaimFactionId,
+                me.vertex.core.factions.FactionsHook::getClaimFactionTag,
+                baseClaimManager::isBaseClaim,
+                combatManager::isTagged);
+        sourceBucketManager.load();
+
         // GC is a self-hosted, third currency -- its own database is the sole
         // balance authority, wired up the same way the other self-contained
         // economy-like features above are (storage -> manager -> menu ->
@@ -611,7 +628,8 @@ combatManager.start();
         shopManager.load();
         shopManager.loadState();
         Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.shop.ShopMenuListener(shopManager, spawnerManager, chunkBusterManager, messages),
+                new me.vertex.core.shop.ShopMenuListener(shopManager, spawnerManager, chunkBusterManager,
+                        sourceBucketManager, messages),
                 this);
         // Chunk Busters' own confirmation-GUI + shop-sub-menu listener --
         // needs ShopManager (for its "back to shop" button), which is why
@@ -619,6 +637,10 @@ combatManager.start();
         // Buster setup above.
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.chunkbuster.ChunkBusterMenuListener(
                 chunkBusterManager, shopManager, spawnerManager, messages, menuRegistry), this);
+        // Source Buckets' own item-use + shop-sub-menu listener -- needs
+        // ShopManager for the same "back to shop" button reason above.
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.bucket.SourceBucketListener(
+                sourceBucketManager, shopManager, spawnerManager, messages), this);
         mineManager = new me.vertex.core.mine.MineManager(this, messages);
         mineManager.load();
         Bukkit.getPluginManager().registerEvents(
@@ -1160,6 +1182,9 @@ combatManager.start();
         }
         if (chunkBusterManager != null) {
             chunkBusterManager.load();
+        }
+        if (sourceBucketManager != null) {
+            sourceBucketManager.load();
         }
         if (factionUpgradeManager != null) {
             factionUpgradeManager.reloadConfig();

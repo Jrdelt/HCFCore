@@ -1,0 +1,105 @@
+# Source Buckets -- see docs/source-buckets.md.
+#
+# Reusable, infinite-use custom buckets that place water or lava following
+# a configured flow pattern. Usable by everyone -- no faction permission,
+# no player permission node, no cooldown -- but only inside a valid faction
+# claim: never Wilderness, never SafeZone/WarZone (see disabled-claim-names
+# below). A variant with base-claim-only: true additionally works only
+# inside a Base Claim, never a Raid Claim.
+#
+# Each variant is bought once from /shop (shop-price) and then stays in the
+# owner's inventory forever, unlocking infinite use -- it is never
+# consumed. Every successful placement then charges the fixed per-use-fee,
+# but ONLY after the placement actually happens; a failed placement or
+# insufficient balance places nothing and charges nothing. Water and Lava
+# are configured entirely independently below.
+#
+# flow-pattern is one of:
+#   single-source -- places exactly one source block at the placement point.
+#   downward      -- places a source on the placement point and on each
+#                     valid block straight down from it, up to max-depth
+#                     blocks deep, stopping early at any obstruction or
+#                     claim boundary (see the class doc on
+#                     SourceBucketManager.computeFlowPositions for the
+#                     exact stopping rules).
+# max-depth is only read for flow-pattern: downward.
+
+water:
+  source:
+    enabled: true
+    flow-pattern: single-source
+    base-claim-only: false
+    combat-allowed: false
+    shop-price: 2500
+    per-use-fee: 5
+    material: WATER_BUCKET
+    glow: false
+    name: "<aqua>Water Source Bucket"
+    lore:
+      - "<gray>Right-click a block to place a"
+      - "<gray>single water source. Reusable --"
+      - "<gray>never consumed. Works in any valid"
+      - "<gray>faction claim."
+  downward:
+    enabled: true
+    flow-pattern: downward
+    max-depth: 8
+    base-claim-only: true
+    combat-allowed: false
+    shop-price: 8000
+    per-use-fee: 15
+    material: WATER_BUCKET
+    # custom-model-data: 2001
+    glow: true
+    name: "<aqua>Waterfall Bucket"
+    lore:
+      - "<gray>Right-click a block to drop a"
+      - "<gray>column of water sources straight"
+      - "<gray>down, up to 8 blocks deep."
+      - "<gray>Base Claims only. Reusable."
+
+lava:
+  source:
+    enabled: true
+    flow-pattern: single-source
+    base-claim-only: false
+    combat-allowed: false
+    shop-price: 3000
+    per-use-fee: 5
+    material: LAVA_BUCKET
+    glow: false
+    name: "<gold>Lava Source Bucket"
+    lore:
+      - "<gray>Right-click a block to place a"
+      - "<gray>single lava source. Reusable --"
+      - "<gray>never consumed. Works in any valid"
+      - "<gray>faction claim."
+  downward:
+    enabled: true
+    flow-pattern: downward
+    max-depth: 5
+    base-claim-only: true
+    combat-allowed: false
+    shop-price: 9000
+    per-use-fee: 20
+    material: LAVA_BUCKET
+    # custom-model-data: 2002
+    glow: true
+    name: "<gold>Lava Cascade Bucket"
+    lore:
+      - "<gray>Right-click a block to drop a"
+      - "<gray>column of lava sources straight"
+      - "<gray>down, up to 5 blocks deep."
+      - "<gray>Base Claims only. Reusable."
+
+# Faction claim names Source Buckets are always blocked in -- matches
+# whatever you named your system factions via /f safezone and /f warzone.
+# Independent from abilities.disabled-claim-names (config.yml) and from
+# chunkbuster.yml's own list, for the same reason chunkbuster.yml gives
+# itself one instead of reusing abilities.disabled-claim-names: this
+# feature needs both blocked by default with no admin bypass, so it gets
+# its own independently configurable list rather than silently depending
+# on another feature's.
+disabled-claim-names:
+  - safezone
+  - warzone

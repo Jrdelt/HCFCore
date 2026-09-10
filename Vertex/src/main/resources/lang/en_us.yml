@@ -309,6 +309,21 @@ chunkbuster:
   permission-invalid-value: "<red>Usage: /chunkbuster permission <role> <allow|deny>"
   permission-updated: "<green>✔ Chunk Busters are now {state} for the {role} role."
 
+sourcebucket:
+  need-block-target: "<red>You need to right-click a block with a Source Bucket."
+  type-disabled: "<red>That Source Bucket variant is currently disabled."
+  combat-blocked: "<red>You can't use a Source Bucket while in combat."
+  wrong-zone: "<red>Source Buckets can't be used here."
+  no-economy: "<red>No economy plugin is available to charge for that."
+  insufficient-funds: "<red>You can't afford that Source Bucket use (<white>{amount}<red>)."
+  failed-placement: "<red>That placement failed -- something is in the way."
+  used: "<green>✔ Placed. Charged <white>{amount}<green>."
+  shop-title: "<aqua>ꜱᴏᴜʀᴄᴇ ʙᴜᴄᴋᴇᴛꜱ"
+  shop-price: "<yellow>Price: <white>{amount}"
+  shop-hint: "<gray>Click to purchase"
+  purchased: "<green>✔ Purchased a Source Bucket <green>for <white>{amount}<green>."
+  cannot-afford: "<red>You can't afford that Source Bucket (<white>{amount}<red>)."
+
 pvptop:
   header: "<red><bold>ᴘᴠᴘ ᴛᴏᴘ"
   empty: "<gray>No faction has earned PvP objective points yet."
@@ -793,6 +808,7 @@ shop:
   category-title: "<yellow>{category}"
   spawners-category-title: "<yellow>Spawners"
   chunkbusters-category-title: "<red>Chunk Busters"
+  sourcebuckets-category-title: "<aqua>Source Buckets"
   category-open-lore: "<green>✔ Click to Open ✔"
   back-button: "<red>← Back to Categories"
   balance-title: "<gold><bold>ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ"

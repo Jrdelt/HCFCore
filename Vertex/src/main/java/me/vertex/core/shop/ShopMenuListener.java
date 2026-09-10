@@ -1,5 +1,7 @@
 package me.vertex.core.shop;
 
+import me.vertex.core.bucket.SourceBucketManager;
+import me.vertex.core.bucket.SourceBucketShopMenu;
 import me.vertex.core.chunkbuster.ChunkBusterManager;
 import me.vertex.core.chunkbuster.ChunkBusterShopMenu;
 import me.vertex.core.economy.EconomyHook;
@@ -19,13 +21,15 @@ public final class ShopMenuListener implements Listener {
     private final ShopManager manager;
     private final SpawnerManager spawnerManager;
     private final ChunkBusterManager chunkBusterManager;
+    private final SourceBucketManager sourceBucketManager;
     private final Messages messages;
 
     public ShopMenuListener(ShopManager manager, SpawnerManager spawnerManager, ChunkBusterManager chunkBusterManager,
-            Messages messages) {
+            SourceBucketManager sourceBucketManager, Messages messages) {
         this.manager = manager;
         this.spawnerManager = spawnerManager;
         this.chunkBusterManager = chunkBusterManager;
+        this.sourceBucketManager = sourceBucketManager;
         this.messages = messages;
     }
 
@@ -56,6 +60,8 @@ public final class ShopMenuListener implements Listener {
                 SpawnerShopMenu.open(player, spawnerManager, messages);
             } else if (ShopMenu.CHUNK_BUSTERS_CATEGORY_ID.equals(categoryId)) {
                 ChunkBusterShopMenu.open(player, chunkBusterManager, messages);
+            } else if (ShopMenu.SOURCE_BUCKETS_CATEGORY_ID.equals(categoryId)) {
+                SourceBucketShopMenu.open(player, sourceBucketManager, messages);
             } else if (categoryId != null) {
                 ShopMenu.openCategory(player, manager, spawnerManager, messages, categoryId, 0);
             }
@@ -75,6 +81,11 @@ public final class ShopMenuListener implements Listener {
         }
         if (ShopMenu.CHUNK_BUSTERS_CATEGORY_ID.equals(holder.categoryIdAtSlot(slot))) {
             ChunkBusterShopMenu.open(player, chunkBusterManager, messages);
+            return;
+        }
+        // The buyable-Source-Bucket button similarly sits in Miscellaneous's control row.
+        if (ShopMenu.SOURCE_BUCKETS_CATEGORY_ID.equals(holder.categoryIdAtSlot(slot))) {
+            SourceBucketShopMenu.open(player, sourceBucketManager, messages);
             return;
         }
         if (slot == ShopMenu.SLOT_PREV_PAGE) {

@@ -174,6 +174,11 @@ Chunk Busters" button opening a small catalog of the 4 Chunk Buster types
 (priced from `chunkbuster.yml`, same reasoning as Spawners above). See
 [Chunk Busters](chunk-busters.md#acquisition).
 
+The **Miscellaneous** category's control row similarly has a "Buy Source
+Buckets" button opening a small catalog of every enabled Source Bucket
+variant (priced from `sourcebuckets.yml`, same reasoning as Spawners
+above). See [Source Buckets](source-buckets.md#acquisition).
+
 ## Auction House
 
 | Command | Permission | Notes |
@@ -215,6 +220,18 @@ mechanics.
 |---|---|---|
 | Right-click a block with a Chunk Buster | *(none — gated by zone/combat/role checks in-code)* | Opens the confirmation GUI. |
 | `/chunkbuster permission <role> <allow\|deny>` | `vertex.chunkbuster.permission` | Faction Leader/Co-Leader only; edits only the caller's own faction's role permissions. |
+
+## Source Buckets
+
+Source Buckets have no dedicated command either — right-clicking with one
+places water/lava immediately, with no confirmation step, purchased from
+`/shop`'s Miscellaneous category. See [Source Buckets](source-buckets.md)
+for the flow patterns, the claim-boundary rule, and the charge-after-
+success economics.
+
+| Command | Permission | Notes |
+|---|---|---|
+| Right-click a block with a Source Bucket | *(none — usable by everyone; gated by zone/combat/economy checks in-code)* | Places water/lava following the item's configured flow pattern. |
 
 ## KOTH & Outposts
 
