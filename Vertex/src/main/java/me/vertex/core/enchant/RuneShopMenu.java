@@ -3,9 +3,7 @@ package me.vertex.core.enchant;
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -18,18 +16,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Opened from the "Buy Runes" control-row button in {@code /shop} -- a
- * catalog of the four Rune tiers, priced per {@code runes.yml} (not {@code
- * shop.yml}), same precedent as {@code ChunkBusterShopMenu}/{@code
- * SourceBucketShopMenu} being priced from their own feature config rather
- * than becoming literal {@code ShopEntry} rows: a Rune is a custom item
- * with a tier, not a plain vanilla material, so it cannot fit the
- * dynamic-pricing block-market model {@code ShopEntry} assumes.
+ * The dedicated Rune catalog opened by {@code /runes}, {@code /ce},
+ * {@code /customenchants}, or {@code /enchant}. Runes are intentionally not
+ * mixed into the ordinary material shop because they open enchant gameplay.
  */
 public final class RuneShopMenu {
 
-    /** Reserved slot for the "back to shop" button -- tier icons start at 1. */
-    public static final int SLOT_BACK = 0;
+    private static final List<Integer> TIER_SLOTS = List.of(11, 12, 14, 15);
 
     private RuneShopMenu() {
     }
@@ -39,26 +32,13 @@ public final class RuneShopMenu {
         Inventory inventory = Bukkit.createInventory(holder, 27, messages.get(player, "rune.shop-title"));
         holder.inventory = inventory;
 
-        inventory.setItem(SLOT_BACK, backButton(player, messages));
-
-        int slot = SLOT_BACK + 1;
-        for (RuneTier tier : RuneTier.values()) {
-            if (slot >= inventory.getSize()) {
-                break;
-            }
+        for (int index = 0; index < RuneTier.values().length && index < TIER_SLOTS.size(); index++) {
+            RuneTier tier = RuneTier.values()[index];
+            int slot = TIER_SLOTS.get(index);
             holder.slotToTier.put(slot, tier);
             inventory.setItem(slot, buildIcon(player, messages, manager, tier));
-            slot++;
         }
         player.openInventory(inventory);
-    }
-
-    private static ItemStack backButton(Player player, Messages messages) {
-        ItemStack item = new ItemStack(Material.ARROW);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(messages.get(player, "shop.back-button").decoration(TextDecoration.ITALIC, false));
-        item.setItemMeta(meta);
-        return item;
     }
 
     private static ItemStack buildIcon(Player player, Messages messages, EnchantManager manager, RuneTier tier) {

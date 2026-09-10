@@ -376,6 +376,58 @@ public final class CoinflipStorage {
         }
     }
 
+    /**
+     * Deletes a winner's claim rows before returning them for payout.
+     *
+     * <p>The deleted rows, rather than a GUI snapshot, authorise delivery.
+     * This is deliberately the same model as Auction House collection claims:
+     * a retry that arrives after the first transaction commits receives no
+     * rows and therefore has nothing to duplicate.
+     */
+    public List<CoinflipClaim> takeClaims(UUID winnerUuid) throws SQLException {
+        try (Connection connection = database.getConnection()) {
+            boolean previousAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                List<CoinflipClaim> candidates = loadClaims(connection, winnerUuid);
+                List<CoinflipClaim> taken = new ArrayList<>(candidates.size());
+                try (PreparedStatement delete = connection.prepareStatement(
+                        "DELETE FROM coinflip_claims WHERE id = ? AND winner_uuid = ?")) {
+                    for (CoinflipClaim candidate : candidates) {
+                        delete.setInt(1, candidate.id());
+                        delete.setString(2, winnerUuid.toString());
+                        if (delete.executeUpdate() == 1) {
+                            taken.add(candidate);
+                        }
+                    }
+                }
+                connection.commit();
+                return taken;
+            } catch (SQLException error) {
+                connection.rollback();
+                throw error;
+            } finally {
+                connection.setAutoCommit(previousAutoCommit);
+            }
+        }
+    }
+
+    private static List<CoinflipClaim> loadClaims(Connection connection, UUID winnerUuid) throws SQLException {
+        List<CoinflipClaim> claims = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT id, winner_uuid, items, won_at FROM coinflip_claims WHERE winner_uuid = ?")) {
+            statement.setString(1, winnerUuid.toString());
+            try (ResultSet results = statement.executeQuery()) {
+                while (results.next()) {
+                    claims.add(new CoinflipClaim(results.getInt("id"), winnerUuid,
+                            ItemStack.deserializeItemsFromBytes(results.getBytes("items")),
+                            results.getLong("won_at")));
+                }
+            }
+        }
+        return claims;
+    }
+
     /** Deletes only the rendered claim rows, never claims created after a GUI opened. */
     public void deleteClaimsById(List<Integer> ids) throws SQLException {
         if (ids.isEmpty()) {

@@ -88,7 +88,22 @@ public final class TradeManager {
     public boolean isAccepting(UUID uuid) { return accepting.getOrDefault(uuid, true); }
 
     public boolean toggle(Player player) { boolean value = !accepting.getOrDefault(player.getUniqueId(), true); accepting.put(player.getUniqueId(), value); track(CompletableFuture.runAsync(() -> { try { storage.saveAccepting(player.getUniqueId(), value); } catch (Exception e) { plugin.getLogger().log(Level.WARNING, "Could not save trade preference", e); } })); return value; }
-    public void loadPlayer(Player player) { track(CompletableFuture.runAsync(() -> { try { accepting.put(player.getUniqueId(), storage.loadAccepting(player.getUniqueId())); applyClaims(player); int levels = storage.takePendingExperience(player.getUniqueId()); double money = storage.takePendingMoney(player.getUniqueId()); if (levels > 0 || money > 0) Bukkit.getScheduler().runTask(plugin, () -> { if (!player.isOnline()) return; if (levels > 0) player.setLevel(player.getLevel() + levels); if (money > 0 && EconomyHook.isAvailable()) EconomyHook.getEconomy().depositPlayer(player, money); }); } catch (Exception e) { plugin.getLogger().log(Level.WARNING, "Could not load trade preferences", e); } })); }
+    public void loadPlayer(Player player) {
+        UUID playerId = player.getUniqueId();
+        track(CompletableFuture.runAsync(() -> {
+            try {
+                accepting.put(playerId, storage.loadAccepting(playerId));
+                applyClaims(playerId);
+                int levels = storage.takePendingExperience(playerId);
+                double money = storage.takePendingMoney(playerId);
+                if (levels > 0 || money > 0) {
+                    Bukkit.getScheduler().runTask(plugin, () -> applyLegacyCredits(playerId, levels, money));
+                }
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "Could not load trade preferences", e);
+            }
+        }));
+    }
     public boolean allowed(Player player) { if (player.hasPermission("vertex.trade.staff.bypassblacklist")) return true; return !worlds.contains(player.getWorld().getName().toLowerCase(Locale.ROOT)) && !gameModes.contains(player.getGameMode()); }
     public boolean canTradeItem(Player player, ItemStack item) { return player.hasPermission("vertex.trade.staff.bypassblacklist") || item == null || !blockedItems.contains(item.getType()); }
     private boolean near(Player a, Player b) { return a.hasPermission("vertex.trade.staff.bypassdistance") || a.getWorld().equals(b.getWorld()) && a.getLocation().distanceSquared(b.getLocation()) <= maxDistance * maxDistance; }
@@ -155,14 +170,78 @@ public final class TradeManager {
             for (TradeEscrow escrow : escrows) {
                 track(CompletableFuture.runAsync(() -> {
                     try { storage.recoverEscrow(escrow);
-                        Player owner = Bukkit.getPlayer(escrow.owner());
-                        if (owner != null) Bukkit.getScheduler().runTask(plugin, () -> loadPlayer(owner));
+                        // JDBC recovery is allowed off-thread; Bukkit player
+                        // lookup is not. Schedule the lookup itself rather
+                        // than merely scheduling a later use of its result.
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            Player owner = Bukkit.getPlayer(escrow.owner());
+                            if (owner != null) loadPlayer(owner);
+                        });
                     } catch (Exception e) { plugin.getLogger().log(Level.SEVERE, "Failed to restore trade escrow " + escrow.sessionId(), e); }
                 }));
             }
         })).exceptionally(error -> { plugin.getLogger().log(Level.SEVERE, "Failed to load trade escrow", error); return null; }));
     }
-    private void applyClaims(Player player) { try { List<ItemStack> claims = storage.loadClaims(player.getUniqueId()); if (claims.isEmpty()) return; Bukkit.getScheduler().runTask(plugin, () -> { for (ItemStack item : claims) give(player, new ItemStack[]{item}); track(CompletableFuture.runAsync(() -> { try { storage.deleteClaims(player.getUniqueId()); } catch (Exception ignored) { } })); }); } catch (Exception e) { plugin.getLogger().log(Level.WARNING, "Failed to load trade item claims", e); } }
+    /** Deletes first, then delivers only the claims this invocation owns. */
+    private void applyClaims(UUID playerId) {
+        try {
+            List<ItemStack> claims = storage.takeClaims(playerId);
+            if (claims.isEmpty()) {
+                return;
+            }
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                Player player = Bukkit.getPlayer(playerId);
+                if (player == null || !player.isOnline()) {
+                    restoreClaims(playerId, claims);
+                    return;
+                }
+                for (ItemStack item : claims) {
+                    give(player, new ItemStack[]{item});
+                }
+            });
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Failed to claim returned trade items", e);
+        }
+    }
+
+    /** A player may quit between the asynchronous claim reservation and its main-thread delivery. */
+    private void restoreClaims(UUID playerId, List<ItemStack> claims) {
+        track(CompletableFuture.runAsync(() -> {
+            try {
+                for (ItemStack item : claims) {
+                    if (item != null && !item.isEmpty()) {
+                        storage.insertClaim(playerId, item);
+                    }
+                }
+            } catch (Exception error) {
+                plugin.getLogger().log(Level.SEVERE, "Failed to restore undelivered trade claims for " + playerId, error);
+            }
+        }));
+    }
+
+    /** Legacy money/XP escrow is re-queued if a player leaves before delivery. */
+    private void applyLegacyCredits(UUID playerId, int levels, double money) {
+        Player player = Bukkit.getPlayer(playerId);
+        if (player == null || !player.isOnline()) {
+            track(CompletableFuture.runAsync(() -> {
+                try {
+                    storage.addPendingExperience(playerId, levels);
+                    if (money > 0) {
+                        storage.addPendingMoney(playerId, money);
+                    }
+                } catch (Exception error) {
+                    plugin.getLogger().log(Level.SEVERE, "Failed to restore pending legacy trade credits for " + playerId, error);
+                }
+            }));
+            return;
+        }
+        if (levels > 0) {
+            player.setLevel(player.getLevel() + levels);
+        }
+        if (money > 0 && EconomyHook.isAvailable()) {
+            EconomyHook.getEconomy().depositPlayer(player, money);
+        }
+    }
     private static boolean canFit(Player player, ItemStack[] items) { ItemStack[] contents = player.getInventory().getStorageContents().clone(); for (ItemStack need : items) { if (need == null || need.isEmpty()) continue; int remaining = need.getAmount(); for (int i=0;i<contents.length && remaining>0;i++) { ItemStack have=contents[i]; if (have != null && have.isSimilar(need)) { int room=have.getMaxStackSize()-have.getAmount(); if(room>0){int move=Math.min(room,remaining);have=have.clone();have.setAmount(have.getAmount()+move);contents[i]=have;remaining-=move;}} } for(int i=0;i<contents.length&&remaining>0;i++) if(contents[i]==null||contents[i].isEmpty()){int move=Math.min(need.getMaxStackSize(),remaining);ItemStack placed=need.clone();placed.setAmount(move);contents[i]=placed;remaining-=move;} if(remaining>0)return false; } return true; }
     private void give(Player player, ItemStack[] items) { for (ItemStack item : items) if (item != null && !item.isEmpty()) player.getInventory().addItem(item.clone()).values().forEach(left -> player.getWorld().dropItemNaturally(player.getLocation(), left)); }
     private void track(CompletableFuture<?> future) { pendingWrites.add(future); future.whenComplete((v,e)->pendingWrites.remove(future)); }

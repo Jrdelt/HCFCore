@@ -3,6 +3,7 @@ package me.vertex.core.mine;
 import me.vertex.core.booster.BoosterCategory;
 import me.vertex.core.booster.BoosterService;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.backpack.BackpackAutoStoreListener;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -32,11 +33,14 @@ public final class MineListener implements Listener {
     private final MineManager mines;
     private final BoosterService boosters;
     private final Messages messages;
+    private final BackpackAutoStoreListener backpackDrops;
 
-    public MineListener(MineManager mines, BoosterService boosters, Messages messages) {
+    public MineListener(MineManager mines, BoosterService boosters, Messages messages,
+            BackpackAutoStoreListener backpackDrops) {
         this.mines = mines;
         this.boosters = boosters;
         this.messages = messages;
+        this.backpackDrops = backpackDrops;
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -82,7 +86,10 @@ public final class MineListener implements Listener {
         MineOreTable.Entry entry = region.oreEntry(block.getType());
         int amount = applyOreBooster(player, entry.dropAmount());
         if (amount > 0) {
-            giveOrDrop(player, new ItemStack(entry.dropMaterial(), amount));
+            java.util.List<ItemStack> drops = java.util.List.of(new ItemStack(entry.dropMaterial(), amount));
+            for (ItemStack leftover : backpackDrops == null ? drops : backpackDrops.routePlayerMiningDrops(player, drops)) {
+                giveOrDrop(player, leftover);
+            }
         }
         mines.scheduleRegen(region, block);
     }

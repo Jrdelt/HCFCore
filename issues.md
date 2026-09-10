@@ -1,219 +1,162 @@
-# Vertex Addons — working punch list
+# Vertex audit — 2026-09-10
 
-Status legend: **[done]** shipped in the working tree · **[open]** not started ·
-**[partial]** some of it landed, remainder noted.
+Scope: 353 production Java files, 70 test Java files, bundled configuration/language files, and repository documentation. mvn test passed during this audit. Its database-failure logs are intentional test paths, not test failures. This is a source audit; FactionsUUID, Vault, Paper, and each database backend still need staging-server smoke tests.
 
----
+## Release blockers
 
-## Milestone 1 — foundations + known bugs
+### VTX-01 — Auction settlement has no durable delivery state
 
-### [done] Shared short-number parsing/formatting
-`Numbers` / `NumberSettings` / `number-formatting.yml`. BigDecimal end to end so
-money never picks up float drift; k/m/b/t; validated comma grouping; rejects
-`1..5m`, `10kk`, `m10`, `1e9`, `Infinity`, and signed input; overflow ceiling;
-configurable symbol/rounding/precision. `AmountParser` now delegates here so
-there is exactly one grammar. Still to do: route the remaining call sites
-(coinflip wagers, auction prices, shop totals) through it.
+Evidence: AuctionManager.buy charges the buyer, then settle calls AuctionStorage.settleListing. That SQL transaction removes the listing and writes history before the buyer receives the item and before the seller's external money payout is confirmed. Overflow is dropped into the world (AuctionManager lines 314 and 498).
 
-### [done] Lang files can receive fixes at all
-`saveResource(.., false)` never overwrites an existing lang file and an on-disk
-key always beats the bundled fallback, so a corrected default could never reach
-a live server — every future message fix would have silently done nothing.
-Added `lang-version` plus an auto-refresh that backs the admin's file up to
-`lang/backup/` before replacing it.
+Failure path: A crash, failed Vault deposit, or despawned overflow drop can leave a permanently sold listing while the buyer, seller, or both never receive their entitlement. A retry cannot safely decide whether it already paid.
 
-### [done] Sand Bots filled outside the claim
-The anchor scan walked its whole square radius filtering only on block type,
-with no claim check, so a trigger block just past the border was filled at the
-faction's expense. Now claim-gated with a per-chunk cache (claims are
-chunk-granular, so one lookup covers every anchor in that chunk).
+Required fix: In the same SQL transaction as the listing change, create idempotent buyer-item, seller-payout, and refund delivery records. Deliver only from that outbox/claim data, mark each record complete after success, retry at startup, and never make a world drop the only delivery copy. Check every Vault EconomyResponse for success.
 
-### [done] Faction TNT bank
-Root cause: TNT was the only resource Vertex did not own. Money and EXP persist
-through `FactionBankManager`; TNT wrote to FactionsUUID's `tntBank(int)`, which
-is a bare field write with no dirty-marking or save hook, and whose ceiling
-comes from *their* `commands.tnt.max-storage`. Deposits could not reliably
-survive a restart and no Vertex upgrade could raise the cap.
+Acceptance: Forced restart/failure at every settlement step creates no duplicate and loses no item, money, EXP, or GC.
 
-Vertex now owns the TNT balance in `faction_banks.tnt`, with a guarded one-time
-migration that moves any native balance across and clears the native field so
-the two can never both claim the same TNT. `/tntfill` moved onto the same bank
-and now debits before filling, refunding whatever the dispensers cannot take.
-Deposit also no longer removes items before the capacity check — the old order
-could throw on `int` overflow *after* the TNT was gone.
+### VTX-02 — Coinflip resolution can outlive its payout
 
-### [done] TNT bank capacity upgrade
-New `tnt-bank` faction upgrade. Its per-level `bonus` is an absolute capacity
-rather than a percentage, so levels are read straight from config with no
-multiplier. Base 1,000,000 (`faction-upgrades.tnt-base-capacity`), levels
-2M → 10M.
+Evidence: CoinflipManager.persistResolution calls CoinflipStorage.resolveCoinflip before winning currency/item claims are delivered. Similar ordering exists in cancellation/refund paths.
 
-### [done, uncommitted] Already fixed but not yet committed
-These are fixed in the working tree; a running server on the last commit still
-shows the old behaviour until this is built and deployed:
-- Coinflip animation clamped to 5–10s, result deferred until it finishes, and
-  disconnect results persisted (`CoinflipResultNotification`).
-- `BACKPACKS > Filtered: <gray>none` — the raw tag came from `filter-none`
-  being `"<gray>none"`; placeholder values are tag-escaped by design.
-- Auction House sort: per-mode default direction (price high→low, date
-  oldest→newest) and an in-place refresh on change.
-- Shop `spawners_and_mob_drops` category and creeper spawners.
-- Chunk Collector item lore (level/stored/capacity, no owner or faction).
-- KOTH focus + live direction arrow rework.
+Failure path: Once the predetermined winner is committed, a crash or failed external payout can remove the open wager without a durable retryable record of exactly what the winner/refund recipient is still owed.
 
-### [open] Remaining known bugs
-- **Staff kick/ban combat check** — no guard exists. Vertex owns neither
-  `/kick` nor `/ban`, so this needs a `PlayerCommandPreprocessEvent` intercept
-  on configurable aliases, same pattern as the leader-leave block.
-- **Invsee stale-item anti-dupe** — staff GUI must revalidate the target's real
-  inventory before applying an edit.
-- **`/f map` size** — not Vertex code. This is FactionsUUID's own command and
-  its own config; either change it there or intercept and re-render.
-- **Auction House tie-break** — equal price should fall back to oldest first,
-  then listing id.
+Required fix: Use OPEN -> RESOLVED -> DELIVERED transaction states. Persist immutable winner/refund entitlements in the same transaction that locks or resolves the flip. Deliver through idempotency keys and recover incomplete deliveries on startup.
 
----
+Acceptance: Restarting during creation, acceptance, cancellation, animation, and payout produces exactly one final outcome and payout/refund.
 
-## Open questions blocking later milestones
+### VTX-03 — GC write-behind is unsafe as auction/coinflip escrow
 
-- **Mining worlds** — need the actual world names, and whether regions are
-  WorldGuard or cuboid coordinates.
-- **Warzone** — undefined today. `FactionsHook` only distinguishes wilderness
-  from claimed; the Artifact Event is built entirely on "inside Warzone".
-  FactionsUUID exposes `Factions.factions().warZone()`, which is the likely
-  answer, but it needs confirming.
-- **`/f top` composition** — assumed spawners only. FactionsUUID owns `/f top`,
-  so Vertex either registers its own or intercepts and re-renders.
-- **Spawner F Top value** — assumed a new per-type `ftop-value` in
-  `spawners.yml`, independent of shop sell price.
+Evidence: GcManager.tryDebit changes memory and queues a database delta. Auction and coinflip accept this result as completed payment immediately (AuctionManager line 281; CoinflipManager line 591).
 
----
+Failure path: If the queued GC write fails after another system grants an item/payout, compensation can restore GC while the other effect remains. A process crash before the write has the same unpaid-value risk.
 
-## Decisions taken
+Required fix: Create a durable GC reservation/ledger row before any dependent external transaction, then finalize or release it with an idempotency key. Recover in-progress reservations on startup; do not use cache-only debit as cross-system escrow.
 
-- **Dynamic pricing** will be replaced with the spec's engine (activation
-  volume, separate buy/sell volume, price weight, smoothing). The current
-  engine is `base × (1 + changePerUnit)^netVolume` with a dead zone and tracks
-  only *net* volume, so it cannot express the spec's model. Live price state
-  resets on switchover.
-- **GUI standard** (config-driven layout + small caps) applies to new GUIs
-  only; the ~30 existing GUIs are left alone.
-- **Locales** — new work adds keys to `en_us.yml` only. The existing de/es/pt
-  files keep working via the bundled fallback.
-- **Vertex Filter** — `/filter` is a *discard* list, so reusing it to mean
-  "protected from Sell Wands" would protect exactly the items a player marked
-  as junk. Sell Wands will use a separate sell-protection list.
-- **Fortune in mining worlds** — disabled, per the spec's "Finalized Tuning
-  Defaults" section, which explicitly overrides the earlier Netherite text.
+Acceptance: Database failure/restart at each debit/finalize point cannot create, delete, or pay value twice.
 
----
+### VTX-04 — Trade escrow is not durable at handoff
 
-## Known flakiness
+Evidence: TradeManager accepts items into memory and only then queues TradeStorage.replaceEscrow. Complete/cancel calls give(...) before final state persistence. give drops inventory overflow into the world.
 
-`KitManager.persistAsync` intermittently surfaces an async error during test
-teardown (seen once in ~6 full runs, passes on re-run). Pre-existing, unrelated
-to current work, but worth chasing before it masks a real failure.
+Failure path: Restart after inventory removal but before escrow persistence loses items. Restart after delivery but before escrow clear restores old escrow and duplicates items. Drops can also despawn.
 
----
+Required fix: Persist each accepted escrow revision before treating it as accepted. Complete/cancel by converting escrow to durable recipient claims in one SQL transaction, then deliver each claim idempotently. Block completion until the latest revision is durable.
 
-## Deep scan findings — 2026-09-08
+Acceptance: Repeated forced restarts during offer edits, complete, cancel, and full-inventory delivery preserve each offered item exactly once.
 
-Source review and a fresh `./mvnw test -q` passed, but the passing suite does
-not cover several high-risk persistence and packet-race paths below.
+### VTX-05 — Claim collection has a delete-before-delivery loss window
 
-### In-game / player-visible issues
+Evidence: Auction, coinflip, and trade claim flows consume/delete the durable claim before directly adding its items to an inventory. This blocks an easy replay but has no recovery after a hard stop between operations.
 
-- **[FIXED] Fresh Auction House and Coinflip entries can be acted on before
-  they have a database ID.** Both managers put a negative-ID placeholder in
-  their live map while an async insert is in flight, and both browsers render
-  those placeholders as normal clickable entries. A buyer/opponent can settle
-  it before the insert completes; the later callback then inserts the real,
-  still-open entry, allowing the same auction item or coinflip wager to be
-  settled again. Do not render/click a listing until it is durable, or mark
-  placeholders explicitly non-actionable.
+Failure path: A process termination in that gap permanently loses the serialized item because its only durable copy is gone.
 
-- **[FIXED] Auction collection-box claiming has no transaction lock or row
-  identity.** The GUI hands out its cached item snapshot first and then starts
-  an async `DELETE` of *all* claims for the player. Replayed/double-clicked
-  inventory packets can grant the same snapshot more than once before that
-  deletion completes. A claim created after the GUI snapshot can also be
-  deleted without ever being shown. Mirror Coinflip's row-ID claim approach,
-  but make the database claim/reservation authoritative before giving items.
+Required fix: Use claim states such as PENDING, DELIVERING, and DELIVERED; retain the serialized item until acknowledged delivery. Attach a stable transaction ID and retry pending delivery after restart. Validate space first or leave the item in the claim GUI.
 
-- **[FIXED] TNT Wands do not remain locked through their bank transaction.**
-  Gunpowder is removed and the collector/chest is committed before the async
-  TNT-bank deposit returns; the container lock is released immediately and
-  the wand use is consumed even if that deposit later fails. A concurrent
-  bank change can therefore consume the use and partially process the
-  container despite the advertised all-or-nothing/full-bank behavior. Reserve
-  capacity and retain the lock until one commit/rollback path finishes.
+Acceptance: Crashing after every database/inventory step leaves an item either collectable or exactly once in its recipient inventory.
 
-- **[FIXED] Shop and Sell-Wand sales can delete items without paying the
-  player.** `ShopManager.sell` and `WandListener.runSell` remove/commit items
-  and ignore Vault's `depositPlayer` response. A failed economy deposit leaves
-  the sold items gone and the market volume changed with no compensation.
-  Check the response and implement a recoverable rollback/claim path.
+### VTX-06 — Zone player state writes race and can stall the server thread
 
-- **[FIXED] Spawner-stack withdrawal drops spawners on the ground when the
-  player's inventory is full.** The management GUI gives/drops each physical
-  spawner before it decrements the stack. This violates the finalized
-  no-drop-on-full rule and risks loss or theft; preflight inventory capacity,
-  then atomically decrement and give the exact items.
+Evidence: ZoneManager.state(UUID, String) calls ZoneStorage.loadPlayer synchronously inside computeIfAbsent from gameplay paths. Its persist method starts unrelated runTaskAsynchronously writes with no per-player ordering, tracking, shutdown drain, or migration drain.
 
-- **[gap] Chunk Collector rank controls are incomplete.** The current faction
-  permission action list only has `collector-open` and `collector-break`.
-  Selling, upgrading, and filter modification cannot be independently
-  controlled as required, so a rank allowed to open a collector may gain more
-  authority than intended.
+Failure path: First zone interaction can block a server tick on SQL. Two quick updates can finish out of order and restore an older cooldown/session/score. A clean shutdown can close the database with queued state still absent.
 
-### Backend / integrity issues
+Required fix: Preload zone player state asynchronously on join, serve all events from a main-thread cache, serialize writes per player/record, and expose awaitWrites() for shutdown/migration. Version snapshots so stale writes cannot overwrite newer state.
 
-- **[FIXED] Auction settlement is only durable after money and item state
-  has already changed.** Buying, cancellation, and expiry remove the live
-  listing and move money/items first; `deleteListing`, audit logging, and
-  offline claims happen later in independent async writes. A database failure
-  or crash in that window can resurrect a sold/cancelled listing after restart
-  while the item has already been delivered, or lose an offline return. Use a
-  single durable settlement record/transaction before exposing the result.
+Acceptance: Delayed/out-of-order SQL tests and immediate shutdown after a zone action retain the newest state without main-thread database I/O.
 
-- **[FIXED] Coinflip money/item settlement has the same crash window.**
-  The opponent is charged and the winner is paid or queued before
-  `resolveCoinflip` completes. If persistence fails, the in-memory listing is
-  gone while the original database listing can remain; after restart it is
-  playable again. Item payout claims are also queued in a separate async
-  write, outside the resolution transaction. Persist a predetermined outcome,
-  both escrow movements, and payout state atomically before delivering money
-  or items.
+### VTX-07 — Portal edits are fire-and-forget
 
-- **[FIXED] Dynamic-shop state writes can land out of order.** Every price
-  change starts an independent async save with no per-material write chain.
-  Under rapid buys/sells or a decay tick, an older write may finish last and
-  overwrite the newest `net_volume` in storage; the live price looks correct
-  until the next restart, when it reverts. Serialize or version writes per
-  material.
+Evidence: PortalManager.persist uses untracked asynchronous work. PortalManager.shutdown and VertexPlugin.awaitStorageWritesForMigration() do not wait for portal writes.
 
-- **[FIXED] The native TNT-bank migration can permanently lose TNT.** It clears
-  FactionsUUID's native balance before the asynchronous Vertex deposit is
-  confirmed, then writes the migration marker even when a deposit returned
-  `false` rather than throwing. A crash or database failure can therefore
-  leave both stores empty and prevent a retry. Persist/verify the Vertex copy
-  first, clear the native value only after success, and mark completion only
-  after every faction is reconciled.
+Failure path: Create, replace, or delete followed immediately by reload, migration, or restart can restore an old portal/route set even after staff see a success message.
 
-- **[gap] No persistent unique-item ID or dupe-investigation system exists.**
-  There is no tracked-item schema, duplicate-ID detector, unresolved-case
-  queue, staff-only inspection command, or persistent offline staff alert.
-  This leaves the required rollback/desync investigation workflow unavailable.
+Required fix: Queue portal and route mutations by ID, track futures, report the actual persistence error, and drain all writes before database close/migration. Only update the live cache after durable success, or compensate on failure.
 
-- **[gap] The spawner data model cannot implement individual aging safely.**
-  A stack currently persists only mob type, one aggregate stack size, and a
-  faction tag. It has no per-spawner timestamps, value progress, stack-member
-  ordering, or F Top association, so youngest-first removal and per-spawner
-  aged value cannot be added as a small GUI change; the persistent schema and
-  migration need design first.
+Acceptance: Immediate restart/reload after every portal mutation reopens the exact saved definitions.
 
-- **[test gap] There are no failure/restart/race tests for the paths above.**
-  Current Auction/Coinflip/Wand tests cover normal flows and pricing, but not
-  negative-ID placeholders, repeated claim packets, failed external deposits,
-  database-write failure, or restart between escrow/payout steps. Add these
-  before treating economy and item-transfer transactions as exploit-safe.
+## High-priority correctness and protection issues
+
+### VTX-08 — Zone terrain protection misses indirect block changes
+
+Evidence: ZoneListener blocks player break/place and bucket fill/empty, but has no rules for pistons, explosions, fluid flow, dispensers, or structure growth across Haven/Riftlands boundaries.
+
+Failure path: A player can change protected terrain indirectly or push a mechanism/effect from outside a boundary into it.
+
+Required fix: Define allowed terrain behaviour and check both source and destination regions for piston extend/retract, block/entity explosions, fluid flow, dispenser placement, structure growth, and relevant dependency events. Add boundary tests for every protected event.
+
+Acceptance: No unprivileged action can modify a zone block even when the player or mechanism begins outside the zone.
+
+### VTX-09 — Dupe reconciliation is not periodic and can false-flag movement
+
+Evidence: DupeManager.load reads/registers scan-interval-ticks, but it does not start a repeating task. A scan only starts after another event. A reconciliation cycle combines observations from multiple loaded-chunk passes over time.
+
+Failure path: A quiet server never receives the promised periodic scan. A legitimate tracked item moved between containers/chunks during one cycle can be observed twice and reported as a duplicate with stale holder information.
+
+Required fix: Start/stop a genuine repeating task at the configured interval. Use scan epochs and stable snapshots: scan evidence in one consistent window, invalidate/retry on holder change, or compare simultaneous observations. Keep event scans as debounced supplements.
+
+Acceptance: A passive server scans on schedule, and moving one unique item during a scan never opens a dupe case.
+
+### VTX-10 — Dupe scans miss nested high-value items
+
+Evidence: Direct inventories, ender chests, tile inventories, and drops are inspected, but Backpack serialized contents, carried shulkers, and other nested storage can contain tracked items without being scanned.
+
+Failure path: A duplicate tracked wand, armor piece, or blueprint can hide in a nested container and escape detection until a later transfer.
+
+Required fix: Add read-only recursive scanners for Vertex serialized inventories and supported vanilla nested containers. Bound depth/size, record the full holder path, and avoid confusing the container's ID with an item's ID. Test backpack, shulker, collector, trade, and move scenarios.
+
+### VTX-11 — Mine/Riftlands entry can select unsafe or invalid locations
+
+Evidence: MineTeleportManager.destination uses exact region center plus getHighestBlockYAt, without validating headroom, a non-hazardous floor, or a nearby fallback. ZoneManager.findSafeTicketLocation uses a random range that throws when region width/depth is no larger than twice ticketBorder.
+
+Failure path: Mine entry can put a player into a blocked/damaging center structure. A small but valid Riftlands region can throw from ticket use instead of returning the configured no-safe-location response.
+
+Required fix: Share a bounded safe-location finder that verifies world, region, two passable blocks, and non-hazardous solid floor, then tries nearby candidates. Clamp/validate effective ticket border against dimensions before random selection.
+
+### VTX-12 — PvP Top awards synchronously write to SQL
+
+Evidence: PvpTopManager.awardCapture calls storage.award(...) directly from capture handling.
+
+Failure path: Slow SQL can freeze the main thread during a KOTH/Outpost capture. A database error permits the capture but loses the point award without a durable retry record.
+
+Required fix: Create an idempotent durable award event (type, event ID, faction) with a unique database constraint; process it asynchronously, retry pending awards at startup, and update memory after persistence succeeds.
+
+### VTX-13 — F Top state is not drained before shutdown/migration
+
+Evidence: FTopManager.persist serializes its writeChain, but exposes no awaitWrites(). VertexPlugin.onDisable and migration waiting omit it.
+
+Failure path: A scheduled or forced recalculation immediately followed by a restart/migration can lose scores or the next-update deadline.
+
+Required fix: Add a bounded awaitWrites() call to shutdown/migration, surface write failures, and test restart immediately after automatic and forced F Top updates.
+
+### VTX-14 — Coinflip creation leaks wager details in public chat
+
+Evidence: CoinflipManager passes summarize(created) to coinflip.public-created; summarizeItems includes every item/amount and money, EXP, and GC amounts are also included.
+
+Failure path: Public chat reveals information that should be limited to the coinflip UI and staff logs. The intended message is creator plus coinflip type, not specific items or a value.
+
+Required fix: Use a separate public type label (item, money, XP, GC) for broadcasts. Retain exact details only in the UI, transaction log, and authorized staff tools. Update every locale and test all wager types.
+
+## Lower-priority follow-up
+
+### VTX-15 — Non-English language files are far behind English
+
+Evidence: en_us.yml has 1,228 lines; de_de.yml, es_us.yml, and pt_br.yml each have 884 and lack whole newer sections such as GC, dupe, zones, and portals. Runtime fallback prevents a crash but creates mixed-language messages.
+
+Required fix: Treat English as the translation schema. Add a test reporting missing/unknown keys per locale, translate all missing messages, and increment language versions intentionally so bundled changes reach live installations.
+
+## Documentation reconciled
+
+- Added/indexed physical-portal documentation.
+- Corrected player trading to item-only.
+- Corrected Mine/Event documentation to describe the implemented event hub.
+- Corrected Sell/TNT Wand activation to left-click.
+- Documented GC as Auction House and Coinflip currency.
+- Updated bundled non-English coinflip/Auction usage text for GC and xp.
+
+## Required staging checks before release
+
+1. Test Vault, FactionsUUID claims/ranks, SQLite, and MySQL integrations.
+2. Force-stop/restart through each VTX-01 through VTX-07 transaction point.
+3. Test zone borders with pistons, explosions, fluids, dispensers, and projectiles.
+4. Test coinflips with both players online, disconnects, full inventories, and every currency type.
+5. Check every bundled language after completing the translation follow-up.

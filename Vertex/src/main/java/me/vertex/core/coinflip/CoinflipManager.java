@@ -1027,14 +1027,14 @@ public final class CoinflipManager {
         }
     }
 
-    /** Reads a fresh claim snapshot and locks repeated clicks until it is cleared. */
-    public CompletableFuture<ClaimBatch> beginClaimAll(UUID uuid) {
+    /** Deletes claims first; only the deleted rows may be delivered to a player. */
+    public CompletableFuture<ClaimBatch> takeClaims(UUID uuid) {
         if (!claimsInProgress.add(uuid)) {
             return CompletableFuture.completedFuture(ClaimBatch.empty());
         }
-        CompletableFuture<ClaimBatch> read = CompletableFuture.supplyAsync(() -> {
+        CompletableFuture<ClaimBatch> take = CompletableFuture.supplyAsync(() -> {
             try {
-                List<CoinflipClaim> claims = storage.loadClaims(uuid);
+                List<CoinflipClaim> claims = storage.takeClaims(uuid);
                 List<Integer> ids = new ArrayList<>(claims.size());
                 List<ItemStack> items = new ArrayList<>();
                 for (CoinflipClaim claim : claims) {
@@ -1050,40 +1050,24 @@ public final class CoinflipManager {
                 throw new java.util.concurrent.CompletionException(error);
             }
         });
-        track(read);
-        read.whenComplete((ignored, error) -> {
-            if (error != null) {
-                claimsInProgress.remove(uuid);
-            }
-        });
-        return read;
+        track(take);
+        take.whenComplete((ignored, error) -> claimsInProgress.remove(uuid));
+        return take;
     }
 
-    /** Clears exactly the rows delivered by {@link #beginClaimAll(UUID)}. */
-    public void finishClaimAll(UUID uuid, ClaimBatch batch) {
-        if (batch.ids().isEmpty()) {
-            claimsInProgress.remove(uuid);
+    /** Restores a reserved claim if its player disconnected before main-thread delivery. */
+    public void restoreClaimBatch(UUID uuid, ClaimBatch batch) {
+        if (batch == null || batch.items().isEmpty()) {
             return;
         }
-        CompletableFuture<Void> delete = CompletableFuture.runAsync(() -> {
+        ItemStack[] items = batch.items().stream().map(ItemStack::clone).toArray(ItemStack[]::new);
+        track(CompletableFuture.runAsync(() -> {
             try {
-                storage.deleteClaimsById(batch.ids());
+                storage.insertClaim(uuid, items, System.currentTimeMillis());
             } catch (Exception error) {
-                throw new java.util.concurrent.CompletionException(error);
+                plugin.getLogger().log(Level.SEVERE, "Failed to restore undelivered Coinflip claims for " + uuid, error);
             }
-        });
-        track(delete);
-        delete.whenComplete((ignored, error) -> {
-            claimsInProgress.remove(uuid);
-            if (error != null) {
-                plugin.getLogger().log(Level.SEVERE, "Failed to clear delivered Coinflip claims for " + uuid, error);
-            }
-        });
-    }
-
-    /** Releases a claim click that could not deliver items (for example a disconnect). */
-    public void abortClaimAll(UUID uuid) {
-        claimsInProgress.remove(uuid);
+        }));
     }
 
     private void queueClaim(UUID winnerUuid, ItemStack[] items) {

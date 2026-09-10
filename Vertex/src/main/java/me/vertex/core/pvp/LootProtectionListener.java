@@ -44,11 +44,14 @@ public final class LootProtectionListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onDeath(PlayerDeathEvent event) {
         Player killer = event.getEntity().getKiller();
-        if (!enabled || durationMillis <= 0L || killer == null || event.getDrops().isEmpty()) {
-            return;
-        }
+        protect(event.getDrops(), killer);
+    }
+
+    /** Reused by systems that add controlled drops after PlayerDeathEvent's initial drop list was built. */
+    public void protect(Iterable<ItemStack> drops, Player killer) {
+        if (!enabled || durationMillis <= 0L || killer == null || drops == null) return;
         long expiresAt = System.currentTimeMillis() + durationMillis;
-        for (ItemStack drop : event.getDrops()) {
+        for (ItemStack drop : drops) {
             if (drop == null || drop.isEmpty()) {
                 continue;
             }

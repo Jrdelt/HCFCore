@@ -53,20 +53,38 @@ public final class BackpackMenuListener implements Listener {
         if (data == null) {
             return;
         }
+        java.util.List<ItemStack> remaining = new java.util.ArrayList<>();
+        boolean movedAny = false;
         for (ItemStack item : data.contents()) {
             if (item == null || item.isEmpty()) {
                 continue;
             }
-            // Each entry can hold far more than a vanilla max stack (that's
-            // the whole point -- capacity is items, not slots), so it has
-            // to be split back into real stacks before handing it to a
-            // player inventory or dropping it.
+            long notMoved = item.getAmount();
+            // A Backpack may hold more than a normal slot, but clicking Empty
+            // is intentionally an inventory-only transfer. Anything that
+            // cannot fit remains in the Backpack for a later click; it is
+            // never thrown on the ground where it could be lost or stolen.
             for (ItemStack stack : BackpackManager.splitIntoRealStacks(item, item.getAmount())) {
-                player.getInventory().addItem(stack).values()
-                        .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+                int offered = stack.getAmount();
+                int leftover = player.getInventory().addItem(stack.clone()).values().stream()
+                        .mapToInt(ItemStack::getAmount).sum();
+                int moved = offered - leftover;
+                notMoved -= moved;
+                movedAny |= moved > 0;
+                if (moved == 0) {
+                    break;
+                }
+            }
+            if (notMoved > 0) {
+                ItemStack retained = item.clone();
+                retained.setAmount((int) Math.min(Integer.MAX_VALUE, notMoved));
+                remaining.add(retained);
             }
         }
-        manager.writeData(holder.backpackItem(), data.withContents(new ItemStack[0]));
+        if (!movedAny) {
+            return;
+        }
+        manager.writeData(holder.backpackItem(), data.withContents(remaining.toArray(new ItemStack[0])));
         syncToOffhand(player, holder.backpackItem());
     }
 

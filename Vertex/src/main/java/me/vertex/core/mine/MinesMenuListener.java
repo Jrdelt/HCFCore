@@ -18,15 +18,17 @@ public final class MinesMenuListener implements Listener {
     private final BoosterService boosters;
     private final Messages messages;
     private final MenuRegistry menus;
+    private final MineTeleportManager teleports;
 
     public MinesMenuListener(MineManager mines, MineKothManager koths, HotZoneManager hotZones,
-            BoosterService boosters, Messages messages, MenuRegistry menus) {
+            BoosterService boosters, Messages messages, MenuRegistry menus, MineTeleportManager teleports) {
         this.mines = mines;
         this.koths = koths;
         this.hotZones = hotZones;
         this.boosters = boosters;
         this.messages = messages;
         this.menus = menus;
+        this.teleports = teleports;
     }
 
     @EventHandler
@@ -52,6 +54,13 @@ public final class MinesMenuListener implements Listener {
             if (back != null && event.getRawSlot() == back.slot()) {
                 menus.layout(MinesMenu.MENU_ID).playSound(viewer, "back");
                 MinesMenu.openOverview(viewer, mines, koths, hotZones, boosters, messages, menus);
+                return;
+            }
+            var teleport = menus.layout(MinesMenu.MENU_ID).item("teleport");
+            int teleportSlot = teleport == null ? 20 : teleport.slot();
+            if (event.getRawSlot() == teleportSlot) {
+                if (teleport != null) menus.layout(MinesMenu.MENU_ID).playSound(viewer, "teleport");
+                teleports.open(viewer, holder.mineId());
             }
             return;
         }

@@ -33,6 +33,11 @@ public abstract class WandContainer {
     public void commit() {
     }
 
+    /** True only when this view is backed by a placed Chunk Collector. */
+    public boolean isCollector() {
+        return false;
+    }
+
     /** @return a view of the block, or null when it is not a container a wand can use. */
     public static WandContainer of(Block block, ChunkCollectorManager collectors) {
         if (collectors != null && collectors.readData(block.getLocation()) != null) {
@@ -114,6 +119,11 @@ public abstract class WandContainer {
         @Override
         public void commit() {
             collectors.writeData(location, data);
+        }
+
+        @Override
+        public boolean isCollector() {
+            return true;
         }
     }
 }

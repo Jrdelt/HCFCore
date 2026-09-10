@@ -9,13 +9,13 @@ import java.util.Locale;
  * One configured Source Bucket variant, as read from {@code
  * sourcebuckets.yml}. Unlike {@code ChunkBusterType} (a fixed 4-constant
  * enum), Source Buckets are config-driven -- an admin can define any number
- * of variants per liquid, each with its own flow behavior -- so this is a
+ * of variants per placed block, each with its own flow behavior -- so this is a
  * plain immutable record rather than an enum, the same shape {@code
  * WandTier} uses for the same reason (arbitrary, admin-named tiers loaded
  * from a {@code ConfigurationSection}'s keys).
  *
  * @param id             globally unique, e.g. {@code "water:downward"} --
- *                       {@link Liquid#configKey()} + {@code ":"} + the
+ *                       {@link PlacedBlock#configKey()} + {@code ":"} + the
  *                       variant's own {@code sourcebuckets.yml} key. This is
  *                       exactly what gets written into the item's PDC tag,
  *                       so renaming a variant's YAML key changes what's on
@@ -29,12 +29,15 @@ import java.util.Locale;
  *                       only a variant removed from the config file entirely
  *                       stops resolving at all, the same limitation {@code
  *                       WandManager.tierOf} already has for a removed tier.
- * @param liquid         WATER or LAVA -- entirely separate configuration
- *                       trees in {@code sourcebuckets.yml}.
- * @param flowPattern    SINGLE_SOURCE or DOWNWARD; see {@link FlowPattern}.
- * @param maxDepth       how many blocks below the placement point a
- *                       DOWNWARD flow may reach (0 = placement point only);
- *                       ignored for SINGLE_SOURCE.
+ * @param placedBlock    the block material this variant places. Each type
+ *                       has a separate top-level configuration tree in
+ *                       {@code sourcebuckets.yml}.
+ * @param flowPattern    SINGLE_SOURCE, DOWNWARD, or OUTWARD; see {@link FlowPattern}.
+ * @param maxDistance    for DOWNWARD, the number of blocks below the
+ *                       placement point that the flow may reach (0 =
+ *                       placement point only, -1 = the world's minimum Y).
+ *                       For OUTWARD, the total number of blocks in the line.
+ *                       Ignored for SINGLE_SOURCE.
  * @param baseClaimOnly  when true, usable only inside a Base Claim (never a
  *                       Raid Claim) -- queried via {@code
  *                       BaseClaimManager.isBaseClaim}.
@@ -53,7 +56,7 @@ import java.util.Locale;
  *                       SourceBucketManager#use} for the exact
  *                       validate-then-place-then-charge ordering.
  * @param material       the item's {@link Material} (typically {@code
- *                       WATER_BUCKET}/{@code LAVA_BUCKET}, but not
+ *                       a bucket, but not
  *                       required to be -- configurable exactly like {@code
  *                       ChunkBusterType.material}).
  * @param customModelData optional resource-pack model override, or null.
@@ -67,9 +70,9 @@ import java.util.Locale;
 public record SourceBucketType(
         String id,
         boolean enabled,
-        Liquid liquid,
+        PlacedBlock placedBlock,
         FlowPattern flowPattern,
-        int maxDepth,
+        int maxDistance,
         boolean baseClaimOnly,
         boolean combatAllowed,
         double shopPrice,
@@ -80,35 +83,43 @@ public record SourceBucketType(
         List<String> lore,
         boolean glow) {
 
-    /** Water and Lava are configured entirely independently of each other. */
-    public enum Liquid {
-        WATER("water", Material.WATER),
-        LAVA("lava", Material.LAVA);
+    /** The block a configured Source Bucket will place. */
+    public enum PlacedBlock {
+        WATER("water", Material.WATER, Material.WATER_BUCKET),
+        LAVA("lava", Material.LAVA, Material.LAVA_BUCKET),
+        OBSIDIAN("obsidian", Material.OBSIDIAN, Material.BUCKET),
+        COBBLESTONE("cobblestone", Material.COBBLESTONE, Material.BUCKET);
 
         private final String configKey;
         private final Material blockMaterial;
+        private final Material defaultItemMaterial;
 
-        Liquid(String configKey, Material blockMaterial) {
+        PlacedBlock(String configKey, Material blockMaterial, Material defaultItemMaterial) {
             this.configKey = configKey;
             this.blockMaterial = blockMaterial;
+            this.defaultItemMaterial = defaultItemMaterial;
         }
 
         public String configKey() {
             return configKey;
         }
 
-        /** The actual placeable liquid block for this type -- {@code Material.WATER}/{@code Material.LAVA}. */
+        /** The actual block material placed by this type. */
         public Material blockMaterial() {
             return blockMaterial;
+        }
+
+        /** The item material used when a variant does not configure one. */
+        public Material defaultItemMaterial() {
+            return defaultItemMaterial;
         }
     }
 
     /**
-     * The two flow behaviors this phase implements. Deliberately a small,
+     * The three flow behaviors this feature implements. Deliberately a small,
      * closed set rather than an open-ended strategy interface: the spec
-     * asks only for these two ("future flow attributes" are explicitly
-     * out of scope for now), and {@code SourceBucketManager.computeFlowPositions}
-     * switches on this enum directly. Adding a third pattern later means
+     * asks only for these three, and {@code SourceBucketManager.computeFlowPositions}
+     * switches on this enum directly. Adding another pattern later means
      * adding one more enum constant and one more branch there -- no
      * rewrite of the claim-boundary/obstruction-stopping logic itself,
      * which is pattern-agnostic (it just walks whatever candidate
@@ -116,7 +127,8 @@ public record SourceBucketType(
      */
     public enum FlowPattern {
         SINGLE_SOURCE("single-source"),
-        DOWNWARD("downward");
+        DOWNWARD("downward"),
+        OUTWARD("outward");
 
         private final String configKey;
 

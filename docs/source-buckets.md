@@ -1,7 +1,7 @@
 # Source Buckets
 
 Source Buckets are purchasable, permanently-reusable custom items that
-place water or lava following a configured flow pattern. Unlike Chunk
+place a configured block following a configured flow pattern. Unlike Chunk
 Busters, a Source Bucket is never consumed — pay the `/shop` price once
 and it stays in your inventory forever, chargeable a small fixed fee on
 every successful use.
@@ -12,9 +12,9 @@ every successful use.
   overridden to 1 (Paper's per-item stack-size API), since a second copy
   of an already-infinite-use item is always redundant.
 - **Per-variant configuration.** `sourcebuckets.yml` defines any number of
-  variants per liquid — each with its own flow pattern, `base-claim-only`
-  flag, combat rule, shop price, and per-use fee. Water and Lava are
-  configured in entirely separate sections and never share settings.
+  variants per placed-block type — each with its own flow pattern,
+  `base-claim-only` flag, combat rule, shop price, and per-use fee. Water,
+  Lava, Obsidian, and Cobblestone are configured independently.
 
 ## Where they work
 
@@ -33,25 +33,24 @@ thing that can narrow which zones a specific variant works in.
 
 ## Flow patterns
 
-Two patterns are implemented, both driven by a single `flow-pattern` key
-so a future third pattern is one more enum constant and one more branch
-in `SourceBucketManager.computeFlowPositions`, not a rewrite:
+Three patterns are implemented, all driven by a single `flow-pattern` key:
 
 - **`single-source`** — places exactly one source block at the placement
   point.
 - **`downward`** — places a source at the placement point and on each
   valid block straight down from it, up to `max-depth` blocks deep,
-  stopping early at the first obstruction or claim-boundary crossing.
+  stopping early at the first obstruction or claim-boundary crossing. Set
+  `max-depth: -1` to continue to the world's minimum Y (or its natural
+  bottom obstruction).
+- **`outward`** — places a straight line in the clicked face's direction.
+  `max-length` is the total number of blocks in the line, including the
+  first placement block. The bundled Obsidian and Cobblestone variants use
+  a 16-block line.
 
 **Obstruction rule.** A candidate block stops the flow (without being
-placed) when it is neither air nor already the same liquid this variant
-places — matching the spec's literal "a non-air, non-liquid-compatible
-block" wording exactly. This is a deliberate simplification versus full
-vanilla bucket-empty semantics, which also special-cases things like tall
-grass, snow layers, or the *opposite* liquid — the spec's own wording
-gives only two non-obstructing categories, so that is all this
-implements. The obstruction itself is never overwritten or pushed
-through.
+placed) when it is neither air nor already the same block material this
+variant places. Tall grass, snow layers, opposite liquids, and all solid
+blocks are obstructions; they are never overwritten or pushed through.
 
 ## The claim-boundary rule (the correctness-critical part of this phase)
 
@@ -85,13 +84,9 @@ independently satisfy all of the following, checked in
 
 A chunk boundary is **not** itself a stopping condition — a flow may cross
 one as long as every block it touches passes the four checks above,
-stopping at the first invalid block rather than at the chunk edge. For the
-two patterns implemented today this distinction rarely bites in practice:
-a straight-down `downward` flow stays in one `x, z` column, and
-FactionsUUID claims apply to a whole chunk regardless of height, so the
-claim status literally cannot change as the flow descends. The check still
-runs on every step regardless, so a future horizontal flow pattern
-inherits correct claim-boundary behavior for free.
+stopping at the first invalid block rather than at the chunk edge. This
+matters for an `outward` line, which validates every block instead of
+trusting only the claim at the clicked block.
 
 No WorldGuard or other external region-protection plugin is consulted
 anywhere in this feature — only Vertex's own `FactionsHook` claim/world
@@ -177,33 +172,16 @@ phase's correctness-critical requirements are entirely about claim
 boundaries and charge ordering, not placement-target fidelity to vanilla
 buckets.
 
-There is no confirmation GUI, unlike Chunk Busters — placing water/lava is
-not the kind of irreversible, no-drops-ever destructive action the spec
-requires confirming, so a use happens the instant you right-click.
+There is no confirmation GUI: a use happens the instant you right-click.
 
 ## Acquisition
 
-Source Buckets are `/shop`-purchasable, following the exact precedent
-Chunk Busters set: a Source Bucket is a custom item with a config-driven
-price, not a plain vanilla `Material`, so it cannot become a literal
-`ShopEntry` row.
-
-- Per-variant price, material, name, and lore live in
-  `sourcebuckets.yml` — **not** `shop.yml`.
-- A "Buy Source Buckets" button (`ShopMenu.SLOT_BUY_SOURCE_BUCKETS`, slot
-  8) sits in the **Miscellaneous** category's control row
-  (`ShopMenu.SOURCE_BUCKETS_HOST_CATEGORY = "miscellaneous"`) — chosen
-  because Miscellaneous already sells a plain vanilla `BUCKET`, so a
-  reusable water/lava Source Bucket fits thematically without needing a
-  10th category slot in the single-row `/shop` picker.
-- Clicking it opens `SourceBucketShopMenu`, a small catalog of every
-  *enabled* variant (both liquids together); buying withdraws the
-  configured price via Vault and gives the item (dropping it at the
-  player's feet if their inventory is full).
-
-No `shop.yml` edits were needed to wire this up — the button lives in
-`miscellaneous`'s existing control row purely in code, exactly like the
-Chunk Busters button does in Raiding Materials.
+Source Buckets are normal, paginated product tiles in `/shop` → **Raiding
+Materials**, alongside Chunk Busters and the other raiding supplies. Their
+one-time price, material, name, and lore live in `sourcebuckets.yml`, not
+the dynamic material-price market. Left-click buys one enabled variant;
+the item is then permanently reusable subject to its use fee and region
+rules.
 
 ## Why no new database table
 
@@ -229,7 +207,8 @@ production wiring in `VertexPlugin` passes real method references
 (`FactionsHook::getClaimFactionId`, `FactionsHook::getClaimFactionTag`,
 `baseClaimManager::isBaseClaim`, `combatManager::isTagged`); tests pass
 lambdas returning canned per-location values. `SourceBucketManagerTest`
-exercises single-source placement, max-depth/obstruction stopping,
+exercises single-source placement, finite and unlimited downward flow,
+an exact-length outward line, obstruction stopping,
 faction-boundary stopping (both an ally-flavored and an enemy-flavored
 case, asserting the identical outcome), SafeZone/WarZone stopping,
 never-enters-unclaimed-land, `base-claim-only` enforcement (including a
@@ -243,7 +222,7 @@ simulation required.
 
 | Command | Permission | Notes |
 |---|---|---|
-| Right-click a block with a Source Bucket | *(none — gated by zone/combat/economy checks in-code)* | Places water/lava immediately; no confirmation step. |
+| Right-click a block with a Source Bucket | *(none — gated by zone/combat/economy checks in-code)* | Places the configured block immediately; no confirmation step. |
 
 Source Buckets have no dedicated command of their own — acquisition is
 entirely through `/shop`.
@@ -251,10 +230,12 @@ entirely through `/shop`.
 ## Configuration
 
 - `sourcebuckets.yml` — per-variant `enabled`/`flow-pattern`/`max-depth`/
-  `base-claim-only`/`combat-allowed`/`shop-price`/`per-use-fee`/
-  `material`/`custom-model-data`/`glow`/`name`/`lore`, grouped under
-  top-level `water:`/`lava:` sections, plus its own `disabled-claim-names`
-  list (independent from `abilities.disabled-claim-names` in `config.yml`
+  `max-length`/`base-claim-only`/`combat-allowed`/`shop-price`/
+  `per-use-fee`/`material`/`custom-model-data`/`glow`/`name`/`lore`, grouped
+  under top-level `water:`/`lava:`/`obsidian:`/`cobblestone:` sections. A
+  downward `max-depth` of `-1` means to world bottom; an outward
+  `max-length` counts total placed blocks. The file also has its own
+  `disabled-claim-names` list (independent from `abilities.disabled-claim-names` in `config.yml`
   and from `chunkbuster.yml`'s own list, for the same reason
   `chunkbuster.yml` gives itself one — see
   [Chunk Busters](chunk-busters.md#why-chunkbusteryml-has-its-own-disabled-claim-names-instead-of-reusing-abilitiesdisabled-claim-names)).

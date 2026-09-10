@@ -78,7 +78,8 @@ public final class RallyManager implements Listener {
     public boolean setRolePermission(int factionId, String role, String action, boolean allowed) {
         if (!List.of("admin", "mod", "member", "recruit").contains(role)
             || !List.of("rally-set", "rally-clear", "spawner-add", "spawner-remove", "collector-open", "collector-break",
-                        "bank-deposit", "bank-withdraw").contains(action)) {
+                        "collector-withdraw", "collector-sell", "collector-upgrade", "collector-filter",
+                        "bank-deposit", "bank-withdraw", "chunkbuster-use").contains(action)) {
             return false;
         }
         plugin.getConfig().set("rally.faction-permissions." + factionId + "." + role + "." + action, allowed);

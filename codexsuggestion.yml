@@ -1,0 +1,115 @@
+version: 1
+generated_on: "2026-09-10"
+purpose: "Product roadmap ideas for a premium factions, PvP, and farming server. These are feature proposals, not confirmed defects."
+
+delivery_order:
+  - "Fix the transaction and inventory issues in codesIssues.md before adding economy-heavy events."
+  - "Add admin observability and safe maintenance tools next."
+  - "Launch one small recurring event at a time, measure participation, then expand."
+
+product_rules:
+  - "Keep paid cosmetics cosmetic; do not sell direct combat power."
+  - "Every reward event needs anti-alt, anti-alliance-farming, cooldown, and audit rules."
+  - "Use scheduled/event-driven work; avoid scanning worlds or inventories every tick."
+  - "Every valuable reward should have a transaction ID and a recoverable delivery record."
+
+recommendations:
+  admin_qol:
+    - id: operations-console
+      priority: highest
+      name: "Vertex Operations Console"
+      idea: "Add a staff-only /vertex health screen showing database health, queued writes, active transactions, scheduled jobs, config warnings, and recent errors."
+      value: "Lets staff see a problem before players report lost items or a broken event."
+      first_release: "Read-only command and GUI with clear green/yellow/red status; add no admin mutation buttons initially."
+
+    - id: safe-maintenance-mode
+      priority: highest
+      name: "Safe Maintenance Mode"
+      idea: "Add a controlled maintenance countdown that stops new auctions, trades, Coinflips, Wands, and bank actions, waits for existing operations to finish, then confirms it is safe to restart."
+      value: "Makes planned restarts feel professional and reduces restart-related item problems."
+      first_release: "Commands for start, status, cancel, and a final drain report; every override is logged."
+
+  pvp_events:
+    - id: warfront
+      priority: high
+      name: "Warfront"
+      idea: "Run a scheduled three-stage Warzone event: capture small supply nodes, unlock a moving convoy, then hold a final KOTH."
+      value: "Creates a full PvP story instead of one static hill fight."
+      first_release: "One map, configurable stage timers, faction PvP Top points, personal participation rewards, and a clear event HUD."
+      guardrails: "No rewards for allied/same-faction farming; persist stage state and recover safely after restart."
+
+    - id: supply-convoy
+      priority: medium
+      name: "Supply Convoy"
+      idea: "Spawn a visible escorted crate that moves through a Warzone route and can be captured at several checkpoints."
+      value: "Creates spontaneous fights that pull factions across the map."
+      first_release: "One route, broadcast previews, configurable crate table, and a final faction claim reward."
+      guardrails: "Use protected event entities and persistent state; never allow the crate to be duplicated through container actions."
+
+  farming_and_progression:
+    - id: farmers-market
+      priority: high
+      name: "Rotating Farmers Market"
+      idea: "Each day, a small set of crops and animal products have public demand orders with visible quotas and better prices."
+      value: "Makes farming a strategic choice instead of an always-identical sell loop."
+      first_release: "Three rotating materials, individual and faction quotas, and a market board in spawn."
+      guardrails: "Use per-item dynamic pricing, payout caps, anti-AFK checks where appropriate, and no single-starting-price bulk sales."
+
+    - id: harvest-rush
+      priority: medium
+      name: "Harvest Rush"
+      idea: "Open a timed public farm or mine plot where players compete for harvested resources and contribution milestones."
+      value: "A calm social event that still feeds server progression."
+      first_release: "One crop-focused event, personal contribution tracking, faction bonus milestones, and automatic cleanup/reset."
+      guardrails: "Reward active contributions rather than raw time online; keep all resets asynchronous and bounded."
+
+    - id: farm-contracts
+      priority: medium
+      name: "Faction Farm Contracts"
+      idea: "Give factions rotating weekly production contracts such as crops, mob drops, mining materials, or crafted supplies."
+      value: "Creates shared goals for non-PvP members without making them feel secondary."
+      first_release: "Three contract choices, progress visible in /f stats, and rewards split between faction upgrades and cosmetics."
+
+  faction_experience:
+    - id: faction-missions
+      priority: high
+      name: "Faction Missions"
+      idea: "Add daily and weekly faction objectives covering captures, farming, mining, building, and defense."
+      value: "Every member can help their faction progress, not only the best fighters."
+      first_release: "A small configurable mission pool, shared progress UI, reroll rules, and auditable rewards."
+
+    - id: territory-intel
+      priority: medium
+      name: "Territory Intel"
+      idea: "Show faction leaders a simple claim activity report: recent claim changes, raid windows, spawner value changes, TNT alerts, and active nearby events."
+      value: "Feels premium while helping leaders make decisions without exposing private enemy information."
+      first_release: "Own-faction alerts only, configurable notification categories, and no live enemy base data."
+
+    - id: faction-season-hall
+      priority: medium
+      name: "Season Hall and Legacy Records"
+      idea: "Create a spawn display and /season history page for past F Top, PvP Top, event wins, and notable faction achievements."
+      value: "Makes a reset feel like a new chapter instead of erased effort."
+      first_release: "Archive final leaderboards and award cosmetic legacy badges after a verified season snapshot."
+
+  premium_finish:
+    - id: guided-onboarding
+      priority: high
+      name: "Interactive New Player Guide"
+      idea: "Use a short /guide checklist to teach kits, claims, faction roles, mining, Backpack use, events, and safe trading."
+      value: "New players understand the server faster and ask staff fewer basic questions."
+      first_release: "Seven optional steps with small non-economic rewards and a resume-any-time menu."
+
+    - id: event-broadcast-themes
+      priority: low
+      name: "Event Presentation Themes"
+      idea: "Give events polished countdowns, boss bars, map markers, sound cues, and selectable cosmetic announcement themes."
+      value: "The server feels more intentional and memorable without affecting gameplay power."
+      first_release: "Standardize one visual language across KOTH, Outpost, Mines, and future events; make all player broadcasts toggleable."
+
+    - id: achievements-and-cosmetics
+      priority: medium
+      name: "Achievements, Titles, and Profile Cards"
+      idea: "Track meaningful accomplishments and show them in a clean /profile card with optional titles, kill effects, and banner cosmetics."
+      value: "Adds long-term identity and prestige without pay-to-win rewards."
+      first_release: "Start with seasonal event, faction, mining, farming, and helper achievements; keep hidden progress staff-safe."

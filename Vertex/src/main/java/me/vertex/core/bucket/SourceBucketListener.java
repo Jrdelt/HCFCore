@@ -2,11 +2,6 @@ package me.vertex.core.bucket;
 
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
-import me.vertex.core.shop.ShopManager;
-import me.vertex.core.shop.ShopMenu;
-import me.vertex.core.spawner.SpawnerManager;
-import net.milkbowl.vault.economy.Economy;
-import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -15,20 +10,14 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
 /**
  * Right-clicking with a Source Bucket triggers an immediate use -- unlike
- * Chunk Busters, there is no confirmation step (placing water/lava is not
- * the kind of irreversible, no-drops-ever destructive action that spec
- * requires confirming). Also handles clicks in {@link SourceBucketShopMenu},
- * the {@code /shop} purchase browser, the same way {@code
- * ChunkBusterMenuListener} folds its confirmation-GUI and shop-menu
- * handling into one listener class.
+ * Chunk Busters, there is no confirmation step. Purchases are handled directly by the ordinary
+ * Raiding Materials shop page.
  *
  * <p><b>Why {@code PlayerInteractEvent} rather than {@code
  * PlayerBucketEmptyEvent}.</b> {@code PlayerBucketEmptyEvent} only fires
@@ -63,15 +52,10 @@ import org.bukkit.inventory.ItemStack;
 public final class SourceBucketListener implements Listener {
 
     private final SourceBucketManager manager;
-    private final ShopManager shopManager;
-    private final SpawnerManager spawnerManager;
     private final Messages messages;
 
-    public SourceBucketListener(SourceBucketManager manager, ShopManager shopManager, SpawnerManager spawnerManager,
-            Messages messages) {
+    public SourceBucketListener(SourceBucketManager manager, Messages messages) {
         this.manager = manager;
-        this.shopManager = shopManager;
-        this.spawnerManager = spawnerManager;
         this.messages = messages;
     }
 
@@ -100,7 +84,7 @@ public final class SourceBucketListener implements Listener {
         }
         Location target = clicked.getRelative(face).getLocation();
 
-        SourceBucketManager.UseResult result = manager.use(player, target, variant);
+        SourceBucketManager.UseResult result = manager.use(player, target, face, variant);
         if (result == SourceBucketManager.UseResult.OK) {
             player.sendMessage(messages.get(player, "sourcebucket.used",
                     "amount", EconomyHook.format(variant.perUseFee())));
@@ -121,55 +105,4 @@ public final class SourceBucketListener implements Listener {
         };
     }
 
-    // ---- Shop sub-menu (SourceBucketShopMenu) ----
-
-    @EventHandler
-    public void onDrag(InventoryDragEvent event) {
-        if (event.getInventory().getHolder() instanceof SourceBucketShopMenu.Holder) {
-            event.setCancelled(true);
-        }
-    }
-
-    @EventHandler
-    public void onClick(InventoryClickEvent event) {
-        if (!(event.getView().getTopInventory().getHolder() instanceof SourceBucketShopMenu.Holder holder)) {
-            return;
-        }
-        event.setCancelled(true);
-        if (event.getClickedInventory() == null
-                || !(event.getClickedInventory().getHolder() instanceof SourceBucketShopMenu.Holder)) {
-            return;
-        }
-        if (!(event.getWhoClicked() instanceof Player player)) {
-            return;
-        }
-        if (event.getSlot() == SourceBucketShopMenu.SLOT_BACK) {
-            if (shopManager != null) {
-                ShopMenu.openCategory(player, shopManager, spawnerManager, messages,
-                        ShopMenu.SOURCE_BUCKETS_HOST_CATEGORY, 0);
-            }
-            return;
-        }
-        SourceBucketType variant = holder.variantAt(event.getSlot());
-        if (variant == null) {
-            return;
-        }
-        if (!EconomyHook.isAvailable()) {
-            player.sendMessage(messages.get(player, "sourcebucket.no-economy"));
-            return;
-        }
-        Economy economy = EconomyHook.getEconomy();
-        double price = variant.shopPrice();
-        EconomyResponse response = economy.withdrawPlayer(player, price);
-        if (!response.transactionSuccess()) {
-            player.sendMessage(messages.get(player, "sourcebucket.cannot-afford", "amount", EconomyHook.format(price)));
-            return;
-        }
-        ItemStack item = manager.createItem(variant);
-        for (ItemStack dropped : player.getInventory().addItem(item).values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), dropped);
-        }
-        player.sendMessage(messages.get(player, "sourcebucket.purchased",
-                "amount", EconomyHook.format(price)));
-    }
 }

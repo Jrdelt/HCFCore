@@ -72,12 +72,15 @@ public final class ChunkCollectorMenuListener implements Listener {
             player.closeInventory();
             return;
         }
-        if (!canAccess(player, location, data)) {
+        if (!canAccess(player, location, data, "collector-open")) {
             player.closeInventory();
             return;
         }
 
         if (event.getSlot() == ChunkCollectorMenu.UPGRADE_SLOT) {
+            if (!canAccess(player, location, data, "collector-upgrade")) {
+                return;
+            }
             upgrade(player, location, data);
             // Keep the collector open after an upgrade attempt so the player
             // can immediately buy another tier; reopening also refreshes the
@@ -85,6 +88,9 @@ public final class ChunkCollectorMenuListener implements Listener {
             ChunkCollectorMenu.open(player, manager, messages, location, data);
             return;
         } else if (event.getRawSlot() < ChunkCollectorMenu.SUMMARY_SLOT) {
+            if (!canAccess(player, location, data, "collector-withdraw")) {
+                return;
+            }
             ItemStack clicked = event.getCurrentItem();
             if (clicked == null || clicked.getType() == Material.AIR) {
                 return;
@@ -112,7 +118,7 @@ public final class ChunkCollectorMenuListener implements Listener {
         if (data == null) {
             return;
         }
-        if (!canAccess(player, location, data)) {
+        if (!canAccess(player, location, data, "collector-withdraw")) {
             return;
         }
         long stored = data.stored(material);
@@ -125,8 +131,8 @@ public final class ChunkCollectorMenuListener implements Listener {
         refresh(player, location);
     }
 
-    private boolean canAccess(Player player, Location location, ChunkCollectorData data) {
-        if (staffManager.isStaffBuild(player.getUniqueId())) {
+    private boolean canAccess(Player player, Location location, ChunkCollectorData data, String action) {
+        if (staffManager.isStaffBuild(player.getUniqueId()) && player.hasPermission("vertex.collector.bypass")) {
             return true;
         }
         String claimTag = FactionsHook.getClaimFactionTag(location);
@@ -135,7 +141,7 @@ public final class ChunkCollectorMenuListener implements Listener {
                 || (claimTag == null && data.ownerFactionTag() != null
                         && data.ownerFactionTag().equalsIgnoreCase(playerTag));
         if (mayUse) {
-            if (!rolePermissions.canUse(player, "collector-open")) {
+            if (!rolePermissions.canUse(player, action)) {
                 player.sendMessage(messages.get(player, "collector.open-permission-denied"));
                 return false;
             }
@@ -158,11 +164,19 @@ public final class ChunkCollectorMenuListener implements Listener {
             return;
         }
         long toWithdraw = Math.min(stored, requestedAmount);
+        if (!canFullyFit(player, material, toWithdraw)) {
+            player.sendMessage(messages.get(player, "collector.inventory-full"));
+            return;
+        }
         long remaining = toWithdraw;
         while (remaining > 0) {
             int batch = (int) Math.min(remaining, material.getMaxStackSize());
-            for (ItemStack dropped : player.getInventory().addItem(new ItemStack(material, batch)).values()) {
-                player.getWorld().dropItemNaturally(player.getLocation(), dropped);
+            if (!player.getInventory().addItem(new ItemStack(material, batch)).isEmpty()) {
+                // The preflight above means this can only be a concurrent
+                // inventory change. Keep the collector unchanged rather than
+                // dropping or deleting anything.
+                player.sendMessage(messages.get(player, "collector.inventory-full"));
+                return;
             }
             remaining -= batch;
         }
@@ -170,6 +184,18 @@ public final class ChunkCollectorMenuListener implements Listener {
         manager.writeData(location, data);
         player.sendMessage(messages.get(player, "collector.withdrew",
                 "amount", String.format("%,d", toWithdraw), "item", material.name()));
+    }
+
+    private static boolean canFullyFit(Player player, Material material, long amount) {
+        long room = 0L;
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item == null || item.isEmpty()) room += material.getMaxStackSize();
+            else if (item.getType() == material && item.isSimilar(new ItemStack(material))) {
+                room += Math.max(0, material.getMaxStackSize() - item.getAmount());
+            }
+            if (room >= amount) return true;
+        }
+        return room >= amount;
     }
 
     private void upgrade(Player player, Location location, ChunkCollectorData data) {

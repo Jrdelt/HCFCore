@@ -8,8 +8,12 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
+import org.bukkit.event.server.TabCompleteEvent;
 import org.bukkit.plugin.Plugin;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -52,6 +56,40 @@ public final class ShieldCommand implements Listener {
             Player player = event.getPlayer();
             Bukkit.getScheduler().runTaskLater(plugin, () -> appendWhoInfo(player, target), 1L);
         }
+    }
+
+    /** Supplies completions for the /f shield branch that Vertex intercepts from FactionsUUID. */
+    @EventHandler
+    public void onFactionTabComplete(TabCompleteEvent event) {
+        if (!(event.getSender() instanceof Player player) || !event.getBuffer().startsWith("/")) return;
+        String[] parts = event.getBuffer().substring(1).split("\\s+", -1);
+        if (parts.length == 2 && isFactionCommand(player, parts[0])) {
+            addCompletions(event, parts[1], List.of("shield"));
+        } else if (parts.length == 3 && isFactionCommand(player, parts[0]) && parts[1].equalsIgnoreCase("shield")) {
+            List<String> choices = new ArrayList<>(List.of("set"));
+            if (player.hasPermission("vertex.admin.claims")) choices.add("admin");
+            addCompletions(event, parts[2], choices);
+        } else if (parts.length == 4 && isFactionCommand(player, parts[0]) && parts[1].equalsIgnoreCase("shield")) {
+            if (parts[2].equalsIgnoreCase("set")) addCompletions(event, parts[3], List.of("00:00", "12:00", "18:00"));
+            if (parts[2].equalsIgnoreCase("admin") && player.hasPermission("vertex.admin.claims")) {
+                List<String> tags = Bukkit.getOnlinePlayers().stream().map(FactionsHook::getFactionTag)
+                        .filter(java.util.Objects::nonNull).distinct().sorted().toList();
+                addCompletions(event, parts[3], tags);
+            }
+        } else if (parts.length == 5 && isFactionCommand(player, parts[0]) && parts[1].equalsIgnoreCase("shield")
+                && parts[2].equalsIgnoreCase("admin") && player.hasPermission("vertex.admin.claims")) {
+            addCompletions(event, parts[4], List.of("active", "inactive", "clear"));
+        }
+    }
+
+    private static void addCompletions(TabCompleteEvent event, String partial, List<String> values) {
+        String normalized = partial.toLowerCase(Locale.ROOT);
+        List<String> completions = new ArrayList<>(event.getCompletions());
+        for (String value : values) {
+            if (value.toLowerCase(Locale.ROOT).startsWith(normalized)
+                    && completions.stream().noneMatch(value::equalsIgnoreCase)) completions.add(value);
+        }
+        event.setCompletions(completions);
     }
 
     private void appendWhoInfo(Player viewer, String target) {

@@ -11,37 +11,29 @@ filler:
 items:
   balance:
     material: SUNFLOWER
-    slot: 13
+    slot: 11
     name: "<yellow><bold>ɢᴄ ʙᴀʟᴀɴᴄᴇ"
     lore:
       - "<gray>ʏᴏᴜ ʜᴀᴠᴇ <yellow>{balance} ɢᴄ"
 
-  deposit:
-    material: LIME_DYE
-    slot: 11
-    name: "<green><bold>ᴅᴇᴘᴏꜱɪᴛ"
-    lore:
-      - "<gray>Convert money into GC."
-      - "<green>Click to enter an amount on the shared sign."
-
   withdraw:
     material: RED_DYE
-    slot: 15
+    slot: 12
     name: "<red><bold>ᴡɪᴛʜᴅʀᴀᴡ"
     lore:
-      - "<gray>Convert GC back into money."
-      - "<red>Click to enter an amount on the shared sign."
+      - "<gray>Convert GC into a one-time redeem code."
+      - "<red>Use <white>/gc withdraw <amount>"
 
   redeem:
-    material: PAPER
-    slot: 20
-    name: "<aqua><bold>ʀᴇᴅᴇᴇᴍ ᴄᴏᴅᴇ"
+    material: GREEN_DYE
+    slot: 13
+    name: "<green><bold>ʀᴇᴅᴇᴇᴍ ᴄᴏᴅᴇ"
     lore:
-      - "<gray>Type <white>/gc redeem <code><gray> in chat."
+      - "<gray>Type <white>/gc redeem <gray>in chat."
 
   logs:
     material: BOOK
-    slot: 24
+    slot: 16
     name: "<white><bold>ᴛʀᴀɴꜱᴀᴄᴛɪᴏɴ ʟᴏɢꜱ"
     lore:
       - "<gray>View your own GC history."

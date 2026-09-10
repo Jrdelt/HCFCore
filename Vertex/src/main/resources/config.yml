@@ -377,14 +377,15 @@ rally:
   permission-gui:
     title: '<gold>Faction Permissions'
     roles:
-      mod: {slot: 2, material: DIAMOND_SWORD, name: '<blue>Moderator', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, bank-deposit: true, bank-withdraw: true}
-      member: {slot: 4, material: GOLDEN_SWORD, name: '<yellow>Member', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, bank-deposit: true, bank-withdraw: true}
-      recruit: {slot: 6, material: WOODEN_SWORD, name: '<gray>Recruit', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, bank-deposit: true, bank-withdraw: true}
+      mod: {slot: 2, material: DIAMOND_SWORD, name: '<blue>Moderator', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, collector-withdraw: true, collector-sell: true, collector-upgrade: true, collector-filter: true, bank-deposit: true, bank-withdraw: true, chunkbuster-use: true}
+      member: {slot: 4, material: GOLDEN_SWORD, name: '<yellow>Member', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, collector-withdraw: true, collector-sell: true, collector-upgrade: false, collector-filter: false, bank-deposit: true, bank-withdraw: true, chunkbuster-use: false}
+      recruit: {slot: 6, material: WOODEN_SWORD, name: '<gray>Recruit', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, collector-withdraw: false, collector-sell: false, collector-upgrade: false, collector-filter: false, bank-deposit: true, bank-withdraw: true, chunkbuster-use: false}
     actions:
       vertex-rally-set: {name: 'Set Rally'}
       vertex-rally-clear: {name: 'Clear Rally'}
       vertex-bank-deposit: {name: 'Deposit Bank Resources'}
       vertex-bank-withdraw: {name: 'Withdraw Bank Resources'}
+      vertex-chunkbuster-use: {name: 'Use Chunk Busters'}
       # Add a FactionsUUID action here to customize its label. Example:
       # build: {name: 'Build'}
 
@@ -435,6 +436,20 @@ abilities:
 # each column can receive multiple falling blocks per tick until its stack
 # reaches the anchor. Every block is paid from native faction money, then /fbank.
 # ============================================
+# ============================================
+# PHYSICAL ENTRY PORTALS
+# /portal creates a source cuboid and a verified route that takes players
+# through a configured mine, Haven, or Riftlands region.
+# ============================================
+portals:
+  # Horizontal/vertical route speed in blocks per second. Each route may
+  # override this while it is being created.
+  flight:
+    speed: 0.8
+  # Prevents repeated trigger packets from starting a second route or
+  # repeatedly sending an error while a player stands inside a portal.
+  activation-cooldown-seconds: 3
+
 sandbot:
   enabled: true
 

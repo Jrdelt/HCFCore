@@ -12,7 +12,6 @@ types:
   upward:
     enabled: true
     price: 5000
-    material: TNT
     name: "<red>Upward Chunk Buster"
     lore:
       - "<gray>Removes every block above where you"
@@ -21,7 +20,6 @@ types:
   downward:
     enabled: true
     price: 5000
-    material: TNT
     name: "<red>Downward Chunk Buster"
     lore:
       - "<gray>Removes every block below where you"
@@ -30,7 +28,6 @@ types:
   full:
     enabled: true
     price: 12000
-    material: TNT
     name: "<dark_red>Full Chunk Buster"
     lore:
       - "<gray>Removes every block in the entire"
@@ -39,7 +36,6 @@ types:
   single-column:
     enabled: true
     price: 1500
-    material: TNT
     name: "<yellow>Single-Column Buster"
     lore:
       - "<gray>Removes only the single 1x1 column"
@@ -87,14 +83,6 @@ processing:
   blocks-per-tick: 1000
   period-ticks: 1
 
-# Which faction roles may use a Chunk Buster inside a faction claim, before
-# a faction's leader customizes it via /chunkbuster permission <role>
-# <allow|deny>. Wilderness use needs no role permission at all -- these
-# defaults only ever apply inside a faction's own claim. Roles: admin
-# (leader), mod (co-leader/moderator), member (normal), recruit.
-role-permissions:
-  defaults:
-    admin: true
-    mod: true
-    member: false
-    recruit: false
+# Faction-rank access is controlled by the existing /f permissions GUI's
+# "Use Chunk Busters" row. Defaults live in config.yml under
+# rally.permission-gui.roles, alongside collectors, banks, and spawners.

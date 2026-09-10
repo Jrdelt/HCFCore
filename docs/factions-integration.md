@@ -4,42 +4,9 @@ Vertex is built directly on top of **FactionsUUID** — it's a hard
 dependency, not an optional one. Vertex is compiled against FactionsUUID
 4.4.0, and its direct API use has also been checked against 4.7.0. This page
 covers everything that plugs into faction identity and relationships:
-nametags, rallies, permissions, upgrades, and the bank. Chat formatting
+rallies, permissions, upgrades, and the bank. Chat formatting
 is covered in [Configuration](configuration.md#chat-formatting) since
 it's primarily config-driven.
-
-## Nametags
-
-Every player sees a nametag above everyone else's head:
-
-```text
-[ftop] [FactionName] PlayerName
-```
-
-- `[ftop]` — the faction's power-ranking position (`-` if factionless).
-- `[FactionName]` — shows `Neutral` if factionless.
-- **Color is relative to the viewer, not fixed.** Your own faction
-  renders green, an allied faction renders light purple, and everyone
-  else — enemies, truce/no-relation factions, and factionless players
-  alike — renders red by default (all four colors configurable under
-  `nametags.colors`). The same subject genuinely renders differently to
-  different viewers simultaneously, because each nametag is its own
-  scoreboard team registered on that specific *viewer's* own scoreboard,
-  not a single shared team.
-- Ally/enemy status comes from FactionsUUID's real `/f ally` / `/f enemy`
-  relations. The more hostile of the two factions' one-directional wishes
-  wins — a one-sided ally wish alone doesn't count, but a one-sided enemy
-  wish does.
-- Teams are keyed by a short hash of the player's UUID, not their name,
-  so a username change can't orphan one. Team names are kept to 14
-  characters — safely under the classic 16-character vanilla scoreboard
-  team-name limit, which still applies to any older client bridged in via
-  ViaVersion regardless of the server's own version.
-- Nametags are rebuilt on join and on every `/vertex reload`, and kept
-  in sync incrementally as factions change in between.
-
-Toggle the whole system with `nametags.enabled`; refresh rate is
-`nametags.update-interval-ticks`.
 
 ## Rally
 
@@ -69,8 +36,8 @@ A faction leader opens the complete FactionsUUID permission matrix with
   roles), **Member**, or **Recruit**.
 - The grid lists every FactionsUUID native permission plus Vertex's **Set
   Rally**, **Clear Rally**, **Add Spawners**, **Remove Spawners**, **Open
-  Collectors**, **Break Collectors**, **Deposit Bank Resources**, and
-  **Withdraw Bank Resources** actions. Every permission is a
+  Collectors**, **Break Collectors**, **Deposit Bank Resources**,
+  **Withdraw Bank Resources**, and **Use Chunk Busters** actions. Every permission is a
   green stained-glass pane when allowed for that role and a red pane when
   denied. The native **Upgrade** permission controls access to Vertex's
   `/f upgrades` menu as well. The state material is deliberately not
@@ -80,7 +47,7 @@ A faction leader opens the complete FactionsUUID permission matrix with
   work normally.
 - **Left-click allows**, **right-click denies**. Changes save immediately
   to FactionsUUID's own permission system for native actions, and to
-  Vertex's per-faction configuration for the eight Vertex-specific actions.
+  Vertex's per-faction configuration for its custom actions.
 - **Admin is intentionally not selectable.** FactionsUUID always permits
   its own Admin role to perform every native action regardless of any
   configured permission, so there is nothing for this GUI to toggle for
@@ -149,10 +116,10 @@ prompt.
 
 Money, experience, **and TNT** are all stored by Vertex in the selected
 database and survive a restart; money moves through Vault. Deposit/withdraw
-opens a free anvil prompt: type a positive whole number, then click the
-green confirm result. Vertex accepts a number typed after the displayed
-prompt as well as a replaced prompt. Amounts accept shorthand — `10k`,
-`1.5m`, `2b` — through the shared parser described in
+closes the bank GUI and prompts you to type a positive whole number in chat
+(`ChatAmountPrompt`), or `cancel` to back out; the GUI reopens once an
+amount is accepted. Amounts accept shorthand — `10k`, `1.5m`, `2b` —
+through the shared parser described in
 [Configuration](configuration.md#number-formatting).
 
 Vertex owns the TNT balance rather than delegating to FactionsUUID's native

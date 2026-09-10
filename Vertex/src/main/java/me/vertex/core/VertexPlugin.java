@@ -177,7 +177,6 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private GhostPlayerManager ghostPlayerManager;
     private me.vertex.core.gc.GcStorage gcStorage;
     private me.vertex.core.gc.GcManager gcManager;
-    private me.vertex.core.gc.GcSignPrompt gcSignPrompt;
     private me.vertex.core.gc.GcInteropHook gcInteropHook;
     private me.vertex.core.gc.GcMenu gcMenu;
     private me.vertex.core.dupe.DupeStorage dupeStorage;
@@ -185,6 +184,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.item.TrackedItemIds trackedItemIds;
     private me.vertex.core.enchant.EnchantManager enchantManager;
     private me.vertex.core.performance.PerformanceManager performanceManager;
+    private me.vertex.core.zone.ZoneManager zoneManager;
+    private me.vertex.core.portal.PortalManager portalManager;
 
     @Override
     public void onLoad() {
@@ -348,7 +349,11 @@ combatManager.start();
         pvpTopManager = new me.vertex.core.faction.PvpTopManager(this, pvpTopStorage);
         pvpTopManager.load();
         pvpTopManager.loadState();
-        Bukkit.getPluginManager().registerEvents(new me.vertex.core.faction.PvpTopCommand(this, pvpTopManager, messages), this);
+        me.vertex.core.faction.PvpTopCommand pvpTopCommand =
+                new me.vertex.core.faction.PvpTopCommand(this, pvpTopManager, messages);
+        Bukkit.getPluginManager().registerEvents(pvpTopCommand, this);
+        getCommand("pvptop").setExecutor(pvpTopCommand);
+        getCommand("pvptop").setTabCompleter(pvpTopCommand);
 
         captureEventManager = new CaptureEventManager(this, messages, rallyManager, staffManager,
                 announcementPreferenceManager);
@@ -508,17 +513,16 @@ combatManager.start();
         // injected as a plain functional reference -- see the class doc for
         // why (mirrors ExplosionProtectionListener's Predicate<Location>
         // decoupling above). Wired after CombatManager/SpawnerManager
-        // (both already exist by here) and before Shop, since Shop's own
-        // listener needs a reference to open the Chunk Buster shop
-        // sub-menu -- see the Shop section below for the other half of
-        // that wiring.
+        // (both already exist by here) and before Shop, because Shop's
+        // listener renders the Chunk Buster entries in Raiding Materials.
         chunkBusterManager = new me.vertex.core.chunkbuster.ChunkBusterManager(this, chunkBusterStorage,
                 spawnerManager,
                 me.vertex.core.factions.FactionsHook::getClaimFactionId,
                 me.vertex.core.factions.FactionsHook::getClaimFactionTag,
                 me.vertex.core.factions.FactionsHook::getFactionId,
                 me.vertex.core.faction.RallyManager::roleId,
-                combatManager::isTagged);
+                combatManager::isTagged,
+                player -> rallyManager.canUse(player, "chunkbuster-use"));
         chunkBusterManager.setPerformanceManager(performanceManager);
         chunkBusterManager.load();
         chunkBusterManager.loadState();
@@ -527,8 +531,8 @@ combatManager.start();
                 new me.vertex.core.chunkbuster.ChunkBusterListener(chunkBusterManager, messages, menuRegistry), this);
         me.vertex.core.chunkbuster.ChunkBusterCommand chunkBusterCommand =
                 new me.vertex.core.chunkbuster.ChunkBusterCommand(this, chunkBusterManager, messages);
-        getCommand("chunkbuster").setExecutor(chunkBusterCommand);
-        getCommand("chunkbuster").setTabCompleter(chunkBusterCommand);
+        getCommand("chunkbusters").setExecutor(chunkBusterCommand);
+        getCommand("chunkbusters").setTabCompleter(chunkBusterCommand);
 
         // Source Buckets (Phase 5): same injected-functional-reference
         // testability shape as Chunk Busters above, plus BaseClaimManager's
@@ -554,15 +558,12 @@ combatManager.start();
         gcManager = new me.vertex.core.gc.GcManager(this, gcStorage);
         gcManager.load();
         gcManager.loadState();
-        gcSignPrompt = new me.vertex.core.gc.GcSignPrompt(this);
-        gcSignPrompt.loadLocation();
         gcInteropHook = new me.vertex.core.gc.GcInteropHook(this);
         gcInteropHook.configure(gcManager.interopCommandTemplate());
-        gcMenu = new me.vertex.core.gc.GcMenu(this, gcManager, gcSignPrompt, gcInteropHook, messages, menuRegistry);
+        gcMenu = new me.vertex.core.gc.GcMenu(this, gcManager, messages, menuRegistry);
         Bukkit.getPluginManager().registerEvents(gcMenu, this);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.gc.GcLogMenuListener(gcManager, gcMenu, messages), this);
-        Bukkit.getPluginManager().registerEvents(new me.vertex.core.gc.GcSignListener(gcSignPrompt), this);
-        me.vertex.core.gc.GcCommand gcCommand = new me.vertex.core.gc.GcCommand(this, gcManager, gcMenu, gcSignPrompt,
+        me.vertex.core.gc.GcCommand gcCommand = new me.vertex.core.gc.GcCommand(this, gcManager, gcMenu,
                 gcInteropHook, messages);
         getCommand("gc").setExecutor(gcCommand);
         getCommand("gc").setTabCompleter(gcCommand);
@@ -583,13 +584,8 @@ combatManager.start();
         getCommand("dupe").setExecutor(dupeCommand);
         getCommand("dupe").setTabCompleter(dupeCommand);
 
-        // Custom Enchantments (Phase 6): Rune rolling is a direct right-click
-        // action with a result message (no GUI -- see RuneListener's class
-        // doc for why); applying a physical enchant item opens
-        // EnchantApplyGui, whose menu id was added to MenuRegistry's bundle
-        // above. The Rune shop sub-menu needs ShopManager, so that listener
-        // is registered further down alongside ChunkBusterMenuListener/
-        // SourceBucketListener, once ShopManager exists.
+        // Custom Enchantments: Rune rolling is a direct right-click action;
+        // /runes (and its aliases) provides the dedicated Rune catalog.
         enchantManager = new me.vertex.core.enchant.EnchantManager(this, trackedItemIds);
         enchantManager.load();
         Bukkit.getPluginManager().registerEvents(
@@ -666,26 +662,27 @@ combatManager.start();
         shopManager.loadState();
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.shop.ShopMenuListener(shopManager, spawnerManager, chunkBusterManager,
-                        sourceBucketManager, enchantManager, messages),
+                        sourceBucketManager, messages),
                 this);
-        // Chunk Busters' own confirmation-GUI + shop-sub-menu listener --
-        // needs ShopManager (for its "back to shop" button), which is why
-        // this is wired here rather than alongside the rest of the Chunk
-        // Buster setup above.
+        // Chunk Busters have a confirmation GUI; their purchase entries are
+        // rendered in Raiding Materials by ShopMenu.
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.chunkbuster.ChunkBusterMenuListener(
-                chunkBusterManager, shopManager, spawnerManager, messages, menuRegistry), this);
-        // Source Buckets' own item-use + shop-sub-menu listener -- needs
-        // ShopManager for the same "back to shop" button reason above.
+                chunkBusterManager, messages, menuRegistry), this);
+        // Source Buckets' item-use listener. Purchases are normal Raiding
+        // Materials entries, not a secondary menu.
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.bucket.SourceBucketListener(
-                sourceBucketManager, shopManager, spawnerManager, messages), this);
-        // Runes' own shop sub-menu listener -- same "needs ShopManager"
-        // reason above.
+                sourceBucketManager, messages), this);
+        // The dedicated /runes purchase GUI is independent from /shop.
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.enchant.RuneShopMenuListener(
-                enchantManager, shopManager, spawnerManager, messages), this);
+                enchantManager, messages), this);
         mineManager = new me.vertex.core.mine.MineManager(this, messages);
         mineManager.load();
+        me.vertex.core.mine.MineTeleportManager mineTeleportManager =
+                new me.vertex.core.mine.MineTeleportManager(this, mineManager, combatManager, messages);
+        Bukkit.getPluginManager().registerEvents(mineTeleportManager, this);
+        backpackAutoStoreListener.setMineRegionPredicate(location -> mineManager.regionAt(location) != null);
         Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.mine.MineListener(mineManager, boosterService, messages), this);
+                new me.vertex.core.mine.MineListener(mineManager, boosterService, messages, backpackAutoStoreListener), this);
 
         me.vertex.core.mine.MineKothStorage mineKothStorage = new me.vertex.core.mine.MineKothStorage(database);
         try {
@@ -715,7 +712,8 @@ combatManager.start();
         getCommand("mines").setExecutor(minesCommand);
         getCommand("mines").setTabCompleter(minesCommand);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.mine.MinesMenuListener(
-                mineManager, mineKothManager, hotZoneManager, boosterService, messages, menuRegistry), this);
+                mineManager, mineKothManager, hotZoneManager, boosterService, messages, menuRegistry,
+                mineTeleportManager), this);
         me.vertex.core.event.EventsCommand eventsCommand = new me.vertex.core.event.EventsCommand(
                 mineManager, mineKothManager, hotZoneManager, messages, menuRegistry);
         getCommand("events").setExecutor(eventsCommand);
@@ -740,17 +738,13 @@ combatManager.start();
         getCommand("wand").setExecutor(wandCommand);
         getCommand("wand").setTabCompleter(wandCommand);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.wand.WandListener(this, wandManager,
-                shopManager, chunkCollectorManager, factionBankManager, factionUpgradeManager, messages), this);
+                shopManager, chunkCollectorManager, factionBankManager, factionUpgradeManager, messages,
+                backpackFilterManager, rallyManager), this);
 
         me.vertex.core.shop.ShopCommand shopCommand =
                 new me.vertex.core.shop.ShopCommand(shopManager, spawnerManager, messages);
         getCommand("shop").setExecutor(shopCommand);
         getCommand("shop").setTabCompleter(shopCommand);
-        // SpawnerMenuListener needs a way back to the shop's category picker
-        // now that /spawners no longer exists as its own entry point -- shop
-        // isn't constructed yet at spawner-setup time above, so it's wired in
-        // here instead of the constructor.
-        spawnerMenuListener.setShopManager(shopManager);
         shopDecayTask = Bukkit.getScheduler().runTaskTimer(this, shopManager::decayTick,
                 shopManager.decayIntervalTicks(), shopManager.decayIntervalTicks());
 
@@ -813,6 +807,55 @@ combatManager.start();
         Bukkit.getPluginManager().registerEvents(combatListener, this);
         lootProtectionListener = new me.vertex.core.pvp.LootProtectionListener(this, messages);
         Bukkit.getPluginManager().registerEvents(lootProtectionListener, this);
+        // Haven/Riftlands deliberately plugs into the existing combat,
+        // backpack, PDC identity, loot-protection, booster, and SQL services.
+        // It is initialized after those dependencies and before PlaceholderAPI.
+        zoneManager = new me.vertex.core.zone.ZoneManager(this, database, messages, combatManager,
+                backpackManager, trackedItemIds);
+        try {
+            zoneManager.initStorage();
+            zoneManager.load();
+            zoneManager.loadState();
+        } catch (Exception e) {
+            getLogger().log(Level.SEVERE, "Failed to initialise Haven/Riftlands zones.", e);
+            Bukkit.getPluginManager().disablePlugin(this);
+            return;
+        }
+        zoneManager.setBoosterService(boosterService);
+        boosterService.register(new me.vertex.core.zone.ZoneBoosterSource(zoneManager));
+        me.vertex.core.zone.ZoneMenu zoneMenu = new me.vertex.core.zone.ZoneMenu(zoneManager);
+        Bukkit.getPluginManager().registerEvents(zoneMenu, this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.zone.ZoneListener(zoneManager, combatManager,
+                lootProtectionListener), this);
+        me.vertex.core.zone.ZoneCommand havenCommand = new me.vertex.core.zone.ZoneCommand(zoneManager, zoneMenu,
+                messages, me.vertex.core.zone.ZoneType.HAVEN);
+        getCommand("haven").setExecutor(havenCommand);
+        getCommand("haven").setTabCompleter(havenCommand);
+        me.vertex.core.zone.ZoneCommand riftlandsCommand = new me.vertex.core.zone.ZoneCommand(zoneManager, zoneMenu,
+                messages, me.vertex.core.zone.ZoneType.RIFTLANDS);
+        getCommand("riftlands").setExecutor(riftlandsCommand);
+        getCommand("riftlands").setTabCompleter(riftlandsCommand);
+        me.vertex.core.zone.ZoneCommand zonesCommand = new me.vertex.core.zone.ZoneCommand(zoneManager, zoneMenu,
+                messages, null);
+        getCommand("zones").setExecutor(zonesCommand);
+        getCommand("zones").setTabCompleter(zonesCommand);
+        zoneManager.start();
+        me.vertex.core.portal.PortalStorage portalStorage = new me.vertex.core.portal.PortalStorage(database);
+        portalManager = new me.vertex.core.portal.PortalManager(this, portalStorage, mineManager, zoneManager,
+                combatManager, messages);
+        try {
+            portalManager.init();
+        } catch (Exception e) {
+            getLogger().log(Level.SEVERE, "Failed to initialise entry portals.", e);
+            Bukkit.getPluginManager().disablePlugin(this);
+            return;
+        }
+        me.vertex.core.portal.PortalCommand portalCommand = new me.vertex.core.portal.PortalCommand(portalManager,
+                mineManager);
+        getCommand("portal").setExecutor(portalCommand);
+        getCommand("portal").setTabCompleter(portalCommand);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.portal.PortalListener(portalManager), this);
+        portalManager.start();
         playerConnectionListener = new PlayerConnectionListener(userManager, combatManager);
         playerConnectionListener.setGhostPlayerManager(ghostPlayerManager);
         Bukkit.getPluginManager().registerEvents(playerConnectionListener, this);
@@ -916,6 +959,7 @@ combatManager.start();
                     kitManager, abilityManager, combatManager, factionBankManager, staffManager, rebootManager,
                     backpackManager, tagManager, blueprintManager, coinflipManager, auctionManager, tradeManager,
                     rallyManager, factionUpgradeManager, sandBotManager);
+            placeholderExpansion.setZoneManager(zoneManager);
             placeholderExpansion.register();
         }
     }
@@ -993,6 +1037,12 @@ combatManager.start();
         }
         if (hotZoneManager != null) {
             hotZoneManager.shutdown();
+        }
+        if (zoneManager != null) {
+            zoneManager.shutdown();
+        }
+        if (portalManager != null) {
+            portalManager.shutdown();
         }
         if (mineKothManager != null) {
             mineKothManager.shutdown();
@@ -1274,6 +1324,12 @@ combatManager.start();
         if (hotZoneManager != null) {
             hotZoneManager.load();
         }
+        if (zoneManager != null) {
+            zoneManager.load();
+        }
+        if (portalManager != null) {
+            portalManager.load();
+        }
         if (boosterService != null) {
             boosterService.reloadConfig();
         }
@@ -1310,7 +1366,6 @@ combatManager.start();
         }
         if (gcManager != null) {
             gcManager.load();
-            gcSignPrompt.loadLocation();
             gcInteropHook.configure(gcManager.interopCommandTemplate());
         }
         if (dupeManager != null) {

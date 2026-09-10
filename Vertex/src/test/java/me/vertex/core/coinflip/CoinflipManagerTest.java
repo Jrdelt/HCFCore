@@ -51,6 +51,7 @@ class CoinflipManagerTest {
     private ServerMock server;
     private PluginMock plugin;
     private Database database;
+    private CoinflipStorage storage;
     private CoinflipManager manager;
     private me.vertex.core.pvp.CombatManager combatManager;
     private FakeEconomy economy;
@@ -64,7 +65,7 @@ class CoinflipManagerTest {
         YamlConfiguration dbConfig = new YamlConfiguration();
         database = new Database(dbConfig, dataFolder.toFile());
 
-        CoinflipStorage storage = new CoinflipStorage(database);
+        storage = new CoinflipStorage(database);
         storage.init();
 
         UserManager userManager = new UserManager(plugin, new InMemoryStorage());
@@ -366,6 +367,19 @@ class CoinflipManagerTest {
         long emeralds = claimed.stream().filter(i -> i.getType() == Material.EMERALD).mapToLong(ItemStack::getAmount).sum();
         assertEquals(3, diamonds, "the winner must receive every item from both sides, not just their own");
         assertEquals(2, emeralds);
+    }
+
+    @Test
+    void itemClaimsCanOnlyBeReservedForDeliveryOnce() throws Exception {
+        storage.insertClaim(host.getUniqueId(), new ItemStack[] { new ItemStack(Material.DIAMOND, 3) },
+                System.currentTimeMillis());
+
+        CoinflipManager.ClaimBatch first = manager.takeClaims(host.getUniqueId()).get();
+        CoinflipManager.ClaimBatch second = manager.takeClaims(host.getUniqueId()).get();
+
+        assertEquals(1, first.items().size());
+        assertEquals(Material.DIAMOND, first.items().get(0).getType());
+        assertTrue(second.items().isEmpty(), "a second reservation cannot receive an already-deleted claim");
     }
 
     @Test

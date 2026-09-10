@@ -40,6 +40,7 @@ class ChunkBusterManagerTest {
     private ServerMock server;
     private WorldMock world;
     private PluginMock plugin;
+    private Database database;
     private ChunkBusterStorage storage;
 
     /** Mutable per-test wiring for the injected lookups, read by the lambdas passed into the manager. */
@@ -57,7 +58,7 @@ class ChunkBusterManagerTest {
         plugin = MockBukkit.createMockPlugin();
         world = server.addSimpleWorld("chunkbuster-test-world");
 
-        Database database = new Database(new YamlConfiguration(), dataFolder.toFile());
+        database = new Database(new YamlConfiguration(), dataFolder.toFile());
         storage = new ChunkBusterStorage(database);
         storage.init();
 
@@ -145,6 +146,30 @@ class ChunkBusterManagerTest {
         playerRole = "member"; // default-denied
         ChunkBusterManager.UseResult result = manager.validate(server.addPlayer(), locationAt(0, 64, 0), ChunkBusterType.FULL);
         assertEquals(ChunkBusterManager.UseResult.NO_ROLE_PERMISSION, result);
+    }
+
+    @Test
+    void factionPermissionGuiCheckOverridesLegacyChunkBusterRoleRows() {
+        ChunkBusterManager guiPermissionManager = new ChunkBusterManager(plugin, storage,
+                new me.vertex.core.spawner.SpawnerManager(plugin, new me.vertex.core.spawner.SpawnerStorage(database)),
+                location -> claimFactionId, location -> claimTag, player -> playerFactionId, player -> playerRole,
+                uuid -> combatTagged, player -> false);
+        guiPermissionManager.load();
+        guiPermissionManager.loadState();
+
+        claimFactionId = 5;
+        playerFactionId = 5;
+        playerRole = "admin"; // The old Chunk Buster defaults would allow this role.
+        assertEquals(ChunkBusterManager.UseResult.NO_ROLE_PERMISSION,
+                guiPermissionManager.validate(server.addPlayer(), locationAt(0, 64, 0), ChunkBusterType.FULL),
+                "The /f permissions action must be authoritative when wired in production.");
+    }
+
+    @Test
+    void everyChunkBusterIsAGlowingMagmaBlock() {
+        ItemStack item = manager.createItem(ChunkBusterType.FULL);
+        assertEquals(Material.MAGMA_BLOCK, item.getType());
+        assertTrue(item.getItemMeta().hasEnchants(), "Chunk Busters should visibly glow in the Raiding Materials shop.");
     }
 
     @Test

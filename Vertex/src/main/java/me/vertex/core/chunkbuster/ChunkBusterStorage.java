@@ -11,8 +11,8 @@ import java.util.List;
 
 /**
  * Durable storage for Chunk Busters: the restart-safe "operation in
- * progress" lock, the per-faction per-role permission matrix, and the
- * write-only use log (kept for a future {@code /f logs} reader, same as
+ * progress" lock and the write-only use log (kept for a future
+ * {@code /f logs} reader, same as
  * {@code ShieldStorage.insertLog} -- see that class's doc for why this
  * phase only writes rows rather than building a reader command).
  *
@@ -162,7 +162,11 @@ public final class ChunkBusterStorage {
         }
     }
 
-    // ---- Per-faction, per-role permission matrix ----
+    // ---- Legacy per-faction role rows ----
+
+    // Kept readable for existing databases and the standalone-manager
+    // compatibility constructor. Production authorization uses the shared
+    // /f permissions GUI through RallyManager instead.
 
     public record RolePermissionRow(int factionId, String role, boolean allowed) {
     }

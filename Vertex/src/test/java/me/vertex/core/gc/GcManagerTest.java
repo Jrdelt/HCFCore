@@ -239,6 +239,49 @@ class GcManagerTest {
         assertEquals(GcManager.RedeemResult.OK, outcome.result());
     }
 
+    @Test
+    void withdrawToCodeDebitsCreatesAnAuditedSingleUseCodeAndSurvivesReload() throws Exception {
+        manager.credit(player, player, GcAction.DEPOSIT, 500L, null);
+        manager.awaitWrites();
+
+        GcManager.WithdrawCodeOutcome withdrawn = manager.withdrawToCode(player, 200L).get(5, TimeUnit.SECONDS);
+        assertEquals(GcManager.WithdrawCodeResult.OK, withdrawn.result());
+        assertNotNull(withdrawn.code());
+        assertEquals(300L, manager.balance(player));
+        assertEquals(300L, withdrawn.balanceAfter());
+
+        List<GcLogEntry> logs = manager.loadLog(player, 10, 0);
+        assertTrue(logs.stream().anyMatch(entry -> entry.action() == GcAction.WITHDRAW_CODE
+                && entry.amount() == 200L && withdrawn.code().equals(entry.note())));
+
+        UUID redeemer = UUID.randomUUID();
+        assertEquals(GcManager.RedeemResult.OK, manager.redeem(redeemer, withdrawn.code())
+                .get(5, TimeUnit.SECONDS).result());
+        assertEquals(GcManager.RedeemResult.EXHAUSTED, manager.redeem(UUID.randomUUID(), withdrawn.code())
+                .get(5, TimeUnit.SECONDS).result());
+
+        GcManager reloaded = new GcManager(plugin, storage);
+        reloaded.load();
+        reloaded.loadState();
+        assertEquals(300L, reloaded.balance(player));
+        assertEquals(200L, reloaded.balance(redeemer));
+    }
+
+    @Test
+    void concurrentWithdrawToCodeRequestsCannotOverdrawTheBalance() throws Exception {
+        manager.credit(player, player, GcAction.DEPOSIT, 100L, null);
+        manager.awaitWrites();
+
+        var first = manager.withdrawToCode(player, 75L);
+        var second = manager.withdrawToCode(player, 75L);
+        GcManager.WithdrawCodeOutcome a = first.get(5, TimeUnit.SECONDS);
+        GcManager.WithdrawCodeOutcome b = second.get(5, TimeUnit.SECONDS);
+
+        assertEquals(1L, java.util.stream.Stream.of(a, b)
+                .filter(outcome -> outcome.result() == GcManager.WithdrawCodeResult.OK).count());
+        assertEquals(25L, manager.balance(player));
+    }
+
     // ---- Audit log ----
 
     @Test

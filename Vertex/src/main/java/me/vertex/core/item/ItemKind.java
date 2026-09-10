@@ -35,5 +35,7 @@ public enum ItemKind {
     /** A physical, not-yet-applied custom enchantment item produced by rolling a Rune. */
     ENCHANTMENT_ITEM,
     /** A gear item that has successfully received at least one custom enchant. */
-    ENCHANTED_ITEM
+    ENCHANTED_ITEM,
+    /** A non-stackable Riftlands emergency-extraction ticket. */
+    RIFTLANDS_TICKET
 }

@@ -168,7 +168,7 @@ class AuctionManagerTest {
     }
 
     @Test
-    void cancellingReturnsTheItemDirectlyToAnOnlineSeller() {
+    void cancellingCreatesADurableCollectionClaimEvenForAnOnlineSeller() {
         manager.list(seller, new ItemStack(Material.EMERALD, 4), 200.0, AuctionCurrency.MONEY);
         settle();
         AuctionListing listing = manager.activeListings().get(0);
@@ -176,7 +176,9 @@ class AuctionManagerTest {
         boolean cancelled = manager.cancel(listing, seller);
 
         assertTrue(cancelled);
-        assertEquals(4, countInInventory(seller, Material.EMERALD));
+        assertEquals(0, countInInventory(seller, Material.EMERALD));
+        assertTrue(manager.hasClaims(seller.getUniqueId()));
+        assertEquals(4, manager.loadClaimItems(seller.getUniqueId()).get(0).getAmount());
         assertTrue(manager.activeListings().isEmpty());
     }
 

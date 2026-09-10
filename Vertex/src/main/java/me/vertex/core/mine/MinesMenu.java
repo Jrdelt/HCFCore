@@ -12,9 +12,12 @@ import me.vertex.core.menu.MenuPlaceholders;
 import me.vertex.core.menu.MenuRegistry;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -78,6 +81,19 @@ public final class MinesMenu {
         layout.place(inventory, "koth", kothPlaceholders(region, koths, mines, messages));
         layout.place(inventory, "hotzone", hotZonePlaceholders(region, hotZones, messages));
         layout.place(inventory, "your-bonus", bonusPlaceholders(viewer, boosters, messages));
+        // Existing servers may have a customized gui/mines.yml from before
+        // the Teleport template existed. Keep the entry flow usable without
+        // overwriting that customization; a fresh config can still style it.
+        if (layout.item("teleport") == null) {
+            ItemStack teleport = new ItemStack(Material.EMERALD_BLOCK);
+            ItemMeta meta = teleport.getItemMeta();
+            meta.displayName(MessageFormatter.deserialize("<green><bold>Teleport"));
+            meta.lore(List.of(MessageFormatter.deserialize("<gray>Confirm a safe mine teleport.")));
+            teleport.setItemMeta(meta);
+            inventory.setItem(20, teleport);
+        } else {
+            layout.place(inventory, "teleport", MenuPlaceholders.of());
+        }
         layout.place(inventory, "back", MenuPlaceholders.of());
         viewer.openInventory(inventory);
     }

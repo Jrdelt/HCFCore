@@ -108,6 +108,24 @@ PlaceholderAPI, a `%...%` token is left as literal text.
 See [Factions Integration](factions-integration.md) for how tags and
 faction relations plug into this.
 
+## Physical entry portals
+
+```yaml
+portals:
+  flight:
+    speed: 0.8
+  activation-cooldown-seconds: 3
+```
+
+`speed` is the default number of route blocks travelled per second. Staff may
+override it for an individual route when running `/portal route create`.
+`activation-cooldown-seconds` is a server-side guard against repeated starts
+and chat spam when somebody remains inside a portal trigger.
+
+Portal triggers and routes themselves are not YAML: they are durable records
+in the selected Vertex database. See [Physical Entry Portals](portals.md)
+for setup and permissions.
+
 ## PvP core settings
 
 ```yaml
@@ -190,7 +208,7 @@ factions:
   add any custom alias here too or those won't be reachable from it.
 
 See [Factions Integration](factions-integration.md) for rallies, the
-permissions GUI, upgrades/bank behavior, and nametag/scoreboard details.
+permissions GUI and upgrades/bank behavior.
 
 ## Faction upgrades
 
@@ -258,23 +276,6 @@ These are validation caps and shared timers, not the kit/ability
 definitions themselves — those live in `kits.yml` and `abilities.yml`,
 covered in [Kits & Abilities](kits-and-abilities.md).
 
-## Nametags
-
-```yaml
-nametags:
-  enabled: true
-  update-interval-ticks: 15
-  colors:
-    same-faction: 'green'
-    ally: 'light_purple'
-    enemy: 'red'
-    neutral: 'red'
-```
-
-Colors accept any Adventure `NamedTextColor` name. Full mechanics
-(per-viewer coloring, team registration, name-length safety for older
-clients) are in [Factions Integration](factions-integration.md#nametags).
-
 ## Reboot scheduling
 
 ```yaml
@@ -302,6 +303,7 @@ rally:
     actions:
       vertex-rally-set: {name: 'Set Rally'}
       vertex-rally-clear: {name: 'Clear Rally'}
+      vertex-chunkbuster-use: {name: 'Use Chunk Busters'}
 ```
 
 Controls the title, per-role slot/icon/name in the top row, and the label

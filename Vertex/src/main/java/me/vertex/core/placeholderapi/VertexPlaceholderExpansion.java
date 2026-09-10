@@ -27,6 +27,8 @@ import me.vertex.core.tag.TagManager;
 import me.vertex.core.trade.TradeManager;
 import me.vertex.core.user.User;
 import me.vertex.core.user.UserManager;
+import me.vertex.core.zone.ZoneManager;
+import me.vertex.core.zone.ZoneType;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -66,6 +68,7 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
     private final RallyManager rallyManager;
     private final FactionUpgradeManager factionUpgradeManager;
     private final SandBotManager sandBotManager;
+    private volatile ZoneManager zoneManager;
 
     public VertexPlaceholderExpansion(VertexPlugin plugin, UserManager userManager, KitManager kitManager,
                                        AbilityManager abilityManager, CombatManager combatManager,
@@ -92,6 +95,11 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
         this.rallyManager = rallyManager;
         this.factionUpgradeManager = factionUpgradeManager;
         this.sandBotManager = sandBotManager;
+    }
+
+    /** Installed after Haven/Riftlands has completed its durable startup load. */
+    public void setZoneManager(ZoneManager zoneManager) {
+        this.zoneManager = zoneManager;
     }
 
     @Override
@@ -176,6 +184,31 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
             case "auction_active" -> auctionManager == null ? "0" : String.valueOf(auctionManager.activeListings().size());
             case "trade_accepting" -> yesNo(tradeManager != null && tradeManager.isAccepting(player.getUniqueId()));
 
+            case "zone", "current_zone" -> zoneManager == null ? "None" : zoneManager.currentZone(player);
+            case "haven_kills" -> zoneManager == null ? "0" : String.valueOf(zoneManager.kills(player, ZoneType.HAVEN));
+            case "riftlands_kills" -> zoneManager == null ? "0" : String.valueOf(zoneManager.kills(player, ZoneType.RIFTLANDS));
+            case "haven_progress" -> zoneManager == null ? "0" : trim(zoneManager.progressionBoost(player, ZoneType.HAVEN));
+            case "riftlands_progress" -> zoneManager == null ? "0" : trim(zoneManager.progressionBoost(player, ZoneType.RIFTLANDS));
+            case "haven_next_milestone" -> zoneManager == null ? "0" : String.valueOf(zoneManager.nextMilestone(player, ZoneType.HAVEN));
+            case "riftlands_next_milestone" -> zoneManager == null ? "0" : String.valueOf(zoneManager.nextMilestone(player, ZoneType.RIFTLANDS));
+            case "haven_next_remaining" -> zoneManager == null ? "0" : String.valueOf(Math.max(0L, zoneManager.nextMilestone(player, ZoneType.HAVEN) - zoneManager.kills(player, ZoneType.HAVEN)));
+            case "riftlands_next_remaining" -> zoneManager == null ? "0" : String.valueOf(Math.max(0L, zoneManager.nextMilestone(player, ZoneType.RIFTLANDS) - zoneManager.kills(player, ZoneType.RIFTLANDS)));
+            case "zone_amplification" -> zoneManager == null ? "0" : trim(zoneManager.amplification(player, zoneManager.isIn(player, ZoneType.RIFTLANDS) ? ZoneType.RIFTLANDS : ZoneType.HAVEN));
+            case "zone_event_active" -> yesNo(zoneManager != null && zoneManager.eventActive());
+            case "zone_event_score" -> zoneManager == null ? "0" : trim(zoneManager.eventScore(player));
+            case "zone_event_rank" -> zoneManager == null ? "0" : String.valueOf(zoneManager.eventRank(player));
+            case "zone_event_remaining" -> zoneManager == null ? "0" : String.valueOf(zoneManager.eventRemainingSeconds());
+            case "zone_winner_boost" -> zoneManager == null ? "0" : trim(zoneManager.winnerBoost(player));
+            case "zone_backpack_amplification" -> backpackManager == null ? "0" : trim(Math.max(0D, backpackManager.equippedDropBonusPercent(player)));
+            case "zone_event_top_1_name" -> zoneManager == null ? "-" : zoneManager.eventTopName(1);
+            case "zone_event_top_2_name" -> zoneManager == null ? "-" : zoneManager.eventTopName(2);
+            case "zone_event_top_3_name" -> zoneManager == null ? "-" : zoneManager.eventTopName(3);
+            case "zone_event_top_1_score" -> zoneManager == null ? "0" : trim(zoneManager.eventTopScore(1));
+            case "zone_event_top_2_score" -> zoneManager == null ? "0" : trim(zoneManager.eventTopScore(2));
+            case "zone_event_top_3_score" -> zoneManager == null ? "0" : trim(zoneManager.eventTopScore(3));
+            case "haven_death_cooldown" -> zoneManager == null ? "0" : String.valueOf(zoneManager.cooldownRemaining(player, ZoneType.HAVEN));
+            case "riftlands_death_cooldown" -> zoneManager == null ? "0" : String.valueOf(zoneManager.cooldownRemaining(player, ZoneType.RIFTLANDS));
+
             case "rally_active" -> yesNo(rallyManager != null && rallyManager.hasActiveRally(player));
 
             case "sandbot_active" -> sandBotManager == null ? "0"
@@ -183,6 +216,10 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
 
             default -> null;
         };
+    }
+
+    private static String trim(double value) {
+        return value == Math.rint(value) ? String.valueOf((long) value) : String.format(Locale.ROOT, "%.2f", value);
     }
 
     private String kitCooldown(Player player, String kitName) {

@@ -1,6 +1,9 @@
 package me.vertex.core.wand;
 
 import me.vertex.core.collector.ChunkCollectorManager;
+import me.vertex.core.collector.ChunkCollectorData;
+import me.vertex.core.backpack.BackpackFilterManager;
+import me.vertex.core.faction.RallyManager;
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.faction.FactionBankManager;
 import me.vertex.core.faction.FactionUpgradeManager;
@@ -18,6 +21,9 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -46,12 +52,15 @@ public final class WandListener implements Listener {
     private final FactionBankManager bank;
     private final FactionUpgradeManager upgrades;
     private final Messages messages;
+    private final BackpackFilterManager filters;
+    private final RallyManager rolePermissions;
 
     /** Containers mid-transaction, so the same one is never processed twice at once. */
     private final Set<Location> busy = ConcurrentHashMap.newKeySet();
 
     public WandListener(Plugin plugin, WandManager wands, ShopManager shop, ChunkCollectorManager collectors,
-            FactionBankManager bank, FactionUpgradeManager upgrades, Messages messages) {
+            FactionBankManager bank, FactionUpgradeManager upgrades, Messages messages,
+            BackpackFilterManager filters, RallyManager rolePermissions) {
         this.plugin = plugin;
         this.wands = wands;
         this.shop = shop;
@@ -59,6 +68,8 @@ public final class WandListener implements Listener {
         this.bank = bank;
         this.upgrades = upgrades;
         this.messages = messages;
+        this.filters = filters;
+        this.rolePermissions = rolePermissions;
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -92,6 +103,9 @@ public final class WandListener implements Listener {
             player.sendMessage(messages.get(player, "wand.no-uses"));
             return;
         }
+        if (container.isCollector() && !canUseCollector(player, block)) {
+            return;
+        }
         if (!busy.add(block.getLocation())) {
             player.sendMessage(messages.get(player, "wand.container-busy"));
             return;
@@ -118,7 +132,9 @@ public final class WandListener implements Listener {
             player.sendMessage(messages.get(player, "wand.no-economy"));
             return;
         }
-        Map<Material, Integer> contents = container.contents(wands::isSellable);
+        java.util.function.Predicate<ItemStack> sellablePredicate = item -> wands.isSellable(item)
+                && !filters.isFiltered(player.getUniqueId(), item.getType());
+        Map<Material, Integer> contents = container.contents(sellablePredicate);
 
         // Priced first, without touching the container. Pricing still walks
         // the market down unit by unit, so a full container earns exactly
@@ -153,7 +169,7 @@ public final class WandListener implements Listener {
         }
 
         sellable.forEach((material, amount) -> {
-            container.remove(material, amount, wands::isSellable);
+            container.remove(material, amount, sellablePredicate);
             shop.recordContainerSale(material, amount);
         });
         container.commit();
@@ -212,7 +228,12 @@ public final class WandListener implements Listener {
         // wands out, but a player can still empty a chest by hand during the
         // bank write, and the gunpowder that was priced must still be there.
         if (convertibleTnt(container, converted) < converted) {
-            bank.withdrawTnt(factionId, converted);
+            bank.withdrawTnt(factionId, converted).whenComplete((reversed, error) -> {
+                if (error != null || !Boolean.TRUE.equals(reversed)) {
+                    plugin.getLogger().severe("TNT Wand bank compensation failed for faction " + factionId
+                            + "; " + converted + " TNT requires staff reconciliation.");
+                }
+            });
             player.sendMessage(messages.get(player, "wand.container-changed"));
             return;
         }
@@ -238,6 +259,52 @@ public final class WandListener implements Listener {
             possible = Math.min(possible, contents.getOrDefault(Material.SAND, 0) / sandPer);
         }
         return (int) Math.min(possible, limit);
+    }
+
+    /** A collector is faction storage, unlike a normal chest. Its own faction role rules always apply. */
+    private boolean canUseCollector(Player player, Block block) {
+        if (player.hasPermission("vertex.collector.bypass")) {
+            return true;
+        }
+        ChunkCollectorData data = collectors.readData(block.getLocation());
+        String claimTag = FactionsHook.getClaimFactionTag(block.getLocation());
+        String playerTag = FactionsHook.getFactionTag(player);
+        boolean belongsToPlayerFaction = (claimTag != null && claimTag.equalsIgnoreCase(playerTag))
+                || (claimTag == null && data != null && data.ownerFactionTag() != null
+                && data.ownerFactionTag().equalsIgnoreCase(playerTag));
+        if (!belongsToPlayerFaction) {
+            player.sendMessage(messages.get(player, "collector.cannot-access"));
+            return false;
+        }
+        if (!rolePermissions.canUse(player, "collector-sell")) {
+            player.sendMessage(messages.get(player, "collector.open-permission-denied"));
+            return false;
+        }
+        return true;
+    }
+
+    /** Prevent a player breaking or editing a locked chest between quote and commit. */
+    @EventHandler(ignoreCancelled = true)
+    public void onBusyBreak(BlockBreakEvent event) {
+        if (busy.contains(event.getBlock().getLocation())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBusyInventoryClick(InventoryClickEvent event) {
+        Location location = event.getView().getTopInventory().getLocation();
+        if (location != null && busy.contains(location)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBusyInventoryDrag(InventoryDragEvent event) {
+        Location location = event.getView().getTopInventory().getLocation();
+        if (location != null && busy.contains(location)) {
+            event.setCancelled(true);
+        }
     }
 
 

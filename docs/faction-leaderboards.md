@@ -143,7 +143,7 @@ player's UUID.
 
 | Command | Permission | Notes |
 |---|---|---|
-| `/f pvptop` (or any configured `factions.command-aliases` alias) | Open to all | Shows each faction ranked by total points: rank, faction name, and point total. Ties break deterministically by faction ID (ascending). There is no movement indicator (unlike `/f top`) and no forced-recalculation or admin management command for PvP Top. |
+| `/pvptop` | Open to all | Shows each faction ranked by total points: rank, faction name, and point total. `/f pvptop` remains a compatibility alias. Ties break deterministically by faction ID (ascending). There is no movement indicator (unlike `/f top`) and no forced-recalculation or admin management command for PvP Top. |
 
 ### Persistence
 
@@ -156,7 +156,7 @@ auditing.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `display-limit` | `10` | Number of factions shown by `/f pvptop` (1–50). |
+| `display-limit` | `10` | Number of factions shown by `/pvptop` (1–50). |
 | `awards.koth-capture` | `10` | Points awarded to the capturing faction per KOTH capture. |
 | `awards.outpost-capture` | `5` | Points awarded to the capturing faction per Outpost capture. |
 

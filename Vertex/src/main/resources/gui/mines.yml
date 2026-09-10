@@ -112,6 +112,15 @@ items:
       - ""
       - "<gray>ᴇꜰꜰᴇᴄᴛɪᴠᴇ: <green>+{effective}%"
 
+  teleport:
+    material: EMERALD_BLOCK
+    slot: 20
+    name: "<green><bold>ᴛᴇʟᴇᴘᴏʀᴛ"
+    lore:
+      - "<gray>ᴄᴏɴꜰɪʀᴍ ᴀ ꜱᴀꜰᴇ ᴛᴇʟᴇᴘᴏʀᴛ ᴛᴏ ᴛʜɪꜱ ᴍɪɴᴇ."
+      - "<gray>ᴍᴏᴠɪɴɢ, ᴅᴀᴍᴀɢᴇ, ᴏʀ ᴄᴏᴍʙᴀᴛ ᴄᴀɴᴄᴇʟꜱ ɪᴛ."
+    sound: minecraft:ui.button.click
+
   back:
     material: ARROW
     slot: 18

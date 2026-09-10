@@ -10,6 +10,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
@@ -125,14 +126,15 @@ public final class SourceBucketManager {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
 
         Map<String, SourceBucketType> loaded = new LinkedHashMap<>();
-        readLiquidSection(config.getConfigurationSection("water"), SourceBucketType.Liquid.WATER, loaded);
-        readLiquidSection(config.getConfigurationSection("lava"), SourceBucketType.Liquid.LAVA, loaded);
+        for (SourceBucketType.PlacedBlock placedBlock : SourceBucketType.PlacedBlock.values()) {
+            readBlockSection(config.getConfigurationSection(placedBlock.configKey()), placedBlock, loaded);
+        }
         variants = Map.copyOf(loaded);
 
         disabledClaimNames = Set.copyOf(config.getStringList("disabled-claim-names"));
     }
 
-    private void readLiquidSection(ConfigurationSection section, SourceBucketType.Liquid liquid,
+    private void readBlockSection(ConfigurationSection section, SourceBucketType.PlacedBlock placedBlock,
             Map<String, SourceBucketType> into) {
         if (section == null) {
             return;
@@ -142,7 +144,7 @@ public final class SourceBucketManager {
             if (variant == null) {
                 continue;
             }
-            String id = liquid.configKey() + ":" + key.toLowerCase(Locale.ROOT);
+            String id = placedBlock.configKey() + ":" + key.toLowerCase(Locale.ROOT);
 
             boolean enabled = variant.getBoolean("enabled", true);
 
@@ -153,13 +155,13 @@ public final class SourceBucketManager {
                         + "' has an unknown flow-pattern, using single-source.");
                 pattern = SourceBucketType.FlowPattern.SINGLE_SOURCE;
             }
-            int maxDepth = Math.max(0, variant.getInt("max-depth", 0));
+            int maxDistance = configuredMaxDistance(variant, pattern, id);
             boolean baseClaimOnly = variant.getBoolean("base-claim-only", false);
             boolean combatAllowed = variant.getBoolean("combat-allowed", false);
             double shopPrice = Math.max(0D, variant.getDouble("shop-price", 0D));
             double perUseFee = Math.max(0D, variant.getDouble("per-use-fee", 0D));
 
-            Material defaultMaterial = liquid.blockMaterial() == Material.WATER ? Material.WATER_BUCKET : Material.LAVA_BUCKET;
+            Material defaultMaterial = placedBlock.defaultItemMaterial();
             Material material = Material.matchMaterial(
                     String.valueOf(variant.getString("material", defaultMaterial.name())).toUpperCase(Locale.ROOT));
             if (material == null || material.isAir()) {
@@ -172,9 +174,33 @@ public final class SourceBucketManager {
             String name = variant.getString("name", key);
             List<String> lore = variant.getStringList("lore");
 
-            into.put(id, new SourceBucketType(id, enabled, liquid, pattern, maxDepth, baseClaimOnly, combatAllowed,
+            into.put(id, new SourceBucketType(id, enabled, placedBlock, pattern, maxDistance, baseClaimOnly, combatAllowed,
                     shopPrice, perUseFee, material, customModelData, name, lore, glow));
         }
+    }
+
+    private int configuredMaxDistance(ConfigurationSection variant, SourceBucketType.FlowPattern pattern, String id) {
+        return switch (pattern) {
+            case SINGLE_SOURCE -> 0;
+            case DOWNWARD -> {
+                int configured = variant.getInt("max-depth", 0);
+                if (configured < -1) {
+                    plugin.getLogger().warning("sourcebuckets.yml: variant '" + id
+                            + "' has max-depth below -1, using 0.");
+                    yield 0;
+                }
+                yield configured; // -1 means from the origin down to the world's minimum Y.
+            }
+            case OUTWARD -> {
+                int configured = variant.getInt("max-length", 16);
+                if (configured < 1) {
+                    plugin.getLogger().warning("sourcebuckets.yml: variant '" + id
+                            + "' has max-length below 1, using 1.");
+                    yield 1;
+                }
+                yield configured;
+            }
+        };
     }
 
     // ---- Variant accessors ----
@@ -320,38 +346,57 @@ public final class SourceBucketManager {
      *       faction either.
      * </ul>
      * A chunk boundary is never itself a stopping condition -- only these
-     * per-block claim checks are. For the two patterns implemented today
-     * this rarely matters in practice (a straight-down DOWNWARD flow stays
-     * in one {@code x,z} column, and FactionsUUID claims apply to a whole
-     * chunk regardless of Y, so the claim status literally cannot change
-     * as the flow descends) but the check runs on every step regardless,
-     * so a future horizontal flow pattern inherits correct behavior for
-     * free rather than needing this logic rewritten.
+     * per-block claim checks are. This is particularly important for an
+     * OUTWARD flow, which can cross chunks and therefore must validate
+     * every block instead of trusting the origin's claim.
      *
      * <p><b>Obstruction rule.</b> A position stops the flow (without being
      * added to the result) when its current block is neither air nor
-     * already the same liquid this variant places -- matching the spec's
-     * literal "a non-air, non-liquid-compatible block" definition. This is
-     * a deliberate simplification versus full vanilla bucket-empty
-     * semantics (which also treats things like tall grass, snow layers, or
-     * the *opposite* liquid specially) -- the spec's own wording gives only
-     * two non-obstructing categories, so that is all this implements; see
-     * {@code docs/source-buckets.md} for the explicit call-out.
+     * already the same block material this variant places. This deliberately
+     * does not overwrite replaceable blocks such as tall grass or snow
+     * layers; only air and an existing matching block are valid.
      */
     List<Location> computeFlowPositions(Location origin, SourceBucketType variant) {
+        return computeFlowPositions(origin, null, variant);
+    }
+
+    /**
+     * Computes placement positions for a use. {@code outwardFace} is only
+     * required for OUTWARD variants and is the face the player clicked.
+     */
+    List<Location> computeFlowPositions(Location origin, BlockFace outwardFace, SourceBucketType variant) {
         List<Location> positions = new ArrayList<>();
         int originFactionId = claimFactionIdAt.applyAsInt(origin);
-        Material liquidMaterial = variant.liquid().blockMaterial();
-        int maxSteps = variant.flowPattern() == SourceBucketType.FlowPattern.DOWNWARD ? variant.maxDepth() : 0;
+        Material placedMaterial = variant.placedBlock().blockMaterial();
+        int maxSteps = switch (variant.flowPattern()) {
+            case SINGLE_SOURCE -> 0;
+            case DOWNWARD -> variant.maxDistance() < 0
+                    ? Math.max(0, origin.getBlockY() - origin.getWorld().getMinHeight())
+                    : variant.maxDistance();
+            case OUTWARD -> variant.maxDistance() - 1;
+        };
 
-        for (int depth = 0; depth <= maxSteps; depth++) {
-            Location candidate = origin.clone().add(0, -depth, 0);
+        if (variant.flowPattern() == SourceBucketType.FlowPattern.OUTWARD
+                && (outwardFace == null || (outwardFace.getModX() == 0
+                && outwardFace.getModY() == 0 && outwardFace.getModZ() == 0))) {
+            return positions;
+        }
+
+        for (int step = 0; step <= maxSteps; step++) {
+            Location candidate = switch (variant.flowPattern()) {
+                case SINGLE_SOURCE -> origin.clone();
+                case DOWNWARD -> origin.clone().add(0, -step, 0);
+                case OUTWARD -> origin.clone().add(
+                        outwardFace.getModX() * step,
+                        outwardFace.getModY() * step,
+                        outwardFace.getModZ() * step);
+            };
             if (!staysWithinClaimBoundary(candidate, originFactionId, variant)) {
                 break;
             }
             Block block = candidate.getBlock();
             Material current = block.getType();
-            if (!(current.isAir() || current == liquidMaterial)) {
+            if (!(current.isAir() || current == placedMaterial)) {
                 break; // obstruction: never overwrite/push through it
             }
             positions.add(candidate);
@@ -402,12 +447,17 @@ public final class SourceBucketManager {
      * possible for a free bucket).
      */
     public UseResult use(Player player, Location target, SourceBucketType variant) {
+        return use(player, target, null, variant);
+    }
+
+    /** Uses a bucket, following {@code outwardFace} for an OUTWARD variant. */
+    public UseResult use(Player player, Location target, BlockFace outwardFace, SourceBucketType variant) {
         UseResult zoneResult = validateZoneAndCombat(player, target, variant);
         if (zoneResult != UseResult.OK) {
             return zoneResult;
         }
 
-        List<Location> positions = computeFlowPositions(target, variant);
+        List<Location> positions = computeFlowPositions(target, outwardFace, variant);
         if (positions.isEmpty()) {
             return UseResult.FAILED_PLACEMENT;
         }
@@ -423,9 +473,9 @@ public final class SourceBucketManager {
             }
         }
 
-        Material liquidMaterial = variant.liquid().blockMaterial();
+        Material placedMaterial = variant.placedBlock().blockMaterial();
         for (Location position : positions) {
-            position.getBlock().setType(liquidMaterial);
+            position.getBlock().setType(placedMaterial);
         }
 
         if (charges) {

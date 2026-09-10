@@ -12,7 +12,9 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -88,7 +90,7 @@ public final class ChunkBusterManager {
     /** Faction roles a permission may be set for -- matches {@code RallyManager.roleId}'s four buckets exactly. */
     public static final List<String> ROLES = List.of("admin", "mod", "member", "recruit");
 
-    private record TypeConfig(boolean enabled, double price, Material material, Integer customModelData,
+    private record TypeConfig(boolean enabled, double price, Integer customModelData,
             String name, List<String> lore) {
     }
 
@@ -108,16 +110,24 @@ public final class ChunkBusterManager {
     private final ToIntFunction<Player> playerFactionId;
     private final Function<Player, String> playerRoleId;
     private final Predicate<UUID> isCombatTagged;
+    /**
+     * The live faction-rank permission check. Production wires this to the
+     * same matrix used by /f permissions; the nullable fallback keeps old
+     * persisted Chunk Buster rows readable for existing installations and
+     * unit tests that construct this manager directly.
+     */
+    private final Predicate<Player> factionPermission;
 
     private volatile Map<ChunkBusterType, TypeConfig> typeConfigs = Map.of();
     private volatile Set<Material> protectedMaterials = Set.of();
     private volatile Set<String> disabledClaimNames = Set.of();
+    /** Legacy fallback only; production delegates access to RallyManager's /f permissions action. */
     private volatile Map<String, Boolean> defaultRolePermissions = Map.of();
     private volatile int blocksPerTick = 1000;
     private volatile long periodTicks = 1L;
     private volatile PerformanceManager performance = PerformanceManager.disabled();
 
-    /** Per-faction, per-role overrides of the configured defaults -- loaded fully into memory, bounded by faction count. */
+    /** Legacy per-faction rows, retained only so an old database remains readable. */
     private final Map<Integer, Map<String, Boolean>> rolePermissions = new ConcurrentHashMap<>();
     /** Chunks currently mid-operation; checked by BlockPlaceEvent/BlockBreakEvent handlers. */
     private final Set<ChunkAreaKey> activeLocks = ConcurrentHashMap.newKeySet();
@@ -126,6 +136,14 @@ public final class ChunkBusterManager {
             ToIntFunction<Location> claimFactionIdAt, Function<Location, String> claimTagAt,
             ToIntFunction<Player> playerFactionId, Function<Player, String> playerRoleId,
             Predicate<UUID> isCombatTagged) {
+        this(plugin, storage, spawners, claimFactionIdAt, claimTagAt, playerFactionId, playerRoleId,
+                isCombatTagged, null);
+    }
+
+    public ChunkBusterManager(Plugin plugin, ChunkBusterStorage storage, SpawnerManager spawners,
+            ToIntFunction<Location> claimFactionIdAt, Function<Location, String> claimTagAt,
+            ToIntFunction<Player> playerFactionId, Function<Player, String> playerRoleId,
+            Predicate<UUID> isCombatTagged, Predicate<Player> factionPermission) {
         this.plugin = plugin;
         this.storage = storage;
         this.spawners = spawners;
@@ -136,6 +154,7 @@ public final class ChunkBusterManager {
         this.playerFactionId = playerFactionId;
         this.playerRoleId = playerRoleId;
         this.isCombatTagged = isCombatTagged;
+        this.factionPermission = factionPermission;
     }
 
     /**
@@ -189,22 +208,17 @@ public final class ChunkBusterManager {
 
     private TypeConfig readTypeConfig(ChunkBusterType type, ConfigurationSection section) {
         if (section == null) {
-            return new TypeConfig(true, 0D, Material.TNT, null, type.name(), List.of());
+            return new TypeConfig(true, 0D, null, type.name(), List.of());
         }
         boolean enabled = section.getBoolean("enabled", true);
         double price = Math.max(0D, section.getDouble("price", 0D));
-        Material material = Material.matchMaterial(section.getString("material", "TNT").toUpperCase(Locale.ROOT));
-        if (material == null || material.isAir()) {
-            plugin.getLogger().warning("chunkbuster.yml: types." + type.configKey() + " has an unknown material, using TNT.");
-            material = Material.TNT;
-        }
         Integer customModelData = section.contains("custom-model-data") ? section.getInt("custom-model-data") : null;
         String name = section.getString("name", type.name());
         List<String> lore = section.getStringList("lore");
-        return new TypeConfig(enabled, price, material, customModelData, name, lore);
+        return new TypeConfig(enabled, price, customModelData, name, lore);
     }
 
-    /** Rebuilds the per-faction role-permission cache from durable storage. Must run after {@link #load()}. */
+    /** Rebuilds legacy role rows from durable storage. Must run after {@link #load()}. */
     public void loadState() {
         rolePermissions.clear();
         try {
@@ -268,8 +282,12 @@ public final class ChunkBusterManager {
     // ---- Item identity ----
 
     public ItemStack createItem(ChunkBusterType type) {
-        TypeConfig config = typeConfigs.getOrDefault(type, new TypeConfig(true, 0D, Material.TNT, null, type.name(), List.of()));
-        ItemStack item = new ItemStack(config.material());
+        TypeConfig config = typeConfigs.getOrDefault(type, new TypeConfig(true, 0D, null, type.name(), List.of()));
+        // Chunk Busters deliberately always use the same glowing magma-block
+        // item. Their type is carried by PDC and their display name, not by a
+        // different vanilla material, so the raiding shop is immediately
+        // recognisable and the configured type cannot be spoofed by a lookalike.
+        ItemStack item = new ItemStack(Material.MAGMA_BLOCK);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(MessageFormatter.deserialize(config.name()));
         List<net.kyori.adventure.text.Component> lore = new ArrayList<>();
@@ -280,6 +298,8 @@ public final class ChunkBusterManager {
         if (config.customModelData() != null) {
             meta.setCustomModelData(config.customModelData());
         }
+        meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+        meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
         meta.getPersistentDataContainer().set(typeKey, PersistentDataType.STRING, type.name());
         item.setItemMeta(meta);
         return item;
@@ -344,7 +364,7 @@ public final class ChunkBusterManager {
             if (playerFaction == FactionsHook.NO_FACTION || playerFaction != claimFactionId) {
                 return UseResult.NOT_YOUR_CLAIM;
             }
-            if (!hasRolePermission(playerFaction, playerRoleId.apply(player))) {
+            if (!hasFactionPermission(player, playerFaction)) {
                 return UseResult.NO_ROLE_PERMISSION;
             }
         }
@@ -361,6 +381,12 @@ public final class ChunkBusterManager {
             return explicit;
         }
         return defaultRolePermissions.getOrDefault(role, false);
+    }
+
+    private boolean hasFactionPermission(Player player, int factionId) {
+        return factionPermission != null
+                ? factionPermission.test(player)
+                : hasRolePermission(factionId, playerRoleId.apply(player));
     }
 
     public boolean rolePermission(int factionId, String role) {

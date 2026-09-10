@@ -21,8 +21,8 @@ Winner takes both sides' stake.
 Amounts accept the server's normal formatted-number syntax: `10k`, `1.25m`,
 `1,000,000`, and the configured suffixes in `number-formatting.yml`.
 
-`exp`/`xp` and `money` both tab-complete right after `<amount>`; a player name
-never tab-completes there, only right after an explicit `exp`/`money`
+`exp`/`xp`, `money`, and `gc` all tab-complete right after `<amount>`; a player name
+never tab-completes there, only right after an explicit currency keyword
 (or as the second word of `/cf hand <player>`) — so a targeted wager
 always needs the wager type typed first. Typing a name never changes
 *what* you're wagering, only *who* can play it. A host's wager is taken
@@ -114,22 +114,16 @@ up a second offer.
 
 ## Result animation
 
-When a coinflip resolves, each participant who has animations enabled
-(the **Animations** toggle in `/cf`, on by default), is online, and is
-**not in combat** sees a short slot-machine-style GUI: a single reel
-alternates between the host's and the opponent's head, slowing down each
-flip, and lands on the winner's head. The win/lose chat message is
+When a coinflip resolves, each online participant sees a short
+slot-machine-style GUI: a single reel alternates between the host's and
+the opponent's head, slowing down each flip, and lands on the winner's
+head. The win/lose chat message is
 deliberately held back until the reel actually lands — showing it the
 instant the coin is flipped would spoil the animation before it's even
-opened, so it only fires once the result is genuinely revealed on
-screen. It's still purely cosmetic in every other sense — the flip has
-already resolved (money/levels/items already moved) before any of this
-happens, so closing the animation early, or having it disabled, only
-changes *when* you're told, never the outcome itself (a participant who
-skips or doesn't see the animation gets the message immediately, exactly
-as before). It never force-opens on someone mid-fight, since that would
-yank their screen away from a PvP fight over something that's already
-decided.
+opened, so it only fires once the shared animation timer completes. The
+result is still server-authoritative — closing the animation or
+disconnecting changes neither the winner nor the payout. A disconnected
+participant's result is retained and shown when they next join.
 
 ## Claiming item payouts
 

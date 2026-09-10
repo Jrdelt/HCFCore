@@ -1,26 +1,34 @@
 package me.vertex.core.shop;
 
+import me.vertex.core.bucket.SourceBucketManager;
+import me.vertex.core.bucket.SourceBucketType;
+import me.vertex.core.chunkbuster.ChunkBusterManager;
+import me.vertex.core.chunkbuster.ChunkBusterType;
 import me.vertex.core.economy.EconomyHook;
+import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.spawner.SpawnerManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
- * {@code /shop} opens a one-row category picker ({@link #openCategories}) --
- * each icon is one {@code shop.yml} category. Clicking one opens that
- * category's own paginated buy/sell browser ({@link #openCategory}): row 0
- * has a Back button and your balance, rows 1-4 list that category's items,
- * row 5 pages.
+ * The normal paginated {@code /shop} browser. Custom products are displayed
+ * in the same item grid as configured shop materials: Chunk Busters and
+ * Source Buckets are part of Raiding Materials, while buyable Spawners are
+ * part of Spawners & Mob Drops. No category uses a top-row shortcut or a
+ * separate shop page.
  */
 public final class ShopMenu {
 
@@ -33,213 +41,162 @@ public final class ShopMenu {
     public static final int SLOT_NEXT_PAGE = 53;
     public static final int STACK_AMOUNT = 64;
 
-    /**
-     * Sentinel category id for the Spawners button -- spawners aren't a real
-     * {@code shop.yml} category (they're priced per mob type, not per
-     * Material, so they don't fit {@link ShopEntry}'s model) and clicking it
-     * opens {@link me.vertex.core.spawner.SpawnerShopMenu} directly instead
-     * of the normal item-browsing view. Never collides with a real category
-     * id, since those come from {@code shop.yml} map keys.
-     */
-    public static final String SPAWNERS_CATEGORY_ID = "__spawners__";
-
-    /**
-     * The shop.yml category the buyable-spawner button lives inside.
-     * Spawner blocks are priced per mob type rather than per Material, so
-     * they cannot be ordinary entries in that category -- the button sits in
-     * its control row instead, which keeps spawners and mob drops in one
-     * place without forcing them into a model that does not fit them.
-     */
     public static final String SPAWNERS_HOST_CATEGORY = "spawners_and_mob_drops";
-
-    /** Control-row slot holding that button, opposite the Back button. */
-    public static final int SLOT_BUY_SPAWNERS = 8;
-
-    /**
-     * Sentinel category id for the Chunk Busters button -- same reasoning
-     * as {@link #SPAWNERS_CATEGORY_ID}: a Chunk Buster is priced per type
-     * in {@code chunkbuster.yml}, not per Material, so it cannot be a real
-     * {@code ShopEntry} row either. Clicking it opens {@link
-     * me.vertex.core.chunkbuster.ChunkBusterShopMenu} directly.
-     */
-    public static final String CHUNK_BUSTERS_CATEGORY_ID = "__chunk_busters__";
-
-    /**
-     * The shop.yml category the buyable-Chunk-Buster button lives inside.
-     * Raiding Materials already holds every other destructive/raiding
-     * consumable (TNT, obsidian, flint and steel, ...), so Chunk Busters
-     * fit thematically without needing a whole new category slot in the
-     * 9-wide /shop picker.
-     */
-    public static final String CHUNK_BUSTERS_HOST_CATEGORY = "raiding";
-
-    /** Control-row slot holding that button -- the one border slot neither Back nor Balance occupies. */
-    public static final int SLOT_BUY_CHUNK_BUSTERS = 7;
-
-    /**
-     * Sentinel category id for the Source Buckets button -- same reasoning
-     * as {@link #CHUNK_BUSTERS_CATEGORY_ID}: a Source Bucket is priced per
-     * variant in {@code sourcebuckets.yml}, not per Material, so it cannot
-     * be a real {@code ShopEntry} row either. Clicking it opens {@link
-     * me.vertex.core.bucket.SourceBucketShopMenu} directly.
-     */
-    public static final String SOURCE_BUCKETS_CATEGORY_ID = "__source_buckets__";
-
-    /**
-     * The shop.yml category the buyable-Source-Bucket button lives inside.
-     * Miscellaneous already sells a plain vanilla {@code BUCKET}, so a
-     * reusable water/lava Source Bucket fits thematically there without
-     * needing a whole new category slot in the 9-wide /shop picker.
-     */
-    public static final String SOURCE_BUCKETS_HOST_CATEGORY = "miscellaneous";
-
-    /** Control-row slot holding that button -- the same "opposite border slot" convention Spawners uses. */
-    public static final int SLOT_BUY_SOURCE_BUCKETS = 8;
-
-    /**
-     * Sentinel category id for the Runes button -- same reasoning as {@link
-     * #CHUNK_BUSTERS_CATEGORY_ID}: a Rune is priced per tier in {@code
-     * runes.yml}, not per Material, so it cannot be a real {@code
-     * ShopEntry} row either. Clicking it opens {@link
-     * me.vertex.core.enchant.RuneShopMenu} directly.
-     */
-    public static final String RUNES_CATEGORY_ID = "__runes__";
-
-    /**
-     * The shop.yml category the buyable-Rune button lives inside.
-     * Miscellaneous already hosts Source Buckets' own buy button (slot 8);
-     * Runes take the one remaining free control-row slot there rather than
-     * needing a whole new category slot in the 9-wide /shop picker.
-     */
-    public static final String RUNES_HOST_CATEGORY = "miscellaneous";
-
-    /** Control-row slot holding that button -- the one border slot neither Back, Balance, nor Source Buckets occupies. */
-    public static final int SLOT_BUY_RUNES = 7;
+    public static final String RAIDING_HOST_CATEGORY = "raiding";
 
     public enum Mode {
         CATEGORIES, ITEMS
     }
 
+    public enum CustomProductKind {
+        SPAWNER, CHUNK_BUSTER, SOURCE_BUCKET
+    }
+
+    /** A config-backed custom item placed in the ordinary shop item grid. */
+    public record CustomProduct(CustomProductKind kind, String id) {
+    }
+
     private ShopMenu() {
     }
 
-    public static void openCategories(Player player, ShopManager manager, SpawnerManager spawnerManager,
-                                       Messages messages) {
+    public static void openCategories(Player player, ShopManager manager, SpawnerManager ignoredSpawnerManager,
+                                      Messages messages) {
         Holder holder = new Holder(Mode.CATEGORIES, null, 0);
         Inventory inventory = Bukkit.createInventory(holder, 9, messages.get(player, "shop.gui-title"));
         holder.inventory = inventory;
 
         List<ShopCategory> categories = manager.categories();
-        int slot = 0;
-        for (; slot < categories.size() && slot < 9; slot++) {
+        for (int slot = 0; slot < categories.size() && slot < 9; slot++) {
             ShopCategory category = categories.get(slot);
             inventory.setItem(slot, categoryIcon(player, messages, category));
             holder.slotCategoryIds.put(slot, category.id());
         }
-        // No separate Spawners button here: buyable spawners live inside the
-        // Spawners & Mob Drops category, so the two are not split across the
-        // menu.
-
         player.openInventory(inventory);
     }
 
-    private static ItemStack spawnersCategoryIcon(Player player, Messages messages) {
-        ItemStack icon = new ItemStack(Material.SPAWNER);
-        ItemMeta meta = icon.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "shop.spawners-category-title")));
-        meta.lore(List.of(noItalic(messages.get(player, "shop.category-open-lore"))));
-        icon.setItemMeta(meta);
-        return icon;
-    }
-
-    private static ItemStack chunkBustersCategoryIcon(Player player, Messages messages) {
-        ItemStack icon = new ItemStack(Material.TNT);
-        ItemMeta meta = icon.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "shop.chunkbusters-category-title")));
-        meta.lore(List.of(noItalic(messages.get(player, "shop.category-open-lore"))));
-        icon.setItemMeta(meta);
-        return icon;
-    }
-
-    private static ItemStack sourceBucketsCategoryIcon(Player player, Messages messages) {
-        ItemStack icon = new ItemStack(Material.WATER_BUCKET);
-        ItemMeta meta = icon.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "shop.sourcebuckets-category-title")));
-        meta.lore(List.of(noItalic(messages.get(player, "shop.category-open-lore"))));
-        icon.setItemMeta(meta);
-        return icon;
-    }
-
-    private static ItemStack runesCategoryIcon(Player player, Messages messages) {
-        ItemStack icon = new ItemStack(Material.AMETHYST_SHARD);
-        ItemMeta meta = icon.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "shop.runes-category-title")));
-        meta.lore(List.of(noItalic(messages.get(player, "shop.category-open-lore"))));
-        icon.setItemMeta(meta);
-        return icon;
-    }
-
     public static void openCategory(Player player, ShopManager manager, SpawnerManager spawnerManager,
-                                     Messages messages, String categoryId, int requestedPage) {
+                                    ChunkBusterManager chunkBusterManager, SourceBucketManager sourceBucketManager,
+                                    Messages messages, String categoryId, int requestedPage) {
         ShopCategory category = manager.category(categoryId);
         if (category == null) {
             openCategories(player, manager, spawnerManager, messages);
             return;
         }
+
+        List<CustomProduct> customProducts = customProducts(categoryId, spawnerManager, chunkBusterManager,
+                sourceBucketManager);
         List<ShopEntry> entries = category.entries();
-        int totalPages = Math.max(1, (int) Math.ceil(entries.size() / (double) PAGE_SIZE));
+        int totalEntries = entries.size() + customProducts.size();
+        int totalPages = Math.max(1, (int) Math.ceil(totalEntries / (double) PAGE_SIZE));
         int page = Math.max(0, Math.min(requestedPage, totalPages - 1));
 
         Holder holder = new Holder(Mode.ITEMS, categoryId, page);
         Inventory inventory = Bukkit.createInventory(holder, 54,
                 messages.get(player, "shop.category-gui-title", "category", category.displayName()));
         holder.inventory = inventory;
-
-        for (int slot = 0; slot < 9; slot++) {
-            inventory.setItem(slot, border());
-        }
-        for (int slot = 45; slot < 54; slot++) {
-            inventory.setItem(slot, border());
-        }
+        for (int slot = 0; slot < 9; slot++) inventory.setItem(slot, border());
+        for (int slot = 45; slot < 54; slot++) inventory.setItem(slot, border());
         inventory.setItem(SLOT_BACK, backButton(player, messages));
         inventory.setItem(SLOT_BALANCE, balanceIcon(player, messages));
-        if (SPAWNERS_HOST_CATEGORY.equals(categoryId)
-                && spawnerManager != null && !spawnerManager.getMobConfigs().isEmpty()) {
-            inventory.setItem(SLOT_BUY_SPAWNERS, spawnersCategoryIcon(player, messages));
-            holder.slotCategoryIds.put(SLOT_BUY_SPAWNERS, SPAWNERS_CATEGORY_ID);
-        }
-        if (CHUNK_BUSTERS_HOST_CATEGORY.equals(categoryId)) {
-            inventory.setItem(SLOT_BUY_CHUNK_BUSTERS, chunkBustersCategoryIcon(player, messages));
-            holder.slotCategoryIds.put(SLOT_BUY_CHUNK_BUSTERS, CHUNK_BUSTERS_CATEGORY_ID);
-        }
-        if (SOURCE_BUCKETS_HOST_CATEGORY.equals(categoryId)) {
-            inventory.setItem(SLOT_BUY_SOURCE_BUCKETS, sourceBucketsCategoryIcon(player, messages));
-            holder.slotCategoryIds.put(SLOT_BUY_SOURCE_BUCKETS, SOURCE_BUCKETS_CATEGORY_ID);
-        }
-        if (RUNES_HOST_CATEGORY.equals(categoryId)) {
-            inventory.setItem(SLOT_BUY_RUNES, runesCategoryIcon(player, messages));
-            holder.slotCategoryIds.put(SLOT_BUY_RUNES, RUNES_CATEGORY_ID);
-        }
 
         int start = page * PAGE_SIZE;
-        int end = Math.min(entries.size(), start + PAGE_SIZE);
-        for (int i = start; i < end; i++) {
-            ShopEntry entry = entries.get(i);
-            int slot = gridSlot(i - start);
-            inventory.setItem(slot, blockIcon(player, manager, messages, entry));
-            holder.slotMaterials.put(slot, entry.material());
+        int end = Math.min(totalEntries, start + PAGE_SIZE);
+        for (int index = start; index < end; index++) {
+            int slot = gridSlot(index - start);
+            if (index < entries.size()) {
+                ShopEntry entry = entries.get(index);
+                inventory.setItem(slot, blockIcon(player, manager, messages, entry));
+                holder.slotMaterials.put(slot, entry.material());
+            } else {
+                CustomProduct product = customProducts.get(index - entries.size());
+                inventory.setItem(slot, customProductIcon(player, messages, spawnerManager, chunkBusterManager,
+                        sourceBucketManager, product));
+                holder.slotProducts.put(slot, product);
+            }
         }
 
-        inventory.setItem(SLOT_PREV_PAGE, pageButton(messages, player, "shop.previous-page", Material.RED_DYE, page > 0));
-        inventory.setItem(SLOT_NEXT_PAGE, pageButton(messages, player, "shop.next-page", Material.LIME_DYE, page < totalPages - 1));
-
+        inventory.setItem(SLOT_PREV_PAGE,
+                pageButton(messages, player, "shop.previous-page", Material.RED_DYE, page > 0));
+        inventory.setItem(SLOT_NEXT_PAGE,
+                pageButton(messages, player, "shop.next-page", Material.LIME_DYE, page < totalPages - 1));
         player.openInventory(inventory);
     }
 
+    private static List<CustomProduct> customProducts(String categoryId, SpawnerManager spawnerManager,
+                                                       ChunkBusterManager chunkBusterManager,
+                                                       SourceBucketManager sourceBucketManager) {
+        List<CustomProduct> products = new ArrayList<>();
+        if (SPAWNERS_HOST_CATEGORY.equals(categoryId) && spawnerManager != null) {
+            spawnerManager.getMobConfigs().stream()
+                    .sorted(Comparator.comparing(config -> config.mobType().name()))
+                    .forEach(config -> products.add(new CustomProduct(CustomProductKind.SPAWNER,
+                            config.mobType().name())));
+        }
+        if (RAIDING_HOST_CATEGORY.equals(categoryId)) {
+            if (chunkBusterManager != null) {
+                for (ChunkBusterType type : chunkBusterManager.enabledTypes()) {
+                    products.add(new CustomProduct(CustomProductKind.CHUNK_BUSTER, type.name()));
+                }
+            }
+            if (sourceBucketManager != null) {
+                for (SourceBucketType type : sourceBucketManager.enabledVariants()) {
+                    products.add(new CustomProduct(CustomProductKind.SOURCE_BUCKET, type.id()));
+                }
+            }
+        }
+        return products;
+    }
+
+    private static ItemStack customProductIcon(Player player, Messages messages, SpawnerManager spawnerManager,
+                                               ChunkBusterManager chunkBusterManager,
+                                               SourceBucketManager sourceBucketManager, CustomProduct product) {
+        return switch (product.kind()) {
+            case SPAWNER -> spawnerIcon(player, messages, spawnerManager, product.id());
+            case CHUNK_BUSTER -> chunkBusterIcon(player, messages, chunkBusterManager, product.id());
+            case SOURCE_BUCKET -> sourceBucketIcon(player, messages, sourceBucketManager, product.id());
+        };
+    }
+
+    private static ItemStack spawnerIcon(Player player, Messages messages, SpawnerManager manager, String id) {
+        EntityType type = EntityType.valueOf(id);
+        SpawnerManager.MobConfig config = manager.getMobConfig(type);
+        ItemStack item = SpawnerManager.createSpawnerItem(type, MessageFormatter.deserialize(config.displayName()));
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(noItalic(meta.displayName()));
+        meta.lore(List.of(noItalic(messages.get(player, "spawner.shop-price", "amount", EconomyHook.format(config.price()))),
+                noItalic(messages.get(player, "spawner.shop-hint"))));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private static ItemStack chunkBusterIcon(Player player, Messages messages, ChunkBusterManager manager, String id) {
+        ChunkBusterType type = ChunkBusterType.valueOf(id);
+        ItemStack item = manager.createItem(type);
+        ItemMeta meta = item.getItemMeta();
+        List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
+        lore.add(noItalic(messages.get(player, "chunkbuster.shop-price", "amount", EconomyHook.format(manager.price(type)))));
+        lore.add(noItalic(messages.get(player, "chunkbuster.shop-hint")));
+        meta.displayName(noItalic(meta.displayName()));
+        meta.lore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private static ItemStack sourceBucketIcon(Player player, Messages messages, SourceBucketManager manager, String id) {
+        SourceBucketType type = manager.variant(id);
+        ItemStack item = manager.createItem(type);
+        ItemMeta meta = item.getItemMeta();
+        List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
+        lore.add(noItalic(messages.get(player, "sourcebucket.shop-price", "amount", EconomyHook.format(type.shopPrice()))));
+        lore.add(noItalic(messages.get(player, "sourcebucket.shop-hint")));
+        meta.displayName(noItalic(meta.displayName()));
+        meta.lore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
     private static int gridSlot(int index) {
-        int row = index / GRID_COLUMNS;
-        int column = index % GRID_COLUMNS;
-        return (row + 1) * 9 + column;
+        return (index / GRID_COLUMNS + 1) * GRID_COLUMNS + index % GRID_COLUMNS;
     }
 
     private static ItemStack categoryIcon(Player player, Messages messages, ShopCategory category) {
@@ -255,7 +212,6 @@ public final class ShopMenu {
         ItemStack icon = new ItemStack(entry.material());
         ItemMeta meta = icon.getItemMeta();
         meta.displayName(noItalic(messages.get(player, "shop.block-title", "block", displayName(entry.material()))));
-
         int direction = manager.priceDirection(entry.material());
         Component buyLine = noItalic(messages.get(player, "shop.block-buy-price",
                 "price", EconomyHook.format(manager.buyPrice(entry.material()))));
@@ -267,8 +223,7 @@ public final class ShopMenu {
             buyLine = buyLine.append(indicator);
             sellLine = sellLine.append(indicator);
         }
-
-        List<Component> lore = new java.util.ArrayList<>(List.of(buyLine, sellLine));
+        List<Component> lore = new ArrayList<>(List.of(buyLine, sellLine));
         lore.add(noItalic(messages.get(player, "shop.block-buy-lore")));
         lore.add(noItalic(messages.get(player, "shop.block-buy-stack-lore")));
         lore.add(noItalic(messages.get(player, "shop.block-sell-lore")));
@@ -282,9 +237,7 @@ public final class ShopMenu {
         String[] words = material.name().toLowerCase(java.util.Locale.ROOT).split("_");
         StringBuilder builder = new StringBuilder();
         for (String word : words) {
-            if (!builder.isEmpty()) {
-                builder.append(' ');
-            }
+            if (!builder.isEmpty()) builder.append(' ');
             builder.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
         }
         return builder.toString();
@@ -324,7 +277,7 @@ public final class ShopMenu {
     }
 
     private static Component noItalic(Component component) {
-        return component.decoration(TextDecoration.ITALIC, false);
+        return component == null ? Component.empty() : component.decoration(TextDecoration.ITALIC, false);
     }
 
     public static final class Holder implements InventoryHolder {
@@ -332,6 +285,7 @@ public final class ShopMenu {
         private final String categoryId;
         private final int page;
         private final java.util.Map<Integer, Material> slotMaterials = new java.util.HashMap<>();
+        private final java.util.Map<Integer, CustomProduct> slotProducts = new java.util.HashMap<>();
         private final java.util.Map<Integer, String> slotCategoryIds = new java.util.HashMap<>();
         private Inventory inventory;
 
@@ -341,29 +295,12 @@ public final class ShopMenu {
             this.page = page;
         }
 
-        public Mode mode() {
-            return mode;
-        }
-
-        public String categoryId() {
-            return categoryId;
-        }
-
-        public int page() {
-            return page;
-        }
-
-        public Material materialAtSlot(int slot) {
-            return slotMaterials.get(slot);
-        }
-
-        public String categoryIdAtSlot(int slot) {
-            return slotCategoryIds.get(slot);
-        }
-
-        @Override
-        public Inventory getInventory() {
-            return inventory;
-        }
+        public Mode mode() { return mode; }
+        public String categoryId() { return categoryId; }
+        public int page() { return page; }
+        public Material materialAtSlot(int slot) { return slotMaterials.get(slot); }
+        public CustomProduct productAtSlot(int slot) { return slotProducts.get(slot); }
+        public String categoryIdAtSlot(int slot) { return slotCategoryIds.get(slot); }
+        @Override public Inventory getInventory() { return inventory; }
     }
 }

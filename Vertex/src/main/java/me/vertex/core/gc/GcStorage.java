@@ -291,6 +291,64 @@ public final class GcStorage {
     }
 
     /**
+     * Atomically turns a player's existing GC into one single-use code. The
+     * balance debit, code row, and audit row commit together, so a code is
+     * never printed unless the player's balance was durably reduced.
+     */
+    public WithdrawCodeAttempt withdrawToCode(UUID ownerUuid, String code, long amount, long now) throws SQLException {
+        try (Connection connection = database.getConnection()) {
+            boolean originalAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement debit = connection.prepareStatement(
+                        "UPDATE gc_balances SET balance = balance - ?, updated_at = ? "
+                                + "WHERE uuid = ? AND balance >= ?")) {
+                    debit.setLong(1, amount);
+                    debit.setLong(2, now);
+                    debit.setString(3, ownerUuid.toString());
+                    debit.setLong(4, amount);
+                    if (debit.executeUpdate() != 1) {
+                        connection.rollback();
+                        return WithdrawCodeAttempt.insufficient();
+                    }
+                }
+                try (PreparedStatement insert = connection.prepareStatement(
+                        "INSERT INTO gc_redeem_codes (code, amount, uses_remaining, created_by_uuid, created_at, "
+                                + "expires_at, status) VALUES (?, ?, 1, ?, ?, NULL, 'ACTIVE')")) {
+                    insert.setString(1, code);
+                    insert.setLong(2, amount);
+                    insert.setString(3, ownerUuid.toString());
+                    insert.setLong(4, now);
+                    insert.executeUpdate();
+                } catch (SQLException duplicateOrFailure) {
+                    // A primary-key collision is recoverable; all other SQL
+                    // errors are still surfaced to the manager after rollback.
+                    connection.rollback();
+                    if (isConstraintViolation(duplicateOrFailure)) {
+                        return WithdrawCodeAttempt.collision();
+                    }
+                    throw duplicateOrFailure;
+                }
+                long balanceAfter = readBalance(connection, ownerUuid);
+                insertLogRow(connection, ownerUuid, ownerUuid, GcAction.WITHDRAW_CODE,
+                        amount, balanceAfter, code, now);
+                connection.commit();
+                return WithdrawCodeAttempt.success(balanceAfter);
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(originalAutoCommit);
+            }
+        }
+    }
+
+    private static boolean isConstraintViolation(SQLException error) {
+        String state = error.getSQLState();
+        return (state != null && state.startsWith("23")) || error.getErrorCode() == 19;
+    }
+
+    /**
      * Atomically consumes one use of a redeem code and credits its amount,
      * all in a single transaction -- the conditional
      * {@code uses_remaining > 0} update is what guards against the same
@@ -380,4 +438,18 @@ public final class GcStorage {
             return new RedeemAttempt(GcManager.RedeemResult.OK, amount);
         }
     }
+
+    public record WithdrawCodeAttempt(WithdrawCodeResult result, long balanceAfter) {
+        static WithdrawCodeAttempt success(long balanceAfter) {
+            return new WithdrawCodeAttempt(WithdrawCodeResult.OK, balanceAfter);
+        }
+        static WithdrawCodeAttempt insufficient() {
+            return new WithdrawCodeAttempt(WithdrawCodeResult.INSUFFICIENT, 0L);
+        }
+        static WithdrawCodeAttempt collision() {
+            return new WithdrawCodeAttempt(WithdrawCodeResult.COLLISION, 0L);
+        }
+    }
+
+    public enum WithdrawCodeResult { OK, INSUFFICIENT, COLLISION }
 }

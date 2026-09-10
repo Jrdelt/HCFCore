@@ -1,140 +1,157 @@
 package me.vertex.core.shop;
 
 import me.vertex.core.bucket.SourceBucketManager;
-import me.vertex.core.bucket.SourceBucketShopMenu;
+import me.vertex.core.bucket.SourceBucketType;
 import me.vertex.core.chunkbuster.ChunkBusterManager;
-import me.vertex.core.chunkbuster.ChunkBusterShopMenu;
+import me.vertex.core.chunkbuster.ChunkBusterType;
 import me.vertex.core.economy.EconomyHook;
-import me.vertex.core.enchant.EnchantManager;
-import me.vertex.core.enchant.RuneShopMenu;
+import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.spawner.SpawnerManager;
-import me.vertex.core.spawner.SpawnerShopMenu;
+import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Material;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.inventory.ItemStack;
 
-/** Handles buy/sell clicks and pagination in {@link ShopMenu}. */
+/** Handles normal-material trades and custom-product purchases in {@link ShopMenu}. */
 public final class ShopMenuListener implements Listener {
 
     private final ShopManager manager;
     private final SpawnerManager spawnerManager;
     private final ChunkBusterManager chunkBusterManager;
     private final SourceBucketManager sourceBucketManager;
-    private final EnchantManager enchantManager;
     private final Messages messages;
 
     public ShopMenuListener(ShopManager manager, SpawnerManager spawnerManager, ChunkBusterManager chunkBusterManager,
-            SourceBucketManager sourceBucketManager, EnchantManager enchantManager, Messages messages) {
+                            SourceBucketManager sourceBucketManager, Messages messages) {
         this.manager = manager;
         this.spawnerManager = spawnerManager;
         this.chunkBusterManager = chunkBusterManager;
         this.sourceBucketManager = sourceBucketManager;
-        this.enchantManager = enchantManager;
         this.messages = messages;
     }
 
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
-        if (event.getInventory().getHolder() instanceof ShopMenu.Holder) {
-            event.setCancelled(true);
-        }
+        if (event.getInventory().getHolder() instanceof ShopMenu.Holder) event.setCancelled(true);
     }
 
     @EventHandler
     public void onClick(InventoryClickEvent event) {
         if (!(event.getInventory().getHolder() instanceof ShopMenu.Holder holder)
-                || !(event.getWhoClicked() instanceof Player player)) {
-            return;
-        }
+                || !(event.getWhoClicked() instanceof Player player)) return;
         event.setCancelled(true);
-        boolean clickedTop = event.getClickedInventory() != null
-                && event.getClickedInventory().getHolder() instanceof ShopMenu.Holder;
-        if (!clickedTop) {
-            return;
-        }
+        if (event.getClickedInventory() == null
+                || !(event.getClickedInventory().getHolder() instanceof ShopMenu.Holder)) return;
 
         int slot = event.getRawSlot();
         if (holder.mode() == ShopMenu.Mode.CATEGORIES) {
             String categoryId = holder.categoryIdAtSlot(slot);
-            if (ShopMenu.SPAWNERS_CATEGORY_ID.equals(categoryId)) {
-                SpawnerShopMenu.open(player, spawnerManager, messages);
-            } else if (ShopMenu.CHUNK_BUSTERS_CATEGORY_ID.equals(categoryId)) {
-                ChunkBusterShopMenu.open(player, chunkBusterManager, messages);
-            } else if (ShopMenu.SOURCE_BUCKETS_CATEGORY_ID.equals(categoryId)) {
-                SourceBucketShopMenu.open(player, sourceBucketManager, messages);
-            } else if (ShopMenu.RUNES_CATEGORY_ID.equals(categoryId)) {
-                RuneShopMenu.open(player, enchantManager, messages);
-            } else if (categoryId != null) {
-                ShopMenu.openCategory(player, manager, spawnerManager, messages, categoryId, 0);
-            }
+            if (categoryId != null) openCategory(player, categoryId, 0);
             return;
         }
-
         if (slot == ShopMenu.SLOT_BACK) {
             ShopMenu.openCategories(player, manager, spawnerManager, messages);
             return;
         }
-        // The buyable-spawner button now sits in the Spawners & Mob Drops
-        // control row rather than beside the categories; the buyable-Chunk-
-        // Buster button similarly sits in Raiding Materials' control row.
-        if (ShopMenu.SPAWNERS_CATEGORY_ID.equals(holder.categoryIdAtSlot(slot))) {
-            SpawnerShopMenu.open(player, spawnerManager, messages);
-            return;
-        }
-        if (ShopMenu.CHUNK_BUSTERS_CATEGORY_ID.equals(holder.categoryIdAtSlot(slot))) {
-            ChunkBusterShopMenu.open(player, chunkBusterManager, messages);
-            return;
-        }
-        // The buyable-Source-Bucket button similarly sits in Miscellaneous's control row.
-        if (ShopMenu.SOURCE_BUCKETS_CATEGORY_ID.equals(holder.categoryIdAtSlot(slot))) {
-            SourceBucketShopMenu.open(player, sourceBucketManager, messages);
-            return;
-        }
-        // The buyable-Rune button also sits in Miscellaneous's control row, one slot over from Source Buckets.
-        if (ShopMenu.RUNES_CATEGORY_ID.equals(holder.categoryIdAtSlot(slot))) {
-            RuneShopMenu.open(player, enchantManager, messages);
-            return;
-        }
         if (slot == ShopMenu.SLOT_PREV_PAGE) {
-            ShopMenu.openCategory(player, manager, spawnerManager, messages, holder.categoryId(), holder.page() - 1);
+            openCategory(player, holder.categoryId(), holder.page() - 1);
             return;
         }
         if (slot == ShopMenu.SLOT_NEXT_PAGE) {
-            ShopMenu.openCategory(player, manager, spawnerManager, messages, holder.categoryId(), holder.page() + 1);
+            openCategory(player, holder.categoryId(), holder.page() + 1);
+            return;
+        }
+
+        ShopMenu.CustomProduct product = holder.productAtSlot(slot);
+        if (product != null) {
+            if (event.isLeftClick()) purchaseCustomProduct(player, product);
+            openCategory(player, holder.categoryId(), holder.page());
             return;
         }
 
         Material material = holder.materialAtSlot(slot);
-        if (material == null) {
-            return;
-        }
-
+        if (material == null) return;
+        int amount = event.isShiftClick() ? ShopMenu.STACK_AMOUNT : manager.defaultBuyAmount();
         if (event.isLeftClick()) {
-            int amount = event.isShiftClick() ? ShopMenu.STACK_AMOUNT : manager.defaultBuyAmount();
             ShopManager.TradeOutcome outcome = manager.buy(player, material, amount);
             if (outcome.result() == ShopManager.TradeResult.OK) {
                 player.sendMessage(messages.get(player, "shop.bought", "amount", String.valueOf(amount),
                         "block", material.name(), "total", EconomyHook.format(outcome.total())));
-            } else {
-                player.sendMessage(messages.get(player, buyFailureKey(outcome.result())));
-            }
+            } else player.sendMessage(messages.get(player, buyFailureKey(outcome.result())));
         } else if (event.isRightClick()) {
-            int amount = event.isShiftClick() ? ShopMenu.STACK_AMOUNT : manager.defaultBuyAmount();
             ShopManager.TradeOutcome outcome = manager.sell(player, material, amount);
             if (outcome.result() == ShopManager.TradeResult.OK) {
                 player.sendMessage(messages.get(player, "shop.sold", "amount", String.valueOf(amount),
                         "block", material.name(), "total", EconomyHook.format(outcome.total())));
-            } else {
-                player.sendMessage(messages.get(player, sellFailureKey(outcome.result())));
-            }
-        } else {
-            return;
+            } else player.sendMessage(messages.get(player, sellFailureKey(outcome.result())));
+        } else return;
+        openCategory(player, holder.categoryId(), holder.page());
+    }
+
+    private void purchaseCustomProduct(Player player, ShopMenu.CustomProduct product) {
+        switch (product.kind()) {
+            case SPAWNER -> purchaseSpawner(player, product.id());
+            case CHUNK_BUSTER -> purchaseChunkBuster(player, product.id());
+            case SOURCE_BUCKET -> purchaseSourceBucket(player, product.id());
         }
-        ShopMenu.openCategory(player, manager, spawnerManager, messages, holder.categoryId(), holder.page());
+    }
+
+    private void purchaseSpawner(Player player, String id) {
+        EntityType type;
+        try { type = EntityType.valueOf(id); } catch (IllegalArgumentException ignored) { return; }
+        SpawnerManager.MobConfig config = spawnerManager.getMobConfig(type);
+        if (config == null) return;
+        if (!withdraw(player, config.price(), "spawner.no-economy", "spawner.cannot-afford")) return;
+        give(player, SpawnerManager.createSpawnerItem(type, MessageFormatter.deserialize(config.displayName())));
+        player.sendMessage(messages.get(player, "spawner.purchased", "amount", EconomyHook.format(config.price())));
+    }
+
+    private void purchaseChunkBuster(Player player, String id) {
+        ChunkBusterType type;
+        try { type = ChunkBusterType.valueOf(id); } catch (IllegalArgumentException ignored) { return; }
+        if (!chunkBusterManager.isEnabled(type)) return;
+        double price = chunkBusterManager.price(type);
+        if (!withdraw(player, price, "chunkbuster.no-economy", "chunkbuster.cannot-afford")) return;
+        give(player, chunkBusterManager.createItem(type));
+        player.sendMessage(messages.get(player, "chunkbuster.purchased", "type", chunkBusterManager.displayName(type),
+                "amount", EconomyHook.format(price)));
+    }
+
+    private void purchaseSourceBucket(Player player, String id) {
+        SourceBucketType type = sourceBucketManager.variant(id);
+        if (type == null || !type.enabled()) return;
+        if (!withdraw(player, type.shopPrice(), "sourcebucket.no-economy", "sourcebucket.cannot-afford")) return;
+        give(player, sourceBucketManager.createItem(type));
+        player.sendMessage(messages.get(player, "sourcebucket.purchased",
+                "amount", EconomyHook.format(type.shopPrice())));
+    }
+
+    private boolean withdraw(Player player, double price, String noEconomyKey, String cannotAffordKey) {
+        if (!EconomyHook.isAvailable()) {
+            player.sendMessage(messages.get(player, noEconomyKey));
+            return false;
+        }
+        EconomyResponse response = EconomyHook.getEconomy().withdrawPlayer(player, price);
+        if (response.transactionSuccess()) return true;
+        player.sendMessage(messages.get(player, cannotAffordKey, "amount", EconomyHook.format(price)));
+        return false;
+    }
+
+    private static void give(Player player, ItemStack item) {
+        for (ItemStack overflow : player.getInventory().addItem(item).values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), overflow);
+        }
+    }
+
+    private void openCategory(Player player, String categoryId, int page) {
+        ShopMenu.openCategory(player, manager, spawnerManager, chunkBusterManager, sourceBucketManager, messages,
+                categoryId, page);
     }
 
     private static String buyFailureKey(ShopManager.TradeResult result) {

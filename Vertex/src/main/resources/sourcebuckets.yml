@@ -1,6 +1,6 @@
 # Source Buckets -- see docs/source-buckets.md.
 #
-# Reusable, infinite-use custom buckets that place water or lava following
+# Reusable, infinite-use custom buckets that place configured blocks following
 # a configured flow pattern. Usable by everyone -- no faction permission,
 # no player permission node, no cooldown -- but only inside a valid faction
 # claim: never Wilderness, never SafeZone/WarZone (see disabled-claim-names
@@ -11,8 +11,8 @@
 # owner's inventory forever, unlocking infinite use -- it is never
 # consumed. Every successful placement then charges the fixed per-use-fee,
 # but ONLY after the placement actually happens; a failed placement or
-# insufficient balance places nothing and charges nothing. Water and Lava
-# are configured entirely independently below.
+# insufficient balance places nothing and charges nothing. Each placed block
+# type is configured independently below.
 #
 # flow-pattern is one of:
 #   single-source -- places exactly one source block at the placement point.
@@ -22,7 +22,11 @@
 #                     claim boundary (see the class doc on
 #                     SourceBucketManager.computeFlowPositions for the
 #                     exact stopping rules).
-# max-depth is only read for flow-pattern: downward.
+#                     Set max-depth: -1 to continue to the world's minimum Y.
+#   outward       -- places a line in the clicked face's direction. It stops
+#                     early at any obstruction or claim boundary.
+# max-depth is only read for flow-pattern: downward. max-length is only read
+# for flow-pattern: outward and counts the placement block as part of the line.
 
 water:
   source:
@@ -90,6 +94,79 @@ lava:
       - "<gray>Right-click a block to drop a"
       - "<gray>column of lava sources straight"
       - "<gray>down, up to 5 blocks deep."
+      - "<gray>Base Claims only. Reusable."
+
+# These solid-block variants are ordinary reusable Source Buckets too. A
+# plain BUCKET is used as their default icon so a resource pack can assign a
+# custom-model-data value later without changing how the item works.
+obsidian:
+  downward:
+    enabled: true
+    flow-pattern: downward
+    # -1 means continue until the world's bottom, an obstruction, or a claim boundary.
+    max-depth: -1
+    base-claim-only: true
+    combat-allowed: false
+    shop-price: 200000
+    per-use-fee: 250
+    material: BUCKET
+    glow: true
+    name: "<dark_purple>Obsidian Downward Bucket"
+    lore:
+      - "<gray>Right-click a block to place a"
+      - "<gray>column of obsidian down to the"
+      - "<gray>world bottom or first obstruction."
+      - "<gray>Base Claims only. Reusable."
+  outward:
+    enabled: true
+    flow-pattern: outward
+    max-length: 16
+    base-claim-only: true
+    combat-allowed: false
+    shop-price: 75000
+    per-use-fee: 100
+    material: BUCKET
+    glow: true
+    name: "<dark_purple>Obsidian Outward Bucket"
+    lore:
+      - "<gray>Right-click a block to place a"
+      - "<gray>16-block obsidian line in the"
+      - "<gray>clicked face's direction."
+      - "<gray>Base Claims only. Reusable."
+
+cobblestone:
+  downward:
+    enabled: true
+    flow-pattern: downward
+    # -1 means continue until the world's bottom, an obstruction, or a claim boundary.
+    max-depth: -1
+    base-claim-only: true
+    combat-allowed: false
+    shop-price: 60000
+    per-use-fee: 100
+    material: BUCKET
+    glow: true
+    name: "<gray>Cobblestone Downward Bucket"
+    lore:
+      - "<gray>Right-click a block to place a"
+      - "<gray>column of cobblestone down to the"
+      - "<gray>world bottom or first obstruction."
+      - "<gray>Base Claims only. Reusable."
+  outward:
+    enabled: true
+    flow-pattern: outward
+    max-length: 16
+    base-claim-only: true
+    combat-allowed: false
+    shop-price: 25000
+    per-use-fee: 50
+    material: BUCKET
+    glow: true
+    name: "<gray>Cobblestone Outward Bucket"
+    lore:
+      - "<gray>Right-click a block to place a"
+      - "<gray>16-block cobblestone line in the"
+      - "<gray>clicked face's direction."
       - "<gray>Base Claims only. Reusable."
 
 # Faction claim names Source Buckets are always blocked in -- matches

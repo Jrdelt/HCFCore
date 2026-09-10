@@ -53,6 +53,8 @@ public final class BackpackManager {
     private volatile long baseItemCapacity;
     private volatile long itemCapacityPerLevel;
     private volatile boolean autoStoreMobDrops;
+    /** Absolute safety ceiling for the bonus shown and applied to any Backpack. */
+    private volatile double maxDropBonusPercent;
     private final Set<Material> autoStoreMiningMaterials = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private volatile double upgradeCostBase;
     private volatile int upgradeCostEasyThroughLevel;
@@ -84,6 +86,12 @@ public final class BackpackManager {
         baseItemCapacity = Math.max(1L, config.getLong("base-item-capacity", 1250L));
         itemCapacityPerLevel = Math.max(0L, config.getLong("item-capacity-per-level", 0L));
         autoStoreMobDrops = config.getBoolean("auto-store.mob-drops", true);
+        double configuredBonusCap = config.getDouble("max-drop-bonus-percent", 250D);
+        if (!Double.isFinite(configuredBonusCap) || configuredBonusCap < 0D) {
+            plugin.getLogger().warning("backpacks.yml: max-drop-bonus-percent must be a finite non-negative number; using 250.0.");
+            configuredBonusCap = 250D;
+        }
+        maxDropBonusPercent = configuredBonusCap;
         autoStoreMiningMaterials.clear();
         for (String name : config.getStringList("auto-store.mining-materials")) {
             Material material = Material.matchMaterial(name);
@@ -192,7 +200,11 @@ public final class BackpackManager {
     }
 
     public double dropBonusPercent(BackpackTier tier, int level) {
-        return BackpackProgression.dropBonusPercent(tier.dropBonusBasePercent(), tier.dropBonusPerLevelPercent(), level);
+        if (tier == null) {
+            return 0D;
+        }
+        return Math.min(maxDropBonusPercent, BackpackProgression.dropBonusPercent(
+                tier.dropBonusBasePercent(), tier.dropBonusPerLevelPercent(), level));
     }
 
     /**
@@ -280,6 +292,19 @@ public final class BackpackManager {
      * responsible for dropping the returned items naturally.
      */
     public List<ItemStack> storeAutoCollected(EquippedBackpack equipped, List<ItemStack> drops) {
+        return store(equipped, drops, true);
+    }
+
+    /**
+     * Stores an already-calculated reward without applying the Backpack's
+     * normal drop multiplier a second time. Zone loot uses this path because
+     * the same Backpack bonus is already part of Zone mob-drop amplification.
+     */
+    public List<ItemStack> storeExact(EquippedBackpack equipped, List<ItemStack> drops) {
+        return store(equipped, drops, false);
+    }
+
+    private List<ItemStack> store(EquippedBackpack equipped, List<ItemStack> drops, boolean applyDropBonus) {
         if (equipped == null || drops == null || drops.isEmpty()) {
             return drops == null ? List.of() : List.copyOf(drops);
         }
@@ -298,7 +323,9 @@ public final class BackpackManager {
             if (drop == null || drop.isEmpty()) {
                 continue;
             }
-            long boostedAmount = applyBonus(drop.getAmount(), equipped.tier(), original.level());
+            long boostedAmount = applyDropBonus
+                    ? applyBonus(drop.getAmount(), equipped.tier(), original.level())
+                    : drop.getAmount();
             long toStore = Math.min(boostedAmount, remainingCapacity);
             if (toStore > 0) {
                 mergeInto(contents, drop, toStore);
@@ -318,6 +345,39 @@ public final class BackpackManager {
             writeData(equipped.item(), original.withContents(contents.toArray(new ItemStack[0])));
         }
         return leftovers;
+    }
+
+    /**
+     * Removes every stack carrying one exact PDC marker from the equipped
+     * backpack and returns immutable clones for a controlled death-drop
+     * path. It intentionally never matches only a material: session-earned
+     * Riftlands rewards must not consume an identical item owned beforehand.
+     */
+    public List<ItemStack> removeMarkedFromEquipped(org.bukkit.entity.Player player,
+            org.bukkit.NamespacedKey key, String expectedValue) {
+        EquippedBackpack equipped = equippedBackpack(player);
+        if (equipped == null || key == null || expectedValue == null) {
+            return List.of();
+        }
+        java.util.ArrayList<ItemStack> kept = new java.util.ArrayList<>();
+        java.util.ArrayList<ItemStack> removed = new java.util.ArrayList<>();
+        for (ItemStack item : equipped.data().contents()) {
+            if (item == null || item.isEmpty()) continue;
+            ItemMeta meta = item.getItemMeta();
+            String value = meta == null ? null : meta.getPersistentDataContainer()
+                    .get(key, PersistentDataType.STRING);
+            if (expectedValue.equals(value)) {
+                removed.add(item.clone());
+            } else {
+                kept.add(item);
+            }
+        }
+        if (!removed.isEmpty()) {
+            writeData(equipped.item(), equipped.data().withContents(kept.toArray(new ItemStack[0])));
+            player.getInventory().setItemInOffHand(equipped.item().clone());
+            player.updateInventory();
+        }
+        return List.copyOf(removed);
     }
 
     /** The base amount plus its randomized drop-bonus fraction (fractional chance of one extra), as a single combined total. */

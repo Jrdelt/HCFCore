@@ -193,6 +193,18 @@ public final class AuctionStorage {
      */
     public boolean settleListing(int id, UUID sellerUuid, UUID buyerUuid, String itemSummary, double price,
             long listedAt, long resolvedAt, AuctionLogEntry.Status status, UUID cancelledByUuid) throws SQLException {
+        return settleListing(id, sellerUuid, buyerUuid, itemSummary, price, listedAt, resolvedAt, status,
+                cancelledByUuid, null, null);
+    }
+
+    /**
+     * Settles a listing and, when it is being returned, creates its collection
+     * claim in the exact same transaction. A resolved listing must never be
+     * able to outlive the only durable copy of its returned item.
+     */
+    public boolean settleListing(int id, UUID sellerUuid, UUID buyerUuid, String itemSummary, double price,
+            long listedAt, long resolvedAt, AuctionLogEntry.Status status, UUID cancelledByUuid,
+            UUID returnClaimOwner, ItemStack returnClaimItem) throws SQLException {
         try (Connection connection = database.getConnection()) {
             boolean previousAutoCommit = connection.getAutoCommit();
             connection.setAutoCommit(false);
@@ -222,6 +234,15 @@ public final class AuctionStorage {
                     log.setString(7, status.name());
                     setNullableUuid(log, 8, cancelledByUuid);
                     log.executeUpdate();
+                }
+                if (returnClaimOwner != null && returnClaimItem != null && !returnClaimItem.isEmpty()) {
+                    try (PreparedStatement claim = connection.prepareStatement(
+                            "INSERT INTO auction_claims (owner_uuid, item, created_at) VALUES (?, ?, ?)")) {
+                        claim.setString(1, returnClaimOwner.toString());
+                        claim.setBytes(2, returnClaimItem.serializeAsBytes());
+                        claim.setLong(3, resolvedAt);
+                        claim.executeUpdate();
+                    }
                 }
                 connection.commit();
                 return true;

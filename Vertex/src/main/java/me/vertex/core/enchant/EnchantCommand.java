@@ -13,10 +13,9 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * {@code /enchant give <player> rune|gem <tier> [amount]} -- there is no
- * other admin distribution path for Lucky Gems (Runes are also
- * shop-purchasable; see {@code RuneShopMenu}), mirroring {@code
- * WandCommand}'s "no in-game shop" give command shape.
+ * {@code /enchant}, {@code /ce}, {@code /customenchants}, and {@code /runes}
+ * open the dedicated Rune shop. {@code /enchant give <player> rune|gem
+ * <tier> [amount]} remains the administrative distribution path.
  */
 public final class EnchantCommand implements CommandExecutor, TabCompleter {
 
@@ -32,6 +31,14 @@ public final class EnchantCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (args.length == 0) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage(messages.get(sender, "general.players-only"));
+                return true;
+            }
+            RuneShopMenu.open(player, manager, messages);
+            return true;
+        }
         if (!sender.hasPermission(GIVE_PERMISSION)) {
             sender.sendMessage(messages.get(sender, "general.no-permission"));
             return true;

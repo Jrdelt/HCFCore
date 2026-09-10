@@ -12,12 +12,16 @@ Miscellaneous by default (configurable, up to 9 categories since it's a
 single row). Clicking a category opens its own paginated buy/sell browser,
 with a **Back** button (top-left) to return to the picker.
 
-Spawn eggs and mob drops share the single **Spawners & Mob Drops** category,
-and buyable spawner blocks are reached from a button in that category's top
-row rather than a separate picker entry — so everything spawner-related is
-in one place instead of split across the menu. Spawner blocks are priced per
-mob type rather than per material, which is why they open their own menu
-instead of appearing as ordinary entries.
+Spawn eggs, mob drops, and buyable spawner blocks share the single
+**Spawners & Mob Drops** category. Spawners are normal paginated product
+tiles in that grid, so nothing spawner-related is hidden in a top-row
+shortcut or separate menu. Their price is configured per mob type rather
+than being a dynamic material-market price.
+
+**Raiding Materials** likewise includes normal product tiles for every
+enabled Chunk Buster and Source Bucket. Chunk Busters are glowing magma
+blocks. Those custom product tiles are left-click purchase-only; regular
+material tiles retain the normal left-buy/right-sell behavior.
 
 You can also trade directly by command, regardless of which category an
 item belongs to:
@@ -91,14 +95,15 @@ category's `items` map, or add a whole new category by adding another
 key under `categories:` (up to the 9-category cap). `/shop buy|sell
 <item>` works regardless of which category an item is filed under.
 
-One extra icon appears after your `shop.yml` categories (still within
-the 9-slot cap) — **Spawners**. It isn't a `shop.yml` category and
-doesn't count toward the cap accounting above; it opens a separate
-catalog priced per mob type from `spawners.yml` instead of the
-Material/dynamic-price model every other category uses, since a
-spawner's mob type isn't representable as a single `Material`. See
-[Spawners & Collectors](spawners-and-collectors.md) for its pricing and
-placement rules. Only shown if at least one mob type is configured.
+Custom product tiles are added in code to their existing categories:
+
+- **Spawners & Mob Drops:** configured Spawner types from `spawners.yml`.
+- **Raiding Materials:** enabled Chunk Busters from `chunkbuster.yml` and
+  enabled Source Buckets from `sourcebuckets.yml`.
+
+They do not consume a category-picker slot and use their feature-specific
+fixed prices. Runes are not a `/shop` product; `/runes`, `/ce`,
+`/customenchants`, and `/enchant` open their dedicated catalog.
 
 ## Other configuration (`shop.yml`)
 

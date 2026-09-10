@@ -106,7 +106,7 @@ Ghost Players are native killable Villagers and do not require an NPC plugin.
 
 | Plugin | Required? | Powers |
 |---|---|---|
-| FactionsUUID | **Yes** | Claims, roles/permissions, relations, chat/nametags, rallies, native TNT/Warps |
+| FactionsUUID | **Yes** | Claims, roles/permissions, relations, chat, rallies, native TNT/Warps |
 | Vault | No | Kit money costs, spawner/collector/faction-upgrade economy, faction money bank, `{balance}` |
 | WorldGuard | No | Region-based ability and no-pearl restrictions |
 | LuckPerms | No | Rank display, the Repair ability |

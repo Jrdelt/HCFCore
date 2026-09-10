@@ -4,14 +4,11 @@ import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.faction.RallyManager;
 import me.vertex.core.lang.Messages;
-import me.vertex.core.shop.ShopManager;
-import me.vertex.core.shop.ShopMenu;
 import me.vertex.core.staff.StaffManager;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -25,14 +22,13 @@ import org.bukkit.inventory.PlayerInventory;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Routes clicks for both SpawnerShopMenu (buy) and SpawnerManagementMenu (withdraw/sell). */
+/** Routes spawner-stack management actions (withdraw/sell). Shop purchases use the main shop grid. */
 public final class SpawnerMenuListener implements Listener {
 
     private final SpawnerManager spawnerManager;
     private final StaffManager staffManager;
     private final Messages messages;
     private final RallyManager rolePermissions;
-    private volatile ShopManager shopManager;
 
     public SpawnerMenuListener(SpawnerManager spawnerManager, StaffManager staffManager, Messages messages, RallyManager rolePermissions) {
         this.spawnerManager = spawnerManager;
@@ -41,71 +37,18 @@ public final class SpawnerMenuListener implements Listener {
         this.rolePermissions = rolePermissions;
     }
 
-    /**
-     * Wired in after both managers exist -- {@code /spawners} no longer
-     * exists as its own command, so the shop's category picker (this
-     * menu's "back" button) is only reachable through here.
-     */
-    public void setShopManager(ShopManager shopManager) {
-        this.shopManager = shopManager;
-    }
-
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
-        if (event.getInventory().getHolder() instanceof SpawnerShopMenu.Holder
-                || event.getInventory().getHolder() instanceof SpawnerManagementMenu.Holder) {
+        if (event.getInventory().getHolder() instanceof SpawnerManagementMenu.Holder) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler
     public void onClick(InventoryClickEvent event) {
-        if (event.getInventory().getHolder() instanceof SpawnerShopMenu.Holder shop) {
-            onShopClick(event, shop);
-        } else if (event.getInventory().getHolder() instanceof SpawnerManagementMenu.Holder management) {
+        if (event.getInventory().getHolder() instanceof SpawnerManagementMenu.Holder management) {
             onManagementClick(event, management);
         }
-    }
-
-    private void onShopClick(InventoryClickEvent event, SpawnerShopMenu.Holder holder) {
-        event.setCancelled(true);
-        if (event.getClickedInventory() == null || !(event.getClickedInventory().getHolder() instanceof SpawnerShopMenu.Holder)) {
-            return;
-        }
-        if (!(event.getWhoClicked() instanceof Player player)) {
-            return;
-        }
-        if (event.getSlot() == SpawnerShopMenu.SLOT_BACK) {
-            ShopManager currentShopManager = shopManager;
-            if (currentShopManager != null) {
-                ShopMenu.openCategories(player, currentShopManager, spawnerManager, messages);
-            }
-            return;
-        }
-        EntityType mobType = holder.mobTypeAt(event.getSlot());
-        if (mobType == null) {
-            return;
-        }
-        SpawnerManager.MobConfig config = spawnerManager.getMobConfig(mobType);
-        if (config == null) {
-            return;
-        }
-        if (!EconomyHook.isAvailable()) {
-            player.sendMessage(messages.get(player, "spawner.no-economy"));
-            return;
-        }
-        Economy economy = EconomyHook.getEconomy();
-        EconomyResponse response = economy.withdrawPlayer(player, config.price());
-        if (!response.transactionSuccess()) {
-            player.sendMessage(messages.get(player, "spawner.cannot-afford", "amount", EconomyHook.format(config.price())));
-            return;
-        }
-        ItemStack item = SpawnerManager.createSpawnerItem(mobType,
-                me.vertex.core.lang.MessageFormatter.deserialize(config.displayName()));
-        for (ItemStack dropped : player.getInventory().addItem(item).values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), dropped);
-        }
-        player.sendMessage(messages.get(player, "spawner.purchased", "amount", EconomyHook.format(config.price())));
     }
 
     private void onManagementClick(InventoryClickEvent event, SpawnerManagementMenu.Holder holder) {

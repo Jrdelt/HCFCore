@@ -18,12 +18,16 @@ you what a click does.
 | `/tags` | Browse and equip cosmetic chat tags |
 | `/shop` | Buy and sell at live market prices |
 | `/ah` | Auction House — buy, sell, collect |
-| `/cf` | Coinflip another player for money, XP, or items |
+| `/cf` | Coinflip another player for money, XP, GC, or items |
+| `/gc` | Open your GC wallet, withdraw a code, or redeem a code |
 | `/trade <player>` | Secure face-to-face trade |
 | `/tradetoggle` | Stop receiving trade requests |
 | `/mines` | Mining world status: ores, KOTH, Hot Zones |
+| `/events` | View active Mine KOTH and Hot Zone events |
+| `/haven` · `/riftlands` · `/zones` | Enter farming zones or view zone progress |
 | `/boosters` | Every bonus currently applying to you |
 | `/filter <material>` | Choose what your Backpack throws away |
+| `/runes` · `/ce` | Browse and buy Custom Enchantment Runes |
 | `/koth focus` · `/outpost focus` | Track an active event with a bossbar |
 | `/f rally` · `/frally` | Set a faction rally point |
 | `/f bank` · `/f upgrades` | Faction money/XP/TNT bank and upgrades |
@@ -58,7 +62,7 @@ is currently above or below its usual price.
 
 ### `/ah` — Auction House
 
-Buy-it-now marketplace. `/ah sell <price> [money|exp]` lists whatever you're
+Buy-it-now marketplace. `/ah sell <price> [money|exp|gc]` lists whatever you're
 holding; the first person to buy it gets it.
 
 In the browser: **left-click** buys, **shift-click** cancels your own
@@ -66,14 +70,15 @@ listing, **right-click** adds it to your watchlist. Your own head opens
 *Your Auction Page* — active listings, expired items, collection box,
 watchlist, and history.
 
-Anything that sells, expires, or is cancelled while you're offline waits in
-your **collection box** (`/ah collect`). Nothing is ever lost to a restart.
+Cancelled and expired listings wait in your **collection box** (`/ah collect`)
+before delivery; other returns use it whenever direct inventory delivery is
+not possible. Nothing is ever lost to a restart.
 
 See [Auction House](auctionhouse.md).
 
 ### Sell Wands
 
-Right-click a **chest** or **Chunk Collector** with a Sell Wand to sell its
+Left-click a **chest** or **Chunk Collector** with a Sell Wand to sell its
 contents straight to your balance. Each wand has limited uses, shown in its
 lore.
 
@@ -120,8 +125,8 @@ announcements you want to receive. Your choices persist between sessions.
 
 ## Trading
 
-`/trade <player>` opens a secure two-sided trade: money, experience, and
-items, with both sides having to confirm. `/tradetoggle` stops incoming
+`/trade <player>` opens a secure two-sided item trade, with both sides having
+to confirm. `/tradetoggle` stops incoming
 requests.
 
 See [Player Trading](trading.md).
@@ -228,6 +233,10 @@ See [KOTH & Outposts](koth-and-outposts.md).
 Spawners are bought from the **Spawners & Mob Drops** category inside
 `/shop` — there's no separate command. Place one in your own faction's claim,
 then right-click it with a matching spawner item to stack them.
+
+Chunk Busters and reusable Source Buckets are bought from `/shop` →
+**Raiding Materials**. Chunk Busters are glowing magma blocks and use the
+rank selected in your faction's `/f permissions` menu.
 
 **Chunk Collectors** gather everything that dies or drops in their chunk into
 one place. The item's lore shows its level, what's stored, and its capacity

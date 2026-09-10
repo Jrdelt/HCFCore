@@ -390,25 +390,58 @@ public final class FactionBankMenu implements Listener {
     }
 
     private void withdrawTnt(Player player, Faction faction, long amount, OperationResult result) {
+        if (!canFullyFit(player.getInventory(), Material.TNT, amount)) {
+            player.sendMessage(messages.get(player, "faction-bank.inventory-full"));
+            result.complete(false);
+            return;
+        }
         manager.withdrawTnt(faction.id(), amount).whenComplete((saved, error) -> onMain(() -> {
             if (error != null || !Boolean.TRUE.equals(saved)) {
                 player.sendMessage(messages.get(player, "faction-bank.not-enough"));
                 result.complete(false);
                 return;
             }
-            giveTnt(player, amount);
+            // A player may have changed inventories while the durable bank
+            // write was running. Never drop bank TNT on the ground. Put the
+            // balance back if it no longer fits, then ask them to free space.
+            if (!giveTnt(player, amount)) {
+                manager.depositTnt(faction.id(), amount, upgrades.tntCapacity(faction.id()));
+                player.sendMessage(messages.get(player, "faction-bank.inventory-full"));
+                result.complete(false);
+                return;
+            }
             result.complete(true);
         }));
     }
 
-    private void giveTnt(Player player, long amount) {
+    private boolean giveTnt(Player player, long amount) {
+        if (!canFullyFit(player.getInventory(), Material.TNT, amount)) {
+            return false;
+        }
         long remaining = amount;
         while (remaining > 0) {
             int stack = (int) Math.min(remaining, Material.TNT.getMaxStackSize());
-            player.getInventory().addItem(new ItemStack(Material.TNT, stack)).values()
-                    .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+            if (!player.getInventory().addItem(new ItemStack(Material.TNT, stack)).isEmpty()) {
+                return false;
+            }
             remaining -= stack;
         }
+        return true;
+    }
+
+    /** Mirrors Bukkit's normal stack/empty-slot insertion rules without mutating the inventory. */
+    private static boolean canFullyFit(Inventory inventory, Material material, long amount) {
+        if (amount < 0L) return false;
+        long room = 0L;
+        for (ItemStack item : inventory.getStorageContents()) {
+            if (item == null || item.isEmpty()) {
+                room += material.getMaxStackSize();
+            } else if (item.getType() == material && item.isSimilar(new ItemStack(material))) {
+                room += Math.max(0, material.getMaxStackSize() - item.getAmount());
+            }
+            if (room >= amount) return true;
+        }
+        return room >= amount;
     }
 
     private boolean removeItems(Player player, Material material, long amount) {

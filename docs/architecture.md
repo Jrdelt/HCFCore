@@ -22,10 +22,11 @@ All code lives under `me.vertex.core`, one package per feature area:
 | `lang` | Message loading/formatting, `/language` |
 | `listener` | Cross-cutting listeners (combat, player connection) |
 | `luckperms` | LuckPerms wrapper |
-| `nametag` | Per-viewer nametag teams |
 | `performance` | OFF/BASIC/DETAILED profiling framework (`PerformanceManager`), `/vertex performance` |
 | `placeholderapi` | PlaceholderAPI expansion hook |
+| `portal` | Physical entry portal volumes and server-controlled guided destination flights |
 | `pvp` | Combat tag, Legacy Combat, Archer Tag, vanilla item cooldowns |
+| `zone` | Haven/Riftlands regions, guided entry, local zone mobs, progression, loot sessions, tickets, and Mob Kill Event |
 | `reboot` | Scheduled shutdown |
 | `spawner` | Spawner shop, stacking, mob stacking |
 | `staff` | Vanish, staff chat/build, freeze, invsee/endersee, death rollback |

@@ -1,0 +1,78 @@
+# Haven is Vertex's PvE-only farming zone. Region and route geometry is stored
+# in the configured database so admin edits survive reloads and restarts.
+entry:
+  # Seconds the player must stand still and remain out of combat after confirming entry.
+  countdown-seconds: 5
+entry-gui:
+  # Every presentation value is editable without code changes.
+  title: '<dark_gray>Enter Haven'
+  size: 27
+  confirm-item:
+    material: EMERALD_BLOCK
+    # custom-model-data: 0
+    name: '<green><bold>Enter Haven'
+    lore:
+      - '<gray>PvP is disabled inside Haven.'
+      - '<gray>A 5-second countdown begins after confirmation.'
+      - '<gray>Moving, damage, or combat cancels it.'
+exit:
+  # /spawn channel duration while inside Haven.
+  spawn-channel-seconds: 10
+reentry-cooldown:
+  # Deaths in Haven block only Haven re-entry for this many seconds; 0 disables it.
+  on-death-seconds: 120
+routes:
+  # Blocks per second of guided server-authoritative movement.
+  speed: 0.8
+mob-spawning:
+  # Zone mobs exist only around players in this zone. The values below are per local player cluster.
+  min-spawn-distance: 20
+  max-spawn-distance: 80
+  base-local-mobs: 15
+  additional-mobs-per-player: 8
+  max-local-mobs: 75
+  cluster-radius: 80
+progression:
+  # Kill total -> Mob Drop Amplification percent. The base rarity of every loot item stays unchanged.
+  milestones:
+    '1000': 1.0
+    '5000': 2.0
+    '10000': 5.0
+    '25000': 8.0
+loot-pool:
+  # Chance assigned to an item first moved into the staff loot-pool editor.
+  default-item-chance: 20.0
+  # Items strictly below this chance can only be awarded once per zone mob death.
+  rare-multi-drop-threshold-percent: 5.0
+  # Set to 0 to leave Mob Drop Amplification uncapped.
+  amplification-cap-percent: 0.0
+kill-event:
+  # One combined Haven/Riftlands event. The Haven file owns the shared schedule and display cadence.
+  cycle-minutes: 120
+  duration-minutes: 5
+  bossbar:
+    refresh-seconds: 2
+  scoring:
+    haven: 1.0
+    riftlands: 1.5
+  rewards:
+    first: 5.0
+    second: 3.0
+    third: 1.0
+# Every definition is independently configurable. Names select the associated damage profile.
+mobs:
+  haven_guardian:
+    type: ZOMBIE
+    enabled: true
+    spawn-weight: 1.0
+    health:
+      min: 30.0
+      max: 50.0
+    names: ['Haven Guardian', 'Grove Defender']
+    profiles:
+      Haven Guardian: { damage: 6.0 }
+      Grove Defender: { damage: 8.0 }
+# Included in an empty default Haven loot pool at this base chance. It is rare-protected.
+riftlands-ticket:
+  include-in-default-loot: true
+  default-loot-chance: 0.75

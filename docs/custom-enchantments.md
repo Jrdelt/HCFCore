@@ -282,17 +282,10 @@ can't already carry on its own.
 
 ## Acquisition
 
-Runes are `/shop`-purchasable, following the same precedent Chunk
-Busters and Source Buckets set: a Rune is a custom item priced per tier
-in `runes.yml` (not `shop.yml`), so it can't become a literal `ShopEntry`
-row.
-
-- Per-tier price, material, name, and lore live in `runes.yml`.
-- A "Buy Runes" button (`ShopMenu.SLOT_BUY_RUNES`, slot 7) sits in the
-  **Miscellaneous** category's control row, alongside Source Buckets'
-  own "Buy Source Buckets" button (slot 8).
-- Clicking it opens `RuneShopMenu`, a small catalog of all 4 tiers;
-  buying withdraws the configured price via Vault and gives the Rune.
+Runes have their own catalog rather than appearing in `/shop`. Use
+`/runes`, `/ce`, `/customenchants`, or `/enchant` to open the four-tier
+Rune GUI. Per-tier price, material, name, and lore live in `runes.yml`;
+left-click buys a Rune with Vault money.
 
 Lucky Gems have no shop entry — `/enchant give <player> gem [amount]` is
 the only distribution path, per the spec's scope for this phase.
@@ -301,6 +294,7 @@ the only distribution path, per the spec's scope for this phase.
 
 | Command | Permission | Notes |
 |---|---|---|
+| `/runes` / `/ce` / `/customenchants` / `/enchant` | *(none)* | Opens the dedicated Rune shop. |
 | Right-click a Rune | *(none)* | Rolls it immediately; no GUI. |
 | Right-click a physical enchant item | *(none)* | Opens the Enchant Application GUI. |
 | `/enchant give <player> rune <tier> [amount]` | `vertex.enchant.give` | `tier` is one of `simple`/`elite`/`rare`/`legendary`. |
@@ -317,5 +311,4 @@ the only distribution path, per the spec's scope for this phase.
   `table` (the tier's weighted `(enchant, level)` roll list).
 - `gui/enchant-apply.yml` — the Enchant Application GUI's background,
   info icon, live chance-display icon, and confirm/cancel buttons.
-- `lang/en_us.yml`'s `rune:`/`enchant:` sections, plus
-  `shop.runes-category-title` for the `/shop` control-row button.
+- `lang/en_us.yml`'s `rune:`/`enchant:` sections.

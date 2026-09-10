@@ -39,7 +39,7 @@ items:
 
   confirm:
     material: LIME_STAINED_GLASS_PANE
-    slot: 20
+    slot: 11
     name: "<green>ᴄᴏɴꜰɪʀᴍ"
     lore:
       - "<gray>Permanently clears the area."
@@ -47,7 +47,7 @@ items:
 
   confirm-spawner-warning:
     material: TNT
-    slot: 20
+    slot: 11
     name: "<red><bold>ᴄᴏɴꜰɪʀᴍ ᴀɴʏᴡᴀʏ"
     lore:
       - "<red>Spawners in this area will be destroyed too."
@@ -56,7 +56,7 @@ items:
 
   cancel:
     material: RED_STAINED_GLASS_PANE
-    slot: 24
+    slot: 15
     name: "<red>ᴄᴀɴᴄᴇʟ"
     lore:
       - "<gray>Closes this menu; nothing changes."

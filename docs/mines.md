@@ -1,5 +1,13 @@
 # Mining Worlds
 
+## Entering a mine
+
+The detail view in `/mines` includes a Teleport button. It opens an Emerald
+Block confirmation screen and then channels for five seconds. Movement,
+damage, changing world, or becoming combat-tagged cancels the request. A
+successful channel teleports the player to safe ground at the configured
+mine region's center, using the same safe-entry flow as Haven/Riftlands.
+
 Two permanent mining worlds with server-controlled ore generation:
 
 | Mine | Ores | PvP |
@@ -261,7 +269,8 @@ and **your effective mining bonus**.
 That last panel reads the same `BoosterService` that `/boosters` reads, so
 the two screens cannot disagree about what you are actually getting.
 
-## Not yet built
+## `/events`
 
-The `/events` GUI that would list Mine KOTHs and Hot Zones alongside other
-server events.
+`/events` opens the player-facing event hub. It shows the currently active
+Mine KOTHs and Hot Zones, their remaining time/control, and any relevant
+mine details without requiring players to inspect each mine individually.

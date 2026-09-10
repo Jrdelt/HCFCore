@@ -25,6 +25,7 @@ class KitCommandTest {
     private ServerMock server;
     private PluginMock plugin;
     private Messages messages;
+    private KitManager kitManager;
     private KitCommand command;
 
     @BeforeEach
@@ -36,12 +37,15 @@ class KitCommandTest {
         messages.load();
         AbilityManager abilityManager = new AbilityManager(plugin, new NoOpStorage());
         abilityManager.load();
-        KitManager kitManager = new KitManager(plugin, new NoOpStorage(), userManager, messages, abilityManager);
+        kitManager = new KitManager(plugin, new NoOpStorage(), userManager, messages, abilityManager);
         command = new KitCommand(plugin, kitManager, messages);
     }
 
     @AfterEach
     void tearDown() {
+        if (kitManager != null) {
+            kitManager.shutdown();
+        }
         MockBukkit.unmock();
     }
 

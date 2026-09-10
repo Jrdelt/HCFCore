@@ -69,7 +69,7 @@ radius or a fixed-size cuboid, which the source spec text left ambiguous.
   where it is.
 - No item or block drops of any kind, for anything removed.
 
-## Batched, restart-safe processing
+## Batched processing and restart behavior
 
 A Full/Upward/Downward Chunk Buster in a tall world can touch on the
 order of 98,000 blocks (16×16 columns × full build height) — clearing
@@ -93,11 +93,10 @@ block placement and breaking: new `BlockPlaceEvent`/`BlockBreakEvent`
 handlers in `ChunkBusterListener` cancel any attempt inside a chunk with
 an operation currently running.
 
-**The persisted restart-safe lock.** This is the one genuinely new
-mechanism in this phase — no existing precedent in this codebase combines
-batching with a *durable* "safe to abandon on restart" marker (`MineRegenQueue`
-gets away with pure in-memory state because it never needs to be resumed
-*or* explicitly cleared). Here's how it works:
+**The persisted operation lock.** This is the one genuinely new
+mechanism in this phase. It records an interrupted operation for staff
+visibility, but it does **not** currently resume it after a restart. Here's
+how it works:
 
 1. The instant an operation is validated and about to start, a row is
    inserted into `chunk_buster_operations` (`world`, `chunk_x`, `chunk_z`,
@@ -127,70 +126,28 @@ gets away with pure in-memory state because it never needs to be resumed
 
 ## Faction role permission
 
-Faction leadership controls which roles can use Chunk Busters inside
-their own claim (wilderness needs no such check at all). There is no
-existing `/f permissions`-style matrix in this codebase to extend — every
-faction-role gate elsewhere is ad hoc per feature — so this phase adds one
-small, purpose-built table: `chunk_buster_role_permissions` (`faction_id`,
-`role`, `allowed`). Roles use the same four buckets `RallyManager.roleId`
-already normalizes every faction role into: `admin` (leader), `mod`
-(co-leader/moderator), `member` (normal), `recruit`.
+Faction leaders configure the **Use Chunk Busters** row inside the existing
+`/f permissions` (or `/f perms`) GUI. It uses the same green/allowed,
+red/denied rank matrix as collectors, banks, and spawners; there is no
+separate Chunk Buster permission command.
 
-Defaults, before any faction customizes them (`chunkbuster.yml`'s
-`role-permissions.defaults`): **admin and mod allowed, member and recruit
-denied.**
-
-```
-/chunkbuster permission <role> <allow|deny>
-```
-
-Faction Leader/Co-Leader only (`FactionsHook.isLeader`), gated by
-`vertex.chunkbuster.permission` (default: everyone — the leadership check
-itself is what actually restricts it, same pattern as `/f baseclaim`'s
-create/remove actions). Every change is logged at `INFO` to the console.
-
-This was built as a standalone command rather than folded into
-`RallyPermissionMenu`'s `CUSTOM_ACTIONS` list: that menu's action set is
-scoped to Rally's own actions (rally-set/spawner-add/collector-open/
-bank-deposit/...), and a completely unrelated, irreversible destructive
-item's permission doesn't belong entangled with it. Both remain easier to
-reason about and revert independently this way.
+The default rank settings live in `config.yml` under
+`rally.permission-gui.roles`: admins and moderators are allowed; members
+and recruits are denied. Wilderness use never checks a faction rank.
 
 The permission check is revalidated at confirm-time, identically to
 combat — see "Combat and confirmation" above.
 
 ## Acquisition
 
-Chunk Busters are `/shop`-purchasable, per the explicit product decision
-that they should be. A Chunk Buster is a custom item (a right-clickable
-tool with its own PDC identity tag), not a plain vanilla `Material`, so it
-cannot become a literal `ShopEntry` row the way `shop.yml`'s dynamic-price
-block market works. The precedent this phase followed is exactly how
-buyable Spawners already work: `spawners.yml` (not `shop.yml`) holds each
-mob type's price, and a "Buy Spawners" button sits in the
-`spawners_and_mob_drops` category's control row, opening a dedicated
-`SpawnerShopMenu` outside the normal buy/sell grid.
+Chunk Busters are normal, paginated product tiles in `/shop` → **Raiding
+Materials**. They use their configured fixed prices from `chunkbuster.yml`
+(not the material market's dynamic prices), and left-click buys one. The
+physical item and its shop icon are always a glowing magma block; its PDC
+type distinguishes upward, downward, full, and single-column variants.
 
-Chunk Busters mirror this exactly:
-
-- Per-type price, material, name, and lore live in `chunkbuster.yml`'s
-  `types` section — **not** `shop.yml`.
-- A "Buy Chunk Busters" button (`ShopMenu.SLOT_BUY_CHUNK_BUSTERS`, slot 7
-  — the one border slot neither Back nor Balance already occupies) sits
-  in the **Raiding Materials** category's control row
-  (`ShopMenu.CHUNK_BUSTERS_HOST_CATEGORY = "raiding"`) — chosen because
-  every other raiding/destructive consumable (TNT, obsidian, flint and
-  steel, ...) already lives there, so Chunk Busters fit thematically
-  without needing a 10th category slot in the single-row `/shop` picker.
-- Clicking it opens `ChunkBusterShopMenu`, a small catalog of every
-  *enabled* type; buying withdraws the configured price via Vault and
-  gives the item (dropping it at the player's feet if their inventory is
-  full), the same debit-then-give flow `SpawnerMenuListener.onShopClick`
-  uses.
-
-No `shop.yml` edits were needed to wire this up — the button lives in
-`raiding`'s existing control row purely in code, exactly like the
-Spawners button does in its own category.
+Staff may also run `/chunkbusters give <player> <upward|downward|full|single-column> [amount]`
+with `vertex.chunkbuster.give`. `/chunkbuster` is kept as an alias.
 
 ## Logging
 
@@ -205,11 +162,9 @@ future reader, the same scope choice `ShieldManager`'s event log made.
 New tables (`me.vertex.core.chunkbuster.ChunkBusterStorage`), added to
 `StorageMigrator`:
 
-- `chunk_buster_operations` — the persisted, restart-safe processing lock
+- `chunk_buster_operations` — the persisted operation lock
   described above. Should normally be empty; a leftover row only exists
   between a crash/shutdown and the next boot's recovery pass.
-- `chunk_buster_role_permissions` — per-faction, per-role overrides of the
-  configured defaults.
 - `chunk_buster_log` — the write-only use log described above.
 
 ## Commands & permissions
@@ -217,19 +172,19 @@ New tables (`me.vertex.core.chunkbuster.ChunkBusterStorage`), added to
 | Command | Permission | Notes |
 |---|---|---|
 | Right-click a block with a Chunk Buster | *(none — gated by zone/combat/role checks in-code)* | Opens the confirmation GUI. |
-| `/chunkbuster permission <role> <allow\|deny>` | `vertex.chunkbuster.permission` | Faction Leader/Co-Leader only; edits only the caller's own faction. |
+| `/chunkbusters give <player> <type> [amount]` | `vertex.chunkbuster.give` | Staff distribution command. |
 
 ## Configuration
 
-- `chunkbuster.yml` — per-type enable/price/material/name/lore, the
-  global protected-block list, `disabled-claim-names`
+- `chunkbuster.yml` — per-type enable/price/name/lore/custom-model-data,
+  the global protected-block list, `disabled-claim-names`
   (SafeZone/WarZone, independent from `abilities.disabled-claim-names` —
-  see below), batching parameters, and default role permissions.
+  see below), and batching parameters. Chunk Busters always render as
+  glowing magma blocks.
 - `gui/chunkbuster.yml` — the confirmation GUI, including the flashy
   spawner-warning variant, following the same `MenuLayout`-driven format
   as every other Vertex GUI (see [GUI framework](gui-framework.md)).
-- `lang/en_us.yml`'s `chunkbuster:` section, plus
-  `shop.chunkbusters-category-title` for the `/shop` control-row button.
+- `lang/en_us.yml`'s `chunkbuster:` section.
 
 ### Why `chunkbuster.yml` has its own `disabled-claim-names` instead of reusing `abilities.disabled-claim-names`
 

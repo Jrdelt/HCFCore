@@ -42,8 +42,13 @@ public final class RallyPermissionMenu implements Listener {
             new CustomAction("vertex:spawner-remove", "Remove Spawners"),
             new CustomAction("vertex:collector-open", "Open Collectors"),
             new CustomAction("vertex:collector-break", "Break Collectors"),
+            new CustomAction("vertex:collector-withdraw", "Withdraw from Collectors"),
+            new CustomAction("vertex:collector-sell", "Sell from Collectors"),
+            new CustomAction("vertex:collector-upgrade", "Upgrade Collectors"),
+            new CustomAction("vertex:collector-filter", "Modify Collector Filters"),
             new CustomAction("vertex:bank-deposit", "Deposit Bank Resources"),
-            new CustomAction("vertex:bank-withdraw", "Withdraw Bank Resources"));
+            new CustomAction("vertex:bank-withdraw", "Withdraw Bank Resources"),
+            new CustomAction("vertex:chunkbuster-use", "Use Chunk Busters"));
     private final Plugin plugin;
     private final RallyManager manager;
     private final Messages messages;

@@ -8,6 +8,11 @@
 # required. Configure the model values to match your resource pack.
 enabled: true
 
+# The bonus above the normal configured drop, regardless of tier or level.
+# This cap is applied to both the actual extra drops and every visible
+# Backpack/booster display, so a high level can never silently exceed it.
+max-drop-bonus-percent: 250.0
+
 # Capacity is counted by actual stack amounts, not occupied slots. A full
 # stack of 64 consumes 64 capacity. Each Backpack level increases the item
 # capacity; Backpacks store items only, never experience.

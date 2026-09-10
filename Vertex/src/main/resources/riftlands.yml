@@ -1,0 +1,70 @@
+# Riftlands is Vertex's PvPvE farming zone. It shares the Zone engine with
+# Haven but enables normal PvP and stores an unsecured session-loot ledger.
+entry:
+  countdown-seconds: 5
+entry-gui:
+  title: '<dark_gray>Enter Riftlands'
+  size: 27
+  confirm-item:
+    material: EMERALD_BLOCK
+    name: '<light_purple><bold>Enter Riftlands'
+    lore:
+      - '<red>PvP is enabled inside Riftlands.'
+      - '<gray>A 5-second countdown begins after confirmation.'
+      - '<gray>Moving, damage, or combat cancels it.'
+exit:
+  # Riftlands has the longer /spawn channel because its current session loot is at risk.
+  spawn-channel-seconds: 20
+reentry-cooldown:
+  on-death-seconds: 180
+routes:
+  speed: 0.8
+mob-spawning:
+  min-spawn-distance: 20
+  max-spawn-distance: 80
+  base-local-mobs: 18
+  additional-mobs-per-player: 10
+  max-local-mobs: 85
+  cluster-radius: 80
+progression:
+  # Riftlands defaults are stronger to reward its PvP risk.
+  milestones:
+    '1000': 2.0
+    '5000': 4.0
+    '10000': 7.0
+    '25000': 12.0
+loot-pool:
+  default-item-chance: 20.0
+  rare-multi-drop-threshold-percent: 5.0
+  amplification-cap-percent: 0.0
+mobs:
+  rift_marauder:
+    type: ZOMBIE
+    enabled: true
+    spawn-weight: 1.0
+    health:
+      min: 40.0
+      max: 65.0
+    names: ['Rift Marauder', 'Void Butcher', 'Ash Reaver']
+    profiles:
+      Rift Marauder: { damage: 7.0 }
+      Void Butcher: { damage: 9.0 }
+      Ash Reaver: { damage: 11.0 }
+# The ticket is an instant, combat-only relocation within the current Riftlands region.
+riftlands-ticket:
+  include-in-default-loot: true
+  default-loot-chance: 0.75
+  item:
+    material: PAPER
+    # custom-model-data: 0
+    name: '<aqua><bold>Riftlands Ticket'
+    lore:
+      - '<gray>Right-click while combat-tagged in Riftlands.'
+      - '<gray>Teleports you to the safest valid spot in this arena.'
+    glow: true
+  teleport:
+    # Random safe ground candidates inspected before selecting the farthest from all legal hostiles.
+    candidates: 40
+    border-distance: 8
+    # Candidate landing locations this close to any guided route waypoint are rejected.
+    entry-route-avoid-radius: 50

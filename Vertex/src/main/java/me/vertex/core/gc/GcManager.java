@@ -43,13 +43,10 @@ public final class GcManager {
     private final GcStorage storage;
     private final File file;
 
-    private volatile long minDeposit;
-    private volatile long maxDeposit;
     private volatile long minWithdraw;
     private volatile long maxWithdraw;
     private volatile int redeemCodeLength;
     private volatile String redeemCodeCharset;
-    private volatile int signPromptTimeoutSeconds;
     private volatile int logPageSize;
     private volatile String interopCommandTemplate;
 
@@ -69,8 +66,6 @@ public final class GcManager {
         }
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
 
-        minDeposit = Math.max(1L, config.getLong("min-deposit", 1L));
-        maxDeposit = Math.max(minDeposit, config.getLong("max-deposit", 1_000_000_000L));
         minWithdraw = Math.max(1L, config.getLong("min-withdraw", 1L));
         maxWithdraw = Math.max(minWithdraw, config.getLong("max-withdraw", 1_000_000_000L));
         redeemCodeLength = Math.max(4, Math.min(32, config.getInt("redeem-code-length", 12)));
@@ -78,7 +73,6 @@ public final class GcManager {
         if (redeemCodeCharset == null || redeemCodeCharset.isBlank()) {
             redeemCodeCharset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         }
-        signPromptTimeoutSeconds = Math.max(5, config.getInt("sign-prompt-timeout-seconds", 45));
         logPageSize = Math.max(1, config.getInt("log-page-size", 8));
         interopCommandTemplate = config.getString("interop-command", "");
     }
@@ -96,24 +90,12 @@ public final class GcManager {
         }
     }
 
-    public long minDeposit() {
-        return minDeposit;
-    }
-
-    public long maxDeposit() {
-        return maxDeposit;
-    }
-
     public long minWithdraw() {
         return minWithdraw;
     }
 
     public long maxWithdraw() {
         return maxWithdraw;
-    }
-
-    public int signPromptTimeoutSeconds() {
-        return signPromptTimeoutSeconds;
     }
 
     public int logPageSize() {
@@ -279,6 +261,49 @@ public final class GcManager {
     }
 
     public record CreateCodeOutcome(boolean success, String code) {
+    }
+
+    public enum WithdrawCodeResult { OK, INSUFFICIENT, FAILED }
+    public record WithdrawCodeOutcome(WithdrawCodeResult result, String code, long balanceAfter) { }
+
+    /**
+     * Converts a player's GC into a one-use code. Unlike the retired
+     * GC-to-Vault path, this waits for one database transaction before the
+     * code is revealed, eliminating an unlogged/free code failure window.
+     */
+    public CompletableFuture<WithdrawCodeOutcome> withdrawToCode(UUID ownerUuid, long amount) {
+        if (amount < minWithdraw || amount > maxWithdraw) {
+            return CompletableFuture.completedFuture(new WithdrawCodeOutcome(WithdrawCodeResult.FAILED, null, balance(ownerUuid)));
+        }
+        CompletableFuture<WithdrawCodeOutcome> request;
+        synchronized (writeChains) {
+            CompletableFuture<Void> previous = writeChains.getOrDefault(ownerUuid, CompletableFuture.completedFuture(null));
+            request = previous.handle((ignored, error) -> null).thenApplyAsync(ignored -> {
+                for (int attempt = 0; attempt < 8; attempt++) {
+                    String code = generateCode();
+                    try {
+                        GcStorage.WithdrawCodeAttempt outcome = storage.withdrawToCode(ownerUuid, code, amount,
+                                System.currentTimeMillis());
+                        if (outcome.result() == GcStorage.WithdrawCodeResult.COLLISION) continue;
+                        if (outcome.result() == GcStorage.WithdrawCodeResult.INSUFFICIENT) {
+                            return new WithdrawCodeOutcome(WithdrawCodeResult.INSUFFICIENT, null, balance(ownerUuid));
+                        }
+                        balances.put(ownerUuid, outcome.balanceAfter());
+                        return new WithdrawCodeOutcome(WithdrawCodeResult.OK, code, outcome.balanceAfter());
+                    } catch (Exception e) {
+                        plugin.getLogger().log(Level.SEVERE, "Failed to create a GC withdrawal code for " + ownerUuid, e);
+                        return new WithdrawCodeOutcome(WithdrawCodeResult.FAILED, null, balance(ownerUuid));
+                    }
+                }
+                plugin.getLogger().severe("Could not allocate a unique GC withdrawal code after eight attempts.");
+                return new WithdrawCodeOutcome(WithdrawCodeResult.FAILED, null, balance(ownerUuid));
+            });
+            CompletableFuture<Void> chain = request.handle((ignored, error) -> null);
+            writeChains.put(ownerUuid, chain);
+            chain.whenComplete((ignored, error) -> writeChains.remove(ownerUuid, chain));
+        }
+        track(request);
+        return request;
     }
 
     /**

@@ -365,11 +365,11 @@ public final class AuctionManager {
             return false;
         }
         boolean adminCancel = !listing.sellerUuid().equals(actor.getUniqueId());
-        if (!settle(listing, null, AuctionLogEntry.Status.CANCELLED, adminCancel ? actor.getUniqueId() : null)) {
+        if (!settle(listing, null, AuctionLogEntry.Status.CANCELLED, adminCancel ? actor.getUniqueId() : null,
+                listing.sellerUuid(), listing.item())) {
             activeListings.put(listing.id(), listing);
             return false;
         }
-        giveOrClaim(listing.sellerUuid(), listing.item());
         return true;
     }
 
@@ -385,13 +385,12 @@ public final class AuctionManager {
             if (!activeListings.remove(listing.id(), listing)) {
                 continue;
             }
-            if (!settle(listing, null, AuctionLogEntry.Status.EXPIRED, null)) {
+            if (!settle(listing, null, AuctionLogEntry.Status.EXPIRED, null, listing.sellerUuid(), listing.item())) {
                 // Left active so the next sweep retries it; returning the item
                 // now could hand it back twice.
                 activeListings.put(listing.id(), listing);
                 continue;
             }
-            queueClaim(listing.sellerUuid(), listing.item());
         }
     }
 
@@ -409,10 +408,16 @@ public final class AuctionManager {
      *         must not deliver anything and should put the listing back
      */
     private boolean settle(AuctionListing listing, UUID buyerUuid, AuctionLogEntry.Status status, UUID cancelledBy) {
+        return settle(listing, buyerUuid, status, cancelledBy, null, null);
+    }
+
+    private boolean settle(AuctionListing listing, UUID buyerUuid, AuctionLogEntry.Status status, UUID cancelledBy,
+            UUID returnClaimOwner, ItemStack returnClaimItem) {
         String summary = listing.item().getAmount() + "x " + listing.item().getType();
         try {
             if (!storage.settleListing(listing.id(), listing.sellerUuid(), buyerUuid, summary, listing.price(),
-                    listing.listedAtMillis(), System.currentTimeMillis(), status, cancelledBy)) {
+                    listing.listedAtMillis(), System.currentTimeMillis(), status, cancelledBy,
+                    returnClaimOwner, returnClaimItem)) {
                 return false;
             }
         } catch (Exception e) {

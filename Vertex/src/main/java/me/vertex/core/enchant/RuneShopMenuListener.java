@@ -2,9 +2,6 @@ package me.vertex.core.enchant;
 
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
-import me.vertex.core.shop.ShopManager;
-import me.vertex.core.shop.ShopMenu;
-import me.vertex.core.spawner.SpawnerManager;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.entity.Player;
@@ -14,19 +11,14 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.ItemStack;
 
-/** Handles purchase clicks in {@link RuneShopMenu} (the {@code /shop} Rune browser). */
+/** Handles purchase clicks in the dedicated {@link RuneShopMenu}. */
 public final class RuneShopMenuListener implements Listener {
 
     private final EnchantManager manager;
-    private final ShopManager shopManager;
-    private final SpawnerManager spawnerManager;
     private final Messages messages;
 
-    public RuneShopMenuListener(EnchantManager manager, ShopManager shopManager, SpawnerManager spawnerManager,
-            Messages messages) {
+    public RuneShopMenuListener(EnchantManager manager, Messages messages) {
         this.manager = manager;
-        this.shopManager = shopManager;
-        this.spawnerManager = spawnerManager;
         this.messages = messages;
     }
 
@@ -45,12 +37,6 @@ public final class RuneShopMenuListener implements Listener {
         }
         event.setCancelled(true);
         if (!(event.getWhoClicked() instanceof Player player)) {
-            return;
-        }
-        if (event.getSlot() == RuneShopMenu.SLOT_BACK) {
-            if (shopManager != null) {
-                ShopMenu.openCategory(player, shopManager, spawnerManager, messages, ShopMenu.RUNES_HOST_CATEGORY, 0);
-            }
             return;
         }
         RuneTier tier = holder.tierAt(event.getSlot());

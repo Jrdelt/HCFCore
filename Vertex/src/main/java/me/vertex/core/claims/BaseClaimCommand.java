@@ -8,7 +8,12 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
+import org.bukkit.event.server.TabCompleteEvent;
 import org.bukkit.plugin.Plugin;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * Owns Vertex's {@code /f baseclaim} view, the same "intercept one
@@ -46,6 +51,26 @@ public final class BaseClaimCommand implements Listener {
         } else {
             handle(event.getPlayer());
         }
+    }
+
+    /** Makes the intercepted /f baseclaim branch visible alongside FactionsUUID's own completions. */
+    @EventHandler
+    public void onFactionTabComplete(TabCompleteEvent event) {
+        if (!(event.getSender() instanceof Player player) || !event.getBuffer().startsWith("/")) return;
+        String[] parts = event.getBuffer().substring(1).split("\\s+", -1);
+        if (parts.length == 2 && isFactionCommand(player, parts[0])) {
+            addCompletion(event, parts[1], "baseclaim");
+        } else if (parts.length == 3 && isFactionCommand(player, parts[0])
+                && parts[1].equalsIgnoreCase("baseclaim")) {
+            addCompletion(event, parts[2], "buy");
+        }
+    }
+
+    private static void addCompletion(TabCompleteEvent event, String partial, String value) {
+        if (!value.startsWith(partial.toLowerCase(Locale.ROOT))) return;
+        List<String> completions = new ArrayList<>(event.getCompletions());
+        if (completions.stream().noneMatch(value::equalsIgnoreCase)) completions.add(value);
+        event.setCompletions(completions);
     }
 
     private void handlePurchase(Player player) {

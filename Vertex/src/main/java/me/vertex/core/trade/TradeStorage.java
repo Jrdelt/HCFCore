@@ -175,6 +175,56 @@ public final class TradeStorage {
         }
         return out;
     }
+
+    /**
+     * Removes and returns only the rows this call actually deleted.
+     *
+     * <p>A claim row is the authority to give the item.  Reading all rows,
+     * handing their items out, and deleting by owner later let a second join
+     * or another asynchronous delivery path use the same snapshot twice.
+     * Selecting row ids then conditionally deleting each one in one
+     * transaction makes a competing caller receive an empty result instead.
+     */
+    public List<ItemStack> takeClaims(UUID owner) throws SQLException {
+        try (Connection c = database.getConnection()) {
+            boolean previousAutoCommit = c.getAutoCommit();
+            c.setAutoCommit(false);
+            try {
+                List<ClaimRow> candidates = new ArrayList<>();
+                try (PreparedStatement select = c.prepareStatement(
+                        "SELECT id, item FROM trade_claims WHERE owner_uuid = ?")) {
+                    select.setString(1, owner.toString());
+                    try (ResultSet results = select.executeQuery()) {
+                        while (results.next()) {
+                            candidates.add(new ClaimRow(results.getLong("id"),
+                                    ItemStack.deserializeBytes(results.getBytes("item"))));
+                        }
+                    }
+                }
+                List<ItemStack> taken = new ArrayList<>(candidates.size());
+                try (PreparedStatement delete = c.prepareStatement(
+                        "DELETE FROM trade_claims WHERE id = ? AND owner_uuid = ?")) {
+                    for (ClaimRow candidate : candidates) {
+                        delete.setLong(1, candidate.id());
+                        delete.setString(2, owner.toString());
+                        if (delete.executeUpdate() == 1) {
+                            taken.add(candidate.item());
+                        }
+                    }
+                }
+                c.commit();
+                return taken;
+            } catch (SQLException error) {
+                c.rollback();
+                throw error;
+            } finally {
+                c.setAutoCommit(previousAutoCommit);
+            }
+        }
+    }
+
+    private record ClaimRow(long id, ItemStack item) { }
+
     public void deleteClaims(UUID owner) throws SQLException {
         try (Connection c = database.getConnection(); PreparedStatement s = c.prepareStatement("DELETE FROM trade_claims WHERE owner_uuid = ?")) { s.setString(1, owner.toString()); s.executeUpdate(); }
     }
@@ -196,6 +246,28 @@ public final class TradeStorage {
             try (PreparedStatement read = c.prepareStatement("SELECT levels FROM trade_pending_exp WHERE uuid = ?")) { read.setString(1, owner.toString()); try (ResultSet r = read.executeQuery()) { if (r.next()) levels = r.getInt(1); } }
             try (PreparedStatement delete = c.prepareStatement("DELETE FROM trade_pending_exp WHERE uuid = ?")) { delete.setString(1, owner.toString()); delete.executeUpdate(); }
             c.commit(); return levels;
+        }
+    }
+
+    /** Re-queues legacy escrow money if its recipient left before main-thread delivery. */
+    public void addPendingMoney(UUID owner, double amount) throws SQLException {
+        if (!Double.isFinite(amount) || amount <= 0) {
+            return;
+        }
+        try (Connection c = database.getConnection(); PreparedStatement s = c.prepareStatement(
+                "INSERT INTO trade_pending_money (uuid, amount) VALUES (?, ?) ON CONFLICT(uuid) "
+                        + "DO UPDATE SET amount = amount + excluded.amount")) {
+            s.setString(1, owner.toString());
+            s.setDouble(2, amount);
+            s.executeUpdate();
+        } catch (SQLException unsupportedUpsert) {
+            try (Connection c = database.getConnection(); PreparedStatement s = c.prepareStatement(
+                    "INSERT INTO trade_pending_money (uuid, amount) VALUES (?, ?) ON DUPLICATE KEY "
+                            + "UPDATE amount = amount + VALUES(amount)")) {
+                s.setString(1, owner.toString());
+                s.setDouble(2, amount);
+                s.executeUpdate();
+            }
         }
     }
     public double takePendingMoney(UUID owner) throws SQLException {

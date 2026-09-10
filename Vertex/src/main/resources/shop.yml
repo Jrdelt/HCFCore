@@ -178,23 +178,6 @@ categories:
       CROSSBOW: { base-price: 22.0 }
       SHIELD: { base-price: 15.0 }
       IRON_BARS: { base-price: 3.0 }
-      # Flat-priced -- see the SAND/RED_SAND/GRAVEL note above; same reason.
-      WHITE_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      ORANGE_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      MAGENTA_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      LIGHT_BLUE_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      YELLOW_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      LIME_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      PINK_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      GRAY_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      LIGHT_GRAY_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      CYAN_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      PURPLE_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      BLUE_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      BROWN_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      GREEN_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      RED_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
-      BLACK_CONCRETE_POWDER: { base-price: 3.5, dynamic-pricing: false }
 
   spawners_and_mob_drops:
     display-name: "Spawners & Mob Drops"

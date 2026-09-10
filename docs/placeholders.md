@@ -1,5 +1,20 @@
 # PlaceholderAPI Placeholders
 
+## Haven & Riftlands
+
+`%vertex_zone%`, `%vertex_haven_kills%`, `%vertex_riftlands_kills%`,
+`%vertex_haven_progress%`, `%vertex_riftlands_progress%`,
+`%vertex_haven_next_milestone%`, `%vertex_riftlands_next_milestone%`,
+`%vertex_haven_next_remaining%`, `%vertex_riftlands_next_remaining%`,
+`%vertex_zone_amplification%`, `%vertex_zone_backpack_amplification%`,
+`%vertex_zone_event_active%`, `%vertex_zone_event_score%`,
+`%vertex_zone_event_rank%`, `%vertex_zone_event_remaining%`,
+`%vertex_zone_event_top_1_name%` through `_3_name`,
+`%vertex_zone_event_top_1_score%` through `_3_score`,
+`%vertex_zone_winner_boost%`, `%vertex_haven_death_cooldown%`, and
+`%vertex_riftlands_death_cooldown%` expose live Zone state. See
+[Haven & Riftlands](haven-riftlands.md) for details.
+
 Vertex does two separate things with PlaceholderAPI, and this page is
 about the second one:
 

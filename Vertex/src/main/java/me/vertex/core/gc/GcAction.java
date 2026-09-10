@@ -8,8 +8,10 @@ package me.vertex.core.gc;
 public enum GcAction {
     /** Player-initiated: money leaves Vault economy, GC balance grows. */
     DEPOSIT,
-    /** Player-initiated: GC balance shrinks, money is credited back to Vault economy. */
+    /** Legacy player-initiated GC-to-Vault withdrawal. Retained so old audit rows still load. */
     WITHDRAW,
+    /** Player-initiated: GC balance became a single-use redeem code. */
+    WITHDRAW_CODE,
     /** A staff-issued redeem code was consumed. */
     REDEEM,
     /** Staff credited a balance directly ({@code /gc admin give}). */

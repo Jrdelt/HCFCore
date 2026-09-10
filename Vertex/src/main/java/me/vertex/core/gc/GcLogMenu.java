@@ -86,7 +86,7 @@ public final class GcLogMenu {
         Material material = switch (entry.action()) {
             case DEPOSIT, REDEEM, STAFF_GIVE, COINFLIP_PAYOUT, AUCTION_SALE, AUCTION_FEE_REFUND, AUCTION_REFUND,
                     COINFLIP_REFUND -> Material.LIME_DYE;
-            case WITHDRAW, STAFF_REMOVE, COINFLIP_WAGER, AUCTION_FEE, AUCTION_PURCHASE -> Material.RED_DYE;
+            case WITHDRAW, WITHDRAW_CODE, STAFF_REMOVE, COINFLIP_WAGER, AUCTION_FEE, AUCTION_PURCHASE -> Material.RED_DYE;
             case STAFF_SET, STAFF_ZERO -> Material.YELLOW_DYE;
         };
         ItemStack icon = new ItemStack(material);

@@ -147,22 +147,23 @@ public final class CoinflipMenuListener implements Listener {
         if (event.getRawSlot() != CoinflipMenu.SLOT_CLAIM_ALL) {
             return;
         }
-        manager.beginClaimAll(player.getUniqueId()).whenComplete((batch, error) ->
+        manager.takeClaims(player.getUniqueId()).whenComplete((batch, error) ->
                 org.bukkit.Bukkit.getScheduler().runTask(
                         org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(CoinflipMenuListener.class), () -> {
-                            if (!player.isOnline() || error != null || batch == null) {
-                                manager.abortClaimAll(player.getUniqueId());
+                            if (error != null || batch == null) {
+                                return;
+                            }
+                            if (!player.isOnline()) {
+                                manager.restoreClaimBatch(player.getUniqueId(), batch);
                                 return;
                             }
                             if (batch.items().isEmpty()) {
-                                manager.finishClaimAll(player.getUniqueId(), batch);
                                 return;
                             }
                             for (ItemStack item : batch.items()) {
                                 player.getInventory().addItem(item).values().forEach(leftover ->
                                         player.getWorld().dropItemNaturally(player.getLocation(), leftover));
                             }
-                            manager.finishClaimAll(player.getUniqueId(), batch);
                             player.sendMessage(messages.get(player, "coinflip.claim-all-claimed"));
                             player.closeInventory();
                         }));

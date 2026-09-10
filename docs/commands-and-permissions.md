@@ -92,18 +92,18 @@ are available for staff testing. See [Player Trading](trading.md).
 
 | Command | Permission | Notes |
 |---|---|---|
-| `/gc` | `vertex.gc.use` (default: true) | Opens the GC wallet GUI (balance, Deposit, Withdraw, Redeem, Logs). |
+| `/gc` | `vertex.gc.use` (default: true) | Opens the GC wallet GUI (balance, withdrawal-code, redeem, and logs hints). |
+| `/gc withdraw <amount>` | `vertex.gc.use` | Atomically creates a one-use GC redeem code. |
 | `/gc redeem <code>` | `vertex.gc.use` | Consumes a staff-generated redeem code. |
 | `/gc redeem create <amount> [uses] [expires-in]` | `vertex.gc.redeem.create` | Generates a new redeem code (default: single-use, no expiry). |
 | `/gc admin balance <player>` | `vertex.gc.view` | Views another player's GC balance. |
 | `/gc admin give\|remove\|set\|zero <player> <amount>` | `vertex.gc.adjust` | Mutates a balance directly. Every attempt — permitted or not — is logged to console. |
 | `/gc admin logs [player] [page]` | `vertex.gc.logs` | Reads the permanent GC audit log. |
-| `/gc setsigninput` | `vertex.gc.adjust` | Sets the shared physical sign Deposit/Withdraw amounts are typed on. |
 
 GC is also a third wager/listing currency in Coinflip (`/cf <amount> gc
 [player]`) and the Auction House (`/ah sell <price> gc`) — see
 [GC (Gift Card / Credit)](gc-currency.md) for the full picture, including
-the sign-based amount-entry flow.
+the one-time withdrawal-code flow.
 
 ## Dupe investigation
 
@@ -140,6 +140,11 @@ join-time summary of any still-open cases. See
 |---|---|---|
 | `/mines` | Open to all | Overview of the placed mining worlds — see [Mining Worlds](mines.md). |
 | `/mines wand <mine>` | `vertex.mines.admin` | Blaze-rod corner selection; saving writes the world and bounds into `mines.yml`. |
+| `/haven`, `/riftlands`, `/zones` | `vertex.zones.use` | Enter/configure the zone flow or view player progression. |
+| `/haven\|riftlands region\|route\|lootpool\|admin`, `/riftlands ticket give` | `vertex.zones.admin` | Zone geometry, route, loot, event, and Ticket administration. |
+| — | `vertex.zones.admin.build` | Bypass the no-build rule inside a zone for controlled maintenance. |
+| `/portal` (alias `/portals`) | `vertex.portals.admin` | Creates source portal volumes, verified destination routes, and staff previews. See [Physical Entry Portals](portals.md). |
+| — | `vertex.portals.use` | Allows a player to enter a configured physical portal. Defaults to everyone. |
 | `/mines fill <mine>` | `vertex.mines.admin` | Seeds the region with ore from its table. Runs automatically when a region is placed; use this after rebuilding the arena or changing the ore table. |
 | `/mines cancel` / `/mines list` | `vertex.mines.admin` | Abandon a selection, or show which mines are placed. Staff subcommands are never named to players who lack the permission. |
 
@@ -147,7 +152,7 @@ join-time summary of any still-open cases. See
 
 | Command | Permission | Notes |
 |---|---|---|
-| `/wand give <player> <tier> [uses]` | `vertex.wand.give` | Gives a Sell Wand or TNT Wand — see [Wands](wands.md). Right-click a chest or Chunk Collector to use one. |
+| `/wand give <player> <tier> [uses]` | `vertex.wand.give` | Gives a Sell Wand or TNT Wand — see [Wands](wands.md). Left-click a chest or Chunk Collector to use one. |
 
 ## Boosters
 
@@ -164,25 +169,12 @@ join-time summary of any still-open cases. See
 | `/shop buy <item> [amount]` | — | Buys at the current dynamic price, regardless of category. |
 | `/shop sell <item> [amount]` | — | Sells at the current dynamic price, regardless of category. |
 
-The category picker's last icon is **Spawners** — a separate catalog
-(one flat price per mob type, from `spawners.yml`, not part of the
-dynamic-price system the rest of the shop uses) with its own Back
-button. This replaces the old standalone `/spawners` command.
-
-The **Raiding Materials** category's control row similarly has a "Buy
-Chunk Busters" button opening a small catalog of the 4 Chunk Buster types
-(priced from `chunkbuster.yml`, same reasoning as Spawners above). See
-[Chunk Busters](chunk-busters.md#acquisition).
-
-The **Miscellaneous** category's control row similarly has a "Buy Source
-Buckets" button opening a small catalog of every enabled Source Bucket
-variant (priced from `sourcebuckets.yml`, same reasoning as Spawners
-above). See [Source Buckets](source-buckets.md#acquisition).
-
-The same **Miscellaneous** category's control row also has a "Buy Runes"
-button opening a small catalog of the 4 Rune tiers (priced from
-`runes.yml`, same reasoning as Spawners above). See
-[Custom Enchantments](custom-enchantments.md#acquisition).
+Buyable Spawners are ordinary paginated product tiles in **Spawners & Mob
+Drops**. Chunk Busters and enabled Source Bucket variants are ordinary
+paginated product tiles in **Raiding Materials**. These custom products use
+their own fixed feature-config prices rather than the material market's
+dynamic prices. Runes are deliberately separate from `/shop`; use `/runes`,
+`/ce`, `/customenchants`, or `/enchant` for the dedicated Rune catalog.
 
 ## Auction House
 
@@ -190,8 +182,8 @@ button opening a small catalog of the 4 Rune tiers (priced from
 |---|---|---|
 | `/ah` (alias `/auctionhouse`) | — | Opens the browse GUI. |
 | `/ah sell <price> [money\|exp\|gc]` | — | Lists the item in your main hand at a fixed buy-it-now price, in money (default), experience levels, or GC. |
-| `/ah cancel <id>` | `vertex.auction.remove` for someone else's; open to the seller for their own | Cancels an unsold listing and returns the item. |
-| `/ah collect` | — | Opens the claim GUI for items waiting on you (sold, expired, or cancelled while you couldn't receive them directly). |
+| `/ah cancel <id>` | `vertex.auction.remove` for someone else's; open to the seller for their own | Cancels an unsold listing and puts its item in the Collection Box. |
+| `/ah collect` | — | Opens the claim GUI for returned, expired, or cancelled listing items. |
 | `/ah logs [player] [page]` | `vertex.auction.logs` | Reads the permanent staff audit log. |
 
 ## Factions & Rally
@@ -207,7 +199,7 @@ button opening a small catalog of the 4 Rune tiers (priced from
 | `/ftopforcecheck` | `vertex.ftop.forcecheck` | Immediately recalculates F Top for every faction without moving the regular scheduled deadline. |
 | `/f baseclaim` (or any `factions.command-aliases` alias) | `vertex.baseclaim.view` | Opens the Base Claim info/removal GUI if standing on one; otherwise attempts to create one (Leader/Co-Leader + `vertex.baseclaim.create` only). Confirming removal in that GUI additionally requires `vertex.baseclaim.remove` (default: true). See [Base and Raid Claims](base-and-raid-claims.md). |
 | `/f baseclaim buy` | `vertex.baseclaim.purchaseslot` | Any member purchases their faction's next Base Claim slot (#2/#3), paid from their own balance. |
-| `/f pvptop` (or any `factions.command-aliases` alias) | Open to all | Faction leaderboard ranked by persisted KOTH/Outpost capture points, independent of F Top. See [Faction Leaderboards](faction-leaderboards.md#pvp-top-objective-points). |
+| `/pvptop` | Open to all | Faction leaderboard ranked by persisted KOTH/Outpost capture points, independent of F Top. `/f pvptop` remains a compatibility alias. See [Faction Leaderboards](faction-leaderboards.md#pvp-top-objective-points). |
 | `/f shield` (or any `factions.command-aliases` alias) | Open to all | Shows the caller's faction's Faction Shield status: active/inactive, countdown, current/pending schedule, admin override. See [Faction Shield](faction-shield.md). |
 | `/f shield set <HH:mm> <minutes>` | `vertex.shield.set` | Leader/Co-Leader only; submits a new Shield schedule (takes effect after the configured activation delay). Rejected until the New-Faction Shield Delay has passed. |
 | `/f shield admin <faction> active\|inactive\|clear` | `vertex.admin.claims` | Staff force a faction's Shield state, or clear an existing override. Every attempt is console-logged; silent to the affected faction. |
@@ -218,31 +210,33 @@ button opening a small catalog of the 4 Rune tiers (priced from
 Chunk Busters have no dedicated `/f` subcommand — they're triggered by
 right-clicking a block with the item, purchased from `/shop`'s Raiding
 Materials category. See [Chunk Busters](chunk-busters.md) for the
-confirmation flow, zone rules, and the batched/restart-safe removal
+confirmation flow, zone rules, and the batched removal
 mechanics.
 
 | Command | Permission | Notes |
 |---|---|---|
 | Right-click a block with a Chunk Buster | *(none — gated by zone/combat/role checks in-code)* | Opens the confirmation GUI. |
-| `/chunkbuster permission <role> <allow\|deny>` | `vertex.chunkbuster.permission` | Faction Leader/Co-Leader only; edits only the caller's own faction's role permissions. |
+| `/chunkbusters give <player> <type> [amount]` | `vertex.chunkbuster.give` | Gives an enabled Chunk Buster type. `/chunkbuster` is an alias. |
+
+Chunk Buster rank access is the **Use Chunk Busters** row in `/f permissions`.
 
 ## Source Buckets
 
 Source Buckets have no dedicated command either — right-clicking with one
-places water/lava immediately, with no confirmation step, purchased from
-`/shop`'s Miscellaneous category. See [Source Buckets](source-buckets.md)
+places its configured block immediately, with no confirmation step, purchased from
+`/shop`'s Raiding Materials category. See [Source Buckets](source-buckets.md)
 for the flow patterns, the claim-boundary rule, and the charge-after-
 success economics.
 
 | Command | Permission | Notes |
 |---|---|---|
-| Right-click a block with a Source Bucket | *(none — usable by everyone; gated by zone/combat/economy checks in-code)* | Places water/lava following the item's configured flow pattern. |
+| Right-click a block with a Source Bucket | *(none — usable by everyone; gated by zone/combat/economy checks in-code)* | Places the configured block following the item's configured flow pattern. |
 
 ## Custom Enchantments
 
 Rolling a Rune is a direct right-click action with no GUI; applying a
 physical enchant item opens the Enchant Application GUI. Runes are
-purchased from `/shop`'s Miscellaneous category, or given by staff. See
+purchased from `/runes` (also `/ce`, `/customenchants`, or `/enchant`), or given by staff. See
 [Custom Enchantments](custom-enchantments.md) for tiers, roll tables, the
 level-replacement rules, and Lucky Gems.
 
@@ -250,6 +244,7 @@ level-replacement rules, and Lucky Gems.
 |---|---|---|
 | Right-click a Rune | *(none)* | Rolls it immediately against its tier's table and gives you the resulting physical enchant item. Consumes one Rune. |
 | Right-click a physical enchant item | *(none)* | Opens the Enchant Application GUI with that item pre-placed. |
+| `/runes` / `/ce` / `/customenchants` / `/enchant` | Open to all | Opens the dedicated Rune shop. |
 | `/enchant give <player> rune <tier> [amount]` | `vertex.enchant.give` | Gives a Rune of the given tier (`simple`/`elite`/`rare`/`legendary`). |
 | `/enchant give <player> gem [amount]` | `vertex.enchant.give` | Gives Lucky Gems. |
 

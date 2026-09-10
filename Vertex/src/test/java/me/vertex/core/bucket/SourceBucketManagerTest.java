@@ -7,6 +7,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.block.BlockFace;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.ServicePriority;
 import org.junit.jupiter.api.AfterEach;
@@ -27,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Covers {@link SourceBucketManager} without touching FactionsUUID's live
@@ -86,22 +88,34 @@ class SourceBucketManagerTest {
     }
 
     private static SourceBucketType waterSingle(boolean baseClaimOnly, boolean combatAllowed, double perUseFee) {
-        return new SourceBucketType("water:test-single", true, SourceBucketType.Liquid.WATER,
+        return new SourceBucketType("water:test-single", true, SourceBucketType.PlacedBlock.WATER,
                 SourceBucketType.FlowPattern.SINGLE_SOURCE, 0, baseClaimOnly, combatAllowed, 100D, perUseFee,
                 Material.WATER_BUCKET, null, "<aqua>Test Water Bucket", List.of(), false);
     }
 
     private static SourceBucketType waterDownward(int maxDepth, boolean baseClaimOnly, boolean combatAllowed,
             double perUseFee) {
-        return new SourceBucketType("water:test-downward", true, SourceBucketType.Liquid.WATER,
+        return new SourceBucketType("water:test-downward", true, SourceBucketType.PlacedBlock.WATER,
                 SourceBucketType.FlowPattern.DOWNWARD, maxDepth, baseClaimOnly, combatAllowed, 100D, perUseFee,
                 Material.WATER_BUCKET, null, "<aqua>Test Waterfall Bucket", List.of(), false);
     }
 
     private static SourceBucketType lavaDownward(int maxDepth) {
-        return new SourceBucketType("lava:test-downward", true, SourceBucketType.Liquid.LAVA,
+        return new SourceBucketType("lava:test-downward", true, SourceBucketType.PlacedBlock.LAVA,
                 SourceBucketType.FlowPattern.DOWNWARD, maxDepth, false, false, 100D, 0D,
                 Material.LAVA_BUCKET, null, "<gold>Test Lava Bucket", List.of(), false);
+    }
+
+    private static SourceBucketType solidDownward(SourceBucketType.PlacedBlock placedBlock, int maxDepth) {
+        return new SourceBucketType(placedBlock.configKey() + ":test-downward", true, placedBlock,
+                SourceBucketType.FlowPattern.DOWNWARD, maxDepth, false, false, 100D, 0D,
+                Material.BUCKET, null, "Test solid bucket", List.of(), true);
+    }
+
+    private static SourceBucketType solidOutward(SourceBucketType.PlacedBlock placedBlock, int maxLength) {
+        return new SourceBucketType(placedBlock.configKey() + ":test-outward", true, placedBlock,
+                SourceBucketType.FlowPattern.OUTWARD, maxLength, false, false, 100D, 0D,
+                Material.BUCKET, null, "Test solid bucket", List.of(), true);
     }
 
     // ---- Config loading ----
@@ -113,10 +127,16 @@ class SourceBucketManagerTest {
         assertNotNull(manager.variant("water:downward"));
         assertNotNull(manager.variant("lava:source"));
         assertNotNull(manager.variant("lava:downward"));
-        assertEquals(SourceBucketType.Liquid.WATER, manager.variant("water:source").liquid());
+        assertNotNull(manager.variant("obsidian:downward"));
+        assertNotNull(manager.variant("obsidian:outward"));
+        assertNotNull(manager.variant("cobblestone:downward"));
+        assertNotNull(manager.variant("cobblestone:outward"));
+        assertEquals(SourceBucketType.PlacedBlock.WATER, manager.variant("water:source").placedBlock());
         assertEquals(SourceBucketType.FlowPattern.SINGLE_SOURCE, manager.variant("water:source").flowPattern());
-        assertEquals(SourceBucketType.Liquid.LAVA, manager.variant("lava:downward").liquid());
+        assertEquals(SourceBucketType.PlacedBlock.LAVA, manager.variant("lava:downward").placedBlock());
         assertEquals(SourceBucketType.FlowPattern.DOWNWARD, manager.variant("lava:downward").flowPattern());
+        assertEquals(-1, manager.variant("obsidian:downward").maxDistance());
+        assertEquals(16, manager.variant("cobblestone:outward").maxDistance());
     }
 
     // ---- Item identity ----
@@ -200,6 +220,37 @@ class SourceBucketManagerTest {
 
         assertEquals(5, positions.size());
         assertEquals(Material.AIR, world.getBlockAt(0, 64, 0).getType(), "a dry-run computation must never mutate a block");
+    }
+
+    @Test
+    void unlimitedDownwardSolidBucketContinuesUntilTheBottomObstruction() {
+        SourceBucketType variant = solidDownward(SourceBucketType.PlacedBlock.OBSIDIAN, -1);
+        Location origin = locationAt(0, 64, 0);
+
+        List<Location> positions = manager.computeFlowPositions(origin, variant);
+        assertFalse(positions.isEmpty());
+        assertTrue(positions.size() > 8, "-1 must not use a normal finite max-depth");
+        Location last = positions.getLast();
+        Location belowLast = last.clone().add(0, -1, 0);
+        assertTrue(last.getBlockY() == world.getMinHeight()
+                        || !belowLast.getBlock().getType().isAir(),
+                "the unlimited column must end at world bottom or the first solid bottom obstruction");
+
+        assertEquals(SourceBucketManager.UseResult.OK, manager.use(player, origin, variant));
+        assertEquals(Material.OBSIDIAN, world.getBlockAt(0, 64, 0).getType());
+        assertEquals(Material.OBSIDIAN, last.getBlock().getType());
+    }
+
+    @Test
+    void outwardSolidBucketPlacesExactlyConfiguredLineAlongClickedFace() {
+        SourceBucketType variant = solidOutward(SourceBucketType.PlacedBlock.COBBLESTONE, 16);
+        Location origin = locationAt(0, 64, 0);
+
+        assertEquals(SourceBucketManager.UseResult.OK, manager.use(player, origin, BlockFace.EAST, variant));
+        for (int x = 0; x < 16; x++) {
+            assertEquals(Material.COBBLESTONE, world.getBlockAt(x, 64, 0).getType(), "line position " + x);
+        }
+        assertEquals(Material.AIR, world.getBlockAt(16, 64, 0).getType(), "the configured length includes the origin");
     }
 
     // ---- Faction-boundary crossing (relationship-independent) ----
@@ -420,7 +471,7 @@ class SourceBucketManagerTest {
 
     @Test
     void disabledVariantIsRejectedWithoutTouchingTheWorld() {
-        SourceBucketType variant = new SourceBucketType("water:test-disabled", false, SourceBucketType.Liquid.WATER,
+        SourceBucketType variant = new SourceBucketType("water:test-disabled", false, SourceBucketType.PlacedBlock.WATER,
                 SourceBucketType.FlowPattern.SINGLE_SOURCE, 0, false, false, 0D, 0D,
                 Material.WATER_BUCKET, null, "<aqua>Test", List.of(), false);
 

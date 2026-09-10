@@ -1,7 +1,7 @@
 # Bumped whenever a bundled message changes. On startup Vertex replaces an
 # older on-disk copy of this file with the new bundled one, moving the
 # previous file into lang/backup/ first so customizations can be re-applied.
-lang-version: 8
+lang-version: 11
 
 general:
   no-permission: "<red>✖ You do not have access to that command."
@@ -312,11 +312,10 @@ chunkbuster:
   purchased: "<green>✔ Purchased a {type} <green>for <white>{amount}<green>."
   cannot-afford: "<red>You can't afford that Chunk Buster (<white>{amount}<red>)."
   no-economy: "<red>No economy plugin is available to charge for that."
-  permission-usage: "<red>Usage: /chunkbuster permission <role> <allow|deny>"
-  permission-leader-only: "<red>Only your faction's Leader or Co-Leader can change Chunk Buster permissions."
-  permission-invalid-role: "<red>Unknown role. Valid roles: admin, mod, member, recruit."
-  permission-invalid-value: "<red>Usage: /chunkbuster permission <role> <allow|deny>"
-  permission-updated: "<green>✔ Chunk Busters are now {state} for the {role} role."
+  give-usage: "<red>Usage: /chunkbusters give <player> <upward|downward|full|single-column> [amount]"
+  give-invalid-type: "<red>That Chunk Buster type is disabled or does not exist."
+  give-invalid-amount: "<red>Amount must be a whole number from 1 to 2,304."
+  given: "<green>✔ Gave <white>{amount}x <yellow>{type}<green> to <white>{player}<green>."
 
 sourcebucket:
   need-block-target: "<red>You need to right-click a block with a Source Bucket."
@@ -356,6 +355,7 @@ enchant:
 
 pvptop:
   header: "<red><bold>ᴘᴠᴘ ᴛᴏᴘ"
+  usage: "<red>Usage: /pvptop"
   empty: "<gray>No faction has earned PvP objective points yet."
   entry: "<gray>#{rank} <white>{faction} <gray>— <red>{points} points"
 
@@ -447,6 +447,7 @@ faction-bank:
   tnt-full: "<red>✖ <gray>The faction TNT bank is full ({max})."
   no-economy: "<red>✖ <gray>A Vault economy provider is required for faction money."
   transaction-failed: "<red>✖ <gray>That bank transaction failed. No resources were moved."
+  inventory-full: "<red>✖ <gray>You need enough inventory space before withdrawing TNT. Nothing was dropped."
   deposit-success: "<green>✔ <gray>Deposited <yellow>{amount} {resource}<gray>."
   withdraw-success: "<green>✔ <gray>Withdrew <yellow>{amount} {resource}<gray>."
 
@@ -545,6 +546,7 @@ collector:
   upgrade-maxed: "<gray>Already at the maximum tier ({tier})."
   upgraded: "&a&lCOLLECTOR&r &7> <green>Upgraded to tier {tier} -- total capacity is now {capacity}."
   withdrew: "&a&lCOLLECTOR&r &7> <green>Withdrew {amount}x {item}."
+  inventory-full: "&a&lCOLLECTOR&r &7> <red>You need enough inventory space; the collector was left unchanged."
   claim-only: "&a&lCOLLECTOR&r &7> <gray>Chunk Collectors can only be placed in your own faction's claimed territory."
   chunk-limit: "&a&lCOLLECTOR&r &7> <gray>This chunk already has the maximum number of Chunk Collectors."
   player-limit: "&a&lCOLLECTOR&r &7> <gray>You already have the maximum number of Chunk Collectors placed."
@@ -836,10 +838,9 @@ shop:
   gui-title: "<dark_gray>ꜱʜᴏᴘ"
   category-gui-title: "<dark_gray>ꜱʜᴏᴘ ➜ {category}"
   category-title: "<yellow>{category}"
+  # Retained as a fallback for older translated locale files. ShopMenu no
+  # longer uses a separate Spawners shortcut.
   spawners-category-title: "<yellow>Spawners"
-  chunkbusters-category-title: "<red>Chunk Busters"
-  sourcebuckets-category-title: "<aqua>Source Buckets"
-  runes-category-title: "<light_purple>Runes"
   category-open-lore: "<green>✔ Click to Open ✔"
   back-button: "<red>← Back to Categories"
   balance-title: "<gold><bold>ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ"
@@ -1002,7 +1003,7 @@ auction:
   is-seller: "&6&lAUCTION HOUSE&r &7> <red>You can't buy your own listing."
   cannot-afford: "&6&lAUCTION HOUSE&r &7> <red>You can't afford that."
   bought: "&6&lAUCTION HOUSE&r &7> <green>Purchased!"
-  cancelled: "&6&lAUCTION HOUSE&r &7> <yellow>Listing cancelled and returned."
+  cancelled: "&6&lAUCTION HOUSE&r &7> <yellow>Listing cancelled. Collect the item with /ah collect."
   claim-all-claimed: "&6&lAUCTION HOUSE&r &7> <green>Claimed everything in your returned items."
   logs-empty: "&6&lAUCTION HOUSE&r &7> <gray>No log entries found."
   logs-header: "&6&lAUCTION HOUSE&r &7> <gray>Audit log, page {page}:"
@@ -1089,6 +1090,11 @@ settings:
   updated-prefix: "&b&lSETTINGS&r &7> <gray>"
 
 mines:
+  entry-combat: "&b&lMINES&r &7> <red>You cannot enter a mine while combat-tagged."
+  entry-countdown: "&b&lMINES&r &7> <gray>Teleporting to <white>{mine}<gray> in <white>{seconds}<gray>..."
+  entry-cancelled: "&b&lMINES&r &7> <red>Mine entry cancelled: {reason}."
+  entry-failed: "&b&lMINES&r &7> <red>The mine destination is unavailable right now."
+  entry-success: "&b&lMINES&r &7> <green>Teleported to <white>{mine}<green>."
   disabled: "&b&lMINES&r &7> <red>Mining worlds are disabled."
   usage-admin: "&b&lMINES&r &7> <gray>Staff: <yellow>/mines wand <mine> [koth]<gray>, <yellow>/mines fill <mine><gray>, <yellow>/mines cancel<gray>, <yellow>/mines list"
   unknown: "&b&lMINES&r &7> <red>Unknown mine. Available: <yellow>{mines}"
@@ -1152,17 +1158,13 @@ gc:
   log-note: "<gray>ɴᴏᴛᴇ: <white>{note}"
   log-date: "<gray>ᴡʜᴇɴ: <white>{date}"
   redeem-hint: "&e&lGC&r &7> <yellow>Type <white>/gc redeem <code><yellow> in chat to redeem a code."
-  sign-not-configured: "&e&lGC&r &7> <red>The shared deposit/withdraw sign hasn't been set up yet. Ask an admin to run /gc setsigninput."
-  sign-busy: "&e&lGC&r &7> <red>Someone else is using the sign right now -- try again shortly."
-  sign-prompt-opened: "&e&lGC&r &7> <yellow>Type the amount on the sign's first line, then click Done."
+  withdraw-hint: "&e&lGC&r &7> <yellow>Type <white>/gc withdraw <amount><yellow> to create a one-time redeem code."
+  withdraw-usage: "&e&lGC&r &7> <gray>Usage: <yellow>/gc withdraw <amount>"
+  withdraw-code-created: "&e&lGC&r &7> <green>Created a <yellow>{amount} GC<green> code: <click:copy_to_clipboard:'{code}'><white>{code}</white></click><gray> (click to copy)."
   amount-out-of-range: "&e&lGC&r &7> <red>That amount is outside the allowed range."
   amount-invalid: "&e&lGC&r &7> <red>Enter a whole number greater than zero."
-  no-economy: "&e&lGC&r &7> <red>A Vault economy provider is required for GC deposits/withdrawals."
-  not-enough-money: "&e&lGC&r &7> <red>You don't have enough money for that."
   not-enough-gc: "&e&lGC&r &7> <red>You don't have enough GC for that."
   transaction-failed: "&e&lGC&r &7> <red>That transaction failed. Nothing was moved."
-  deposit-success: "&e&lGC&r &7> <green>Deposited <yellow>{amount} GC<green>."
-  withdraw-success: "&e&lGC&r &7> <green>Withdrew <yellow>{amount} GC<green>."
   redeem-success: "&e&lGC&r &7> <green>Redeemed <yellow>{amount} GC<green>!"
   redeem-not-found: "&e&lGC&r &7> <red>That code doesn't exist."
   redeem-expired: "&e&lGC&r &7> <red>That code has expired."
@@ -1175,10 +1177,8 @@ gc:
   logs-empty: "&e&lGC&r &7> <gray>No matching GC log entries."
   logs-header: "&e&lGC&r &7> <yellow>GC audit log -- page {page}"
   logs-line: "<gray>#{id} <white>{action}<gray> {amount} GC -- actor: <white>{actor}<gray>, target: <white>{target}<gray>, balance after: <white>{balance}"
-  setsigninput-no-target: "&e&lGC&r &7> <red>You need to be looking at a block within 8 blocks."
-  setsigninput-success: "&e&lGC&r &7> <green>The shared GC sign-input location has been set."
-  command-usage: "&e&lGC&r &7> <gray>Usage: /gc, /gc redeem <code>"
-  command-usage-admin: "&e&lGC&r &7> <gray>Staff: /gc redeem create <amount> [uses] [expires-in], /gc admin balance|give|remove|set|zero|logs, /gc setsigninput"
+  command-usage: "&e&lGC&r &7> <gray>Usage: /gc, /gc withdraw <amount>, /gc redeem <code>"
+  command-usage-admin: "&e&lGC&r &7> <gray>Staff: /gc redeem create <amount> [uses] [expires-in], /gc admin balance|give|remove|set|zero|logs"
 
 dupe:
   usage: "&c&lDUPE&r &7> <gray>Usage: /dupe inspect list [page]|inspect <id>|resolve <id> [reason]|dismiss <id> [reason]|confirm <id> [reason]"
@@ -1197,3 +1197,32 @@ dupe:
   confirmed: "&c&lDUPE&r &7> <green>Case {case} confirmed as a duplicate."
   alert: "&c&lDUPE&r &7> <red>Suspected duplicate detected: case {case} ({player})."
   pending-alert: "&c&lDUPE&r &7> <red>There are {count} open suspected-duplicate case(s). Run /dupe inspect list."
+
+zones:
+  no-permission: "&5&lZONES&r &7> <red>You do not have permission for that zone action."
+  usage: "&5&lZONES&r &7> <gray>Use /haven, /riftlands, or /zones. Staff: region, route, lootpool, ticket, admin."
+  no-route: "&5&lZONES&r &7> <red>This zone has no valid entry route configured yet."
+  entry-combat: "&5&lZONES&r &7> <red>You cannot enter a zone while combat-tagged."
+  entry-cooldown: "&5&lZONES&r &7> <red>You must wait <white>{seconds}s<red> before entering this zone again."
+  entry-countdown: "&5&lZONES&r &7> <gray>Entering <light_purple>{zone}<gray> in <white>{seconds}<gray>..."
+  entry-cancelled: "&5&lZONES&r &7> <red>Zone entry cancelled: {reason}."
+  entered: "&5&lZONES&r &7> <green>You entered {zone}."
+  spawn-countdown: "&5&lZONES&r &7> <gray>Teleporting to spawn in <white>{seconds}<gray>..."
+  spawn-cancelled: "&5&lZONES&r &7> <red>/spawn channel cancelled: {reason}."
+  rift-loot-secured: "&5&lZONES&r &7> <green>Your Riftlands session loot is now secured."
+  loot-reward: "&5&lZONES&r &7> <green>You received <white>{amount}<green> zone loot reward(s)."
+  loot-saved: "&5&lZONES&r &7> <green>Zone loot pool saved."
+  ticket-not-rift: "&5&lZONES&r &7> <red>Riftlands Tickets only work while you are inside Riftlands."
+  ticket-not-combat: "&5&lZONES&r &7> <red>You must be combat-tagged to use a Riftlands Ticket."
+  ticket-no-safe: "&5&lZONES&r &7> <red>No safe Riftlands destination could be found. Your ticket was not used."
+  ticket-success: "&5&lZONES&r &7> <green>You escaped to a safer location. Your combat tag was cleared."
+  event-start: "&5&lZONES&r &7> <gold>The 5-minute Mob Kill Event has started! Haven kills are worth 1 point; Riftlands kills are worth 1.5."
+  event-end: "&5&lZONES&r &7> <gold>The Mob Kill Event has ended."
+  event-winner: "&5&lZONES&r &7> <green>You placed #{place} and earned <white>+{boost}%<green> Mob Drop Amplification until the next event finishes."
+
+portals:
+  no-permission: "&6&lPORTALS&r &7> <red>You cannot use entry portals."
+  combat: "&6&lPORTALS&r &7> <red>You cannot enter a portal while combat-tagged."
+  no-route: "&6&lPORTALS&r &7> <red>{target} has no valid arrival route configured yet."
+  unavailable: "&6&lPORTALS&r &7> <red>{target} is unavailable right now."
+  entered: "&6&lPORTALS&r &7> <green>Entering <white>{target}<green>... Click to drop early."

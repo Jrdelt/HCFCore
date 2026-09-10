@@ -40,17 +40,15 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
     private final Plugin plugin;
     private final GcManager manager;
     private final GcMenu menu;
-    private final GcSignPrompt signPrompt;
     private final GcInteropHook interopHook;
     private final Messages messages;
     private final Logger logger;
 
-    public GcCommand(Plugin plugin, GcManager manager, GcMenu menu, GcSignPrompt signPrompt,
+    public GcCommand(Plugin plugin, GcManager manager, GcMenu menu,
             GcInteropHook interopHook, Messages messages) {
         this.plugin = plugin;
         this.manager = manager;
         this.menu = menu;
-        this.signPrompt = signPrompt;
         this.interopHook = interopHook;
         this.messages = messages;
         this.logger = plugin.getLogger();
@@ -74,11 +72,40 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
         String first = args[0].toLowerCase(Locale.ROOT);
         switch (first) {
             case "redeem" -> handleRedeem(sender, args);
+            case "withdraw" -> handleWithdrawCode(sender, args);
             case "admin" -> handleAdmin(sender, args);
-            case "setsigninput" -> handleSetSignInput(sender);
             default -> sendUsage(sender);
         }
         return true;
+    }
+
+    private void handleWithdrawCode(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(messages.get(sender, "general.players-only"));
+            return;
+        }
+        if (!player.hasPermission(USE_PERMISSION)) {
+            player.sendMessage(messages.get(player, "general.no-permission"));
+            return;
+        }
+        if (args.length != 2) {
+            player.sendMessage(messages.get(player, "gc.withdraw-usage"));
+            return;
+        }
+        Long amount = Numbers.parseLongPositive(args[1]);
+        if (amount == null || amount < manager.minWithdraw() || amount > manager.maxWithdraw()) {
+            player.sendMessage(messages.get(player, "gc.amount-out-of-range"));
+            return;
+        }
+        manager.withdrawToCode(player.getUniqueId(), amount).thenAccept(outcome -> Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) return;
+            switch (outcome.result()) {
+                case OK -> player.sendMessage(messages.get(player, "gc.withdraw-code-created",
+                        "amount", Numbers.formatFull(amount), "code", outcome.code()));
+                case INSUFFICIENT -> player.sendMessage(messages.get(player, "gc.not-enough-gc"));
+                case FAILED -> player.sendMessage(messages.get(player, "gc.transaction-failed"));
+            }
+        }));
     }
 
     private void handleRedeem(CommandSender sender, String[] args) {
@@ -315,26 +342,6 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    private void handleSetSignInput(CommandSender sender) {
-        if (!sender.hasPermission(ADJUST_PERMISSION)) {
-            sender.sendMessage(messages.get(sender, "general.no-permission"));
-            return;
-        }
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.get(sender, "general.players-only"));
-            return;
-        }
-        org.bukkit.block.Block target = player.getTargetBlockExact(8);
-        if (target == null || target.getType().isAir()) {
-            player.sendMessage(messages.get(player, "gc.setsigninput-no-target"));
-            return;
-        }
-        signPrompt.setLocation(target.getLocation());
-        logger.warning(player.getName() + " set the shared GC sign-input location to "
-                + target.getWorld().getName() + " " + target.getX() + "," + target.getY() + "," + target.getZ());
-        player.sendMessage(messages.get(player, "gc.setsigninput-success"));
-    }
-
     private void logAdminAttempt(CommandSender sender, GcAction action, OfflinePlayer target, String amountText,
             boolean permitted) {
         String senderName = sender instanceof Player player ? player.getName() : sender.getName();
@@ -363,13 +370,10 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> options = new ArrayList<>(List.of("redeem"));
+            List<String> options = new ArrayList<>(List.of("redeem", "withdraw"));
             if (sender.hasPermission(ADJUST_PERMISSION) || sender.hasPermission(LOGS_PERMISSION)
                     || sender.hasPermission(VIEW_PERMISSION)) {
                 options.add("admin");
-            }
-            if (sender.hasPermission(ADJUST_PERMISSION)) {
-                options.add("setsigninput");
             }
             return filterPrefix(options, args[0]);
         }

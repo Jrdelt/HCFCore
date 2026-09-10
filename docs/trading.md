@@ -10,29 +10,22 @@ requests; `/trade cancel` returns both offers immediately.
 - A player may have only one pending request or active trade at once.
 - The six-row GUI has separate, 16-slot offer grids. A player cannot click,
   drag, shift-click, drop, or edit the other side's items.
-- Items move into the shared trade escrow as soon as they are placed. An
-  item offer, declared money, and XP level amount all become read-only when
-  that player locks their offer.
-- Money and XP are withdrawn at lock time, held until completion, and
-  refunded on cancellation. When both sides lock, only the first player to
-  lock can press the final accept button.
+- Items move into the shared trade escrow as soon as they are placed. An item
+  offer becomes read-only when that player locks it. Money and XP are not
+  tradeable in the current item-only trade system.
+- When both sides lock, only the first player to lock can press the final
+  accept button.
 - If either inventory cannot receive the opposite items, the entire trade is
   cancelled before anything transfers. Disconnects, closing either GUI,
   moving out of range, blacklisted world/gamemode changes, inactivity, and
   plugin shutdown all cancel safely.
-- Current escrow snapshots are stored in SQL. Startup returns unresolved
-  item claims, money, and XP from an interrupted trade before new sessions
-  can begin.
+- Current escrow snapshots are stored in SQL. Startup returns unresolved item
+  claims from an interrupted trade before new sessions can begin.
 
 Right-click a shulker box or barrel in either trade grid to inspect its
 contents. The viewer is read-only and returns to the trade on close.
 
-## Values and commands
-
-Click your gold ingot or experience bottle to enter a value through a normal
-anvil. Inputs accept whole numbers plus `k`, `m`, and `b` suffixes, including
-decimals before a suffix (`1.5m`). The configured maximum and current balance
-or levels are checked before the offer is accepted and again when it locks.
+## Commands
 
 | Command | Permission | Purpose |
 |---|---|---|
@@ -50,10 +43,9 @@ Staff can use `vertex.trade.staff.bypassdistance` and
 ## Configuration
 
 `plugins/Vertex/traders.yml` controls the distance, request/idle/cooldown
-timers, money/XP toggles and caps, GUI materials, compact/full number display,
-and world, gamemode, or material blacklist. Bad numerical or Material values
-are logged and replaced with safe defaults; run `/tradeadmin reload` after
-editing it.
+timers, GUI materials, and world, gamemode, or material blacklist. Bad
+numerical or Material values are logged and replaced with safe defaults; run
+`/tradeadmin reload` after editing it.
 
 Trade activity is written to `trade_history` for audit purposes. The staff
 history menus query it with SQL pagination rather than loading all records at

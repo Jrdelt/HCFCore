@@ -1,39 +1,22 @@
 package me.vertex.core.chunkbuster;
 
-import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.Messages;
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * {@code /chunkbuster permission <role> <allow|deny>} -- the one command
- * this phase actually needs, per the spec's "Leadership can control which
- * faction roles can use Chunk Busters."
- *
- * <p>Deliberately a standalone command rather than an addition to {@code
- * RallyPermissionMenu}'s {@code CUSTOM_ACTIONS} list: that menu is scoped
- * to Rally's own action set (rally-set/spawner-add/collector-open/
- * bank-deposit/...) and entangling a completely unrelated destructive
- * item's permission with it would make both harder to reason about and
- * revert independently. A minimal standalone command matches the spec's
- * "new small permission-matrix storage, since none exists -- scope
- * minimally" instruction and keeps Chunk Busters self-contained within
- * this one package.
- *
- * <p>Faction-leader only (mirrors {@code BaseClaimCommand}'s leader-only
- * actions) -- edits only the caller's own faction's row. Every change is
- * logged at INFO to the console for a plain audit trail, since it changes
- * who can trigger an irreversible, drop-free area-clear.
- */
+/** Administrative distribution command for the purchasable Chunk Buster items. */
 public final class ChunkBusterCommand implements CommandExecutor, TabCompleter {
+
+    public static final String GIVE_PERMISSION = "vertex.chunkbuster.give";
 
     private final Plugin plugin;
     private final ChunkBusterManager manager;
@@ -47,64 +30,76 @@ public final class ChunkBusterCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage(messages.get(sender, "general.players-only"));
+        if (!sender.hasPermission(GIVE_PERMISSION)) {
+            sender.sendMessage(messages.get(sender, "general.no-permission"));
             return true;
         }
-        if (args.length != 3 || !args[0].equalsIgnoreCase("permission")) {
-            sender.sendMessage(messages.get(sender, "chunkbuster.permission-usage"));
+        if (args.length < 3 || !args[0].equalsIgnoreCase("give")) {
+            sender.sendMessage(messages.get(sender, "chunkbuster.give-usage"));
             return true;
         }
-        if (!player.hasPermission("vertex.chunkbuster.permission")) {
-            player.sendMessage(messages.get(player, "general.no-permission"));
+
+        Player target = Bukkit.getPlayerExact(args[1]);
+        if (target == null) {
+            sender.sendMessage(messages.get(sender, "general.player-not-found"));
             return true;
         }
-        if (!FactionsHook.isLeader(player)) {
-            player.sendMessage(messages.get(player, "chunkbuster.permission-leader-only"));
+        ChunkBusterType type = ChunkBusterType.fromConfigKey(args[2]);
+        if (type == null || !manager.isEnabled(type)) {
+            sender.sendMessage(messages.get(sender, "chunkbuster.give-invalid-type"));
             return true;
         }
-        int factionId = FactionsHook.getFactionId(player);
-        if (factionId == FactionsHook.NO_FACTION) {
-            player.sendMessage(messages.get(player, "baseclaim.no-faction"));
+        int amount = args.length >= 4 ? parseAmount(args[3]) : 1;
+        if (amount <= 0) {
+            sender.sendMessage(messages.get(sender, "chunkbuster.give-invalid-amount"));
             return true;
         }
-        String role = args[1].toLowerCase(Locale.ROOT);
-        if (!ChunkBusterManager.ROLES.contains(role)) {
-            player.sendMessage(messages.get(player, "chunkbuster.permission-invalid-role"));
-            return true;
+
+        ItemStack prototype = manager.createItem(type);
+        int remaining = amount;
+        while (remaining > 0) {
+            ItemStack item = prototype.clone();
+            int stackAmount = Math.min(item.getMaxStackSize(), remaining);
+            item.setAmount(stackAmount);
+            for (ItemStack overflow : target.getInventory().addItem(item).values()) {
+                target.getWorld().dropItemNaturally(target.getLocation(), overflow);
+            }
+            remaining -= stackAmount;
         }
-        Boolean allowed = parseAllowDeny(args[2]);
-        if (allowed == null) {
-            player.sendMessage(messages.get(player, "chunkbuster.permission-invalid-value"));
-            return true;
-        }
-        manager.setRolePermission(factionId, role, allowed);
-        player.sendMessage(messages.get(player, "chunkbuster.permission-updated", "role", role,
-                "state", allowed ? "allowed" : "denied"));
-        plugin.getLogger().info(player.getName() + " set the Chunk Buster permission for role '" + role
-                + "' to " + allowed + " in faction #" + factionId + ".");
+        sender.sendMessage(messages.get(sender, "chunkbuster.given", "amount", String.valueOf(amount),
+                "type", type.configKey(), "player", target.getName()));
+        plugin.getLogger().info(sender.getName() + " gave " + amount + " " + type.configKey()
+                + " Chunk Buster(s) to " + target.getName() + ".");
         return true;
     }
 
-    private static Boolean parseAllowDeny(String raw) {
-        return switch (raw.toLowerCase(Locale.ROOT)) {
-            case "allow", "true", "yes" -> Boolean.TRUE;
-            case "deny", "false", "no" -> Boolean.FALSE;
-            default -> null;
-        };
+    private static int parseAmount(String raw) {
+        try {
+            return Math.min(2_304, Integer.parseInt(raw));
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1) {
-            return List.of("permission");
+        if (!sender.hasPermission(GIVE_PERMISSION)) {
+            return List.of();
         }
-        if (args.length == 2 && args[0].equalsIgnoreCase("permission")) {
-            return new ArrayList<>(ChunkBusterManager.ROLES);
-        }
-        if (args.length == 3 && args[0].equalsIgnoreCase("permission")) {
-            return List.of("allow", "deny");
-        }
-        return List.of();
+        return switch (args.length) {
+            case 1 -> matching(args[0], List.of("give"));
+            case 2 -> Bukkit.getOnlinePlayers().stream().map(Player::getName)
+                    .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(args[1].toLowerCase(Locale.ROOT)))
+                    .sorted().toList();
+            case 3 -> matching(args[2], java.util.Arrays.stream(ChunkBusterType.values())
+                    .filter(manager::isEnabled).map(ChunkBusterType::configKey).toList());
+            case 4 -> List.of("1", "2", "16", "64");
+            default -> List.of();
+        };
+    }
+
+    private static List<String> matching(String prefix, List<String> values) {
+        String normalized = prefix.toLowerCase(Locale.ROOT);
+        return values.stream().filter(value -> value.startsWith(normalized)).toList();
     }
 }

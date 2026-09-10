@@ -11,12 +11,15 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 /** Routes configured mining drops and player-killed mob drops into an equipped Backpack. */
 public final class BackpackAutoStoreListener implements Listener {
     private final BackpackManager manager;
     private final BackpackFilterManager filters;
     private final Messages messages;
+    /** MineListener owns configured mine drops, including anti-silk-touch rules. */
+    private volatile Predicate<org.bukkit.Location> mineRegion = location -> false;
 
     public BackpackAutoStoreListener(BackpackManager manager, BackpackFilterManager filters, Messages messages) {
         this.manager = manager;
@@ -24,9 +27,15 @@ public final class BackpackAutoStoreListener implements Listener {
         this.messages = messages;
     }
 
+    /** Prevent vanilla drop lookup from racing MineListener's custom-drop path. */
+    public void setMineRegionPredicate(Predicate<org.bukkit.Location> mineRegion) {
+        this.mineRegion = mineRegion == null ? location -> false : mineRegion;
+    }
+
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onMine(BlockBreakEvent event) {
-        if (!event.isDropItems() || !manager.autoStoresMining(event.getBlock().getType())) {
+        if (!event.isDropItems() || mineRegion.test(event.getBlock().getLocation())
+                || !manager.autoStoresMining(event.getBlock().getType())) {
             return;
         }
         Player player = event.getPlayer();
@@ -105,6 +114,17 @@ public final class BackpackAutoStoreListener implements Listener {
         if (!manager.autoStoresMobDrops()) {
             return drops;
         }
+        BackpackManager.EquippedBackpack equipped = manager.equippedBackpack(player);
+        return equipped == null ? drops : route(player, equipped, drops);
+    }
+
+    /**
+     * Routes a drop that another Vertex subsystem has already calculated.
+     * The caller retains responsibility for its leftovers. In particular,
+     * MineListener supplies its configured ingot/drop result here instead of
+     * asking Bukkit for a second, Silk-Touch-sensitive vanilla drop list.
+     */
+    public List<ItemStack> routePlayerMiningDrops(Player player, List<ItemStack> drops) {
         BackpackManager.EquippedBackpack equipped = manager.equippedBackpack(player);
         return equipped == null ? drops : route(player, equipped, drops);
     }

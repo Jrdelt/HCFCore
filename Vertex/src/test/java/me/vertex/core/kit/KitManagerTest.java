@@ -25,6 +25,8 @@ import org.mockbukkit.mockbukkit.plugin.PluginMock;
 import org.mockbukkit.mockbukkit.scheduler.BukkitSchedulerMock;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.Arrays;
@@ -44,6 +46,7 @@ class KitManagerTest {
     private Messages messages;
     private AbilityManager abilityManager;
     private KitManager kitManager;
+    private final List<KitManager> managers = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -54,12 +57,22 @@ class KitManagerTest {
         messages.load();
         abilityManager = new AbilityManager(plugin, new InMemoryStorage());
         abilityManager.load();
-        kitManager = new KitManager(plugin, new InMemoryStorage(), userManager, messages, abilityManager);
+        kitManager = newManager();
     }
 
     @AfterEach
     void tearDown() {
+        for (KitManager manager : managers) {
+            manager.shutdown();
+        }
+        managers.clear();
         MockBukkit.unmock();
+    }
+
+    private KitManager newManager() {
+        KitManager manager = new KitManager(plugin, new InMemoryStorage(), userManager, messages, abilityManager);
+        managers.add(manager);
+        return manager;
     }
 
     @Test
@@ -73,7 +86,7 @@ class KitManagerTest {
         kitManager.save("Starter", player, "vertex.kit.starter", 30, Kit.Cost.NONE);
         kitManager.shutdown();
 
-        KitManager reloaded = new KitManager(plugin, new InMemoryStorage(), userManager, messages, abilityManager);
+        KitManager reloaded = newManager();
         reloaded.load();
         Kit kit = reloaded.get("starter");
         assertEquals("Starter", kit.getName());
@@ -83,7 +96,7 @@ class KitManagerTest {
         reloaded.delete("Starter");
         reloaded.shutdown();
 
-        KitManager reloadedAgain = new KitManager(plugin, new InMemoryStorage(), userManager, messages, abilityManager);
+        KitManager reloadedAgain = newManager();
         reloadedAgain.load();
         assertNull(reloadedAgain.get("starter"));
     }
@@ -447,7 +460,7 @@ class KitManagerTest {
         kitManager.load();
         assertEquals("CHAINMAIL_LEGGINGS", kitManager.get("scout").getIcon());
 
-        KitManager reloaded = new KitManager(plugin, new InMemoryStorage(), userManager, messages, abilityManager);
+        KitManager reloaded = newManager();
         reloaded.load();
         assertEquals("CHAINMAIL_LEGGINGS", reloaded.get("scout").getIcon());
     }

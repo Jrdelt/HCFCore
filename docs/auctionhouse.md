@@ -10,7 +10,7 @@ gets it immediately — no bidding, no waiting for an auction to end.
 |---|---|
 | `/ah` | Opens the browser |
 | `/ah sell <price> [money\|exp\|xp\|gc]` | Lists the item in your main hand at that price. "money" is the default if omitted; `xp` aliases `exp` |
-| `/ah cancel <id>` | Cancels your own listing (or any listing, with `vertex.auction.remove`) and returns the item |
+| `/ah cancel <id>` | Cancels your own listing (or any listing, with `vertex.auction.remove`) and puts the item in the Collection Box |
 | `/ah collect` | Opens the claim GUI for items waiting on you |
 | `/ah logs [player] [page]` | Staff audit log (`vertex.auction.logs`) |
 
@@ -19,7 +19,7 @@ surface: `/ah sell 10k money`, `/ah sell 1.25m exp`, and `/ah sell 1,000,000`.
 
 In the browser: **left-click** a listing to buy it; **shift-click** your
 own listing (or anyone's, with `vertex.auction.remove`) to cancel it and
-get the item back; **right-click** toggles it on your
+put its item in the seller's Collection Box; **right-click** toggles it on your
 [watchlist](#watchlist-and-your-auction-page). Row 0 also has:
 
 - The **Collection Box** shortcut (opens `/ah collect`).
@@ -74,10 +74,9 @@ opens **Your Auction Page**, a hub linking to:
 
 ## Claim stash
 
-If a listing sells, expires, or gets cancelled while the recipient is
-offline (or their inventory is full), the item doesn't try to force its
-way in — it queues in a claim stash instead, collected any time via
-`/ah collect` or the claim button in the browse GUI. A money sale settles
+If a listing expires or is cancelled before anyone buys it, its item is placed
+in a durable claim stash rather than being forced into an inventory. It can be
+collected any time via `/ah collect` or the claim button in the browse GUI. A money sale settles
 instantly through Vault, whether the seller is online or not; an
 experience sale credits the seller's levels immediately if they're
 online, or waits (persisted) for their next login if not — either way, a
