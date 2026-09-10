@@ -473,6 +473,18 @@ combatManager.start();
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.shield.ShieldFactionLifecycleListener(shieldManager), this);
 
+        // TNT / Explosion / Wither rules (Phase 3): explosion block damage
+        // is stripped out only where it touches a Base Claim, regardless of
+        // Shield state -- Base Claims disable explosion block damage on
+        // their own, Shield only ever gates combat (see ShieldCombatListener
+        // above). Raid Claims and wilderness are left exactly as
+        // FactionsUUID's own territory protection already handles them.
+        // Player/mob damage from any explosion is cancelled everywhere,
+        // unconditionally. Withers are disabled server-wide.
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.claims.ExplosionProtectionListener(baseClaimManager::isBaseClaim), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.listener.WitherPreventionListener(), this);
+
         // GC is a self-hosted, third currency -- its own database is the sole
         // balance authority, wired up the same way the other self-contained
         // economy-like features above are (storage -> manager -> menu ->

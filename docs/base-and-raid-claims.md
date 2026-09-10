@@ -88,6 +88,67 @@ timestamp, stored as an absolute epoch millisecond deadline
 - **Raid Claim creation and automatic expiration/unclaiming are never
   logged anywhere** — this is intentional per spec, not an oversight.
 
+## TNT / explosion / Wither rules
+
+Three unconditional rules layered on top of the claim types above, all
+enforced by `me.vertex.core.claims.ExplosionProtectionListener` and
+`me.vertex.core.listener.WitherPreventionListener` — neither depends on
+Faction Shield, so these apply the same whether or not a faction's Shield
+is active.
+
+- **Explosion block damage is disabled inside a Base Claim, always.**
+  `ExplosionProtectionListener` listens to `EntityExplodeEvent` and
+  `BlockExplodeEvent` and strips any block whose location is
+  `BaseClaimManager.isBaseClaim` out of the explosion's block list before
+  it can be destroyed. This is **not** a Shield effect — Base Claims block
+  explosion damage on their own, unconditionally, even while Shield is
+  inactive; Shield (see [Faction Shield](faction-shield.md)) only ever
+  gates combat, never block damage.
+- **Raid Claims and wilderness are left completely untouched by this
+  listener.** It only ever *removes* blocks from an explosion's block
+  list for the Base Claim case above — it never adds blocks back and
+  never inspects Raid Claim or wilderness locations at all. TNT raiding
+  in a Raid Claim works exactly as it does today: this phase found no
+  Vertex-owned "raid TNT" logic anywhere in the codebase to preserve or
+  extend (the only pre-existing explosion-event precedent,
+  `BlueprintListener`'s `onEntityExplode`/`onBlockExplode`, only reacts to
+  already-destroyed Blueprint anchor blocks after the fact — it never
+  gates whether a block breaks). Whatever block-breaking permission a Raid
+  Claim already has comes entirely from FactionsUUID's own native claim
+  protection, which this phase does not touch, weaken, or duplicate.
+- **Explosion damage to players and mobs is cancelled everywhere,
+  unconditionally.** A separate `EntityDamageEvent` handler cancels any
+  damage whose cause is `ENTITY_EXPLOSION` or `BLOCK_EXPLOSION` for every
+  `LivingEntity` (players and mobs alike) — this is claim-independent by
+  design: it applies the same in a Base Claim, a Raid Claim, and the
+  wilderness. An `EntityDamageEvent` cause check was chosen over trying to
+  filter entity lists out of the explosion events themselves, because
+  neither `EntityExplodeEvent` nor `BlockExplodeEvent` exposes the set of
+  entities about to take damage — only the block list — so the damage
+  event is the only hook fine-grained enough to cancel a specific
+  entity's explosion damage.
+- **Withers are disabled server-wide.** `WitherPreventionListener`
+  cancels `CreatureSpawnEvent` whenever the spawned type is `WITHER`,
+  regardless of `SpawnReason` — this covers the vanilla
+  soul-sand-and-three-skulls construction (`SpawnReason.BUILD_WITHER`,
+  the primary way players make one) exactly the same as a spawn egg,
+  spawner, or command. No world or claim scoping; no exceptions.
+- **No admin bypass was wired in for the block-damage rule.** This
+  codebase's one existing "admin bypasses claim protection" pattern,
+  `StaffBuildListener`, un-cancels already-cancelled events for players in
+  staff-build mode — but every event it covers carries a `Player` to
+  check permissions against. `EntityExplodeEvent`/`BlockExplodeEvent`
+  carry no igniting player in vanilla Bukkit, so there was nothing to
+  hook a bypass onto without inventing new state (tracking who lit each
+  TNT) that the spec never asked for. If a staff bypass for this specific
+  rule is wanted later, it needs that new tracking built first.
+- **No new player-facing messages were added for this phase.** Both
+  suppression rules are structurally silent — there is no player
+  reference available at the moment block damage is stripped or a Wither
+  spawn is cancelled, so there is no clean way to attribute either event
+  to a specific player's screen. This mirrors how `FallDamageImmunityListener`
+  and vanilla's own blocked-spawn cases give no chat feedback either.
+
 ## Data model
 
 New tables (`me.vertex.core.claims.ClaimStorage`), added to
