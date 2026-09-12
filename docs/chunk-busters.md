@@ -71,6 +71,12 @@ radius or a fixed-size cuboid, which the source spec text left ambiguous.
 
 ## Batched processing and restart behavior
 
+Each batch rechecks the user's faction, claim ownership, combat and role
+permission. If permission is lost, the user disconnects, or the world becomes
+unavailable, clearing stops before the next batch and the operation is logged
+as stopped. Already-cleared blocks remain cleared; the consumed buster is not
+refunded after a partial operation.
+
 A Full/Upward/Downward Chunk Buster in a tall world can touch on the
 order of 98,000 blocks (16×16 columns × full build height) — clearing
 that in a single tick would freeze the server. `ChunkBusterManager`

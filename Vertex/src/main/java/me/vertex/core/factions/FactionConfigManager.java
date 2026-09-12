@@ -42,6 +42,12 @@ public final class FactionConfigManager {
             }
         }
         changed |= migrateShieldDurationDefaults(factions);
+        List<String> aliases = factions.getStringList("factions.command-aliases");
+        List<String> supportedAliases = aliases.stream().filter(alias -> !alias.trim().equalsIgnoreCase("t")).toList();
+        if (!supportedAliases.equals(aliases)) {
+            factions.set("factions.command-aliases", supportedAliases);
+            changed = true;
+        }
 
         if (changed) {
             try {

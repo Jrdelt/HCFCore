@@ -9,10 +9,15 @@ the associated staff tools.
 Build the deployable shaded JAR with Java 21:
 
 ```sh
-./mvnw clean package -DskipTests
+./mvnw clean package
 ```
 
 The output is `target/vertex-1.0.0.jar`.
+
+The source and documentation are versioned; generated JARs remain local build
+artifacts and are intentionally ignored by Git. Read the [open issues](../issues.md)
+and [verification scope](../docs/audit-progress.md) before deployment. Shared
+shards require an all-backend maintenance upgrade, not a mixture of old/new jars.
 
 ## Active configuration
 
@@ -53,6 +58,7 @@ its ore table intact:
 /mines create <mine-template> [koth]
 ```
 
-Use Shift-left-click in `/runes` or `/ce` to confirm a purchase of up to 64
-runes, or Shift-right-click to confirm the largest purchase permitted by the
-player's current balance and inventory space.
+Shift-left-click in `/runes` or `/ce` confirms a purchase of up to 64 runes.
+Shift-right-click is intended for the largest affordable purchase, but currently
+opens the catalog first (ISS-38); the shop also has an unresolved bottom-inventory
+shift-click safety issue (ISS-37). See [issues.md](../issues.md).

@@ -30,6 +30,7 @@ public final class ZoneStorage {
             s.executeUpdate("CREATE TABLE IF NOT EXISTS zone_flight_returns (player_uuid VARCHAR(36) PRIMARY KEY, zone_region VARCHAR(64) NOT NULL, world VARCHAR(128) NOT NULL, x DOUBLE NOT NULL, y DOUBLE NOT NULL, z DOUBLE NOT NULL)");
             SqlSchema.ensureLongBlob(c, database.dialect(), "zone_loot", "item", false);
         }
+        new ZoneEventStorage(database).init();
     }
 
     public List<ZoneRegion> loadRegions() throws SQLException {
@@ -93,19 +94,7 @@ public final class ZoneStorage {
     public void saveLong(String key,long value) throws SQLException { String sql=database.dialect()==Database.Dialect.SQLITE ? "INSERT INTO zone_event_state (state_key,value) VALUES (?,?) ON CONFLICT(state_key) DO UPDATE SET value=excluded.value" : "INSERT INTO zone_event_state (state_key,value) VALUES (?,?) ON DUPLICATE KEY UPDATE value=VALUES(value)"; try(Connection c=database.getConnection();PreparedStatement s=c.prepareStatement(sql)){s.setString(1,key);s.setLong(2,value);s.executeUpdate();} }
     public List<ScoreRow> loadScores(long eventStart) throws SQLException { List<ScoreRow> result=new ArrayList<>();try(Connection c=database.getConnection();PreparedStatement s=c.prepareStatement("SELECT player_uuid,player_name,score,reached_at FROM zone_event_scores WHERE event_start=?")){s.setLong(1,eventStart);try(ResultSet rs=s.executeQuery()){while(rs.next())result.add(new ScoreRow(UUID.fromString(rs.getString(1)),rs.getString(2),rs.getDouble(3),rs.getLong(4)));}}return result; }
     public record ScoreRow(UUID uuid,String name,double score,long reachedAt) { }
-    public void upsertScore(long start,ScoreRow row) throws SQLException {String sql=database.dialect()==Database.Dialect.SQLITE?"INSERT INTO zone_event_scores (event_start,player_uuid,player_name,score,reached_at) VALUES (?,?,?,?,?) ON CONFLICT(event_start,player_uuid) DO UPDATE SET player_name=excluded.player_name,score=excluded.score,reached_at=excluded.reached_at":"INSERT INTO zone_event_scores (event_start,player_uuid,player_name,score,reached_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE player_name=VALUES(player_name),score=VALUES(score),reached_at=VALUES(reached_at)";try(Connection c=database.getConnection();PreparedStatement s=c.prepareStatement(sql)){s.setLong(1,start);s.setString(2,row.uuid().toString());s.setString(3,row.name());s.setDouble(4,row.score());s.setLong(5,row.reachedAt());s.executeUpdate();}}
-    /** Clears all prior winner boosts and writes the new Top 3 in one transaction. */
-    public void replaceWinnerBoosts(long cycle, List<WinnerRow> winners) throws SQLException {
-        String upsert = database.dialect() == Database.Dialect.SQLITE
-                ? "INSERT INTO zone_players (player_uuid,last_name,haven_kills,riftlands_kills,haven_cooldown_until,riftlands_cooldown_until,rift_session_id,winner_boost,winner_cycle) VALUES (?,?,0,0,0,0,NULL,?,?) ON CONFLICT(player_uuid) DO UPDATE SET last_name=excluded.last_name,winner_boost=excluded.winner_boost,winner_cycle=excluded.winner_cycle"
-                : "INSERT INTO zone_players (player_uuid,last_name,haven_kills,riftlands_kills,haven_cooldown_until,riftlands_cooldown_until,rift_session_id,winner_boost,winner_cycle) VALUES (?,?,0,0,0,0,NULL,?,?) ON DUPLICATE KEY UPDATE last_name=VALUES(last_name),winner_boost=VALUES(winner_boost),winner_cycle=VALUES(winner_cycle)";
-        try (Connection c=database.getConnection(); PreparedStatement clear=c.prepareStatement("UPDATE zone_players SET winner_boost=0,winner_cycle=?"); PreparedStatement insert=c.prepareStatement(upsert)) {
-            c.setAutoCommit(false); clear.setLong(1,cycle); clear.executeUpdate();
-            for (WinnerRow winner : winners) { insert.setString(1,winner.uuid().toString()); insert.setString(2,winner.name()); insert.setDouble(3,winner.boost()); insert.setLong(4,cycle); insert.addBatch(); }
-            insert.executeBatch(); c.commit();
-        }
-    }
-    public record WinnerRow(UUID uuid, String name, double boost) { }
+    // Event scores and winner awards are written only through ZoneEventStorage's transactional ledger.
     public void saveFlightReturn(UUID uuid,String region,String world,double x,double y,double z)throws SQLException {String sql=database.dialect()==Database.Dialect.SQLITE?"INSERT INTO zone_flight_returns (player_uuid,zone_region,world,x,y,z) VALUES (?,?,?,?,?,?) ON CONFLICT(player_uuid) DO UPDATE SET zone_region=excluded.zone_region,world=excluded.world,x=excluded.x,y=excluded.y,z=excluded.z":"INSERT INTO zone_flight_returns (player_uuid,zone_region,world,x,y,z) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE zone_region=VALUES(zone_region),world=VALUES(world),x=VALUES(x),y=VALUES(y),z=VALUES(z)";try(Connection c=database.getConnection();PreparedStatement s=c.prepareStatement(sql)){s.setString(1,uuid.toString());s.setString(2,region);s.setString(3,world);s.setDouble(4,x);s.setDouble(5,y);s.setDouble(6,z);s.executeUpdate();}}
     public FlightReturn loadFlightReturn(UUID uuid)throws SQLException {try(Connection c=database.getConnection();PreparedStatement select=c.prepareStatement("SELECT zone_region,world,x,y,z FROM zone_flight_returns WHERE player_uuid=?")){select.setString(1,uuid.toString());try(ResultSet rs=select.executeQuery()){return rs.next()?new FlightReturn(rs.getString(1),rs.getString(2),rs.getDouble(3),rs.getDouble(4),rs.getDouble(5)):null;}}}
     public void deleteFlightReturn(UUID uuid)throws SQLException {try(Connection c=database.getConnection();PreparedStatement delete=c.prepareStatement("DELETE FROM zone_flight_returns WHERE player_uuid=?")){delete.setString(1,uuid.toString());delete.executeUpdate();}}

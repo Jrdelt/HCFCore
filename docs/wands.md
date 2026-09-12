@@ -38,6 +38,10 @@ Splitting a sale across two wand uses earns the same as doing it in one.
   that entry. This is why a wand can never sweep up your custom gear, and
   why Vertex's own items (wands, Backpacks, Chunk Collectors) are safe
   without needing to be listed anywhere.
+- **Filled container items and nondefault vanilla metadata**, including damage,
+  potion/firework/book data. Eligibility uses the normal shop's conservative
+  comparison after stripping only harmless `mob_drop` bookkeeping on a clone.
+- **Materials blocked by the player's Vertex Filter.**
 - **Materials on `sell-wands.never-sell`** — server-controlled protection.
   Ships with `SPAWNER` and `BEDROCK`.
 - **Anything the shop does not trade.**
@@ -63,8 +67,8 @@ doing it first means a failure costs the player nothing — rather than taking
 their Gunpowder and only then discovering there was no room.
 
 Once the deposit lands, the container is re-checked before the Gunpowder is
-removed. The container lock keeps other wands out, but a player can still
-empty a chest by hand during the bank write; if the Gunpowder that was
+removed. Collectors are re-read from live block data, preserving changes made
+during the bank write, including upgrades and newly collected loot. If the Gunpowder that was
 priced is no longer there, the banked TNT is withdrawn again and nothing is
 taken.
 
@@ -77,12 +81,13 @@ player nothing.
 
 ## Transaction safety
 
-- A container being processed is locked for the duration, so two players
-  cannot empty the same chest at once and a click repeat cannot double-fire.
+- The clicked container location is locked for the duration.
   The TNT path holds that lock across its asynchronous bank write rather
   than releasing it when the click handler returns.
-- Nothing is removed, no use is spent, and no money or TNT moves unless the
-  whole operation can complete.
+- Per-wand reservation, double-chest lock identity and crash-safe coupling of
+  bank credits to consumed materials are **not yet complete**. See the open
+  findings in [issues.md](../issues.md); the current lock is not an atomic
+  world-inventory/database transaction.
 - Sell Wand sales and TNT Wand conversions are logged to console with the
   player, the amounts, and the tier used.
 

@@ -317,6 +317,7 @@ public final class ZoneListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         zones.cancelEntry(event.getPlayer(), "disconnect"); zones.cancelExit(event.getPlayer(), "disconnect"); zones.recordFlightDisconnect(event.getPlayer());
+        zones.clearSlowFall(event.getPlayer());
     }
     @EventHandler
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {

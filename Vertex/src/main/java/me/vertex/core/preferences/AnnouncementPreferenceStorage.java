@@ -77,22 +77,16 @@ public final class AnnouncementPreferenceStorage {
     }
 
     public void save(UUID uuid, AnnouncementCategory category, boolean enabled) throws SQLException {
+        String upsert = database.dialect() == Database.Dialect.SQLITE
+                ? "ON CONFLICT(uuid, category) DO UPDATE SET enabled = excluded.enabled"
+                : "ON DUPLICATE KEY UPDATE enabled = VALUES(enabled)";
         try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(
                 "INSERT INTO announcement_preferences (uuid, category, enabled) VALUES (?, ?, ?) "
-                        + "ON CONFLICT(uuid, category) DO UPDATE SET enabled = excluded.enabled")) {
+                        + upsert)) {
             statement.setString(1, uuid.toString());
             statement.setString(2, category.name());
             statement.setBoolean(3, enabled);
             statement.executeUpdate();
-        } catch (SQLException unsupportedUpsert) {
-            try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO announcement_preferences (uuid, category, enabled) VALUES (?, ?, ?) "
-                            + "ON DUPLICATE KEY UPDATE enabled = VALUES(enabled)")) {
-                statement.setString(1, uuid.toString());
-                statement.setString(2, category.name());
-                statement.setBoolean(3, enabled);
-                statement.executeUpdate();
-            }
         }
     }
 }

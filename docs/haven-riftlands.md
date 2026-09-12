@@ -44,7 +44,7 @@ All setup requires `vertex.zones.admin`.
 | `/haven spawnpoints list\|preview\|delete <name>` / `/riftlands spawnpoints list\|preview\|delete <name>` | `vertex.zones.admin` | Manages or tests existing zone routes. |
 | `/haven lootpool` / `/riftlands lootpool` | `vertex.zones.admin` | Opens the editable loot-pool editor version. |
 | `/haven koth\|outpost create\|cancel\|delete\|list` / `/riftlands koth\|outpost create\|cancel\|delete\|list` | `vertex.zones.admin` | Creates and manages the zone-local KOTH and Outpost control points. |
-| `/haven admin event start\|stop` | `vertex.zones.admin` | Starts or stops the hourly event. |
+| `/haven admin event start\|stop` | `vertex.zones.admin` | Starts or stops the shared Mob Kill Event (configured cycle; default 120 minutes). |
 | `/haven admin inspect <player>` | `vertex.zones.admin` | Inspects a player’s zone progression and current amplification. |
 | `/haven admin clear-mobs [all]` / `/riftlands admin clear-mobs [all]` | `vertex.zones.admin` | Removes tracked mobs from that zone, or from both zones with `all`. |
 
@@ -77,6 +77,22 @@ the local population without scanning the whole world.
 Mob Drop Amplification grants whole independent extra loot-pool rolls; it never changes a listed item’s base chance. It combines the current zone milestone, current Top-3 event boost, equipped Backpack bonus, and future compatible shared sources. Items strictly below the configured rare threshold cannot be awarded twice from one mob death.
 
 The combined Mob Kill Event uses an epoch-stable persisted cycle (default 120 minutes) and active window (default five minutes), so restarts neither extend boosters nor restart an event. Haven kills score 1.0 point and Riftlands kills score 1.5 by default; ties resolve by the earliest time at which a player reached that score.
+
+Both zones now use Haven's `kill-event.scoring` values. With shared-MySQL shards,
+each recorded kill has a durable replay receipt and adds to the global total;
+changing shards cannot overwrite the event score with a smaller local value.
+Winners are finalized once from SQL scores, not separately from each shard's
+leaderboard. Applied winner boosts are read from that immutable result, so a
+stale player save cannot revoke them. Exact score/time ties use player UUID.
+
+The scoreboard and boosts refresh asynchronously every
+`kill-event.shared-refresh-seconds` (default 2, bounded 1–60). Finalization waits
+`kill-event.settlement-delay-seconds` after the deadline (default 5, bounded 1–60)
+for queued writes. Late writes are rejected and logged; a process killed before
+an asynchronous score reaches SQL can still lose that uncommitted score. Event
+start/stop is shared, and stopping preserves the current event's scores. Keep
+event configuration identical across shards. See the deployment limitations and
+maintenance rollout in [network persistence](network-shards.md#persistence-scope-and-current-limits).
 
 ## Placeholders
 

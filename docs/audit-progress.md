@@ -1,0 +1,684 @@
+# Audit repair progress — 2026-09-12
+
+This is a **partial repair and review checkpoint**, not a production certification.
+The whole-project, every-file review requested by the owner is **not finished**.
+The checklist below deliberately distinguishes targeted work from completed
+top-to-bottom review. Compilation, text searches and green tests do not prove
+that every file or every crash scenario was reviewed.
+
+## Results
+
+- Starting tree: `main`, based on `29e58b1`; earlier GC-cooldown changes were already present and preserved.
+- Clean Maven package: **774 tests; 773 passed, 1 skipped; 0 failures/errors**.
+- Release rebuild repeated successfully on 2026-09-12 at 15:27 PDT with Temurin 25 (Java 21 compilation target). JAR SHA-256: `16495b21e9b8b04c0528ab1b4f0d19d2b5f62222426407b2c31406fdacc79e68`. Deployment/network/trade/event additions are present in the shaded artifact. All 177 local links in the changed Markdown files resolved during the publication check.
+- The existing collector material-cap test is skipped because MockBukkit does not implement its `Material.isItem/fromLegacy` path. Its Paper scenario still needs verification.
+- A disposable MySQL test verified single/multi-use redemption concurrency, stale-cache overdraft rejection, wallet overflow/code preservation, transactional auction failure/retry, and competing auction/coinflip spending. MySQL was shut down afterward.
+- Generated artifact: `Vertex/target/vertex-1.0.0.jar`. JARs are intentionally ignored by Git; source, tests and documentation are the versioned deliverables. Deployment to a server is a separate operator action.
+- Expected test logs include deliberately injected SQL failures and test-only missing delivery services. Packaging still emits existing dependency manifest/module-info overlap warnings; no blanket warning suppression was added.
+- [issues.md](../issues.md) contains 23 remaining/partially resolved findings and staging scenarios, including six from the scheduled scan, three shard/mob findings and the pre-push admin-confirmation finding (ISS-45). Completed findings are removed from that backlog and retained in this history.
+- Deployment choice confirmed: multiple MySQL shards plus optional standalone SQLite/dedicated MySQL, controlled by the existing `network.enabled`. Startup validates the mode and identity; reload preserves the boot identity.
+- The trade ownership pass added 21 regression cases across deployment, ownership, GUI gating and migration. An additional disposable MySQL probe verified cross-shard rejection, eight concurrent settlement retries, concurrent restart refunds and injected SQL failure/rollback. Its server was shut down afterward. These are storage-level tests, not a two-Paper-server certification.
+- The shared-event/PvP Top pass added 17 cases: idempotent additive scoring, settlement deadlines, restart/replay, finalization rollback/contention, stale player saves, administrative cycle transitions, deterministic ties, cache replacement and migration. A separate two-pool MySQL probe passed 16 competing score calls, eight competing finalizers, receipt rollback/retry and the database-clock query. The disposable MySQL server is stopped. None of this certifies general player-row ownership, geometry ownership or inventory transfers.
+
+## Completed focused repairs
+
+| Original issues | Change and evidence |
+| --- | --- |
+| ISS-01, 02, 31 | SQL-authorized GC debits, local withdrawal reservations, checked wallet ceiling, atomic GC auction/coinflip settlement. SQLite regression tests plus isolated MySQL contention/failure probes. |
+| ISS-03, 24 | Trade cross-inventory actions blocked; hotbar/offhand/drag source validated; read-only preview returns to the same session. `TradeListenerSafetyTest`. |
+| ISS-04 | Shard/process fencing lease, owner-only abandoned-session recovery, atomic terminal states and replay guards. `TradeOwnershipTest`, expanded listener/migration tests, and disposable MySQL contention/rollback checks. Legacy network escrow remains held for explicit offline ownership migration; see `docs/trading.md`. |
+| ISS-05, 06 | Completed delivery IDs retained as replay tombstones; full inventory keeps overflow in SQL; rows acknowledged individually. `DeliveryStorageTest`, `ClaimDeliveryTest`. |
+| ISS-10, 34 | Collector state is read live after asynchronous work; wand selling reuses conservative shop metadata checks. `WandCollectorSafetyTest`, `WandManagerTest`. |
+| ISS-18 | Each Chunk Buster batch revalidates current claim, membership/permissions and combat state. Stop is logged rather than reported completed. `ChunkBusterManagerTest`. |
+| ISS-19, 20, 28, 29 | Mine saves preserve current shared configuration; KOTH world validation; per-mine hologram reload; announced Hot Zone retained until start. `MineConfigurationSafetyTest`. |
+| ISS-21 | Per-player serialized preference reads/writes, pending-edit merge and reconnect refresh. `AnnouncementPreferenceManagerTest`. |
+| ISS-22, 23 | Installed retired /t alias migration and command-namespace ownership checks. `FactionConfigManagerTest`, `CommandVisibilityListenerTest`. |
+| ISS-25 | Removed the blanket MONITOR un-cancellation listener. Existing native faction/mine staff-build bypasses remain. Recovery is possible through Git. Requires live integration verification with runes and transfer locks. |
+| ISS-27 | Zone spawning uses configured cluster targets, distance/bias and a shared per-region pass budget. Target arithmetic tested by `ZoneMobBudgetTest`; native spawn counts still need Paper testing. |
+| ISS-30, 33 | YAML performance key migration; bounded, overflow-checked GC code expiry. `MessagesTest`, `GcRedemptionSafetyTest`. |
+
+Additional findings fixed while implementing these repairs:
+
+- Partial tagged-stack recovery now adds only the missing quantity.
+- Newly admitted overstacked deliveries are split into normal stacks; large inboxes need not fit all at once.
+- Staff GC mutations now report SQL completion asynchronously, and staff balance inspection refreshes SQL first.
+- Shared zone-event scores use SQL deltas with replay receipts; winner finalization reads global durable scores once and cannot be overwritten by stale player saves. PvP Top refreshes remote awards/disbands and replaces stale caches. See the shared-event results above and [network rollout](network-shards.md#shared-events-and-leaderboard-rollout).
+
+Partial fixes retained in the open list:
+
+- ISS-26: finite renewable flight effects and logout/shutdown cleanup stop new permanent-effect leaks. Legitimate potion ownership/restoration and legacy-effect migration remain.
+- ISS-32: historical GC formats survive local reload/restart. Format invalidation across already-running shards remains.
+
+## Next repair order
+
+1. Shared inventory-session/delivery barrier, durable player-save receipts and the remaining live trade snapshot window (ISS-07, 08, 13, 14, 35); staff inventory and Rune Shop loss/dupe findings ISS-36/37.
+2. Source-debit journals and per-wand reservations for spawners/TNT (ISS-09, 11, 12).
+3. Shard-qualified persisted block/zone identity, player progression fencing, aggregate F Top and coordinated season reset/backup (ISS-15–17, 42/43). Do not guess which shard owns ambiguous legacy world-coordinate records.
+4. Finish ISS-26/32, the scheduled UX/configuration findings ISS-38–41, mob-stack neighbor coverage (ISS-44), durable admin confirmations (ISS-45), and the remaining file-by-file review below.
+5. Repeat a clean build and two-Paper-backend crash/disconnect tests. No live-season reset or migration has been executed.
+
+## File-review coverage
+
+Inventory was taken with `git ls-files --cached --others --exclude-standard`.
+Generated/ignored build outputs are covered by build verification, not source-review checkboxes.
+All unchecked files still require a full top-to-bottom pass. **Targeted** means
+relevant paths were investigated or changed, not that the whole file was cleared.
+This checklist is an honest remaining-work index, not a claim of exhaustive review.
+
+New files from the shard ownership pass (not in the baseline inventory):
+
+- [x] `Vertex/src/main/java/me/vertex/core/network/NetworkDeployment.java` — read/reviewed in full; deployment regression tests.
+- [x] `Vertex/src/main/java/me/vertex/core/trade/TradeOwnership.java` — read/reviewed in full; SQLite and MySQL lease/fencing checks.
+- [x] `Vertex/src/test/java/me/vertex/core/network/NetworkDeploymentTest.java` — read/reviewed in full.
+- [x] `Vertex/src/test/java/me/vertex/core/trade/TradeOwnershipTest.java` — read/reviewed in full.
+- [x] `Vertex/src/main/java/me/vertex/core/zone/ZoneEventStorage.java` — new event ledger reviewed in full; SQLite and two-pool MySQL transaction checks.
+- [x] `Vertex/src/test/java/me/vertex/core/zone/ZoneEventStorageTest.java` — 13 storage regression cases.
+- [x] `Vertex/src/test/java/me/vertex/core/faction/PvpTopManagerTest.java` — three cache/reload regression cases.
+- Targeted follow-up: `ZoneManager` event writes, refresh, boosters and timing; `PvpTopManager` cache coherence; `VertexPlugin` invalidation/reload wiring; `StorageMigrator` and season-table inclusion. The rest of these modules is not newly certified.
+
+- [ ] `.gitignore` — full-file review pending
+- [ ] `.vscode/settings.json` — full-file review pending
+- [ ] `LICENSE` — full-file review pending
+- [ ] `README.md` — full-file review pending
+- [ ] `Vertex/.mvn/wrapper/maven-wrapper.properties` — full-file review pending
+- [ ] `Vertex/README.md` — full-file review pending
+- [ ] `Vertex/dependency-reduced-pom.xml` — full-file review pending
+- [ ] `Vertex/mvnw` — full-file review pending
+- [ ] `Vertex/mvnw.cmd` — full-file review pending
+- [ ] `Vertex/pom.xml` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/VertexCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/VertexPlugin.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/AbilitiesCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/AbilitiesMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/Ability.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/AbilityGate.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/AbilityManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/AbilityMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/AntiBlockupBoneListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/BlockupTracker.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/CooldownsCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/FakePearlListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/FallDamageImmunity.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/FallDamageImmunityListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/GetItemCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/GrapplingHookListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/JumpBoostFeatherListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/LeapListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/MageSpellListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/NinjaStarListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/NoPearlSpawnListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/PearlStunnerListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/PearlVelocityListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/PortableBardListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/PortableBardMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/RabbitsFeedListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/RepairListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/RogueBackstabListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/SwitcherSnowballListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/TimeWarpPearlListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/VanillaCooldownListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/ability/VanillaCooldownManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionClaim.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionCurrency.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionHistoryMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionHistoryMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionHubMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionHubMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionJoinListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionListing.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionLogEntry.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/auction/AuctionStorage.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/audit/LargeTransactionAudit.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/backpack/BackpackAutoStoreListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/backpack/BackpackCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/backpack/BackpackData.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/backpack/BackpackFilterCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/backpack/BackpackFilterManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/backpack/BackpackInteractListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/backpack/BackpackManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/backpack/BackpackMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/backpack/BackpackMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/backpack/BackpackProgression.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/backpack/BackpackTier.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/blueprint/ActiveBuild.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/blueprint/BlueprintActivationMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/blueprint/BlueprintActivationMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/blueprint/BlueprintCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/blueprint/BlueprintListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/blueprint/BlueprintManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/blueprint/BlueprintMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/blueprint/BlueprintMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/blueprint/BlueprintOutline.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/blueprint/BlueprintStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/blueprint/BlueprintTemplate.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/booster/BackpackBoosterSource.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/booster/BoosterCategory.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/booster/BoosterContribution.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/booster/BoosterService.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/booster/BoosterSource.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/booster/BoosterStacking.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/booster/BoostersCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/booster/BoostersMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/booster/BoostersMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/booster/FactionUpgradeBoosterSource.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/bucket/SourceBucketListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/bucket/SourceBucketManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/bucket/SourceBucketType.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/capture/CaptureCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/capture/CaptureDefinition.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/capture/CaptureEventManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/capture/CaptureEventType.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/capture/CaptureProgression.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/capture/FactionXpBoosterManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/chat/ChatFormatterListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/chunkbuster/ChunkBusterArea.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/chunkbuster/ChunkBusterCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/chunkbuster/ChunkBusterListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/chunkbuster/ChunkBusterManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/chunkbuster/ChunkBusterMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/chunkbuster/ChunkBusterMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/chunkbuster/ChunkBusterStorage.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/chunkbuster/ChunkBusterType.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/claims/BaseClaimCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/claims/BaseClaimManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/claims/BaseClaimMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/claims/BaseClaimMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/claims/BaseDisconnectConfirmMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/claims/ChunkKey.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/claims/ClaimEventListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/claims/ClaimStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/claims/ExplosionProtectionListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/claims/RaidClaimManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/Coinflip.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipAnimationMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipAnimationMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipClaim.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipJoinListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipLogEntry.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipMatchReviewMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipMatchReviewMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipPendingMatch.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipResultNotification.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipStorage.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipType.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipWagerMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/coinflip/CoinflipWagerMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/collector/ChunkCollectorClaimListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/collector/ChunkCollectorCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/collector/ChunkCollectorData.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/collector/ChunkCollectorListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/collector/ChunkCollectorManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/collector/ChunkCollectorMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/collector/ChunkCollectorMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/collector/ChunkCollectorStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/command/CommandVisibilityListener.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/command/VertexCommandPrecedenceListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/dupe/DupeCase.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/dupe/DupeCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/dupe/DupeListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/dupe/DupeManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/dupe/DupeStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/economy/EconomyHook.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/enchant/ArenaRuneListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/enchant/ArenaRuneManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/enchant/EnchantCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/enchant/EnchantDefinition.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/enchant/EnchantManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/enchant/EnchantTargetGroups.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/enchant/RuneCatalogMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/enchant/RuneFormatting.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/enchant/RuneListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/enchant/RuneRollTable.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/enchant/RuneShopMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/enchant/RuneShopMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/enchant/RuneTier.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/essentials/EssentialsHook.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/event/EventsCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/event/EventsMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/event/EventsMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FTopCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FTopManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FTopStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FactionBankManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FactionBankMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FactionBankStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FactionRenameListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FactionUpgrade.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FactionUpgradeEffectsListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FactionUpgradeManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FactionUpgradeMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FactionUpgradeStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FactionVaultManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/FactionVaultStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/PvpTopCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/PvpTopManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/PvpTopStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/RallyCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/RallyManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/RallyPermissionMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/RallyPoint.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/faction/TntFillCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/AdminAuditStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FPowerBooster.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionAdminCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionConfigManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionData.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionDisbandMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionGameplayListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionMember.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionPowerListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionPowerProfile.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionProtectionListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionRelation.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionRole.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionService.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionSocialCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionSocialManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionSocialStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionWarp.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/FactionsHook.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/event/FactionClaimEvent.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/event/FactionLifecycleEvent.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/factions/event/FactionUnclaimAllEvent.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/gc/GcAction.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/gc/GcChatProtectionListener.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/gc/GcCommand.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/gc/GcInteropHook.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/gc/GcLogEntry.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/gc/GcLogMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/gc/GcLogMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/gc/GcManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/gc/GcMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/gc/GcStorage.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/grace/DurationParser.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/grace/GraceCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/grace/GraceManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/grace/GraceStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/item/ItemKind.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/item/TrackedItemIds.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/kit/ArmorClass.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/kit/Kit.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/kit/KitCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/kit/KitManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/kit/KitMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/kit/KitPreviewMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/kit/KitsCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/kit/KitsMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/lang/LanguageCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/lang/MessageFormatter.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/lang/Messages.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/lang/PlaceholderResolver.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/lang/SmallCaps.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/listener/CombatListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/listener/ItemRestrictionListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/listener/PlayerConnectionListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/listener/WitherPreventionListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/luckperms/LuckPermsHook.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/menu/MenuItemTemplate.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/menu/MenuLayout.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/menu/MenuPlaceholders.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/menu/MenuRegistry.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/HotZoneBoosterSource.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/HotZoneManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/HotZoneStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MineKothBooster.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MineKothBoosterSource.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MineKothControl.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MineKothDefinition.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MineKothManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MineKothStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MineListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MineManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MineOreTable.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MineRegenQueue.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MineRegion.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MineTeleportManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MinesCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MinesMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/mine/MinesMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/network/NetworkLocation.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/network/NetworkManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/network/NetworkStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/network/PlayerStateSnapshot.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/network/ShardState.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/performance/PerformanceManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/placeholderapi/PlaceholderApiHook.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/placeholderapi/VertexPlaceholderExpansion.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/portal/EntryPortal.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/portal/PortalListener.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/portal/PortalManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/portal/PortalRoute.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/portal/PortalStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/portal/PortalTarget.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/preferences/AnnouncementCategory.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/preferences/AnnouncementPreferenceManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/preferences/AnnouncementPreferenceStorage.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/preferences/PlayerInteractionPreferenceListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/preferences/SettingsCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/preferences/SettingsMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/preferences/SettingsMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/pvp/ArcherTagListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/pvp/ArcherTagManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/pvp/CombatCheckCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/pvp/CombatManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/pvp/CombatSafezoneListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/pvp/CombatTagCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/pvp/FullHealSplashListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/pvp/GhostPlayerManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/pvp/HungerManagementListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/pvp/LegacyCombatManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/pvp/LootProtectionListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/pvp/UncombatCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/reboot/NextRebootCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/reboot/RebootCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/reboot/RebootManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/sandbot/SandBotCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/sandbot/SandBotListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/sandbot/SandBotManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/season/SeasonResetManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shield/ShieldCombatListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shield/ShieldCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shield/ShieldFactionLifecycleListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shield/ShieldManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shield/ShieldSchedule.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shield/ShieldScheduleMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shield/ShieldStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shop/SellCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shop/ShopCategory.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shop/ShopCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shop/ShopEntry.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shop/ShopManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shop/ShopMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shop/ShopMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shop/ShopPricing.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/shop/ShopStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/spawner/MobStackListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/spawner/SpawnerClaimListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/spawner/SpawnerData.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/spawner/SpawnerItemProtectionListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/spawner/SpawnerListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/spawner/SpawnerManagementMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/spawner/SpawnerManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/spawner/SpawnerMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/spawner/SpawnerMobListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/spawner/SpawnerStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/Death.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/DeathListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/DeathManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/EndseeCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/FreezeCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/FreezeListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/InvRestoreMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/InvRestoreMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/InvseeCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/InvseeMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/InvseeMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/PunishmentCombatListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/RollbackCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/StaffBuildCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/StaffBuildListener.java` — removed; native bypass wiring checked
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/StaffChatCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/StaffChatListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/StaffCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/StaffManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/VanishCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/staff/VanishListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/stats/PlayerStatsManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/stats/PlayerStatsStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/storage/ClaimDelivery.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/storage/ClaimDeliveryGuard.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/storage/Database.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/storage/DeliveryManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/storage/DeliveryStorage.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/storage/DeliveryWal.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/storage/SqlRetry.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/storage/SqlSchema.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/storage/SqlStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/storage/Storage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/storage/StorageMigrator.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/tag/GradientColor.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/tag/TagManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/tag/TagMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/tag/TagMenuListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/tag/TagMenuState.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/tag/TagSearchMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/tag/TagsCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/teleport/DeathSpawnListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/teleport/GlobalLocationManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/teleport/RtpCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/teleport/RtpManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/teleport/RtpStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/teleport/ServerAdminCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/teleport/SpawnCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/teleport/TeleportManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/teleport/WarpCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/teleport/WarpMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/trade/TradeCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/trade/TradeEscrow.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/trade/TradeHistoryCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/trade/TradeHistoryListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/trade/TradeHistoryMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/trade/TradeListener.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/trade/TradeLogEntry.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/trade/TradeManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/trade/TradeMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/trade/TradeSession.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/trade/TradeSnapshot.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/trade/TradeStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/trade/TradeToggleCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/user/User.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/user/UserManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/util/AmountParser.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/util/ChatAmountPrompt.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/util/NumberFormatConfig.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/util/NumberSettings.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/util/Numbers.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/wand/WandCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/wand/WandContainer.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/wand/WandListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/wand/WandManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/wand/WandTier.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/wand/WandType.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/worldguard/WorldGuardHook.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/zone/ArenaControlBoosterSource.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/zone/ArenaControlManager.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/zone/ZoneBoosterSource.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/zone/ZoneCommand.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/zone/ZoneCommandRestrictionListener.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/zone/ZoneListener.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/zone/ZoneManager.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/zone/ZoneMenu.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/zone/ZoneRegion.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/zone/ZoneRoute.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/zone/ZoneStorage.java` — full-file review pending
+- [ ] `Vertex/src/main/java/me/vertex/core/zone/ZoneType.java` — full-file review pending
+- [ ] `Vertex/src/main/resources/abilities.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/ah.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/arena-runes.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/backpacks.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/blueprints.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/boosters.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/capture-events.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/chunkbuster.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/coinflips.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/collectors.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/config.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/dupes.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/enchants.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/factions.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/ftop.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/gc.yml` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/resources/gui/baseclaim.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/gui/boosters.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/gui/chunkbuster.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/gui/events.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/gui/gc.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/gui/mines.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/haven.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/kits.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/lang/de_de.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/lang/en_us.yml` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/main/resources/lang/es_us.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/lang/pt_br.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/mines.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/number-formatting.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/performance.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/plugin.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/pvptop.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/riftlands.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/runes.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/shop.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/sourcebuckets.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/spawners.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/tags.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/traders.yml` — full-file review pending
+- [ ] `Vertex/src/main/resources/wands.yml` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/PluginDependencySafetyTest.java` — new regression coverage; tested
+- [ ] `Vertex/src/test/java/me/vertex/core/ability/AbilityManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/ability/AbilityTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/ability/BlockupTrackerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/ability/GetItemCommandTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/ability/PortableBardCooldownTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/auction/AuctionManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/auction/AuctionStorageTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/backpack/BackpackManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/backpack/BackpackProgressionTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/blueprint/BlueprintOutlineTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/booster/BoosterServiceTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/booster/BoosterStackingTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/bucket/SourceBucketManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/capture/CaptureProgressionTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/chunkbuster/ChunkBusterAreaTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/chunkbuster/ChunkBusterManagerTest.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/claims/BaseClaimManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/claims/ExplosionProtectionListenerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/claims/RaidClaimManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/coinflip/CoinflipManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/coinflip/CoinflipStorageTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/collector/ChunkCollectorManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/command/CommandVisibilityListenerTest.java` — new regression coverage; tested
+- [ ] `Vertex/src/test/java/me/vertex/core/dupe/DupeManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/dupe/DupeStorageTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/enchant/EnchantManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/enchant/RuneRollTableTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/essentials/EssentialsHookTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/faction/FactionBankManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/faction/FactionVaultStorageTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/faction/PvpTopStorageTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/factions/FactionConfigManagerTest.java` — new regression coverage; tested
+- [ ] `Vertex/src/test/java/me/vertex/core/factions/FactionMapTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/factions/FactionSocialStorageTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/factions/FactionStorageTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/gc/GcManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/gc/GcRedemptionSafetyTest.java` — new regression coverage; tested
+- [ ] `Vertex/src/test/java/me/vertex/core/gc/GcSettlementSafetyTest.java` — new regression coverage; tested
+- [ ] `Vertex/src/test/java/me/vertex/core/grace/DurationParserTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/grace/GraceManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/item/TrackedItemIdsTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/kit/ArmorClassTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/kit/KitCommandTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/kit/KitManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/lang/MessageAssertions.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/lang/MessageFormatterTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/lang/MessagesTest.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/lang/PlaceholderResolverTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/lang/SmallCapsTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/listener/WitherPreventionListenerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/luckperms/LuckPermsHookTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/menu/MenuRegistryTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/mine/MineConfigurationSafetyTest.java` — new regression coverage; tested
+- [ ] `Vertex/src/test/java/me/vertex/core/mine/MineKothBoosterTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/mine/MineKothControlTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/mine/MineKothStorageTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/mine/MineOreTableTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/mine/MineRegenQueueTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/mine/MineRegionTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/network/NetworkStorageTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/network/PlayerStateSnapshotTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/performance/PerformanceManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/preferences/AnnouncementPreferenceManagerTest.java` — new regression coverage; tested
+- [ ] `Vertex/src/test/java/me/vertex/core/pvp/ArcherTagManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/pvp/CombatManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/reboot/RebootCommandTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/shield/ShieldManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/shop/ShopManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/shop/ShopPricingTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/spawner/SpawnerDataTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/spawner/SpawnerItemProtectionListenerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/spawner/SpawnerManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/staff/InvseeMenuTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/staff/PunishmentCombatListenerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/storage/ClaimDeliveryTest.java` — new regression coverage; tested
+- [ ] `Vertex/src/test/java/me/vertex/core/storage/DeliveryStorageTest.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/storage/DeliveryWalTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/storage/LocalStorageTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/storage/StorageMigratorTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/tag/GradientColorTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/tag/TagManagerTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/tag/TagSearchMenuTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/trade/TradeListenerSafetyTest.java` — new regression coverage; tested
+- [ ] `Vertex/src/test/java/me/vertex/core/trade/TradeStorageTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/util/AmountParserTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/util/ChatAmountPromptTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/util/NumbersTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/wand/SellWandPricingTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/wand/WandCollectorSafetyTest.java` — new regression coverage; tested
+- [ ] `Vertex/src/test/java/me/vertex/core/wand/WandManagerTest.java` — targeted review/changes; full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/zone/ZoneMenuTest.java` — full-file review pending
+- [ ] `Vertex/src/test/java/me/vertex/core/zone/ZoneMobBudgetTest.java` — new regression coverage; tested
+- [ ] `Vertex/src/test/java/me/vertex/core/zone/ZoneRegionTest.java` — full-file review pending
+- [ ] `docs/README.md` — full-file review pending
+- [ ] `docs/architecture.md` — full-file review pending
+- [ ] `docs/auctionhouse.md` — full-file review pending
+- [ ] `docs/backpacks.md` — full-file review pending
+- [ ] `docs/base-and-raid-claims.md` — full-file review pending
+- [ ] `docs/blueprints.md` — full-file review pending
+- [ ] `docs/boosters.md` — full-file review pending
+- [ ] `docs/chunk-busters.md` — targeted review/changes; full-file review pending
+- [ ] `docs/coinflips.md` — full-file review pending
+- [ ] `docs/commands-and-permissions.md` — full-file review pending
+- [ ] `docs/configuration.md` — full-file review pending
+- [ ] `docs/custom-enchantments.md` — full-file review pending
+- [ ] `docs/dupe-investigation.md` — full-file review pending
+- [ ] `docs/faction-leaderboards.md` — full-file review pending
+- [ ] `docs/faction-shield.md` — full-file review pending
+- [ ] `docs/factions-integration.md` — full-file review pending
+- [ ] `docs/gc-currency.md` — targeted review/changes; full-file review pending
+- [ ] `docs/gui-framework.md` — full-file review pending
+- [ ] `docs/haven-riftlands.md` — full-file review pending
+- [ ] `docs/installation.md` — full-file review pending
+- [ ] `docs/integrations.md` — full-file review pending
+- [ ] `docs/kits-and-abilities.md` — full-file review pending
+- [ ] `docs/koth-and-outposts.md` — full-file review pending
+- [ ] `docs/localization.md` — full-file review pending
+- [ ] `docs/mines.md` — full-file review pending
+- [ ] `docs/network-shards.md` — full-file review pending
+- [ ] `docs/performance.md` — full-file review pending
+- [ ] `docs/placeholders.md` — full-file review pending
+- [ ] `docs/player-guide.md` — full-file review pending
+- [ ] `docs/portals.md` — full-file review pending
+- [ ] `docs/pvp-and-combat.md` — full-file review pending
+- [ ] `docs/sandbots.md` — full-file review pending
+- [ ] `docs/settings.md` — full-file review pending
+- [ ] `docs/setup-haven.md` — full-file review pending
+- [ ] `docs/setup-mines.md` — full-file review pending
+- [ ] `docs/setup-riftlands.md` — full-file review pending
+- [ ] `docs/shop.md` — full-file review pending
+- [ ] `docs/source-buckets.md` — full-file review pending
+- [ ] `docs/spawners-and-collectors.md` — full-file review pending
+- [ ] `docs/staff-tools.md` — full-file review pending
+- [ ] `docs/tags-and-cosmetics.md` — full-file review pending
+- [ ] `docs/trading.md` — targeted review/changes; full-file review pending
+- [ ] `docs/wands.md` — targeted review/changes; full-file review pending
+- [ ] `issues.md` — targeted review/changes; full-file review pending
+- [ ] `optimizations.md` — full-file review pending

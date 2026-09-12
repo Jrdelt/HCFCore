@@ -23,19 +23,25 @@ import java.util.UUID;
  * {@link #init()} method, and {@code setAutoCommit(false)} plus commit/
  * rollback for the multi-statement writes that must never partially apply.
  *
- * <p>Every credit/debit is written as a <em>relative</em> SQL delta
- * ({@code balance = balance + ?}), never as an absolute value computed in
- * Java from a possibly-stale in-memory snapshot. That is what lets
- * {@link GcManager} apply a balance change to its in-memory cache the
- * instant a command runs, in parallel with the async database write it
- * queues behind it, without an ordering hazard: two relative deltas commute
- * no matter which one physically reaches the database first, and the
- * per-player write chain in {@link GcManager} still applies them to the
- * database in the same order they were queued. Staff {@code SET}/{@code
- * ZERO} are the one deliberate exception -- an admin overwriting a balance
- * to an exact value is supposed to be absolute, not additive.
+ * <p>The database is authoritative. Every delta checks the locked wallet's
+ * current balance and integer bounds in the same transaction as its audit
+ * record. A cached balance can never authorize an overdraft. Settlement
+ * callers can debit on their existing connection so rewards and payment
+ * commit together. Staff SET/ZERO are intentionally absolute.
  */
 public final class GcStorage {
+
+    public static final long MAX_BALANCE = Long.MAX_VALUE;
+
+    /** An expected insufficient-funds/overflow rejection, not a failed SQL write. */
+    public static final class BalanceRejectedException extends SQLException {
+        private final long balance;
+        public BalanceRejectedException(long balance) {
+            super("GC balance change exceeds the wallet's available funds or integer limit");
+            this.balance = balance;
+        }
+        public long balance() { return balance; }
+    }
 
     private static final String CREATE_BALANCES = """
             CREATE TABLE IF NOT EXISTS gc_balances (
@@ -88,18 +94,18 @@ public final class GcStorage {
 
     private final Database database;
     private final String createLog;
-    private final String upsertDeltaSql;
+    private final String ensureWalletSql;
     private final String upsertAbsoluteSql;
 
     public GcStorage(Database database) {
         this.database = database;
         boolean sqlite = database.dialect() == Database.Dialect.SQLITE;
         this.createLog = sqlite ? CREATE_LOG_SQLITE : CREATE_LOG_MYSQL;
-        this.upsertDeltaSql = sqlite
-                ? "INSERT INTO gc_balances (uuid, balance, updated_at) VALUES (?, ?, ?) "
-                        + "ON CONFLICT(uuid) DO UPDATE SET balance = balance + excluded.balance, updated_at = excluded.updated_at"
-                : "INSERT INTO gc_balances (uuid, balance, updated_at) VALUES (?, ?, ?) "
-                        + "ON DUPLICATE KEY UPDATE balance = balance + VALUES(balance), updated_at = VALUES(updated_at)";
+        this.ensureWalletSql = sqlite
+                ? "INSERT INTO gc_balances (uuid, balance, updated_at) VALUES (?, 0, ?) "
+                        + "ON CONFLICT(uuid) DO UPDATE SET uuid = excluded.uuid"
+                : "INSERT INTO gc_balances (uuid, balance, updated_at) VALUES (?, 0, ?) "
+                        + "ON DUPLICATE KEY UPDATE uuid = VALUES(uuid)";
         this.upsertAbsoluteSql = sqlite
                 ? "INSERT INTO gc_balances (uuid, balance, updated_at) VALUES (?, ?, ?) "
                         + "ON CONFLICT(uuid) DO UPDATE SET balance = excluded.balance, updated_at = excluded.updated_at"
@@ -130,7 +136,7 @@ public final class GcStorage {
              ResultSet results = statement.executeQuery()) {
             while (results.next()) {
                 try {
-                    balances.put(UUID.fromString(results.getString("uuid")), results.getLong("balance"));
+                    balances.put(UUID.fromString(results.getString("uuid")), exactBalance(results, "balance"));
                 } catch (IllegalArgumentException ignored) {
                     // Skip a malformed row rather than failing every other balance.
                 }
@@ -141,11 +147,8 @@ public final class GcStorage {
 
     /**
      * Applies a relative balance change and writes its audit row in one
-     * transaction. {@code delta} may be negative (a debit); the caller is
-     * responsible for having already verified sufficiency against its own
-     * in-memory cache -- this never rejects a delta that would go negative,
-     * since the whole point of a relative SQL update is that it always
-     * commits regardless of write ordering.
+     * transaction. Both insufficient funds and integer overflow are rejected
+     * atomically, regardless of the caller's cached balance.
      *
      * @return the resulting balance, for an accurate audit row.
      */
@@ -163,12 +166,18 @@ public final class GcStorage {
             boolean originalAutoCommit = connection.getAutoCommit();
             connection.setAutoCommit(false);
             try {
+                ensureWallet(connection, targetUuid, now);
                 if (operationKey != null) {
                     try (PreparedStatement existing = connection.prepareStatement(
-                            "SELECT balance_after FROM gc_log WHERE operation_key = ?")) {
+                            "SELECT target_uuid, action, amount FROM gc_log WHERE operation_key = ?")) {
                         existing.setString(1, operationKey);
                         try (ResultSet row = existing.executeQuery()) {
                             if (row.next()) {
+                                if (!targetUuid.toString().equals(row.getString(1))
+                                        || !action.name().equals(row.getString(2))
+                                        || delta == Long.MIN_VALUE || Math.abs(delta) != row.getLong(3)) {
+                                    throw new SQLException("GC operation key conflicts with a different ledger change");
+                                }
                                 long current = readBalance(connection, targetUuid);
                                 connection.commit();
                                 return new DeltaResult(false, current);
@@ -176,13 +185,7 @@ public final class GcStorage {
                         }
                     }
                 }
-                try (PreparedStatement upsert = connection.prepareStatement(upsertDeltaSql)) {
-                    upsert.setString(1, targetUuid.toString());
-                    upsert.setLong(2, delta);
-                    upsert.setLong(3, now);
-                    upsert.executeUpdate();
-                }
-                long resultingBalance = readBalance(connection, targetUuid);
+                long resultingBalance = adjustBalance(connection, targetUuid, delta, now);
                 insertLogRow(connection, actorUuid, targetUuid, action, Math.abs(delta), resultingBalance, note, now,
                         operationKey);
                 connection.commit();
@@ -199,6 +202,7 @@ public final class GcStorage {
     /** Overwrites a balance to an exact value (staff set/zero) and writes its audit row in one transaction. */
     public void setAbsolute(UUID targetUuid, UUID actorUuid, GcAction action, long newBalance, String note, long now)
             throws SQLException {
+        if (newBalance < 0) throw new SQLException("GC balance must be nonnegative");
         try (Connection connection = database.getConnection()) {
             boolean originalAutoCommit = connection.getAutoCommit();
             connection.setAutoCommit(false);
@@ -220,16 +224,85 @@ public final class GcStorage {
         }
     }
 
-    private long readBalance(Connection connection, UUID uuid) throws SQLException {
+    public long loadBalance(UUID uuid) throws SQLException {
+        try (Connection connection = database.getConnection()) { return readBalance(connection, uuid); }
+    }
+
+    /** Derived shapes, not a second code authority; codes/history survive season resets. */
+    public Map<Integer, String> loadCodeAlphabets() throws SQLException {
+        Map<Integer, java.util.Set<Character>> alphabets = new HashMap<>();
+        try (Connection connection = database.getConnection();
+             PreparedStatement query = connection.prepareStatement("SELECT code FROM gc_redeem_codes");
+             ResultSet rows = query.executeQuery()) {
+            while (rows.next()) {
+                String code = rows.getString(1).toUpperCase(java.util.Locale.ROOT);
+                if (code.isEmpty() || code.length() > 32) continue;
+                java.util.Set<Character> alphabet = alphabets.computeIfAbsent(code.length(), ignored -> new java.util.TreeSet<>());
+                for (char character : code.toCharArray()) alphabet.add(character);
+            }
+        }
+        Map<Integer, String> result = new HashMap<>();
+        alphabets.forEach((length, alphabet) -> {
+            StringBuilder characters = new StringBuilder();
+            alphabet.forEach(characters::append);
+            result.put(length, characters.toString());
+        });
+        return result;
+    }
+
+    private static long exactBalance(ResultSet row, String column) throws SQLException {
+        try {
+            long value = row.getBigDecimal(column).longValueExact();
+            if (value < 0) throw new ArithmeticException("negative balance");
+            return value;
+        } catch (ArithmeticException | NullPointerException error) {
+            throw new SQLException("GC wallet contains invalid/non-integral data; refusing to spend it", error);
+        }
+    }
+
+    private static long readBalance(Connection connection, UUID uuid) throws SQLException {
         try (PreparedStatement select = connection.prepareStatement("SELECT balance FROM gc_balances WHERE uuid = ?")) {
             select.setString(1, uuid.toString());
             try (ResultSet results = select.executeQuery()) {
-                return results.next() ? results.getLong("balance") : 0L;
+                return results.next() ? exactBalance(results, "balance") : 0L;
             }
         }
     }
 
-    private void insertLogRow(Connection connection, UUID actorUuid, UUID targetUuid, GcAction action, long amount,
+    private void ensureWallet(Connection connection, UUID target, long now) throws SQLException {
+        // The no-op upsert also takes the row's write lock before any balance/log read.
+        try (PreparedStatement ensure = connection.prepareStatement(ensureWalletSql)) {
+            ensure.setString(1, target.toString());
+            ensure.setLong(2, now);
+            ensure.executeUpdate();
+        }
+    }
+
+    private static long adjustBalance(Connection connection, UUID target, long delta, long now) throws SQLException {
+        String predicate = delta < 0 ? "balance >= ?" : "balance <= ?";
+        long bound = delta < 0 ? (delta == Long.MIN_VALUE ? MAX_BALANCE : -delta) : MAX_BALANCE - delta;
+        if (delta == Long.MIN_VALUE) throw new BalanceRejectedException(readBalance(connection, target));
+        try (PreparedStatement update = connection.prepareStatement(
+                "UPDATE gc_balances SET balance = balance + ?, updated_at = ? WHERE uuid = ? AND balance >= 0 AND " + predicate)) {
+            update.setLong(1, delta);
+            update.setLong(2, now);
+            update.setString(3, target.toString());
+            update.setLong(4, bound);
+            if (update.executeUpdate() != 1) throw new BalanceRejectedException(readBalance(connection, target));
+        }
+        return readBalance(connection, target);
+    }
+
+    /** Participates in an existing settlement transaction; never commits independently. */
+    public static void debitForSettlement(Connection connection, UUID target, GcAction action, long amount,
+            String operationKey, long now) throws SQLException {
+        if (connection.getAutoCommit()) throw new SQLException("GC settlement debit requires a transaction");
+        if (amount <= 0) throw new SQLException("GC debit amount must be positive");
+        long resulting = adjustBalance(connection, target, -amount, now);
+        insertLogRow(connection, target, target, action, amount, resulting, operationKey, now, operationKey);
+    }
+
+    private static void insertLogRow(Connection connection, UUID actorUuid, UUID targetUuid, GcAction action, long amount,
             long balanceAfter, String note, long now, String operationKey) throws SQLException {
         String sql = "INSERT INTO gc_log (actor_uuid, target_uuid, action, amount, balance_after, note, operation_key, "
                 + "created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
@@ -330,6 +403,7 @@ public final class GcStorage {
      * never printed unless the player's balance was durably reduced.
      */
     public WithdrawCodeAttempt withdrawToCode(UUID ownerUuid, String code, long amount, long now) throws SQLException {
+        if (amount <= 0) throw new SQLException("GC withdrawal must be positive");
         try (Connection connection = database.getConnection()) {
             boolean originalAutoCommit = connection.getAutoCommit();
             connection.setAutoCommit(false);
@@ -411,7 +485,7 @@ public final class GcStorage {
                             connection.rollback();
                             return RedeemAttempt.failure(GcManager.RedeemResult.EXHAUSTED);
                         }
-                        if (hasExpiry && expiresAt < now) {
+                        if (hasExpiry && expiresAt <= now) {
                             connection.rollback();
                             return RedeemAttempt.failure(GcManager.RedeemResult.EXPIRED);
                         }
@@ -443,18 +517,19 @@ public final class GcStorage {
                     }
                 }
 
-                try (PreparedStatement upsert = connection.prepareStatement(upsertDeltaSql)) {
-                    upsert.setString(1, playerUuid.toString());
-                    upsert.setLong(2, amount);
-                    upsert.setLong(3, now);
-                    upsert.executeUpdate();
+                if (amount <= 0) throw new SQLException("GC code contains a nonpositive amount");
+                ensureWallet(connection, playerUuid, now);
+                long resultingBalance;
+                try { resultingBalance = adjustBalance(connection, playerUuid, amount, now); }
+                catch (BalanceRejectedException limit) {
+                    connection.rollback();
+                    return RedeemAttempt.failure(GcManager.RedeemResult.BALANCE_LIMIT);
                 }
-                long resultingBalance = readBalance(connection, playerUuid);
                 insertLogRow(connection, playerUuid, playerUuid, GcAction.REDEEM, amount, resultingBalance, code, now,
                         null);
 
                 connection.commit();
-                return RedeemAttempt.success(amount);
+                return RedeemAttempt.success(amount, resultingBalance);
             } catch (SQLException e) {
                 connection.rollback();
                 throw e;
@@ -464,13 +539,13 @@ public final class GcStorage {
         }
     }
 
-    public record RedeemAttempt(GcManager.RedeemResult result, long amount) {
+    public record RedeemAttempt(GcManager.RedeemResult result, long amount, long balanceAfter) {
         static RedeemAttempt failure(GcManager.RedeemResult result) {
-            return new RedeemAttempt(result, 0L);
+            return new RedeemAttempt(result, 0L, 0L);
         }
 
-        static RedeemAttempt success(long amount) {
-            return new RedeemAttempt(GcManager.RedeemResult.OK, amount);
+        static RedeemAttempt success(long amount, long balanceAfter) {
+            return new RedeemAttempt(GcManager.RedeemResult.OK, amount, balanceAfter);
         }
     }
 

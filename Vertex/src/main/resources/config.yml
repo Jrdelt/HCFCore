@@ -51,9 +51,16 @@ storage:
 # VELOCITY / SHARD NETWORK
 # ============================================
 network:
-  # Requires storage.type: mysql. Leave false for a standalone server.
+  # false = one server (local SQLite or a dedicated MySQL database).
+  # true = multiple Vertex shards sharing MySQL behind Velocity.
+  # Network mode with local storage is rejected at startup, not silently downgraded.
+  # Mode, shard identity and storage backend require restart; changing an existing
+  # deployment also requires an explicit data migration. /vertex reload keeps
+  # the current deployment identity and refreshes other network settings.
   enabled: false
-  # Must exactly match this backend's Velocity server name.
+  # Unique per backend; must match its Velocity server name. Use 1-64 lowercase
+  # letters/digits, '-' or '_'. Network mode rejects the placeholder 'standalone'.
+  # Keep this stable across restarts: it owns claims, locations and trade escrow.
   shard-id: standalone
   role: base
   max-players: 100

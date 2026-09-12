@@ -77,6 +77,47 @@ class StorageMigratorTest {
     }
 
     @Test
+    void preservesSharedZoneEventFinalizationAndScoreReceipts() throws SQLException {
+        new me.vertex.core.zone.ZoneStorage(source).init();
+        String player = UUID.randomUUID().toString(), operation = UUID.randomUUID().toString();
+        try (Connection c = source.getConnection()) {
+            execute(c, "INSERT INTO zone_event_runs VALUES(?,?,?,?,?,?,?)", 120000L, 130000L, 5000L, 135000L, 5D, 3D, 1D);
+            execute(c, "INSERT INTO zone_event_score_ops VALUES(?,?,?,?,?)", operation, 120000L, player, 1.5D, 120001L);
+            execute(c, "INSERT INTO zone_event_winners VALUES(?,?,?,?,?)", 120000L, player, "Winner", 1, 5D);
+        }
+        StorageMigrator.Result result = StorageMigrator.migrate(source, target);
+        assertEquals(1, result.rowsPerTable().get("zone_event_runs"));
+        assertEquals(1, result.rowsPerTable().get("zone_event_score_ops"));
+        assertEquals(1, result.rowsPerTable().get("zone_event_winners"));
+    }
+
+    @Test
+    void preservesTradeOwnershipAndTerminalReplayGuards() throws SQLException {
+        new me.vertex.core.trade.TradeStorage(source).init();
+        String boot = UUID.randomUUID().toString(), session = UUID.randomUUID().toString();
+        try (Connection c = source.getConnection()) {
+            execute(c, "INSERT INTO trade_owners(shard_id,boot_id,expires_at) VALUES(?,?,?)", "factions", boot, 1234L);
+            execute(c, "INSERT INTO trade_sessions(session_id,owner_shard,boot_id,state) VALUES(?,?,?,?)",
+                    session, "factions", boot, "RECOVERED");
+        }
+        StorageMigrator.Result result = StorageMigrator.migrate(source, target);
+        assertEquals(1, result.rowsPerTable().get("trade_owners"));
+        assertEquals(1, result.rowsPerTable().get("trade_sessions"));
+        try (Connection c = target.getConnection(); PreparedStatement s = c.prepareStatement(
+                "SELECT t.owner_shard,t.boot_id,t.state,o.expires_at FROM trade_sessions t "
+                        + "JOIN trade_owners o ON o.shard_id=t.owner_shard WHERE t.session_id=?")) {
+            s.setString(1, session);
+            try (ResultSet rows = s.executeQuery()) {
+                assertTrue(rows.next());
+                assertEquals("factions", rows.getString(1));
+                assertEquals(boot, rows.getString(2));
+                assertEquals("RECOVERED", rows.getString(3));
+                assertEquals(1234L, rows.getLong(4));
+            }
+        }
+    }
+
+    @Test
     void copiesEveryTableToAnEmptyTarget() throws SQLException {
         UUID player = UUID.randomUUID();
         Location location = new Location(server.addSimpleWorld("world"), 4, 70, 8);

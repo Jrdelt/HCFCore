@@ -28,9 +28,19 @@ public final class TradeStorage {
     private final Database database;
     private final String historyTable;
     private final String escrowTable;
+    private final TradeOwnership ownership;
+    private final boolean sharedNetwork;
 
     public TradeStorage(Database database) {
+        this(database, "standalone", false);
+    }
+
+    public TradeStorage(Database database, String shardId, boolean sharedNetwork) {
         this.database = database;
+        String shard = shardId == null ? "" : shardId.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!shard.matches("[a-z0-9_-]{1,64}")) throw new IllegalArgumentException("Invalid trade shard identity");
+        this.ownership = new TradeOwnership(database, shard);
+        this.sharedNetwork = sharedNetwork;
         boolean mysql = database.dialect() == Database.Dialect.MYSQL;
         historyTable = mysql ? """
                 CREATE TABLE IF NOT EXISTS trade_history (
@@ -68,6 +78,10 @@ public final class TradeStorage {
             s.executeUpdate(CREATE_PENDING_PAYOUTS);
             s.executeUpdate(escrowTable);
             s.executeUpdate(historyTable);
+            ownership.init(c);
+            s.executeUpdate("CREATE TABLE IF NOT EXISTS trade_sessions (session_id CHAR(36) PRIMARY KEY, "
+                    + "owner_shard VARCHAR(64) NOT NULL, boot_id CHAR(36) NOT NULL, state VARCHAR(16) NOT NULL)");
+            SqlSchema.ensureIndex(c, "trade_sessions", "idx_trade_session_owner", false, "owner_shard", "state");
             SqlSchema.ensureIndex(c, "trade_history", "idx_trade_history_requester", false,
                     "requester_uuid", "created_at DESC");
             SqlSchema.ensureIndex(c, "trade_history", "idx_trade_history_target", false,
@@ -82,17 +96,83 @@ public final class TradeStorage {
         }
     }
 
+    /** Called once at startup, after schema initialization and before opening trades. */
+    public void startOwnership() throws SQLException {
+        ownership.acquire();
+        if (sharedNetwork) return; // Old shared escrow has no trustworthy shard association.
+        try (Connection c = database.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                ownership.require(c);
+                try (PreparedStatement check = c.prepareStatement("SELECT 1 FROM trade_owners WHERE shard_id<>?")) {
+                    check.setString(1, ownership.shard);
+                    try (ResultSet rows = check.executeQuery()) {
+                        if (rows.next()) throw new SQLException("Standalone mode cannot adopt a database with other shard owners. "
+                                + "Use network.enabled: true or a dedicated single-server database.");
+                    }
+                }
+                try (PreparedStatement adopt = c.prepareStatement(
+                        "INSERT INTO trade_sessions (session_id,owner_shard,boot_id,state) "
+                                + "SELECT DISTINCT e.session_id,?,'00000000-0000-0000-0000-000000000000','OPEN' "
+                                + "FROM trade_escrow e LEFT JOIN trade_sessions s ON s.session_id=e.session_id "
+                                + "WHERE s.session_id IS NULL")) {
+                    adopt.setString(1, ownership.shard);
+                    adopt.executeUpdate();
+                }
+                c.commit();
+            } catch (SQLException | RuntimeException error) {
+                c.rollback();
+                throw error;
+            }
+        }
+    }
+
+    public boolean ownershipHealthy() { return ownership.healthy(); }
+    public void renewOwnership() throws SQLException { ownership.renew(); }
+    public void releaseOwnership() throws SQLException { ownership.release(); }
+
+    public int unownedEscrowCount() throws SQLException {
+        try (Connection c = database.getConnection(); Statement s = c.createStatement(); ResultSet rows = s.executeQuery(
+                "SELECT COUNT(DISTINCT e.session_id) FROM trade_escrow e LEFT JOIN trade_sessions t "
+                        + "ON t.session_id=e.session_id WHERE t.session_id IS NULL")) {
+            return rows.next() ? rows.getInt(1) : 0;
+        }
+    }
+
     public void replaceEscrow(TradeSnapshot snapshot) throws SQLException {
         try (Connection c = database.getConnection()) {
             c.setAutoCommit(false);
-            try (PreparedStatement delete = c.prepareStatement("DELETE FROM trade_escrow WHERE session_id = ?")) {
-                delete.setString(1, snapshot.sessionId().toString()); delete.executeUpdate();
+            try {
+                ownership.require(c);
+                SessionOwner existing = sessionOwner(c, snapshot.sessionId());
+                if (existing == null) {
+                    // Do not accidentally attach a legacy row to a fresh session with the same ID.
+                    try (PreparedStatement legacy = c.prepareStatement("SELECT 1 FROM trade_escrow WHERE session_id=?")) {
+                        legacy.setString(1, snapshot.sessionId().toString());
+                        try (ResultSet rows = legacy.executeQuery()) {
+                            if (rows.next()) throw new SQLException("Unowned legacy trade requires inspection");
+                        }
+                    }
+                    try (PreparedStatement insert = c.prepareStatement(
+                            "INSERT INTO trade_sessions (session_id,owner_shard,boot_id,state) VALUES (?,?,?,'OPEN')")) {
+                        insert.setString(1, snapshot.sessionId().toString());
+                        insert.setString(2, ownership.shard);
+                        insert.setString(3, ownership.boot);
+                        insert.executeUpdate();
+                    }
+                } else requireLiveOwner(existing);
+                try (PreparedStatement delete = c.prepareStatement("DELETE FROM trade_escrow WHERE session_id = ?")) {
+                    delete.setString(1, snapshot.sessionId().toString()); delete.executeUpdate();
+                }
+                try (PreparedStatement insert = c.prepareStatement("INSERT INTO trade_escrow (session_id, owner_uuid, items, money, experience) VALUES (?, ?, ?, ?, ?)")) {
+                    writeEscrow(insert, snapshot.sessionId(), snapshot.requester(), snapshot.requesterItems(), snapshot.requesterHeldMoney(), snapshot.requesterHeldExperience());
+                    writeEscrow(insert, snapshot.sessionId(), snapshot.target(), snapshot.targetItems(), snapshot.targetHeldMoney(), snapshot.targetHeldExperience());
+                }
+                c.commit();
+            } catch (SQLException | RuntimeException error) {
+                c.rollback();
+                throw error;
             }
-            try (PreparedStatement insert = c.prepareStatement("INSERT INTO trade_escrow (session_id, owner_uuid, items, money, experience) VALUES (?, ?, ?, ?, ?)")) {
-                writeEscrow(insert, snapshot.sessionId(), snapshot.requester(), snapshot.requesterItems(), snapshot.requesterHeldMoney(), snapshot.requesterHeldExperience());
-                writeEscrow(insert, snapshot.sessionId(), snapshot.target(), snapshot.targetItems(), snapshot.targetHeldMoney(), snapshot.targetHeldExperience());
-            }
-            c.commit();
         }
     }
     private static void writeEscrow(PreparedStatement s, UUID session, UUID owner, ItemStack[] items, double money, int exp) throws SQLException {
@@ -107,10 +187,21 @@ public final class TradeStorage {
         }
         return out;
     }
-    public void deleteEscrow(UUID session) throws SQLException {
-        try (Connection c = database.getConnection(); PreparedStatement s = c.prepareStatement("DELETE FROM trade_escrow WHERE session_id = ?")) {
-            s.setString(1, session.toString()); s.executeUpdate();
+
+    public List<TradeEscrow> loadRecoverableEscrow() throws SQLException {
+        List<TradeEscrow> out = new ArrayList<>();
+        try (Connection c = database.getConnection(); PreparedStatement s = c.prepareStatement(
+                "SELECT e.session_id,e.owner_uuid,e.items,e.money,e.experience FROM trade_escrow e "
+                        + "JOIN trade_sessions t ON t.session_id=e.session_id "
+                        + "WHERE t.owner_shard=? AND t.boot_id<>? AND t.state='OPEN'")) {
+            s.setString(1, ownership.shard);
+            s.setString(2, ownership.boot);
+            try (ResultSet r = s.executeQuery()) {
+                while (r.next()) out.add(new TradeEscrow(UUID.fromString(r.getString(1)), UUID.fromString(r.getString(2)),
+                        ItemStack.deserializeItemsFromBytes(r.getBytes(3)), r.getDouble(4), r.getInt(5)));
+            }
         }
+        return out;
     }
 
     /**
@@ -124,6 +215,15 @@ public final class TradeStorage {
             boolean previous = connection.getAutoCommit();
             connection.setAutoCommit(false);
             try {
+                ownership.require(connection);
+                SessionOwner owner = sessionOwner(connection, snapshot.sessionId());
+                String terminal = completed ? "COMPLETED" : "CANCELLED";
+                if (owner != null && owner.shard.equals(ownership.shard) && owner.boot.equals(ownership.boot)
+                        && terminal.equals(owner.state)) {
+                    connection.rollback();
+                    return; // A retry after an uncertain commit may not emit claims/history again.
+                }
+                requireLiveOwner(owner);
                 insertClaims(connection, snapshot.requester(),
                         completed ? snapshot.targetItems() : snapshot.requesterItems());
                 insertClaims(connection, snapshot.target(),
@@ -134,8 +234,9 @@ public final class TradeStorage {
                     delete.executeUpdate();
                 }
                 insertHistory(connection, snapshot, requesterName, targetName, status);
+                finishSession(connection, snapshot.sessionId(), terminal);
                 connection.commit();
-            } catch (SQLException error) {
+            } catch (SQLException | RuntimeException error) {
                 connection.rollback();
                 throw error;
             } finally {
@@ -158,49 +259,74 @@ public final class TradeStorage {
     }
 
     /**
-     * Moves one abandoned escrow row into durable player claims in one SQL
-     * transaction. It deletes the source only after the replacement records
-     * exist, so a restart cannot pay the same escrow over and over.
+     * Recovers an entire abandoned session owned by this shard's previous boot.
+     * The supplied row identifies the session only: contents are reread under
+     * the same SQL locks as the terminal transition, never trusted from a stale list.
      */
     public void recoverEscrow(TradeEscrow escrow) throws SQLException {
         try (Connection c = database.getConnection()) {
             c.setAutoCommit(false);
             try {
-                String lockSuffix = database.dialect() == Database.Dialect.MYSQL ? " FOR UPDATE" : "";
+                ownership.require(c);
+                SessionOwner owner = sessionOwner(c, escrow.sessionId());
+                if (owner == null || !ownership.shard.equals(owner.shard) || ownership.boot.equals(owner.boot)
+                        || !"OPEN".equals(owner.state)) {
+                    c.rollback();
+                    return;
+                }
                 try (PreparedStatement source = c.prepareStatement(
-                        "SELECT 1 FROM trade_escrow WHERE session_id=? AND owner_uuid=?" + lockSuffix)) {
+                        "SELECT owner_uuid,items,money,experience FROM trade_escrow WHERE session_id=?")) {
                     source.setString(1, escrow.sessionId().toString());
-                    source.setString(2, escrow.owner().toString());
-                    try (ResultSet row = source.executeQuery()) {
-                        if (!row.next()) {
-                            c.rollback();
-                            return;
+                    try (ResultSet rows = source.executeQuery()) {
+                        while (rows.next()) {
+                            UUID recipient = UUID.fromString(rows.getString(1));
+                            insertClaims(c, recipient, ItemStack.deserializeItemsFromBytes(rows.getBytes(2)));
+                            int experience = rows.getInt(4);
+                            double money = rows.getDouble(3);
+                            if (experience > 0) insertPendingPayout(c,
+                                    "legacy-escrow:" + escrow.sessionId() + ":" + recipient + ":exp",
+                                    recipient, PayoutCurrency.EXP, experience, System.currentTimeMillis());
+                            if (money > 0) insertPendingPayout(c,
+                                    "legacy-escrow:" + escrow.sessionId() + ":" + recipient + ":money",
+                                    recipient, PayoutCurrency.MONEY, money, System.currentTimeMillis());
                         }
                     }
                 }
-                try (PreparedStatement item = c.prepareStatement(
-                        "INSERT INTO trade_claims (owner_uuid, item) VALUES (?, ?)");
-                     PreparedStatement delete = c.prepareStatement(
-                        "DELETE FROM trade_escrow WHERE session_id = ? AND owner_uuid = ?")) {
-                    for (ItemStack stack : escrow.items()) {
-                        if (stack == null || stack.isEmpty()) continue;
-                        item.setString(1, escrow.owner().toString()); item.setBytes(2, stack.serializeAsBytes()); item.addBatch();
-                    }
-                    item.executeBatch();
-                    if (escrow.experience() > 0) insertPendingPayout(c,
-                            "legacy-escrow:" + escrow.sessionId() + ":" + escrow.owner() + ":exp",
-                            escrow.owner(), PayoutCurrency.EXP, escrow.experience(), System.currentTimeMillis());
-                    if (escrow.money() > 0) insertPendingPayout(c,
-                            "legacy-escrow:" + escrow.sessionId() + ":" + escrow.owner() + ":money",
-                            escrow.owner(), PayoutCurrency.MONEY, escrow.money(), System.currentTimeMillis());
-                    delete.setString(1, escrow.sessionId().toString()); delete.setString(2, escrow.owner().toString());
-                    if (delete.executeUpdate() != 1) throw new SQLException("Trade escrow changed during recovery");
+                try (PreparedStatement delete = c.prepareStatement("DELETE FROM trade_escrow WHERE session_id=?")) {
+                    delete.setString(1, escrow.sessionId().toString());
+                    delete.executeUpdate();
                 }
+                finishSession(c, escrow.sessionId(), "RECOVERED");
                 c.commit();
-            } catch (SQLException sqliteUpsertUnsupported) {
+            } catch (SQLException | RuntimeException error) {
                 c.rollback();
-                throw sqliteUpsertUnsupported;
+                throw error;
             }
+        }
+    }
+
+    private record SessionOwner(String shard, String boot, String state) { }
+
+    private SessionOwner sessionOwner(Connection c, UUID id) throws SQLException {
+        try (PreparedStatement s = c.prepareStatement("SELECT owner_shard,boot_id,state FROM trade_sessions WHERE session_id=?"
+                + (database.dialect() == Database.Dialect.MYSQL ? " FOR UPDATE" : ""))) {
+            s.setString(1, id.toString());
+            try (ResultSet r = s.executeQuery()) {
+                return r.next() ? new SessionOwner(r.getString(1), r.getString(2), r.getString(3)) : null;
+            }
+        }
+    }
+
+    private void requireLiveOwner(SessionOwner owner) throws SQLException {
+        if (owner == null || !ownership.shard.equals(owner.shard) || !ownership.boot.equals(owner.boot)
+                || !"OPEN".equals(owner.state)) throw new SQLException("Trade is absent, terminal or owned by another process");
+    }
+
+    private void finishSession(Connection c, UUID id, String state) throws SQLException {
+        try (PreparedStatement s = c.prepareStatement("UPDATE trade_sessions SET state=? WHERE session_id=? AND state='OPEN'")) {
+            s.setString(1, state);
+            s.setString(2, id.toString());
+            if (s.executeUpdate() != 1) throw new SQLException("Trade session changed before completion");
         }
     }
 

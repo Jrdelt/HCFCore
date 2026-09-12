@@ -60,8 +60,8 @@ public final class MineManager {
     private volatile int maxRegenPerPass;
     private volatile long kothTickIntervalTicks;
     private volatile int fillBlocksPerTick;
-    private volatile boolean kothHologramsEnabled;
-    private volatile List<String> kothHologramLines = List.of();
+    private final Map<String, Boolean> kothHologramsEnabled = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, List<String>> kothHologramLines = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Deque<FillJob> fillJobs = new java.util.ArrayDeque<>();
     private BukkitTask regenTask;
     private volatile HotZoneManager hotZones;
@@ -90,6 +90,8 @@ public final class MineManager {
 
         regions.clear();
         kothDefinitions.clear();
+        kothHologramsEnabled.clear();
+        kothHologramLines.clear();
         ConfigurationSection mines = config.getConfigurationSection("mines");
         if (mines != null) {
             for (String id : mines.getKeys(false)) {
@@ -107,9 +109,9 @@ public final class MineManager {
                 if (koth != null) {
                     kothDefinitions.put(mineId, koth);
                 }
-                if (kothSection != null && kothHologramLines.isEmpty()) {
-                    kothHologramsEnabled = kothSection.getBoolean("hologram.enabled", true);
-                    kothHologramLines = List.copyOf(kothSection.getStringList("hologram.lines"));
+                if (kothSection != null) {
+                    kothHologramsEnabled.put(mineId, kothSection.getBoolean("hologram.enabled", true));
+                    kothHologramLines.put(mineId, List.copyOf(kothSection.getStringList("hologram.lines")));
                 }
             }
         }
@@ -214,12 +216,12 @@ public final class MineManager {
         return kothTickIntervalTicks;
     }
 
-    public boolean kothHologramsEnabled() {
-        return kothHologramsEnabled;
+    public boolean kothHologramsEnabled(String mineId) {
+        return kothHologramsEnabled.getOrDefault(mineId, false);
     }
 
-    public List<String> kothHologramLines() {
-        return kothHologramLines;
+    public List<String> kothHologramLines(String mineId) {
+        return kothHologramLines.getOrDefault(mineId, List.of());
     }
 
     public boolean isEnabled() {
@@ -338,6 +340,11 @@ public final class MineManager {
             player.sendMessage(messages.get(player, "mines.selection-world-mismatch"));
             return;
         }
+        MineRegion parent = region(selection.mineId);
+        if (selection.kothZone && (parent == null || !selection.first.getWorld().getName().equals(parent.world()))) {
+            player.sendMessage(messages.get(player, "mines.selection-world-mismatch"));
+            return;
+        }
         int minX = Math.min(selection.first.getBlockX(), selection.second.getBlockX());
         int minY = Math.min(selection.first.getBlockY(), selection.second.getBlockY());
         int minZ = Math.min(selection.first.getBlockZ(), selection.second.getBlockZ());
@@ -351,18 +358,27 @@ public final class MineManager {
             return;
         }
 
+        // Hot Zones and owner config edits share this file. Merge just this
+        // selection into the latest valid document, never save a stale cache.
+        YamlConfiguration edited = new YamlConfiguration();
+        try { edited.load(file); }
+        catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE, "Cannot safely edit mines.yml", error);
+            player.sendMessage(messages.get(player, "mines.save-failed"));
+            return;
+        }
         String path = "mines." + selection.mineId + (selection.kothZone ? ".koth" : "");
         if (!selection.kothZone) {
-            config.set(path + ".world", selection.first.getWorld().getName());
+            edited.set(path + ".world", selection.first.getWorld().getName());
         }
-        config.set(path + ".minimum.x", minX);
-        config.set(path + ".minimum.y", minY);
-        config.set(path + ".minimum.z", minZ);
-        config.set(path + ".maximum.x", maxX);
-        config.set(path + ".maximum.y", maxY);
-        config.set(path + ".maximum.z", maxZ);
+        edited.set(path + ".minimum.x", minX);
+        edited.set(path + ".minimum.y", minY);
+        edited.set(path + ".minimum.z", minZ);
+        edited.set(path + ".maximum.x", maxX);
+        edited.set(path + ".maximum.y", maxY);
+        edited.set(path + ".maximum.z", maxZ);
         try {
-            config.save(file);
+            edited.save(file);
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to save mines.yml", e);
             player.sendMessage(messages.get(player, "mines.save-failed"));

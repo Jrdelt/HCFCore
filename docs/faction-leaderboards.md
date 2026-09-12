@@ -96,6 +96,11 @@ Scores and the next-run deadline are stored in dedicated `ftop_scores`
 and `ftop_schedule` tables (MySQL or SQLite, whichever backend Vertex is
 using) — entirely separate from Vertex faction power.
 
+**Shared-shard limitation:** F Top still calculates from each backend's local
+spawner index and overwrites the shared result. This is unresolved (ISS-16),
+not the same implementation as the repaired PvP Top refresh below. See
+[issues.md](../issues.md) before enabling shared production shards.
+
 ### Spawner Stack GUI
 
 Right-clicking a tracked spawner with an empty hand opens its management
@@ -148,6 +153,14 @@ Point totals live in a `pvptop_points` table, keyed one row per faction,
 with a companion `pvptop_log` table recording every individual award
 (faction, points, source identifier, actor UUID, timestamp) for later
 auditing.
+
+Awards use persistent operation IDs to prevent replay. When shard mode is
+enabled, committed awards publish invalidations so other backends reload their
+score projection. Faction mutations/disbands also request a refresh;
+`/vertex reload` refreshes the live cache. A ten-second reconciliation pass
+recovers missed invalidations. Refresh replaces the complete projection, so
+removed factions do not remain in the cache. All periodic reads run off the
+server thread. Standalone mode uses the same tables in its own database.
 
 ### Configuration (`pvptop.yml`)
 

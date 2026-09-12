@@ -6,12 +6,14 @@ import org.bukkit.plugin.Plugin;
 
 import java.io.File;
 import java.security.SecureRandom;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 import java.util.logging.Level;
 
 /**
@@ -19,44 +21,51 @@ import java.util.logging.Level;
  * {@link GcStorage} are the sole balance authority; nothing here ever reads
  * from or defers to Tebex, PlaceholderAPI, or any other external plugin.
  *
- * <p>Balances live in an in-memory cache ({@link #balances}), the same
- * "moment-to-moment source of truth, storage trails behind it"
- * philosophy {@code CoinflipManager}'s own class doc describes -- chosen
- * over {@code FactionBankManager}'s more conservative "commit to memory
- * only after the database write succeeds" style because GC needs to hand a
- * synchronous yes/no back to Coinflip and the Auction House the same way
- * {@code EconomyHook}/Vault already does for money, on the same tick a
- * command runs.
- *
- * <p>Every credit or debit is applied to the cache immediately (see
- * {@link #tryDebit} / {@link #credit}) and queued as a <em>relative</em>
- * database delta on a per-player write chain -- see {@link GcStorage}'s
- * class doc for why a relative delta is what makes this safe without
- * blocking the calling thread on the database write. Staff {@code
- * set}/{@code zero} are the one absolute (non-relative) mutation, which is
- * intentional: an admin overwriting a balance to an exact value is meant to
- * win outright, not merge with whatever else was happening to it.
+ * <p>The database, not the cache, authorizes all spending. The displayed
+ * balance projects the last confirmed wallet plus local pending deltas.
+ * Each completed write replaces that confirmed baseline and removes only
+ * its own reservation. Code withdrawals participate in the same queue.
+ * Auction/coinflip settlement debits commit with the settlement in SQL.
  */
 public final class GcManager {
 
     private final Plugin plugin;
     private final GcStorage storage;
     private final File file;
+    private final LongSupplier monotonicMillis;
+
+    private static final long DEFAULT_REDEEM_COOLDOWN_SECONDS = 3L;
+    private static final long MAX_REDEEM_COOLDOWN_SECONDS = 60L;
+    private volatile long redeemCooldownMillis = DEFAULT_REDEEM_COOLDOWN_SECONDS * 1000L;
+    // Admission/cooldown state uses writeChains' monitor; completion only removes
+    // from the concurrent in-flight set, so it never blocks a waiting staff write.
+    private final Map<UUID, Long> redeemDeadlines = new HashMap<>();
+    private final java.util.Set<UUID> redemptionsInFlight = ConcurrentHashMap.newKeySet();
+    private long nextRedeemCleanup = Long.MIN_VALUE;
 
     private volatile long minWithdraw;
     private volatile long maxWithdraw;
     private volatile int redeemCodeLength;
     private volatile String redeemCodeCharset;
+    private volatile long maxCodeLifetimeSeconds;
+    private final Map<Integer, String> recognizedCodeAlphabets = new ConcurrentHashMap<>();
     private volatile int logPageSize;
     private volatile String interopCommandTemplate;
 
     private final Map<UUID, Long> balances = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> confirmedBalances = new HashMap<>();
+    private final Map<UUID, java.math.BigInteger> pendingDeltas = new HashMap<>();
     private final Map<UUID, CompletableFuture<Void>> writeChains = new ConcurrentHashMap<>();
     private final java.util.Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
 
     public GcManager(Plugin plugin, GcStorage storage) {
+        this(plugin, storage, () -> TimeUnit.NANOSECONDS.toMillis(System.nanoTime()));
+    }
+
+    GcManager(Plugin plugin, GcStorage storage, LongSupplier monotonicMillis) {
         this.plugin = plugin;
         this.storage = storage;
+        this.monotonicMillis = monotonicMillis;
         this.file = new File(plugin.getDataFolder(), "gc.yml");
     }
 
@@ -68,12 +77,31 @@ public final class GcManager {
 
         minWithdraw = Math.max(1L, config.getLong("min-withdraw", 1L));
         maxWithdraw = Math.max(minWithdraw, config.getLong("max-withdraw", 1_000_000_000L));
+        long cooldownSeconds = DEFAULT_REDEEM_COOLDOWN_SECONDS;
+        if (config.contains("redeem-cooldown-seconds")) {
+            Object configured = config.get("redeem-cooldown-seconds");
+            if ((configured instanceof Integer || configured instanceof Long)
+                    && ((Number) configured).longValue() >= 0L
+                    && ((Number) configured).longValue() <= MAX_REDEEM_COOLDOWN_SECONDS) {
+                cooldownSeconds = ((Number) configured).longValue();
+            } else {
+                plugin.getLogger().warning("Invalid gc.yml redeem-cooldown-seconds: expected a whole number from 0 to "
+                        + MAX_REDEEM_COOLDOWN_SECONDS + "; using " + DEFAULT_REDEEM_COOLDOWN_SECONDS + " seconds.");
+            }
+        }
+        redeemCooldownMillis = cooldownSeconds * 1000L;
         redeemCodeLength = Math.max(4, Math.min(32, config.getInt("redeem-code-length", 12)));
         redeemCodeCharset = config.getString("redeem-code-charset", "ABCDEFGHJKLMNPQRSTUVWXYZ23456789");
         if (redeemCodeCharset == null || redeemCodeCharset.isBlank()) {
             redeemCodeCharset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         }
         redeemCodeCharset = redeemCodeCharset.toUpperCase(java.util.Locale.ROOT);
+        rememberCodeAlphabet(redeemCodeLength, redeemCodeCharset);
+        maxCodeLifetimeSeconds = config.getLong("max-code-lifetime-seconds", 31_536_000L);
+        if (maxCodeLifetimeSeconds < 1 || maxCodeLifetimeSeconds > 3_153_600_000L) {
+            maxCodeLifetimeSeconds = 31_536_000L;
+            plugin.getLogger().warning("Invalid gc.yml max-code-lifetime-seconds; using 31536000 (one year).");
+        }
         logPageSize = Math.max(1, config.getInt("log-page-size", 8));
         interopCommandTemplate = config.getString("interop-command", "");
     }
@@ -85,7 +113,15 @@ public final class GcManager {
 
     public void loadState() {
         try {
-            balances.putAll(storage.loadAllBalances());
+            Map<UUID, Long> loaded = storage.loadAllBalances();
+            storage.loadCodeAlphabets().forEach(this::rememberCodeAlphabet);
+            synchronized (writeChains) {
+                confirmedBalances.clear();
+                confirmedBalances.putAll(loaded);
+                balances.clear();
+                loaded.keySet().forEach(this::projectBalance);
+                pendingDeltas.keySet().forEach(this::projectBalance);
+            }
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to load GC balances from the database.", e);
         }
@@ -107,12 +143,26 @@ public final class GcManager {
         return redeemCodeLength;
     }
 
-    /** True when a token has the exact configured GC-code shape. */
+    public long maxCodeLifetimeSeconds() { return maxCodeLifetimeSeconds; }
+
+    private void rememberCodeAlphabet(int length, String alphabet) {
+        recognizedCodeAlphabets.merge(length, alphabet, (old, added) -> {
+            StringBuilder merged = new StringBuilder(old);
+            for (char character : added.toCharArray()) if (merged.indexOf(String.valueOf(character)) < 0) merged.append(character);
+            return merged.toString();
+        });
+    }
+
+    public java.util.Set<Integer> recognizedCodeLengths() { return java.util.Set.copyOf(recognizedCodeAlphabets.keySet()); }
+
+    /** Includes persisted historical formats so a reload cannot expose an older code in chat. */
     public boolean isRedeemCodeCandidate(String token) {
-        if (token == null || token.length() != redeemCodeLength) return false;
+        if (token == null) return false;
+        String alphabet = recognizedCodeAlphabets.get(token.length());
+        if (alphabet == null) return false;
         String upper = token.toUpperCase(java.util.Locale.ROOT);
         for (int index = 0; index < upper.length(); index++) {
-            if (redeemCodeCharset.indexOf(upper.charAt(index)) < 0) return false;
+            if (alphabet.indexOf(upper.charAt(index)) < 0) return false;
         }
         return true;
     }
@@ -127,13 +177,68 @@ public final class GcManager {
         return amount > 0 && balance(uuid) >= amount;
     }
 
+    // All reservation/baseline edits hold writeChains' monitor. BigInteger
+    // prevents temporary pending deltas from overflowing during reconciliation.
+    private void projectBalance(UUID target) {
+        java.math.BigInteger projected = java.math.BigInteger.valueOf(confirmedBalances.getOrDefault(target, 0L))
+                .add(pendingDeltas.getOrDefault(target, java.math.BigInteger.ZERO));
+        balances.put(target, projected.max(java.math.BigInteger.ZERO)
+                .min(java.math.BigInteger.valueOf(GcStorage.MAX_BALANCE)).longValue());
+    }
+
+    private boolean reserve(UUID target, long delta) {
+        long current = balance(target);
+        if (delta == Long.MIN_VALUE || (delta < 0 && current < -delta)
+                || (delta > 0 && current > GcStorage.MAX_BALANCE - delta)) return false;
+        pendingDeltas.merge(target, java.math.BigInteger.valueOf(delta), java.math.BigInteger::add);
+        projectBalance(target);
+        return true;
+    }
+
+    private void finishMutation(UUID target, long reservedDelta, Long committedBalance) {
+        synchronized (writeChains) {
+            if (reservedDelta != 0L) {
+                pendingDeltas.compute(target, (ignored, value) -> {
+                    java.math.BigInteger remaining = (value == null ? java.math.BigInteger.ZERO : value)
+                            .subtract(java.math.BigInteger.valueOf(reservedDelta));
+                    return remaining.signum() == 0 ? null : remaining;
+                });
+            }
+            if (committedBalance != null) confirmedBalances.put(target, committedBalance);
+            projectBalance(target);
+        }
+    }
+
+    /** Refresh after login or a settlement performed on another SQL transaction. */
+    public CompletableFuture<Boolean> refreshBalance(UUID target) {
+        synchronized (writeChains) {
+            return enqueue(target, () -> {
+                try { finishMutation(target, 0L, storage.loadBalance(target)); return true; }
+                catch (Exception error) {
+                    plugin.getLogger().log(Level.WARNING, "Failed to refresh GC balance for " + target, error);
+                    return false;
+                }
+            });
+        }
+    }
+
+    private <T> CompletableFuture<T> enqueue(UUID target, java.util.function.Supplier<T> action) {
+        CompletableFuture<Void> previous = writeChains.getOrDefault(target, CompletableFuture.completedFuture(null));
+        CompletableFuture<T> result = previous.handle((ignored, error) -> null).thenApplyAsync(ignored -> action.get());
+        CompletableFuture<Void> chain = result.handle((ignored, error) -> null);
+        writeChains.put(target, chain);
+        chain.whenComplete((ignored, error) -> writeChains.remove(target, chain));
+        track(result);
+        return result;
+    }
+
     // ---- Core mutation primitives ----
 
     /**
      * Debits {@code amount} from {@code target}'s cached balance immediately
      * if (and only if) they have enough, then queues the matching database
-     * delta. Used for every debit: player withdrawals, staff removals,
-     * Coinflip wagers, Auction House fees/purchases.
+     * delta. This compatibility API reports admission, NOT persistence;
+     * callers granting a reward must use a durable operation instead.
      *
      * @return false without changing anything if the amount is non-positive
      *         or the balance is insufficient.
@@ -145,10 +250,8 @@ public final class GcManager {
     /**
      * As {@link #tryDebit(UUID, UUID, GcAction, long, String)}, additionally
      * invoking {@code onPersistFailure} (on the main thread) if the database
-     * write behind this debit ultimately fails -- for a caller that took
-     * something from an external system on the strength of this debit
-     * succeeding (Vault money, in {@code GcMenu}'s withdraw-to-economy flow)
-     * and must undo that too, not just let GC's own in-memory reversal happen.
+     * write behind this debit ultimately fails. No reward should be finalized
+     * on the strength of an optimistic admission alone.
      */
     public boolean tryDebit(UUID target, UUID actor, GcAction action, long amount, String note,
             Runnable onPersistFailure) {
@@ -156,11 +259,7 @@ public final class GcManager {
             return false;
         }
         synchronized (writeChains) {
-            long current = balances.getOrDefault(target, 0L);
-            if (current < amount) {
-                return false;
-            }
-            balances.merge(target, -amount, Long::sum);
+            if (!reserve(target, -amount)) return false;
             queuePersist(target, actor, action, -amount, amount, note, null, onPersistFailure);
             return true;
         }
@@ -177,9 +276,7 @@ public final class GcManager {
             String operationKey){
         if(amount<=0)return new DurableDebit(false,CompletableFuture.completedFuture(false));
         synchronized(writeChains){
-            long current=balances.getOrDefault(target,0L);
-            if(current<amount)return new DurableDebit(false,CompletableFuture.completedFuture(false));
-            balances.merge(target,-amount,Long::sum);
+            if(!reserve(target,-amount))return new DurableDebit(false,CompletableFuture.completedFuture(false));
             return new DurableDebit(true,queuePersist(target,actor,action,-amount,amount,note,operationKey,null));
         }
     }
@@ -199,7 +296,11 @@ public final class GcManager {
             return;
         }
         synchronized (writeChains) {
-            balances.merge(target, amount, Long::sum);
+            if (!reserve(target, amount)) {
+                if (onPersistFailure != null) Bukkit.getScheduler().runTask(plugin, onPersistFailure);
+                plugin.getLogger().warning("GC credit rejected at wallet limit for " + target);
+                return;
+            }
             queuePersist(target, actor, action, amount, amount, note, null, onPersistFailure);
         }
     }
@@ -213,20 +314,31 @@ public final class GcManager {
             String note) {
         if (amount <= 0) return CompletableFuture.completedFuture(true);
         synchronized (writeChains) {
-            balances.merge(target, amount, Long::sum);
-            return queuePersist(target, actor, action, amount, amount, note, note, null);
+            boolean reserved = reserve(target, amount);
+            // A retry may already be committed at the wallet limit. Always
+            // allow SQL to recognize the operation key before rejecting it.
+            return queuePersist(target, actor, action, amount, amount, note, note, null, reserved ? amount : 0L);
         }
     }
 
     /** Staff-only: overwrites a balance to an exact value. Deliberately absolute, not additive -- see the class doc. */
     public boolean setBalance(UUID target, UUID actor, GcAction action, long newBalance, String note) {
+        try { return setBalanceDurably(target, actor, action, newBalance, note).get(10, TimeUnit.SECONDS); }
+        catch (InterruptedException error) { Thread.currentThread().interrupt(); return false; }
+        catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE, "GC staff override is still pending or failed; inspect the ledger for " + target, error);
+            return false;
+        }
+    }
+
+    /** Staff commands await this asynchronously, so SQL cannot stall a server tick. */
+    public CompletableFuture<Boolean> setBalanceDurably(UUID target, UUID actor, GcAction action, long newBalance, String note) {
         long clamped = Math.max(0L, newBalance);
         synchronized (writeChains) {
-            CompletableFuture<Void> previous = writeChains.getOrDefault(target, CompletableFuture.completedFuture(null));
-            try {
-                previous.get(10, TimeUnit.SECONDS);
+            return enqueue(target, () -> {
+                try {
                 storage.setAbsolute(target, actor, action, clamped, note, System.currentTimeMillis());
-                balances.put(target, clamped);
+                finishMutation(target, 0L, clamped);
                 return true;
             } catch (Exception error) {
                 plugin.getLogger().log(Level.SEVERE,
@@ -234,6 +346,18 @@ public final class GcManager {
                                 + "; the live balance was not changed.", error);
                 return false;
             }
+            });
+        }
+    }
+
+    /** SQL-authorized staff adjustment, including wallets changed on another shard. */
+    public CompletableFuture<Boolean> adjustStaffDurably(UUID target, UUID actor, GcAction action, long delta, String note) {
+        if (action != GcAction.STAFF_GIVE && action != GcAction.STAFF_REMOVE) throw new IllegalArgumentException("Not a staff adjustment");
+        if (delta == 0 || delta == Long.MIN_VALUE || (delta > 0) != (action == GcAction.STAFF_GIVE)) return CompletableFuture.completedFuture(false);
+        synchronized (writeChains) {
+            boolean reserved = reserve(target, delta);
+            return queuePersist(target, actor, action, delta, Math.abs(delta), note,
+                    "staff:" + UUID.randomUUID(), null, reserved ? delta : 0L);
         }
     }
 
@@ -247,69 +371,87 @@ public final class GcManager {
     private CompletableFuture<Boolean> queuePersist(UUID target, UUID actor, GcAction action, long delta,
             long logAmount, String note, String operationKey,
             Runnable onPersistFailure) {
+        return queuePersist(target, actor, action, delta, logAmount, note, operationKey, onPersistFailure, delta);
+    }
+
+    private CompletableFuture<Boolean> queuePersist(UUID target, UUID actor, GcAction action, long delta,
+            long logAmount, String note, String operationKey, Runnable onPersistFailure, long reservation) {
         long now = System.currentTimeMillis();
-        CompletableFuture<Void> previous = writeChains.getOrDefault(target, CompletableFuture.completedFuture(null));
-        CompletableFuture<Boolean> result = new CompletableFuture<>();
-        CompletableFuture<Void> next = previous.handle((ignored, error) -> null).thenRunAsync(() -> {
+        return enqueue(target, () -> {
             try {
                 GcStorage.DeltaResult applied = storage.applyDeltaOnce(target, actor, action, delta, note, now,
                         operationKey);
-                if (!applied.applied()) {
-                    // The database already contains this durable payout (for
-                    // example after a crash before its outbox acknowledgement).
-                    // Undo only the speculative cache increment made above.
-                    balances.merge(target, -delta, Long::sum);
-                }
-                result.complete(true);
+                finishMutation(target, reservation, applied.balanceAfter());
+                return true;
+            } catch (GcStorage.BalanceRejectedException rejected) {
+                finishMutation(target, reservation, rejected.balance());
+                if (onPersistFailure != null) Bukkit.getScheduler().runTask(plugin, onPersistFailure);
+                return false;
             } catch (Exception e) {
                 plugin.getLogger().log(Level.SEVERE, "Failed to persist a GC balance " + (delta < 0 ? "debit" : "credit")
                         + " (" + action + ", " + Math.abs(logAmount) + ") for " + target
                         + " -- reversing it in memory.", e);
-                balances.merge(target, -delta, Long::sum);
+                finishMutation(target, reservation, null);
                 if (onPersistFailure != null) {
                     Bukkit.getScheduler().runTask(plugin, onPersistFailure);
                 }
-                result.complete(false);
+                return false;
             }
         });
-        writeChains.put(target, next);
-        next.whenComplete((ignored, error) -> writeChains.remove(target, next));
-        track(next);
-        return result;
     }
 
     // ---- Redeem codes ----
 
     public enum RedeemResult {
-        OK, NOT_FOUND, EXPIRED, EXHAUSTED, FAILED
+        OK, NOT_FOUND, EXPIRED, EXHAUSTED, FAILED, COOLDOWN, IN_PROGRESS, BALANCE_LIMIT
     }
 
-    public record RedeemOutcome(RedeemResult result, long amount) {
-    }
-
-    /** Consumes one use of a code for this player, crediting its amount atomically against the database. */
-    public CompletableFuture<RedeemOutcome> redeem(UUID playerUuid, String rawCode) {
-        String code = normalizeCode(rawCode);
-        if (code.isEmpty()) {
-            return CompletableFuture.completedFuture(new RedeemOutcome(RedeemResult.NOT_FOUND, 0L));
+    public record RedeemOutcome(RedeemResult result, long amount, long retryAfterMillis) {
+        public RedeemOutcome(RedeemResult result, long amount) {
+            this(result, amount, 0L);
         }
+    }
+
+    /**
+     * Rate-limits all attempts per player before queueing SQL, including invalid
+     * codes. The SQL transaction, not this local spam guard, prevents two players
+     * or servers from consuming the same single-use code successfully.
+     */
+    public CompletableFuture<RedeemOutcome> redeem(UUID playerUuid, String rawCode) {
         CompletableFuture<RedeemOutcome> request;
         synchronized (writeChains) {
+            long now = monotonicMillis.getAsLong();
+            if (now >= nextRedeemCleanup) {
+                redeemDeadlines.entrySet().removeIf(entry -> entry.getValue() <= now);
+                nextRedeemCleanup = now + MAX_REDEEM_COOLDOWN_SECONDS * 1000L;
+            }
+            if (redemptionsInFlight.contains(playerUuid)) {
+                return CompletableFuture.completedFuture(new RedeemOutcome(RedeemResult.IN_PROGRESS, 0L));
+            }
+            Long deadline = redeemDeadlines.get(playerUuid);
+            if (deadline != null && deadline > now) {
+                return CompletableFuture.completedFuture(new RedeemOutcome(RedeemResult.COOLDOWN, 0L, deadline - now));
+            }
+            redeemDeadlines.put(playerUuid, now + redeemCooldownMillis);
+            String code = normalizeCode(rawCode);
+            // Codes already issued remain usable after length/charset config changes.
+            if (code.isEmpty() || code.length() > 32) {
+                return CompletableFuture.completedFuture(new RedeemOutcome(RedeemResult.NOT_FOUND, 0L));
+            }
+            redemptionsInFlight.add(playerUuid);
             CompletableFuture<Void> previous = writeChains.getOrDefault(playerUuid, CompletableFuture.completedFuture(null));
             request = previous.handle((ignored, error) -> null).thenApplyAsync(ignored -> {
                 try {
                     GcStorage.RedeemAttempt attempt = storage.consumeRedeemCode(code, playerUuid, System.currentTimeMillis());
                     if (attempt.result() == RedeemResult.OK) {
-                        // A relative correction -- see the class doc on why this
-                        // must never be an absolute put() computed here.
-                        balances.merge(playerUuid, attempt.amount(), Long::sum);
+                        finishMutation(playerUuid, 0L, attempt.balanceAfter());
                     }
                     return new RedeemOutcome(attempt.result(), attempt.amount());
                 } catch (Exception e) {
                     plugin.getLogger().log(Level.SEVERE, "Failed to redeem GC code for " + playerUuid, e);
                     return new RedeemOutcome(RedeemResult.FAILED, 0L);
                 }
-            });
+            }).whenComplete((ignored, error) -> redemptionsInFlight.remove(playerUuid));
             CompletableFuture<Void> chain = request.handle((ignored, error) -> null);
             writeChains.put(playerUuid, chain);
             chain.whenComplete((ignored, error) -> writeChains.remove(playerUuid, chain));
@@ -335,6 +477,9 @@ public final class GcManager {
         }
         CompletableFuture<WithdrawCodeOutcome> request;
         synchronized (writeChains) {
+            if (!reserve(ownerUuid, -amount)) {
+                return CompletableFuture.completedFuture(new WithdrawCodeOutcome(WithdrawCodeResult.INSUFFICIENT, null, balance(ownerUuid)));
+            }
             CompletableFuture<Void> previous = writeChains.getOrDefault(ownerUuid, CompletableFuture.completedFuture(null));
             request = previous.handle((ignored, error) -> null).thenApplyAsync(ignored -> {
                 for (int attempt = 0; attempt < 8; attempt++) {
@@ -344,16 +489,19 @@ public final class GcManager {
                                 System.currentTimeMillis());
                         if (outcome.result() == GcStorage.WithdrawCodeResult.COLLISION) continue;
                         if (outcome.result() == GcStorage.WithdrawCodeResult.INSUFFICIENT) {
+                            finishMutation(ownerUuid, -amount, storage.loadBalance(ownerUuid));
                             return new WithdrawCodeOutcome(WithdrawCodeResult.INSUFFICIENT, null, balance(ownerUuid));
                         }
-                        balances.put(ownerUuid, outcome.balanceAfter());
+                        finishMutation(ownerUuid, -amount, outcome.balanceAfter());
                         return new WithdrawCodeOutcome(WithdrawCodeResult.OK, code, outcome.balanceAfter());
                     } catch (Exception e) {
+                        finishMutation(ownerUuid, -amount, null);
                         plugin.getLogger().log(Level.SEVERE, "Failed to create a GC withdrawal code for " + ownerUuid, e);
                         return new WithdrawCodeOutcome(WithdrawCodeResult.FAILED, null, balance(ownerUuid));
                     }
                 }
                 plugin.getLogger().severe("Could not allocate a unique GC withdrawal code after eight attempts.");
+                finishMutation(ownerUuid, -amount, null);
                 return new WithdrawCodeOutcome(WithdrawCodeResult.FAILED, null, balance(ownerUuid));
             });
             CompletableFuture<Void> chain = request.handle((ignored, error) -> null);
@@ -365,11 +513,7 @@ public final class GcManager {
     }
 
     /**
-     * Generates and persists a new redeem code. The code is generated and
-     * returned immediately; the database insert happens asynchronously,
-     * with a console error if it fails -- the same "trust the common case,
-     * log loudly on the rare failure" shape used everywhere else this
-     * plugin persists something after already having decided the outcome.
+     * Generates a code but reveals it only after its SQL insert commits.
      */
     public CompletableFuture<CreateCodeOutcome> createRedeemCode(UUID staffUuid, long amount, int uses, Long expiresAtMillis) {
         if (amount <= 0 || uses <= 0) {

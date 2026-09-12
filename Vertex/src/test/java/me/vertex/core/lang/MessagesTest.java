@@ -64,6 +64,19 @@ class MessagesTest {
     }
 
     @Test
+    void legacyBooleanOffKeyIsMigratedWithoutLosingItsTranslation() throws IOException {
+        File folder=new File(plugin.getDataFolder(),"lang");folder.mkdirs();
+        File file=new File(folder,"xx_legacy.yml");
+        Files.writeString(file.toPath(),"performance:\n  off: '&aCustom disabled'\n",StandardCharsets.UTF_8);
+        var messages=new Messages(plugin,new UserManager(plugin,new LocaleStorage("xx_legacy")));
+        messages.load();
+        var migrated=YamlConfiguration.loadConfiguration(file);
+        assertEquals("&aCustom disabled",migrated.getString("performance.off"));
+        assertFalse(migrated.contains("performance.false"));
+        assertNotNull(bundledLocale("en_us").getString("performance.off"));
+    }
+
+    @Test
     void fallsBackToTheDefaultLocaleWhenAKeyIsMissingInThePlayersLocale() throws IOException {
         // A locale file that only overrides one key -- everything else
         // must still resolve from en_us (the configured default).

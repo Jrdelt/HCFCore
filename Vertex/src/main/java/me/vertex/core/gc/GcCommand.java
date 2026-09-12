@@ -12,7 +12,6 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -151,6 +150,10 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
                 case NOT_FOUND -> player.sendMessage(messages.get(player, "gc.redeem-not-found"));
                 case EXPIRED -> player.sendMessage(messages.get(player, "gc.redeem-expired"));
                 case EXHAUSTED -> player.sendMessage(messages.get(player, "gc.redeem-exhausted"));
+                case COOLDOWN -> player.sendMessage(messages.get(player, "gc.redeem-cooldown",
+                        "seconds", Long.toString(Math.max(1L, (outcome.retryAfterMillis() + 999L) / 1000L))));
+                case IN_PROGRESS -> player.sendMessage(messages.get(player, "gc.redeem-in-progress"));
+                case BALANCE_LIMIT -> player.sendMessage(messages.get(player, "gc.balance-limit"));
                 case FAILED -> player.sendMessage(messages.get(player, "gc.transaction-failed"));
             }
         }));
@@ -183,10 +186,14 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
         if (args.length >= 5) {
             Long seconds = parseDurationSeconds(args[4]);
             if (seconds == null) {
-                sender.sendMessage(messages.get(sender, "gc.amount-invalid"));
+                sender.sendMessage(messages.get(sender, "gc.expiry-invalid"));
                 return;
             }
-            expiresAt = System.currentTimeMillis() + Duration.ofSeconds(seconds).toMillis();
+            try { expiresAt = Math.addExact(System.currentTimeMillis(), Math.multiplyExact(seconds, 1000L)); }
+            catch (ArithmeticException overflow) {
+                sender.sendMessage(messages.get(sender, "gc.expiry-invalid"));
+                return;
+            }
         }
         UUID staffUuid = sender instanceof Player player ? player.getUniqueId() : new UUID(0L, 0L);
         int finalUses = uses;
@@ -201,24 +208,28 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
     }
 
     /** Accepts a bare number of seconds, or a shorthand like {@code 7d}/{@code 12h}/{@code 30m}. */
-    private Long parseDurationSeconds(String raw) {
+    Long parseDurationSeconds(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
         }
         String trimmed = raw.trim().toLowerCase(Locale.ROOT);
         char unit = trimmed.charAt(trimmed.length() - 1);
         String numberPart = Character.isDigit(unit) ? trimmed : trimmed.substring(0, trimmed.length() - 1);
-        Long number = Numbers.parseLongPositive(numberPart);
+        java.math.BigDecimal number = Numbers.parsePositive(numberPart);
         if (number == null) {
             return null;
         }
-        return switch (Character.isDigit(unit) ? 's' : unit) {
-            case 's' -> number;
-            case 'm' -> number * 60;
-            case 'h' -> number * 3600;
-            case 'd' -> number * 86400;
-            default -> null;
+        long multiplier = switch (Character.isDigit(unit) ? 's' : unit) {
+            case 's' -> 1;
+            case 'm' -> 60;
+            case 'h' -> 3600;
+            case 'd' -> 86400;
+            default -> 0;
         };
+        try {
+            long seconds = number.multiply(java.math.BigDecimal.valueOf(multiplier)).longValueExact();
+            return seconds > 0 && seconds <= manager.maxCodeLifetimeSeconds() ? seconds : null;
+        } catch (ArithmeticException invalid) { return null; }
     }
 
     private void handleAdmin(CommandSender sender, String[] args) {
@@ -248,8 +259,13 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
             return;
         }
         OfflinePlayer target = Bukkit.getOfflinePlayer(args[2]);
-        sender.sendMessage(messages.get(sender, "gc.admin-balance",
-                "player", displayName(target), "balance", Numbers.formatFull(manager.balance(target.getUniqueId()))));
+        manager.refreshBalance(target.getUniqueId()).whenComplete((fresh,error) -> {
+            if (!plugin.isEnabled()) return;
+            Bukkit.getScheduler().runTask(plugin, () -> sender.sendMessage(error == null && Boolean.TRUE.equals(fresh)
+                    ? messages.get(sender, "gc.admin-balance", "player", displayName(target),
+                        "balance", Numbers.formatFull(manager.balance(target.getUniqueId())))
+                    : messages.get(sender, "gc.balance-unavailable")));
+        });
     }
 
     /** {@code /gc admin give|remove|set <player> <amount>}. Every attempt is logged, whether or not it was permitted. */
@@ -272,31 +288,13 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
         }
         UUID actorUuid = sender instanceof Player player ? player.getUniqueId() : null;
         UUID targetUuid = target.getUniqueId();
-        switch (action) {
-            case STAFF_GIVE -> {
-                manager.credit(targetUuid, actorUuid, action, amount, "/gc admin give");
-                sender.sendMessage(messages.get(sender, "gc.admin-mutate-success",
-                        "player", displayName(target), "balance", Numbers.formatFull(manager.balance(targetUuid))));
-            }
-            case STAFF_REMOVE -> {
-                boolean applied = manager.tryDebit(targetUuid, actorUuid, action, amount, "/gc admin remove");
-                if (!applied) {
-                    sender.sendMessage(messages.get(sender, "gc.not-enough-gc"));
-                    return;
-                }
-                sender.sendMessage(messages.get(sender, "gc.admin-mutate-success",
-                        "player", displayName(target), "balance", Numbers.formatFull(manager.balance(targetUuid))));
-            }
-            case STAFF_SET -> {
-                if (!manager.setBalance(targetUuid, actorUuid, action, amount, "/gc admin set")) {
-                    sender.sendMessage(messages.get(sender, "gc.admin-mutate-failed"));
-                    return;
-                }
-                sender.sendMessage(messages.get(sender, "gc.admin-mutate-success",
-                        "player", displayName(target), "balance", Numbers.formatFull(amount)));
-            }
-            default -> { }
-        }
+        var result = switch (action) {
+            case STAFF_GIVE -> manager.adjustStaffDurably(targetUuid, actorUuid, action, amount, "/gc admin give");
+            case STAFF_REMOVE -> manager.adjustStaffDurably(targetUuid, actorUuid, action, -amount, "/gc admin remove");
+            case STAFF_SET -> manager.setBalanceDurably(targetUuid, actorUuid, action, amount, "/gc admin set");
+            default -> java.util.concurrent.CompletableFuture.completedFuture(false);
+        };
+        reportMutation(sender, target, result);
     }
 
     private void handleAdminZero(CommandSender sender, String[] args) {
@@ -312,11 +310,18 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
             return;
         }
         UUID actorUuid = sender instanceof Player player ? player.getUniqueId() : null;
-        if (!manager.setBalance(target.getUniqueId(), actorUuid, GcAction.STAFF_ZERO, 0L, "/gc admin zero")) {
-            sender.sendMessage(messages.get(sender, "gc.admin-mutate-failed"));
-            return;
-        }
-        sender.sendMessage(messages.get(sender, "gc.admin-mutate-success", "player", displayName(target), "balance", "0"));
+        reportMutation(sender, target, manager.setBalanceDurably(target.getUniqueId(), actorUuid,
+                GcAction.STAFF_ZERO, 0L, "/gc admin zero"));
+    }
+
+    private void reportMutation(CommandSender sender, OfflinePlayer target, java.util.concurrent.CompletableFuture<Boolean> result) {
+        result.whenComplete((applied,error) -> {
+            if (!plugin.isEnabled()) return;
+            Bukkit.getScheduler().runTask(plugin, () -> sender.sendMessage(error == null && Boolean.TRUE.equals(applied)
+                    ? messages.get(sender, "gc.admin-mutate-success", "player", displayName(target),
+                        "balance", Numbers.formatFull(manager.balance(target.getUniqueId())))
+                    : messages.get(sender, "gc.admin-mutate-failed")));
+        });
     }
 
     private void handleAdminLogs(CommandSender sender, String[] args) {

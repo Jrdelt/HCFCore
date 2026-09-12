@@ -67,7 +67,6 @@ import me.vertex.core.staff.FreezeListener;
 import me.vertex.core.staff.InvseeCommand;
 import me.vertex.core.staff.InvseeMenuListener;
 import me.vertex.core.staff.StaffBuildCommand;
-import me.vertex.core.staff.StaffBuildListener;
 import me.vertex.core.staff.StaffChatCommand;
 import me.vertex.core.staff.StaffChatListener;
 import me.vertex.core.staff.StaffCommand;
@@ -202,6 +201,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.portal.PortalManager portalManager;
     private me.vertex.core.storage.DeliveryManager deliveryManager;
     private me.vertex.core.network.NetworkManager networkManager;
+    private me.vertex.core.network.NetworkDeployment networkDeployment;
     private me.vertex.core.teleport.TeleportManager teleportManager;
     private me.vertex.core.teleport.GlobalLocationManager globalLocationManager;
     private me.vertex.core.teleport.RtpManager rtpManager;
@@ -221,6 +221,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         validateRuntimeDependencies();
 
         try {
+            networkDeployment = me.vertex.core.network.NetworkDeployment.read(getConfig());
+            networkDeployment.apply(getConfig());
             database = new Database(getConfig(), getDataFolder());
             boolean sharedClaims = getConfig().getBoolean("network.enabled", false)
                     && database.dialect() == Database.Dialect.MYSQL;
@@ -266,7 +268,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             shopStorage.init();
             auctionStorage = new me.vertex.core.auction.AuctionStorage(database);
             auctionStorage.init();
-            tradeStorage = new me.vertex.core.trade.TradeStorage(database);
+            tradeStorage = new me.vertex.core.trade.TradeStorage(database, networkDeployment.shardId(),
+                    networkDeployment.enabled());
             tradeStorage.init();
             announcementPreferenceStorage = new me.vertex.core.preferences.AnnouncementPreferenceStorage(database);
             announcementPreferenceStorage.init();
@@ -379,6 +382,10 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 getConfig().getString("pvp.actionbar.vs-unknown", ""));
 combatManager.start();
         try {
+            // Claim the process identity before NetworkManager can publish a
+            // heartbeat under it. A rejected duplicate must not mark the real
+            // owner's shard CRASH_RECOVERY/OFFLINE during failed startup.
+            tradeStorage.startOwnership();
             networkManager = new me.vertex.core.network.NetworkManager(this, database, messages, combatManager);
             networkManager.init();
             networkManager.start();
@@ -388,8 +395,14 @@ combatManager.start();
                 getLogger().warning("A network season reset completed; shutting this shard down to reload clean state.");
                 Bukkit.shutdown();
             });
-            factionService.setMutationPublisher(payload -> networkManager.publishInvalidation("factions", payload));
-            networkManager.registerInvalidation("factions", factionService::refreshFromNetwork);
+            factionService.setMutationPublisher(payload -> {
+                networkManager.publishInvalidation("factions", payload);
+                if (pvpTopManager != null) pvpTopManager.refreshAsync();
+            });
+            networkManager.registerInvalidation("factions", () -> {
+                factionService.refreshFromNetwork();
+                if (pvpTopManager != null) pvpTopManager.refreshAsync();
+            });
             factionSocialManager.setMutationPublisher(() ->
                     networkManager.publishInvalidation("faction-social", "changed"));
             networkManager.registerInvalidation("faction-social", factionSocialManager::refreshAsync);
@@ -502,6 +515,10 @@ combatManager.start();
         pvpTopManager = new me.vertex.core.faction.PvpTopManager(this, pvpTopStorage);
         pvpTopManager.load();
         pvpTopManager.loadState();
+        pvpTopManager.setMutationPublisher(() -> networkManager.publishInvalidation("pvptop", "changed"));
+        networkManager.registerInvalidation("pvptop", pvpTopManager::refreshAsync);
+        // Reconcile even if an invalidation could not be published during a database interruption.
+        Bukkit.getScheduler().runTaskTimer(this, () -> pvpTopManager.refreshAsync(), 200L, 200L);
         me.vertex.core.faction.PvpTopCommand pvpTopCommand =
                 new me.vertex.core.faction.PvpTopCommand(pvpTopManager, messages);
         getCommand("pvptop").setExecutor(pvpTopCommand);
@@ -521,7 +538,6 @@ combatManager.start();
         getCommand("outpost").setTabCompleter(outpostCommand);
         Bukkit.getPluginManager().registerEvents(new VanishListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new StaffChatListener(staffManager, messages), this);
-        Bukkit.getPluginManager().registerEvents(new StaffBuildListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new FreezeListener(staffManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.staff.PunishmentCombatListener(this, combatManager, messages), this);
@@ -984,6 +1000,13 @@ combatManager.start();
         auctionSweepTask = Bukkit.getScheduler().runTaskTimer(this, auctionManager::sweepExpired,
                 auctionManager.sweepIntervalTicks(), auctionManager.sweepIntervalTicks());
 
+        try {
+            tradeStorage.renewOwnership();
+        } catch (Exception error) {
+            getLogger().log(Level.SEVERE, "Could not acquire safe trade ownership, disabling Vertex.", error);
+            Bukkit.getPluginManager().disablePlugin(this);
+            return;
+        }
         tradeManager = new me.vertex.core.trade.TradeManager(this, tradeStorage, announcementPreferenceManager, messages);
         tradeManager.load();
         tradeManager.restoreEscrow();
@@ -1364,6 +1387,9 @@ combatManager.start();
         }
         if (tradeManager != null) {
             tradeManager.shutdown();
+        } else if (tradeStorage != null) {
+            try { tradeStorage.releaseOwnership(); }
+            catch (Exception error) { getLogger().log(Level.WARNING, "Could not release trade startup ownership", error); }
         }
         if (announcementPreferenceManager != null) {
             announcementPreferenceManager.awaitWrites();
@@ -1486,6 +1512,19 @@ combatManager.start();
 
     public void reload() {
         reloadConfig();
+        if (networkDeployment != null) {
+            try {
+                if (!networkDeployment.equals(me.vertex.core.network.NetworkDeployment.read(getConfig()))) {
+                    getLogger().warning("Changes to network.enabled, network.shard-id or storage.type require a planned "
+                            + "restart and data migration where applicable. Keeping the active deployment during reload.");
+                }
+            } catch (IllegalArgumentException invalid) {
+                getLogger().warning("Invalid deployment configuration on reload: " + invalid.getMessage()
+                        + " Keeping the active deployment.");
+            }
+            networkDeployment.apply(getConfig());
+        }
+        if (networkManager != null) networkManager.reloadConfig(database.dialect());
         me.vertex.core.factions.FactionConfigManager.loadAndApply(this);
         applyWorldDifficultyConfig();
         NumberFormatConfig.load(this);
@@ -1531,6 +1570,7 @@ combatManager.start();
         }
         if (pvpTopManager != null) {
             pvpTopManager.load();
+            pvpTopManager.refreshAsync();
         }
         if (baseClaimManager != null) {
             baseClaimManager.load();

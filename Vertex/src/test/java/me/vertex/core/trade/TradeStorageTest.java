@@ -36,6 +36,7 @@ class TradeStorageTest {
         database = new Database(new YamlConfiguration(), dataFolder.toFile());
         storage = new TradeStorage(database);
         storage.init();
+        storage.startOwnership();
     }
 
     @AfterEach

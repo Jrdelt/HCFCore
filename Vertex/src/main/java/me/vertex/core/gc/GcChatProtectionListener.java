@@ -9,6 +9,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.Plugin;
 
 import java.util.Map;
@@ -61,7 +62,7 @@ public final class GcChatProtectionListener implements Listener {
 
     boolean containsUnescapedCode(String message) {
         if (message == null) return false;
-        int length = manager.redeemCodeLength();
+        for (int length : manager.recognizedCodeLengths()) {
         for (int start = 0; start + length <= message.length(); start++) {
             int end = start + length;
             if (start > 0 && Character.isLetterOrDigit(message.charAt(start - 1))) continue;
@@ -69,7 +70,13 @@ public final class GcChatProtectionListener implements Listener {
             if (start > 0 && message.charAt(start - 1) == '\\') continue;
             if (manager.isRedeemCodeCandidate(message.substring(start, end))) return true;
         }
+        }
         return false;
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        manager.refreshBalance(event.getPlayer().getUniqueId());
     }
 
     @EventHandler

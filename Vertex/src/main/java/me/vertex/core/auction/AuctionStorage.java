@@ -556,6 +556,11 @@ public final class AuctionStorage {
                         return false;
                     }
                 }
+                if (listing.currency() == AuctionCurrency.GC) {
+                    me.vertex.core.gc.GcStorage.debitForSettlement(connection, buyerUuid,
+                            me.vertex.core.gc.GcAction.AUCTION_PURCHASE, (long) Math.ceil(listing.price()),
+                            "auction:purchase:" + listing.id(), resolvedAt);
+                }
                 try (PreparedStatement log = connection.prepareStatement("""
                         INSERT INTO auction_log (seller_uuid, buyer_uuid, item_summary, price, listed_at,
                             resolved_at, status, cancelled_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""")) {

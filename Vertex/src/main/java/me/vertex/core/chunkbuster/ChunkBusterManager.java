@@ -346,6 +346,10 @@ public final class ChunkBusterManager {
     // ---- Validation, shared by initial item-use and confirm-time revalidation ----
 
     public UseResult validate(Player player, Location target, ChunkBusterType type) {
+        return validate(player, target, type, true);
+    }
+
+    private UseResult validate(Player player, Location target, ChunkBusterType type, boolean checkLock) {
         if (!isEnabled(type)) {
             return UseResult.TYPE_DISABLED;
         }
@@ -367,7 +371,7 @@ public final class ChunkBusterManager {
             }
         }
         // Wilderness (claimFactionId == NO_FACTION): no faction-permission check at all, per spec.
-        if (isLocked(target)) {
+        if (checkLock && isLocked(target)) {
             return UseResult.AREA_BUSY;
         }
         return UseResult.OK;
@@ -460,7 +464,17 @@ public final class ChunkBusterManager {
             World liveWorld = Bukkit.getWorld(area.world());
             if (liveWorld == null) {
                 taskHolder[0].cancel();
-                finishOperation(operationId, area, playerId, type, logLocation);
+                stopOperation(operationId, area, playerId, "world unavailable");
+                return;
+            }
+            // Claims, memberships and /f permissions may change during this
+            // multi-tick operation. Only the job's own area lock is bypassed.
+            Player livePlayer = Bukkit.getPlayer(playerId);
+            UseResult current = livePlayer == null ? UseResult.NO_ROLE_PERMISSION
+                    : validate(livePlayer, logLocation, type, false);
+            if (current != UseResult.OK) {
+                taskHolder[0].cancel();
+                stopOperation(operationId, area, playerId, current.name());
                 return;
             }
             int processed = 0;
@@ -514,6 +528,14 @@ public final class ChunkBusterManager {
                 plugin.getLogger().log(Level.WARNING, "Failed to write a Chunk Buster log entry.", error);
             }
         });
+    }
+
+    private void stopOperation(long operationId, ChunkAreaKey area, UUID playerId, String reason) {
+        activeLocks.remove(area);
+        plugin.getLogger().warning("Stopped Chunk Buster operation " + operationId + " by " + playerId
+                + " at " + area + ": " + reason + ". Already-cleared blocks remain cleared.");
+        try { storage.stopOperation(operationId); }
+        catch (SQLException error) { plugin.getLogger().log(Level.SEVERE, "Could not mark stopped Chunk Buster " + operationId, error); }
     }
 
     private static void consumeOne(Player player, ItemStack item) {

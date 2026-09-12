@@ -15,3 +15,5 @@ These are performance improvements, not required feature changes.
 - **Add performance counters.** Track queue depth, failed writes, active flights, pending claims, and scan duration so staff spot bottlenecks early.
 
 - **Avoid full GUI redraws when nothing changed.** Reuse static filler items and redraw only balances, timers, and listing slots that actually changed.
+
+- **Measure shared event traffic before a large rollout.** The new score ledger prioritizes safe ordering with a shared database lock. Test realistic kill rates on several shards, watch queued writes and settlement delays, then consider safe batching or narrower locks. Passing contention tests does not establish a player-capacity limit.

@@ -67,6 +67,11 @@ integration behavior.
 
 ## Conventions used throughout
 
+For release decisions, use the [unresolved issue list](../issues.md) and
+[audit/verification history](audit-progress.md), not the feature inventory as a
+production guarantee. Shared shard ownership and transfer limitations are
+documented in [network persistence](network-shards.md#persistence-scope-and-current-limits).
+
 - Config keys are written as dotted paths into `config.yml` (e.g.
   `pvp.combat-tag-seconds`) unless another file is named.
 - Commands omit the leading `/` in prose but are shown in full in tables.

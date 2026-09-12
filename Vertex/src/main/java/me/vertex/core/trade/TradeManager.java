@@ -44,6 +44,8 @@ public final class TradeManager {
     private final Set<UUID> claimDeliveries = ConcurrentHashMap.newKeySet();
     private final Set<String> pendingPayoutsInProgress = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean shuttingDown = new AtomicBoolean();
+    private final AtomicBoolean renewingOwnership = new AtomicBoolean();
+    private long lastOwnershipRenew;
     private volatile boolean enabled;
     private volatile double maxDistance; private volatile long requestTimeout, idleTimeout, cooldown;
     private volatile Material divider = Material.BLACK_STAINED_GLASS_PANE, filler = Material.GRAY_STAINED_GLASS_PANE, confirm = Material.LIME_DYE, locked = Material.GRAY_DYE;
@@ -65,7 +67,8 @@ public final class TradeManager {
     private Set<Material> materials(Collection<String> values) { Set<Material> out = new HashSet<>(); for (String raw : values) { Material m = Material.matchMaterial(raw); if (m == null) warn("blacklist.items", raw); else out.add(m); } return Set.copyOf(out); }
     private Set<String> lower(Collection<String> values) { return values.stream().filter(s -> s != null && !s.isBlank()).map(s -> s.toLowerCase(Locale.ROOT)).collect(java.util.stream.Collectors.toUnmodifiableSet()); }
     private void warn(String key, String value) { plugin.getLogger().warning("Invalid traders.yml " + key + " (" + value + "); using a safe fallback."); }
-    public boolean isEnabled() { return enabled; }
+    public boolean isEnabled() { return enabled && canEditEscrow(); }
+    public boolean canEditEscrow() { return !shuttingDown.get() && storage != null && storage.ownershipHealthy(); }
     public Material dividerMaterial() { return divider; } public Material fillerMaterial() { return filler; } public Material confirmMaterial() { return confirm; } public Material lockedMaterial() { return locked; }
     public double maxDistance() { return maxDistance; }
     public boolean isProgrammaticClose(UUID id) { return programmaticClose.remove(id); }
@@ -73,11 +76,12 @@ public final class TradeManager {
     public TradeSession session(UUID id) { return sessions.get(id); }
 
     public Result request(Player sender, Player target) {
-        if (!enabled) return Result.DISABLED; if (sender.equals(target)) return Result.SELF; if (busy(sender.getUniqueId()) || busy(target.getUniqueId())) return Result.BUSY; if (onCooldown(sender.getUniqueId()) || onCooldown(target.getUniqueId())) return Result.COOLDOWN;
+        if (!isEnabled()) return Result.DISABLED; if (sender.equals(target)) return Result.SELF; if (busy(sender.getUniqueId()) || busy(target.getUniqueId())) return Result.BUSY; if (onCooldown(sender.getUniqueId()) || onCooldown(target.getUniqueId())) return Result.COOLDOWN;
         if (!allowed(sender) || !allowed(target)) return Result.BLOCKED; if (!isAccepting(target.getUniqueId())) return Result.TARGET_OFF; if (!near(sender, target)) return Result.TOO_FAR;
         Request request = new Request(sender.getUniqueId(), target.getUniqueId(), System.currentTimeMillis() + requestTimeout); requests.put(target.getUniqueId(), request); return Result.OK;
     }
     public Result accept(Player target, Player sender) {
+        if (!isEnabled()) return Result.DISABLED;
         Request request = requests.get(target.getUniqueId()); if (request == null) return Result.NO_REQUEST; if (!request.sender.equals(sender.getUniqueId())) return Result.NOT_REQUESTED;
         if (request.expires < System.currentTimeMillis()) { endRequest(request); return Result.EXPIRED; }
         if (!near(sender, target)) return Result.TOO_FAR; if (!allowed(sender) || !allowed(target)) return Result.BLOCKED;
@@ -104,10 +108,12 @@ public final class TradeManager {
     private boolean onCooldown(UUID id) { return cooldowns.getOrDefault(id, 0L) > System.currentTimeMillis(); }
     private void endRequest(Request request) { requests.remove(request.target, request); cooldowns.put(request.sender, System.currentTimeMillis() + cooldown); cooldowns.put(request.target, System.currentTimeMillis() + cooldown); }
     public Result lock(Player player, TradeSession session) {
+        if (!canEditEscrow()) return Result.DISABLED;
         if (session == null || session.locked(player.getUniqueId())) return Result.LOCKED;
         session.lock(player.getUniqueId()); touch(session); return Result.OK;
     }
     public Result complete(Player actor, TradeSession session) {
+        if (!canEditEscrow()) return Result.DISABLED;
         if (session == null || !session.bothLocked() || !actor.getUniqueId().equals(session.firstLocked)) return Result.NOT_FIRST_LOCKED; if (session.finishing) return Result.LOCKED;
         Player requester = Bukkit.getPlayer(session.requester); Player target = Bukkit.getPlayer(session.target); if (requester == null || target == null || !near(requester, target) || !allowed(requester) || !allowed(target) || !canFit(requester, session.itemsFor(session.target)) || !canFit(target, session.itemsFor(session.requester))) { cancel(session, "trade-cancelled"); return Result.FULL; }
         session.finishing = true;
@@ -125,12 +131,40 @@ public final class TradeManager {
         if (target != null && "COMPLETED".equals(status)) target.sendMessage(messages.get(target, "trade.complete", "player", requester == null ? "player" : requester.getName()));
     }
     private void closeTradeView(TradeSession session, Player player) {
+        if (player != null && player.getOpenInventory().getTopInventory().getHolder() instanceof TradeMenu.PeekHolder peek
+                && session.id.equals(peek.sessionId())) {
+            player.closeInventory();
+            return;
+        }
         if (player == null || !(player.getOpenInventory().getTopInventory().getHolder() instanceof TradeMenu.Holder holder)
                 || !session.id.equals(holder.sessionId())) return;
         programmaticClose.add(player.getUniqueId()); player.closeInventory();
     }
     public void touch(TradeSession session) { if (session == null || session.finishing || sessions.get(session.requester) != session) return; session.lastActivity = System.currentTimeMillis(); Player a = Bukkit.getPlayer(session.requester), b = Bukkit.getPlayer(session.target); TradeMenu.render(session, Bukkit.getOfflinePlayer(session.requester), Bukkit.getOfflinePlayer(session.target), this, messages); if (a != null && b != null) { Player other = a; other.playSound(other.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING, .2f, 1.7f); } persistEscrow(session); }
-    public void sweep() { long now = System.currentTimeMillis(); for (Request request : List.copyOf(requests.values())) if (request.expires <= now) endRequest(request); Set<TradeSession> unique = new HashSet<>(sessions.values()); for (TradeSession s : unique) { Player a = Bukkit.getPlayer(s.requester), b = Bukkit.getPlayer(s.target); if (a == null || b == null || !allowed(a) || !allowed(b) || !near(a,b)) cancel(s, "trade-cancelled"); else if (now - s.lastActivity >= idleTimeout) cancel(s, "trade-idle-cancelled"); } cooldowns.entrySet().removeIf(e -> e.getValue() <= now); }
+    public void sweep() {
+        if (shuttingDown.get()) return;
+        long monotonic = System.nanoTime();
+        if ((lastOwnershipRenew == 0 || monotonic - lastOwnershipRenew >= TimeUnit.SECONDS.toNanos(10))
+                && renewingOwnership.compareAndSet(false, true)) {
+            lastOwnershipRenew = monotonic;
+            track(CompletableFuture.runAsync(() -> {
+                try { storage.renewOwnership(); }
+                catch (Exception error) { plugin.getLogger().log(Level.SEVERE,
+                        "Trade ownership renewal failed; escrow edits are blocked until ownership is healthy. "
+                                + "An expired/fenced owner requires a restart.", error); }
+                finally { renewingOwnership.set(false); }
+            }));
+        }
+        if (!canEditEscrow()) return;
+        long now = System.currentTimeMillis();
+        for (Request request : List.copyOf(requests.values())) if (request.expires <= now) endRequest(request);
+        for (TradeSession session : new HashSet<>(sessions.values())) {
+            Player a = Bukkit.getPlayer(session.requester), b = Bukkit.getPlayer(session.target);
+            if (a == null || b == null || !allowed(a) || !allowed(b) || !near(a, b)) cancel(session, "trade-cancelled");
+            else if (now - session.lastActivity >= idleTimeout) cancel(session, "trade-idle-cancelled");
+        }
+        cooldowns.entrySet().removeIf(e -> e.getValue() <= now);
+    }
     public void shutdown() {
         shuttingDown.set(true);
         for (TradeSession session : new HashSet<>(sessions.values())) {
@@ -148,6 +182,10 @@ public final class TradeManager {
             }
         }
         awaitWrites();
+        if (pendingWrites.isEmpty()) {
+            try { storage.releaseOwnership(); }
+            catch (Exception error) { plugin.getLogger().log(Level.SEVERE, "Could not release trade ownership", error); }
+        }
     }
     private void persistEscrow(TradeSession session) {
         TradeSnapshot snapshot = TradeSnapshot.capture(session);
@@ -203,7 +241,11 @@ public final class TradeManager {
                 List<TradeStorage.PendingPayout> uncertain = storage.loadUncertainPayouts();
                 if (!uncertain.isEmpty()) plugin.getLogger().severe("Trade has " + uncertain.size()
                         + " uncertain legacy payout(s). Inspect with /trade payouts before retrying them.");
-                return storage.loadEscrow();
+                int unowned = storage.unownedEscrowCount();
+                if (unowned > 0) plugin.getLogger().severe("Trade has " + unowned
+                        + " legacy escrow session(s) without shard ownership. They were preserved, not refunded. "
+                        + "See docs/trading.md before performing an offline ownership migration.");
+                return storage.loadRecoverableEscrow();
             }
             catch (Exception e) { throw new java.util.concurrent.CompletionException(e); }
         }).thenAccept(escrows -> Bukkit.getScheduler().runTask(plugin, () -> {

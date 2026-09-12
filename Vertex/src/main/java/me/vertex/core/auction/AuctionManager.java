@@ -386,11 +386,7 @@ public final class AuctionManager {
             if (!EconomyHook.getEconomy().has(buyer, listing.price())) {
                 return BuyResult.CANNOT_AFFORD;
             }
-        } else if (listing.currency() == AuctionCurrency.GC) {
-            if (!gc.has(buyer.getUniqueId(), priceGc)) {
-                return BuyResult.CANNOT_AFFORD;
-            }
-        } else if (buyer.getLevel() < priceLevels) {
+        } else if (listing.currency() != AuctionCurrency.GC && buyer.getLevel() < priceLevels) {
             return BuyResult.CANNOT_AFFORD;
         }
         if (!activeListings.remove(listingId, listing)) {
@@ -404,12 +400,7 @@ public final class AuctionManager {
                 activeListings.put(listingId, listing);
                 return BuyResult.CANNOT_AFFORD;
             }
-        } else if (listing.currency() == AuctionCurrency.GC) {
-            if (!gc.tryDebit(buyer.getUniqueId(), buyer.getUniqueId(), GcAction.AUCTION_PURCHASE, priceGc, null)) {
-                activeListings.put(listingId, listing);
-                return BuyResult.CANNOT_AFFORD;
-            }
-        } else {
+        } else if (listing.currency() != AuctionCurrency.GC) {
             buyer.setLevel(buyer.getLevel() - priceLevels);
         }
 
@@ -420,6 +411,10 @@ public final class AuctionManager {
         boolean settled;
         try {
             settled = storage.settleSale(listing, buyer.getUniqueId(), proceeds, System.currentTimeMillis());
+        } catch (me.vertex.core.gc.GcStorage.BalanceRejectedException insufficient) {
+            activeListings.put(listingId, listing);
+            gc.refreshBalance(buyer.getUniqueId());
+            return BuyResult.CANNOT_AFFORD;
         } catch (Exception error) {
             plugin.getLogger().log(Level.SEVERE,
                     "Failed to settle Auction House listing " + listing.id() + " -- nothing was delivered.", error);
@@ -428,9 +423,7 @@ public final class AuctionManager {
         if (!settled) {
             if (listing.currency() == AuctionCurrency.MONEY) {
                 EconomyHook.getEconomy().depositPlayer(buyer, listing.price());
-            } else if (listing.currency() == AuctionCurrency.GC) {
-                gc.credit(buyer.getUniqueId(), buyer.getUniqueId(), GcAction.AUCTION_REFUND, priceGc, null);
-            } else {
+            } else if (listing.currency() != AuctionCurrency.GC) {
                 buyer.setLevel(buyer.getLevel() + priceLevels);
             }
             activeListings.put(listingId, listing);
@@ -439,6 +432,7 @@ public final class AuctionManager {
         clearWatchesForListing(listing.id());
         processPendingPayouts(listing.sellerUuid());
         if (listing.currency() == AuctionCurrency.GC) {
+            gc.refreshBalance(buyer.getUniqueId());
             me.vertex.core.audit.LargeTransactionAudit.record(plugin, priceGc, "AUCTION_GC_SALE",
                     Bukkit.getOfflinePlayer(listing.sellerUuid()), buyer);
         }

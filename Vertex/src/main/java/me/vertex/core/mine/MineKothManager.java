@@ -291,7 +291,8 @@ public final class MineKothManager {
      * -- heals itself rather than leaving the board dead for good.
      */
     private void updateHologram(MineKothDefinition definition, State state) {
-        if (!mines.kothHologramsEnabled() || !hologramsAvailable()) {
+        if (!mines.kothHologramsEnabled(definition.mineId()) || !hologramsAvailable()) {
+            removeHologram(definition);
             return;
         }
         Location location = definition.hologramLocation();
@@ -305,7 +306,7 @@ public final class MineKothManager {
                 ? 0D : definition.booster().percentFor(held);
         MineKothBooster.Tier next = definition.booster().nextTier(held);
 
-        List<String> lines = mines.kothHologramLines().stream()
+        List<String> lines = mines.kothHologramLines(definition.mineId()).stream()
                 .map(line -> MessageFormatter.legacyAmpersand(line
                         .replace("{name}", region == null ? definition.mineId() : region.displayName())
                         .replace("{owner}", state.owner == null

@@ -56,7 +56,10 @@ public final class ClaimDelivery {
             if (found >= item.item().getAmount()) {
                 present.put(item.marker(), found - item.item().getAmount());
             } else {
-                missing.add(item);
+                ItemStack remainder = item.item().clone();
+                remainder.setAmount(item.item().getAmount() - found);
+                missing.add(new TaggedItem(item.marker(), remainder));
+                present.remove(item.marker());
             }
         }
         return missing;
@@ -94,6 +97,7 @@ public final class ClaimDelivery {
 
     /** Adds a preflight-checked batch. Any leftover is a hard invariant failure. */
     public static boolean add(Player player, List<TaggedItem> items) {
+        if (!canFit(player, items)) return false;
         ItemStack[] before = cloneContents(player.getInventory().getStorageContents());
         for (TaggedItem item : items) {
             if (!player.getInventory().addItem(item.item().clone()).isEmpty()) {
@@ -125,6 +129,16 @@ public final class ClaimDelivery {
             meta.getPersistentDataContainer().remove(key);
             item.setItemMeta(meta);
             player.getInventory().setItem(slot, item);
+        }
+    }
+
+    public static void clearMarker(Player player, Plugin plugin, String acknowledgedMarker) {
+        ItemStack[] contents=player.getInventory().getContents();
+        for(int slot=0;slot<contents.length;slot++){
+            ItemStack item=contents[slot];if(item==null||!item.hasItemMeta())continue;
+            ItemMeta meta=item.getItemMeta();
+            if(!acknowledgedMarker.equals(meta.getPersistentDataContainer().get(key(plugin),PersistentDataType.STRING)))continue;
+            meta.getPersistentDataContainer().remove(key(plugin));item.setItemMeta(meta);player.getInventory().setItem(slot,item);
         }
     }
 

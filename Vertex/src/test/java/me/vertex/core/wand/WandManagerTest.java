@@ -171,4 +171,28 @@ class WandManagerTest {
         assertFalse(wands.isSellable(odd), "an unrecognised tag still means hands off");
     }
 
+    @Test
+    void doesNotSellFilledContainerItemsOrEraseTheirContentsWhileChecking() {
+        ItemStack barrel = new ItemStack(Material.BARREL);
+        org.bukkit.inventory.meta.BlockStateMeta meta = (org.bukkit.inventory.meta.BlockStateMeta) barrel.getItemMeta();
+        org.bukkit.block.Barrel state = (org.bukkit.block.Barrel) meta.getBlockState();
+        state.getInventory().setItem(0, new ItemStack(Material.DIAMOND, 64));
+        meta.setBlockState(state);
+        barrel.setItemMeta(meta);
+        ItemStack before = barrel.clone();
+        assertFalse(wands.isSellable(barrel));
+        assertEquals(before, barrel);
+    }
+
+    @Test
+    void harmlessMarkerDoesNotHideOtherVanillaMetadata() {
+        ItemStack sword = new ItemStack(Material.DIAMOND_SWORD);
+        org.bukkit.inventory.meta.Damageable meta = (org.bukkit.inventory.meta.Damageable) sword.getItemMeta();
+        meta.setDamage(10);
+        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "mob_drop"), PersistentDataType.BYTE, (byte) 1);
+        sword.setItemMeta(meta);
+        assertFalse(wands.isPlainStack(sword));
+        assertTrue(sword.getItemMeta().getPersistentDataContainer().has(new NamespacedKey(plugin, "mob_drop")));
+    }
+
 }

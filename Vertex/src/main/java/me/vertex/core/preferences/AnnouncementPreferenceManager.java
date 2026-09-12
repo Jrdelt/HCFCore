@@ -6,6 +6,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 
 import java.util.EnumSet;
@@ -23,6 +24,10 @@ public final class AnnouncementPreferenceManager implements Listener {
     private final Messages messages;
     private final Map<UUID, Set<AnnouncementCategory>> disabled = new ConcurrentHashMap<>();
     private final Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
+    private final Object stateLock = new Object();
+    private final Map<UUID, CompletableFuture<Void>> writeChains = new java.util.HashMap<>();
+    private final Map<UUID, Object> loading = new java.util.HashMap<>();
+    private final Map<UUID, Map<AnnouncementCategory, Boolean>> pendingEdits = new java.util.HashMap<>();
 
     public AnnouncementPreferenceManager(Plugin plugin, AnnouncementPreferenceStorage storage, Messages messages) {
         this.plugin = plugin;
@@ -35,20 +40,42 @@ public final class AnnouncementPreferenceManager implements Listener {
         loadPlayer(event.getPlayer().getUniqueId());
     }
 
-    /** Loads once per connection; a click before the async read finishes wins over the stale read. */
-    public void loadPlayer(UUID uuid) {
-        if (disabled.containsKey(uuid)) {
-            return;
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        synchronized (stateLock) {
+            UUID uuid = event.getPlayer().getUniqueId();
+            loading.remove(uuid);
+            pendingEdits.remove(uuid);
+            disabled.remove(uuid);
         }
-        CompletableFuture<Void> load = CompletableFuture.runAsync(() -> {
+    }
+
+    /** Refreshes each connection, preserving all stored categories and explicit edits made while loading. */
+    public void loadPlayer(UUID uuid) {
+        synchronized (stateLock) {
+        if (loading.containsKey(uuid)) return;
+        Object token = new Object();
+        loading.put(uuid, token);
+        pendingEdits.put(uuid, new java.util.EnumMap<>(AnnouncementCategory.class));
+        enqueue(uuid, () -> {
             try {
                 EnumSet<AnnouncementCategory> stored = storage.loadDisabled(uuid);
-                disabled.putIfAbsent(uuid, Set.copyOf(stored));
+                synchronized (stateLock) {
+                    if (loading.get(uuid) != token) return;
+                    pendingEdits.getOrDefault(uuid, Map.of()).forEach((category, enabled) -> {
+                        if (enabled) stored.remove(category); else stored.add(category);
+                    });
+                    disabled.put(uuid, Set.copyOf(stored));
+                }
             } catch (Exception e) {
                 plugin.getLogger().log(Level.WARNING, "Could not load announcement preferences for " + uuid, e);
+            } finally {
+                synchronized (stateLock) {
+                    if (loading.remove(uuid, token)) pendingEdits.remove(uuid);
+                }
             }
         });
-        track(load);
+        }
     }
 
     public boolean isEnabled(UUID uuid, AnnouncementCategory category) {
@@ -70,6 +97,7 @@ public final class AnnouncementPreferenceManager implements Listener {
 
     /** Changes the runtime value first so a click immediately affects the next broadcast. */
     public boolean toggle(UUID uuid, AnnouncementCategory category) {
+        synchronized (stateLock) {
         Set<AnnouncementCategory> prior = disabled.getOrDefault(uuid, Set.of());
         EnumSet<AnnouncementCategory> next = prior.isEmpty()
                 ? EnumSet.noneOf(AnnouncementCategory.class) : EnumSet.copyOf(prior);
@@ -81,16 +109,29 @@ public final class AnnouncementPreferenceManager implements Listener {
             enabled = false;
         }
         disabled.put(uuid, Set.copyOf(next));
+        if (loading.containsKey(uuid)) pendingEdits.get(uuid).put(category, enabled);
         boolean savedEnabled = enabled;
-        CompletableFuture<Void> save = CompletableFuture.runAsync(() -> {
+        enqueue(uuid, () -> {
             try {
-                storage.save(uuid, category, savedEnabled);
+                me.vertex.core.storage.SqlRetry.run(plugin, "player preference save",
+                        () -> storage.save(uuid, category, savedEnabled));
             } catch (Exception e) {
                 plugin.getLogger().log(Level.WARNING, "Could not save announcement preferences for " + uuid, e);
             }
         });
-        track(save);
         return enabled;
+        }
+    }
+
+    /** Caller holds stateLock; each read/write completes before its successor starts. */
+    private void enqueue(UUID uuid, Runnable operation) {
+        CompletableFuture<Void> previous = writeChains.getOrDefault(uuid, CompletableFuture.completedFuture(null));
+        CompletableFuture<Void> next = previous.handle((ignored, error) -> null).thenRunAsync(operation);
+        writeChains.put(uuid, next);
+        next.whenComplete((ignored, error) -> {
+            synchronized (stateLock) { writeChains.remove(uuid, next); }
+        });
+        track(next);
     }
 
     public void broadcast(AnnouncementCategory category, String messageKey, String... placeholders) {
@@ -107,7 +148,8 @@ public final class AnnouncementPreferenceManager implements Listener {
     }
 
     public void awaitWrites() {
-        CompletableFuture.allOf(pendingWrites.toArray(CompletableFuture[]::new)).join();
+        try { CompletableFuture.allOf(pendingWrites.toArray(CompletableFuture[]::new)).get(10, java.util.concurrent.TimeUnit.SECONDS); }
+        catch (Exception error) { plugin.getLogger().log(Level.WARNING, "Could not finish preference writes during shutdown", error); }
     }
 
     private void track(CompletableFuture<?> future) {

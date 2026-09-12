@@ -257,6 +257,19 @@ class ChunkBusterManagerTest {
     // ---- Persisted lock + place/break enforcement, end to end ----
 
     @Test
+    void ownershipChangeStopsBeforeTheNextBatch() throws Exception {
+        PlayerMock player=server.addPlayer();Location target=locationAt(5,64,5);
+        world.getBlockAt(5,63,5).setType(Material.STONE);
+        player.getInventory().setItemInMainHand(manager.createItem(ChunkBusterType.SINGLE_COLUMN));
+        assertEquals(ChunkBusterManager.UseResult.OK,manager.confirmAndExecute(player,target,ChunkBusterType.SINGLE_COLUMN));
+        claimFactionId=99;claimTag="Enemy";
+        server.getScheduler().performTicks(2);
+        assertEquals(Material.STONE,world.getBlockAt(5,63,5).getType());
+        assertFalse(manager.isLocked(target));
+        assertEquals("STOPPED",storage.loadOperations().getFirst().status());
+    }
+
+    @Test
     void confirmAndExecuteLocksTheAreaThenClearsItAndReleasesTheLock() throws Exception {
         PlayerMock player = server.addPlayer();
         Location target = locationAt(5, 64, 5);

@@ -77,8 +77,7 @@ public final class DeliveryManager implements Listener {
     private Admission enqueue(UUID owner,Collection<ItemStack> items,String source){
         List<ItemStack> copies=items==null?List.of():items.stream().filter(item->item!=null&&!item.isEmpty()).map(ItemStack::clone).toList();
         if(copies.isEmpty())return new Admission(true,CompletableFuture.completedFuture(true));
-        List<DeliveryStorage.PreparedDelivery> prepared=copies.stream().map(item->new DeliveryStorage.PreparedDelivery(
-                UUID.randomUUID().toString(),item)).toList();
+        List<DeliveryStorage.PreparedDelivery> prepared=DeliveryStorage.prepare(copies);
         String batchId=UUID.randomUUID().toString();
         PendingEnqueue batch=new PendingEnqueue(batchId,owner,prepared,source,new CompletableFuture<>(),new AtomicBoolean());
         try{
@@ -112,8 +111,8 @@ public final class DeliveryManager implements Listener {
         CompletableFuture<Boolean> write=CompletableFuture.supplyAsync(()->{
             try{
                 storage.enqueuePrepared(batch.owner(),batch.items(),batch.source());
-                // Never allow delivery while its WAL record remains. Otherwise
-                // a later replay could re-create rows that were already claimed.
+                // Completed SQL IDs are retained, so another shard may deliver
+                // safely even if local WAL removal fails and is later replayed.
                 wal.remove(batch.batchId());
                 return true;
             }
@@ -135,29 +134,34 @@ public final class DeliveryManager implements Listener {
         CompletableFuture<Batch> load=CompletableFuture.supplyAsync(()->{try{List<DeliveryStorage.Reservation> rows=new ArrayList<>(storage.delivering(owner));DeliveryStorage.Reservation fresh=storage.reserve(owner);if(!fresh.rows().isEmpty())rows.add(fresh);return new Batch(rows,fresh.rows().isEmpty()?null:fresh.token());}catch(Exception error){throw new java.util.concurrent.CompletionException(error);}});track(load);
         load.whenComplete((batch,error)->Bukkit.getScheduler().runTask(plugin,()->{
             if(error!=null){plugin.getLogger().log(Level.WARNING,"Could not load item deliveries for "+owner,error);retryOwners.add(owner);active.remove(owner);return;}
-            deliverAt(player,batch,0);
+            // A reservation may contain more than an inventory can ever hold.
+            // Acknowledge rows separately so the player can clear space and resume.
+            List<DeliveryStorage.Reservation> individual=new ArrayList<>();
+            for(DeliveryStorage.Reservation reservation:batch.reservations())for(DeliveryStorage.Row row:reservation.rows())
+                individual.add(new DeliveryStorage.Reservation(reservation.token(),List.of(row)));
+            deliverAt(player,new Batch(individual,batch.freshToken()),0);
         }));
     }
 
     private void deliverAt(Player player,Batch batch,int index){
         if(!player.isOnline()){releaseFresh(player.getUniqueId(),batch);active.remove(player.getUniqueId());return;}
-        if(index>=batch.reservations().size()){ClaimDelivery.clearSourceMarkers(player,plugin,"delivery");active.remove(player.getUniqueId());return;}
+        if(index>=batch.reservations().size()){
+            ClaimDelivery.clearSourceMarkers(player,plugin,"delivery");active.remove(player.getUniqueId());
+            return;
+        }
         DeliveryStorage.Reservation reservation=batch.reservations().get(index);List<ClaimDelivery.TaggedItem> expected=new ArrayList<>();
         for(DeliveryStorage.Row row:reservation.rows())expected.add(ClaimDelivery.tagged(plugin,"delivery",reservation.token(),row.id(),0,row.item()));
         List<ClaimDelivery.TaggedItem> missing=ClaimDelivery.missing(player,plugin,expected);
         if(!ClaimDelivery.canFit(player,missing)||!ClaimDelivery.add(player,missing)){
-            for(ClaimDelivery.TaggedItem item:missing)player.getWorld().dropItemNaturally(player.getLocation(),item.item().clone());
-            CompletableFuture<Integer> dropped=CompletableFuture.supplyAsync(()->{try{return storage.complete(player.getUniqueId(),reservation.token());}catch(Exception error){throw new java.util.concurrent.CompletionException(error);}});track(dropped);
-            dropped.whenComplete((changed,error)->Bukkit.getScheduler().runTask(plugin,()->{
-                if(error!=null||changed==null)plugin.getLogger().log(Level.WARNING,"Could not acknowledge dropped item delivery for "+player.getUniqueId(),error);
-                deliverAt(player,batch,index+1);
-            }));
+            // Retain the same reservation/markers until the player makes room.
+            // Dropping here would make recovery unable to locate the items.
+            retryOwners.add(player.getUniqueId());active.remove(player.getUniqueId());
             return;
         }
-        CompletableFuture<Integer> complete=CompletableFuture.supplyAsync(()->{try{return storage.complete(player.getUniqueId(),reservation.token());}catch(Exception error){throw new java.util.concurrent.CompletionException(error);}});track(complete);
+        CompletableFuture<Integer> complete=CompletableFuture.supplyAsync(()->{try{return storage.complete(player.getUniqueId(),reservation.token(),reservation.rows().getFirst().id());}catch(Exception error){throw new java.util.concurrent.CompletionException(error);}});track(complete);
         complete.whenComplete((changed,error)->Bukkit.getScheduler().runTask(plugin,()->{
             if(error!=null||changed==null||changed!=reservation.rows().size()){plugin.getLogger().log(Level.SEVERE,"Could not acknowledge item delivery "+reservation.token(),error);retryOwners.add(player.getUniqueId());active.remove(player.getUniqueId());return;}
-            ClaimDelivery.clearMarkers(player,plugin,"delivery",reservation.token());deliverAt(player,batch,index+1);
+            ClaimDelivery.clearMarker(player,plugin,expected.getFirst().marker());deliverAt(player,batch,index+1);
         }));
     }
 

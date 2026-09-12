@@ -103,6 +103,10 @@ public final class PortalManager {
         if (task != null) task.cancel();
         task = null;
         for (UUID playerId : List.copyOf(flights.keySet())) releaseFlight(playerId, false);
+        for (UUID playerId : List.copyOf(slowFallers)) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) clearSlowFall(player);
+        }
         selections.clear();
         cooldowns.clear();
         slowFallers.clear();
@@ -367,6 +371,10 @@ public final class PortalManager {
 
     public void releaseFlight(Player player, boolean slowFall) { releaseFlight(player.getUniqueId(), slowFall); }
 
+    public void clearSlowFall(Player player) {
+        if (slowFallers.remove(player.getUniqueId())) player.removePotionEffect(PotionEffectType.SLOW_FALLING);
+    }
+
     private PortalRoute chooseRoute(PortalTarget target) {
         List<PortalRoute> choices = routes(target).stream().filter(route -> !route.waypoints().isEmpty()).toList();
         // Haven/Riftlands already have a durable route system used by their
@@ -404,7 +412,7 @@ public final class PortalManager {
         if (!player.teleport(first.location(world))) return false;
         player.setAllowFlight(false);
         player.setFlying(false);
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, Integer.MAX_VALUE, 0, false, false, false));
+player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 100, 0, false, false, false));
         slowFallers.add(player.getUniqueId());
         flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), previous, route.waypoints(), route.speed()));
         if (!preview && route.target().kind() == PortalTarget.Kind.RIFTLANDS) zones.startPortalRiftSession(player);
@@ -421,7 +429,7 @@ public final class PortalManager {
         if (flight.before.allowFlight() && flight.before.flying()) player.setFlying(true);
         player.setFlySpeed(flight.before.flySpeed());
         if (slowFall) {
-            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, Integer.MAX_VALUE, 0, false, false, false));
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 100, 0, false, false, false));
             slowFallers.add(playerId);
         }
     }
@@ -433,6 +441,9 @@ public final class PortalManager {
             if (player == null || player.isOnGround()) {
                 if (player != null) player.removePotionEffect(PotionEffectType.SLOW_FALLING);
                 slowFallers.remove(playerId);
+            } else {
+                // A finite, renewed effect cannot become permanent after a crash.
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 100, 0, false, false, false));
             }
         }
     }

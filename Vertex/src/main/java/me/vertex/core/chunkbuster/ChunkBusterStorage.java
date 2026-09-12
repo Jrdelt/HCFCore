@@ -162,6 +162,13 @@ public final class ChunkBusterStorage {
         }
     }
 
+    public void stopOperation(long id) throws SQLException {
+        try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(
+                "UPDATE chunk_buster_operations SET status='STOPPED' WHERE id=?")) {
+            statement.setLong(1,id);statement.executeUpdate();
+        }
+    }
+
     // ---- Legacy per-faction role rows ----
 
     // Kept readable for existing databases and the standalone-manager

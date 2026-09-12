@@ -111,7 +111,8 @@ public final class SeasonResetManager {
             "faction_shield_activations", "faction_shield_overrides", "faction_shields",
             "faction_shield_weekly", "faction_grace", "ftop_scores", "ftop_schedule", "pvptop_points", "pvptop_log",
             "spawners", "chunk_collectors", "mine_koths", "mine_hot_zones", "shop_stock",
-            "zone_event_scores", "zone_event_state", "vertex_player_stats",
+            "zone_event_scores", "zone_event_state", "zone_event_runs", "zone_event_score_ops",
+            "zone_event_winners", "vertex_player_stats",
             "chunk_buster_operations", "chunk_buster_log");
 
     public record Result(boolean success, Map<String, Integer> affectedRows, String error) {

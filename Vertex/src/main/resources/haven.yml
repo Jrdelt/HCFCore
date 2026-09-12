@@ -74,6 +74,11 @@ kill-event:
   # One combined Haven/Riftlands event. The Haven file owns the shared schedule and display cadence.
   cycle-minutes: 120
   duration-minutes: 5
+  # Shared SQL scoreboard/boost refresh (1-60 seconds), also used in standalone mode.
+  shared-refresh-seconds: 2
+  # Wait for in-flight score writes before settling winners (1-60 seconds).
+  # Persisted with each event. Writes arriving after this deadline are rejected and logged.
+  settlement-delay-seconds: 5
   bossbar:
     refresh-seconds: 2
   scoring:

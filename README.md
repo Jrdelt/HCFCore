@@ -51,6 +51,15 @@ Feature messages, labels, and lore are configured in the language files.
 See the [documentation index](docs/README.md) for exact behavior,
 configuration, permissions, and operational limits.
 
+## Verification and deployment limits
+
+The current repair checkpoint passes 773 tests with one existing MockBukkit
+skip (774 total). It is **not a production or every-file-audit sign-off**.
+[Open issues](issues.md) lists remaining loss/duplication and shard-ownership
+risks; [audit progress](docs/audit-progress.md) preserves completed-fix evidence.
+Shared deployments must follow the [all-shards maintenance rollout](docs/network-shards.md#shared-events-and-leaderboard-rollout).
+Generated JARs are built locally and intentionally excluded from Git.
+
 ## Requirements
 
 | Dependency | Required for |
@@ -62,7 +71,7 @@ configuration, permissions, and operational limits.
 
 WorldGuard, LuckPerms, PlaceholderAPI, EssentialsX, and FancyNPCs are optional
 integrations. MySQL/MariaDB is optional for one standalone server but required
-when `network.enabled: true`; standalone mode uses SQLite. Exact integration
+when `network.enabled: true`; standalone mode supports SQLite or dedicated MySQL. Exact integration
 behavior is listed in [Integrations](docs/integrations.md).
 
 ## Install

@@ -34,9 +34,9 @@ Picks where data is saved. Two values matter:
   below. Use it when several servers need to share the same data, or when
   you already run MySQL and want everything in one place.
 
-Only the exact value `mysql` selects MySQL. Anything else — `local`,
-a blank value, a typo, or the key being missing entirely — falls back to
-local, so a bad value can't stop the server from booting.
+Only `mysql` selects MySQL (trimmed and case-insensitive). Other values select
+local storage in standalone mode. With `network.enabled: true`, that local
+selection is rejected at startup instead of silently creating a divergent shard.
 
 Both backends store the same data with the same schema. To move an
 existing server from one to the other, use `/vertex storage <local|mysql>`
@@ -45,6 +45,20 @@ effect on the next restart. The final `storage.type` change is written to a
 temporary sibling file and atomically replaced, so a crash cannot leave a
 partially written `config.yml`. See
 [Installation](installation.md#switching-backends-in-game).
+
+### Network deployment
+
+Use `network.enabled: false` for one independent server, or `true` for multiple
+Vertex backends sharing the same MySQL database. Each network backend needs a
+unique, stable `network.shard-id` matching its Velocity name; the default
+`standalone` identity is rejected in network mode.
+
+`/vertex reload` refreshes gameplay/timing settings but retains the running
+network mode, shard ID and database dialect, warning when the file requests a
+different deployment. Such changes require a planned restart and, for existing
+data, an explicit ownership/storage migration. Do not point an independent
+standalone server at a live shard database. Read the
+[ownership limitations and all-shards rollout](network-shards.md) before use.
 
 ## Large GC transaction audit
 
@@ -118,10 +132,11 @@ mysql:
 Create the database itself before first use (`CREATE DATABASE vertex;`);
 Vertex creates its own tables inside it, but not the database.
 
-All gameplay-loop reads/writes (kit claims, ability cooldowns, spawner
-and collector state, blueprint progress) go through the connection pool
-asynchronously on either backend. Only the one-time startup schema check
-touches the main thread.
+The connection pool is shared by the storage modules. Many gameplay writes and
+the shared event/leaderboard refreshes run asynchronously, while Bukkit inventory
+and world changes stay on the server thread. Do not assume every legacy path is
+asynchronous or atomic: the [audit backlog](../issues.md) and
+[performance suggestions](../optimizations.md) describe remaining work.
 
 ## Chat formatting
 

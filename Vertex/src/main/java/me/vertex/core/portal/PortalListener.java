@@ -90,6 +90,7 @@ public final class PortalListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         if (portals.isFlying(event.getPlayer().getUniqueId())) portals.releaseFlight(event.getPlayer(), false);
+        portals.clearSlowFall(event.getPlayer());
     }
 
     private void feedback(Player player, String result) {

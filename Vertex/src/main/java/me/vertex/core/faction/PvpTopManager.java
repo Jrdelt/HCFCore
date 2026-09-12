@@ -10,7 +10,7 @@ import java.io.File;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -20,7 +20,9 @@ public final class PvpTopManager {
     private final Plugin plugin;
     private final PvpTopStorage storage;
     private final File file;
-    private final Map<Integer, Long> points = new ConcurrentHashMap<>();
+    private volatile Map<Integer, Long> points = Map.of();
+    private final AtomicBoolean refreshing = new AtomicBoolean();
+    private volatile Runnable mutationPublisher = () -> { };
     private final Object writeLock = new Object();
     private CompletableFuture<Void> writeTail = CompletableFuture.completedFuture(null);
     private volatile long kothPoints;
@@ -40,8 +42,24 @@ public final class PvpTopManager {
     }
 
     public void loadState() {
-        try { points.putAll(storage.load()); }
+        try { points = Map.copyOf(storage.load()); }
         catch (Exception error) { plugin.getLogger().log(Level.SEVERE, "Failed to load PvP Top points.", error); }
+    }
+
+    public void setMutationPublisher(Runnable publisher) {
+        mutationPublisher = publisher == null ? () -> { } : publisher;
+    }
+
+    /** The same lane as local awards prevents an older query replacing a newer result. */
+    public CompletableFuture<Void> refreshAsync() {
+        synchronized (writeLock) {
+            if (!refreshing.compareAndSet(false, true)) return writeTail;
+            writeTail = writeTail.handle((ignored, error) -> null).thenRunAsync(() -> {
+                try { loadState(); }
+                finally { refreshing.set(false); }
+            });
+            return writeTail;
+        }
     }
 
     public void awardCapture(CaptureEventType type, int factionId, Player actor, String eventId,
@@ -57,7 +75,9 @@ public final class PvpTopManager {
                     String source = type.id() + ":" + eventId;
                     PvpTopStorage.AwardResult result = storage.award(factionId, amount, source,
                             source + ":" + activationId, actorUuid, now);
-                    points.put(factionId, result.total());
+                    // Replace the whole projection so disbanded/removed factions disappear too.
+                    points = Map.copyOf(storage.load());
+                    if (result.awarded()) mutationPublisher.run();
                     if (result.awarded()) plugin.getLogger().info("PvP Top: "
                             + FactionsHook.getFactionName(factionId) + " received " + amount
                             + " points for " + type.id() + " " + eventId + ".");

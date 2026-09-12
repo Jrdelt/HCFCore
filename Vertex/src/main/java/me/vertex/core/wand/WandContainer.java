@@ -90,18 +90,21 @@ public abstract class WandContainer {
     private static final class CollectorContainer extends WandContainer {
         private final Location location;
         private final ChunkCollectorManager collectors;
-        private final ChunkCollectorData data;
+        // Only stage data during the synchronous remove/commit portion. Never
+        // carry a detached collector snapshot across an asynchronous bank call.
+        private ChunkCollectorData data;
 
         private CollectorContainer(Location location, ChunkCollectorManager collectors) {
             this.location = location;
             this.collectors = collectors;
-            this.data = collectors.readData(location);
         }
 
         @Override
         public Map<Material, Integer> contents(Predicate<ItemStack> eligible) {
             Map<Material, Integer> totals = new LinkedHashMap<>();
-            data.stored().forEach((material, amount) -> {
+            ChunkCollectorData current = data == null ? collectors.readData(location) : data;
+            if (current == null) return totals;
+            current.stored().forEach((material, amount) -> {
                 // A collector stores bare counts, so the only thing to test is
                 // the material itself.
                 if (amount > 0 && eligible.test(new ItemStack(material))) {
@@ -113,12 +116,17 @@ public abstract class WandContainer {
 
         @Override
         public void remove(Material material, int amount, Predicate<ItemStack> eligible) {
-            data.setStored(material, Math.max(0L, data.stored(material) - amount));
+            if (data == null) data = collectors.readData(location);
+            if (data == null || amount < 0 || data.stored(material) < amount) {
+                throw new IllegalStateException("Collector changed before wand removal");
+            }
+            data.setStored(material, data.stored(material) - amount);
         }
 
         @Override
         public void commit() {
-            collectors.writeData(location, data);
+            if (data != null) collectors.writeData(location, data);
+            data = null;
         }
 
         @Override

@@ -85,7 +85,16 @@ public final class Messages {
             for (File file : files) {
                 String name = file.getName();
                 String locale = name.substring(0, name.length() - ".yml".length()).toLowerCase(Locale.ROOT);
-                locales.put(locale, YamlConfiguration.loadConfiguration(file));
+                YamlConfiguration loaded = YamlConfiguration.loadConfiguration(file);
+                // Older unquoted YAML "off" keys were parsed as boolean false.
+                // Preserve the installed translation rather than replacing the locale.
+                if (!loaded.contains("performance.off") && loaded.isString("performance.false")) {
+                    loaded.set("performance.off", loaded.getString("performance.false"));
+                    loaded.set("performance.false", null);
+                    try { loaded.save(file); }
+                    catch (IOException error) { plugin.getLogger().warning("Could not persist performance message key migration for " + locale); }
+                }
+                locales.put(locale, loaded);
             }
         }
 

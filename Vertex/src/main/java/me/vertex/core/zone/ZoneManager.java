@@ -104,7 +104,14 @@ public final class ZoneManager {
     private final Set<UUID> slowFalling = ConcurrentHashMap.newKeySet();
     private final Set<UUID> spawnDispatchBypass = ConcurrentHashMap.newKeySet();
     private final Set<String> peacefulWorldWarnings = ConcurrentHashMap.newKeySet();
-    private final Map<UUID, Score> scores = new ConcurrentHashMap<>();
+    private volatile Map<UUID, Score> scores = Map.of();
+    private final ZoneEventStorage eventStorage;
+    private volatile ZoneEventStorage.Snapshot eventSnapshot;
+    private volatile long eventSnapshotNanos;
+    private final java.util.concurrent.atomic.AtomicBoolean eventRefreshPending = new java.util.concurrent.atomic.AtomicBoolean();
+    private long lastEventRefresh;
+    private long eventRefreshMillis = 2_000L;
+    private long eventSettlementMillis = 5_000L;
     /** Region -> only entity UUIDs spawned by Vertex, avoiding world-wide cleanup scans every tick. */
     private final Map<String, Set<UUID>> zoneMobsByRegion = new ConcurrentHashMap<>();
     private final Map<ZoneType, ZoneConfig> configs = new EnumMap<>(ZoneType.class);
@@ -119,7 +126,6 @@ public final class ZoneManager {
     private volatile BoosterService boosters;
     private volatile AnnouncementPreferenceManager announcementPreferences;
     private volatile long cycleAnchor;
-    private volatile long loadedScoreEvent = Long.MIN_VALUE;
     private volatile long lastFinishedEvent = Long.MIN_VALUE;
     private volatile long lastAnnouncedEvent = Long.MIN_VALUE;
     private volatile long lastBossRefresh;
@@ -129,6 +135,7 @@ public final class ZoneManager {
             BackpackManager backpacks, TrackedItemIds trackedItems) {
         this.plugin = plugin;
         this.storage = new ZoneStorage(database);
+        this.eventStorage = new ZoneEventStorage(database);
         this.messages = messages;
         this.combat = combat;
         this.backpacks = backpacks;
@@ -165,6 +172,9 @@ public final class ZoneManager {
             blockedCommands.put(type, readBlockedCommands(type));
             mobDespawnRadii.put(type, readMobDespawnRadius(type));
         }
+        YamlConfiguration eventConfig = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), "haven.yml"));
+        eventRefreshMillis = Math.max(1L, Math.min(60L, eventConfig.getLong("kill-event.shared-refresh-seconds", 2L))) * 1_000L;
+        eventSettlementMillis = Math.max(1L, Math.min(60L, eventConfig.getLong("kill-event.settlement-delay-seconds", 5L))) * 1_000L;
     }
 
     public List<String> blockedCommands(ZoneType type) {
@@ -204,10 +214,7 @@ public final class ZoneManager {
                 }
                 loot.put(type, loaded);
             }
-            long cycle = Math.max(60_000L, config(ZoneType.HAVEN).eventCycleMillis());
-            cycleAnchor = storage.loadLong("cycle_anchor", System.currentTimeMillis() - Math.floorMod(System.currentTimeMillis(), cycle));
-            storage.saveLong("cycle_anchor", cycleAnchor);
-            restoreCurrentScores();
+            applyEventSnapshot(eventStorage.refresh(eventSettings()), System.nanoTime(), false);
         } catch (Exception e) {
             throw new IllegalStateException("Could not load Haven/Riftlands state", e);
         }
@@ -231,6 +238,10 @@ public final class ZoneManager {
         tickTask = null;
         for (Player player : Bukkit.getOnlinePlayers()) eventBar.removePlayer(player);
         for (Flight flight : List.copyOf(flights.values())) releaseFlight(flight.playerId, false);
+        for (UUID id : List.copyOf(slowFalling)) {
+            Player player = Bukkit.getPlayer(id);
+            if (player != null) clearSlowFall(player);
+        }
         entries.clear(); exits.clear(); selections.clear(); slowFalling.clear();
         awaitWrites();
     }
@@ -527,7 +538,7 @@ public final class ZoneManager {
         if (!player.teleport(first.location(world))) return false;
         FlightState before = new FlightState(player.getAllowFlight(), player.isFlying(), player.getFlySpeed());
         player.setAllowFlight(false); player.setFlying(false);
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,Integer.MAX_VALUE,0,false,false,false));
+player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,100,0,false,false,false));
         slowFalling.add(player.getUniqueId());
         flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), region.type(), route.regionId(), before,
                 route.waypoints(), route.speed()));
@@ -600,7 +611,7 @@ public final class ZoneManager {
         if (!player.teleport(first.location(world))) return false;
         player.setAllowFlight(false);
         player.setFlying(false);
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, Integer.MAX_VALUE, 0, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 100, 0, false, false, false));
         slowFalling.add(player.getUniqueId());
         flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), type, route.regionId(), before,
                 route.waypoints(), route.speed()));
@@ -631,7 +642,7 @@ public final class ZoneManager {
         player.setFlying(false); player.setAllowFlight(flight.before.allowFlight());
         if (flight.before.allowFlight() && flight.before.flying()) player.setFlying(true);
         player.setFlySpeed(flight.before.flySpeed());
-        if(slowFall){player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,Integer.MAX_VALUE,0,false,false,false));slowFalling.add(uuid);}
+        if(slowFall){player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,100,0,false,false,false));slowFalling.add(uuid);}
     }
     public void releaseFlightFromHit(Player player){if(flights.containsKey(player.getUniqueId()))releaseFlight(player.getUniqueId(),true);}
     public void recordFlightDisconnect(Player player) { Flight flight=flights.get(player.getUniqueId());if(flight==null||combat.isTagged(player.getUniqueId()))return;ZoneRegion region=region(flight.regionId);if(region==null)return;Location current=player.getLocation().clone();Location safe=findSafeGround(region,current);Location stored=safe==null?current:safe;releaseFlight(player.getUniqueId(),false);ZoneStorage.FlightReturn row=new ZoneStorage.FlightReturn(region.id(),stored.getWorld().getName(),stored.getX(),stored.getY(),stored.getZ());pendingFlightReturns.put(player.getUniqueId(),row);persist("flight-return:"+player.getUniqueId(),()->storage.saveFlightReturn(player.getUniqueId(),region.id(),stored.getWorld().getName(),stored.getX(),stored.getY(),stored.getZ())); }
@@ -645,7 +656,26 @@ public final class ZoneManager {
         if (mobRegion != null) { Set<UUID> ids = zoneMobsByRegion.get(mobRegion); if (ids != null) ids.remove(entity.getUniqueId()); }
         vanillaDrops.clear(); ZoneType type; try{type=ZoneType.valueOf(raw);}catch(Exception ignored){return;}
         if(killer==null)return; PlayerState state=state(killer); if(!state.operational()){killer.sendMessage(messages.get(killer,"zones.state-loading"));return;}if(type==ZoneType.HAVEN)state.havenKills++;else state.riftKills++;persistPlayer(state);
-        if(isEventActive()){double points=type==ZoneType.HAVEN?config(type).havenScore():config(type).riftScore();Score previous=scores.get(killer.getUniqueId());Score score=new Score(killer.getUniqueId(),killer.getName(),(previous==null?0D:previous.score())+points,previous==null?System.currentTimeMillis():previous.reachedAt());scores.put(killer.getUniqueId(),score);long start=currentEventStart();persist("score:"+start+":"+score.uuid(),()->storage.upsertScore(start,new ZoneStorage.ScoreRow(score.uuid(),score.name(),score.score(),score.reachedAt())));}
+        double points = type == ZoneType.HAVEN ? config(ZoneType.HAVEN).havenScore() : config(ZoneType.HAVEN).riftScore();
+        long scoredAt = eventNow();
+        long cycle = config(ZoneType.HAVEN).eventCycleMillis();
+        long scoreEvent = cycleAnchor + Math.floorDiv(scoredAt - cycleAnchor, cycle) * cycle;
+        long scoreEnd = eventSnapshot != null && scoreEvent == eventSnapshot.start()
+                ? eventSnapshot.end() : scoreEvent + config(ZoneType.HAVEN).eventDurationMillis();
+        if (eventSnapshot != null && scoredAt < scoreEnd && Double.isFinite(points) && points > 0) {
+            UUID operation = entity.getUniqueId();
+            UUID playerId = killer.getUniqueId();
+            String playerName = killer.getName();
+            long start = scoreEvent;
+            ZoneEventStorage.Settings settings = eventSettings();
+            // A distinct key is essential: coalescing per-player snapshots loses uncommitted deltas.
+            persist("score:" + operation, () -> {
+                try { eventStorage.addScore(operation, start, playerId, playerName, points, scoredAt, settings); }
+                catch (ZoneEventStorage.ClosedEventException closed) {
+                    plugin.getLogger().warning(closed.getMessage() + " operation=" + operation + " player=" + playerId);
+                }
+            });
+        }
         List<RolledLoot> rewards=rollLoot(killer,type); if(!rewards.isEmpty())deliverRewards(killer,type,rewards);
     }
     private List<RolledLoot> rollLoot(Player player,ZoneType type){List<LootEntry> pool=loot.getOrDefault(type,List.of());if(pool.isEmpty())return List.of();List<RolledLoot> result=new ArrayList<>();Set<String> rareSeen=new HashSet<>();int guaranteed=(int)Math.floor(amplification(player,type)/100D);double chance=amplification(player,type)/100D-guaranteed;int rolls=1+guaranteed+(chance>0D&&ThreadLocalRandom.current().nextDouble()<chance?1:0);for(int i=0;i<rolls;i++)for(LootEntry entry:pool)if(ThreadLocalRandom.current().nextDouble()*100D<entry.chance()){String key=Base64.getEncoder().encodeToString(ItemStack.serializeItemsAsBytes(new ItemStack[]{entry.item()}));if(entry.chance()<config(type).rareThreshold()&& !rareSeen.add(key))continue;result.add(new RolledLoot(entry.item().clone(),entry.chance()));}return result;}
@@ -705,7 +735,12 @@ public final class ZoneManager {
     public void setDeathCooldown(Player player,ZoneType type){PlayerState state=state(player);if(!state.operational())return;long seconds=config(type).deathCooldownSeconds();state.setCooldown(type,seconds<=0?0:System.currentTimeMillis()+seconds*1000L);persistPlayer(state);}
     public double progressionBoost(Player player,ZoneType type){long kills=state(player).kills(type);double value=0D;for(var e:config(type).milestones().entrySet())if(kills>=e.getKey())value=e.getValue();return value;}
     public double amplification(Player player,ZoneType type){double value=progressionBoost(player,type)+winnerBoost(player);double backpack=backpacks.equippedDropBonusPercent(player);if(backpack>0)value+=backpack;BoosterService service=boosters;if(service!=null)value+=service.contributions(player,me.vertex.core.booster.BoosterCategory.MOB_DROP).stream().filter(c->c.active()&&!"backpack".equals(c.sourceId())&&!"zone".equals(c.sourceId())).mapToDouble(me.vertex.core.booster.BoosterContribution::percent).sum();double cap=config(type).amplificationCap();return cap<=0D?value:Math.min(value,cap);}
-    public double winnerBoost(Player player){return state(player).winnerBoost;}
+    public double winnerBoost(Player player) {
+        ZoneEventStorage.Snapshot snapshot = eventSnapshot;
+        if (snapshot == null || snapshot.winnerCycle() == Long.MIN_VALUE) return state(player).winnerBoost;
+        return snapshot.winners().stream().filter(w -> w.uuid().equals(player.getUniqueId()))
+                .mapToDouble(ZoneEventStorage.Winner::boost).findFirst().orElse(0D);
+    }
 
     // ---- ticket -----------------------------------------------------------
     public ItemStack createTicket(){ZoneConfig c=config(ZoneType.RIFTLANDS);ItemStack item=new ItemStack(c.ticketMaterial());ItemMeta meta=item.getItemMeta();meta.displayName(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(c.ticketName())));meta.lore(c.ticketLore().stream().map(me.vertex.core.lang.SmallCaps::template).map(MessageFormatter::deserialize).toList());if(c.ticketModel()!=null)meta.setCustomModelData(c.ticketModel());if(c.ticketGlow()){meta.addEnchant(Enchantment.UNBREAKING,1,true);meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);}meta.getPersistentDataContainer().set(ticketKey,PersistentDataType.BYTE,(byte)1);item.setItemMeta(meta);trackedItems.ensureInstanceId(item,ItemKind.RIFTLANDS_TICKET);return item;}
@@ -759,9 +794,41 @@ public final class ZoneManager {
             }
         }
     }
-    private void tickSlowFalling(){for(UUID uuid:List.copyOf(slowFalling)){Player player=Bukkit.getPlayer(uuid);if(player==null||player.isOnGround()){if(player!=null)player.removePotionEffect(PotionEffectType.SLOW_FALLING);slowFalling.remove(uuid);}}}
+    public void clearSlowFall(Player player) {
+        if (slowFalling.remove(player.getUniqueId())) player.removePotionEffect(PotionEffectType.SLOW_FALLING);
+    }
+    private void tickSlowFalling(){for(UUID uuid:List.copyOf(slowFalling)){Player player=Bukkit.getPlayer(uuid);if(player==null||player.isOnGround()){if(player!=null)player.removePotionEffect(PotionEffectType.SLOW_FALLING);slowFalling.remove(uuid);}else{player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,100,0,false,false,false));}}}
     private void tickMobs(){for(ZoneType type:ZoneType.values()){Map<String,List<Player>> byRegion=new HashMap<>();for(Player p:Bukkit.getOnlinePlayers()){ZoneRegion r=regionAt(p.getLocation());if(r!=null&&r.type()==type)byRegion.computeIfAbsent(r.id(),ignored->new ArrayList<>()).add(p);}for(ZoneRegion r:regions(type)){List<Player> active=byRegion.getOrDefault(r.id(),List.of());if(active.isEmpty()){despawnZoneMobs(r);continue;}maintainMobs(r,active);despawnFarZoneMobs(r,active,mobDespawnRadii.getOrDefault(type,40D));}}}
-    private void maintainMobs(ZoneRegion region,List<Player> active){if(region==null)return;ZoneConfig c=config(region.type());if(active.isEmpty()||!prepareMobWorld(active.getFirst().getWorld(),c))return;int zoneMobCount=countZoneMobs(region,active.getFirst().getWorld());for(Player player:active){if(!player.isOnGround()||zoneMobCount>=c.maxLocalMobs())continue;int target=ThreadLocalRandom.current().nextInt(10,21);int nearby=(int)player.getWorld().getNearbyEntities(player.getLocation(),10D,10D,10D,entity->isZoneMob(entity)&&region.id().equals(entity.getPersistentDataContainer().get(mobRegionKey,PersistentDataType.STRING))&&entity.getLocation().distanceSquared(player.getLocation())<=100D).size();for(int count=nearby;count<target&&zoneMobCount<c.maxLocalMobs();count++){Location at=randomMobLocation(region,player,c,2D,10D);if(at==null)break;spawnMob(region,at);zoneMobCount++;}}}
+    private void maintainMobs(ZoneRegion region, List<Player> active) {
+        if (region == null || active.isEmpty()) return;
+        ZoneConfig c = config(region.type());
+        if (!prepareMobWorld(active.getFirst().getWorld(), c)) return;
+        int budget = c.maxSpawnsPerPass();
+        for (List<Player> cluster : clusters(active, c.clusterRadius())) {
+            List<Player> grounded = cluster.stream().filter(Player::isOnGround).toList();
+            if (grounded.isEmpty()) continue;
+            Set<UUID> nearby = new HashSet<>();
+            double radius = c.maxSpawnDistance();
+            for (Player player : cluster) {
+                for (Entity entity : player.getWorld().getNearbyEntities(player.getLocation(), radius, radius, radius)) {
+                    if (isZoneMob(entity) && region.id().equals(entity.getPersistentDataContainer().get(mobRegionKey, PersistentDataType.STRING))
+                            && entity.getLocation().distanceSquared(player.getLocation()) <= radius * radius) nearby.add(entity.getUniqueId());
+                }
+            }
+            int deficit = Math.max(0, localMobTarget(c, cluster.size()) - nearby.size());
+            for (int attempted = 0; attempted < deficit && budget > 0; attempted++, budget--) {
+                Player anchor = grounded.get(ThreadLocalRandom.current().nextInt(grounded.size()));
+                Location at = randomMobLocation(region, anchor, c);
+                if (at != null) spawnMob(region, at);
+            }
+            if (budget <= 0) return;
+        }
+    }
+    static int localMobTarget(ZoneConfig config, int players) {
+        if (players <= 0) return 0;
+        return (int) Math.min(config.maxLocalMobs(), (long) config.baseLocalMobs()
+                + (long) config.additionalPerPlayer() * (players - 1L));
+    }
     private int countZoneMobs(ZoneRegion region,World world){int count=0;Set<UUID> ids=zoneMobsByRegion.get(region.id());if(ids==null)return 0;for(UUID id:ids){Entity entity=Bukkit.getEntity(id);if(entity!=null&&entity.isValid()&&entity.getWorld().equals(world)&&region.contains(entity.getLocation()))count++;}return count;}
     private void despawnFarZoneMobs(ZoneRegion region,List<Player> active,double radius){Set<UUID> ids=zoneMobsByRegion.get(region.id());if(ids==null)return;double radiusSquared=radius*radius;for(UUID id:List.copyOf(ids)){Entity entity=Bukkit.getEntity(id);if(!(entity instanceof LivingEntity living)||!isZoneMob(entity)){ids.remove(id);continue;}boolean nearby=active.stream().anyMatch(player->player.getWorld().equals(entity.getWorld())&&player.getLocation().distanceSquared(entity.getLocation())<=radiusSquared);if(!nearby){entity.remove();ids.remove(id);}}}
     private boolean prepareMobWorld(World world,ZoneConfig config){if(world.getDifficulty()!=Difficulty.PEACEFUL){peacefulWorldWarnings.remove(world.getName());return true;}if(!config.forceNormalDifficulty()){if(peacefulWorldWarnings.add(world.getName()))plugin.getLogger().warning("Zone mobs cannot spawn in peaceful world '"+world.getName()+"'. Set mob-spawning.force-normal-difficulty to true or change the world's difficulty.");return false;}world.setDifficulty(Difficulty.NORMAL);peacefulWorldWarnings.remove(world.getName());plugin.getLogger().info("Changed zone world '"+world.getName()+"' from PEACEFUL to NORMAL so configured hostile zone mobs can spawn.");return true;}
@@ -804,14 +871,104 @@ public final class ZoneManager {
     private ItemStack leather(Material material,Color color){ItemStack item=new ItemStack(material);LeatherArmorMeta meta=(LeatherArmorMeta)item.getItemMeta();meta.setColor(color);item.setItemMeta(meta);return item;}
     private <T extends LivingEntity>T spawnTaggedMob(Location at,Class<T> entityClass,ZoneRegion region,MobDefinition definition){return at.getWorld().spawn(at,entityClass,org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM,false,entity->{entity.getPersistentDataContainer().set(zoneMobKey,PersistentDataType.STRING,region.type().name());entity.getPersistentDataContainer().set(mobRegionKey,PersistentDataType.STRING,region.id());entity.getPersistentDataContainer().set(mobDefinitionKey,PersistentDataType.STRING,definition.id);});}
     private void despawnZoneMobs(ZoneRegion region){Set<UUID> ids=zoneMobsByRegion.remove(region.id());if(ids==null)return;for(UUID id:ids){Entity entity=Bukkit.getEntity(id);if(entity!=null&&isZoneMob(entity))entity.remove();}}
-    private void tickEvent(long now){long start=currentEventStart();boolean active=now>=start&&now<start+config(ZoneType.HAVEN).eventDurationMillis();if(active&&loadedScoreEvent!=start)restoreCurrentScores();if(active&&lastAnnouncedEvent!=start){lastAnnouncedEvent=start;broadcastEvent("zones.event-start");}if(!active&&loadedScoreEvent==start&&lastFinishedEvent!=start){finishEvent(start);lastFinishedEvent=start;}if(now-lastBossRefresh>=config(ZoneType.HAVEN).bossRefreshMillis()){lastBossRefresh=now;updateBossBar(active,start,now);}}
-    private long currentEventStart(){long cycle=Math.max(60_000L,config(ZoneType.HAVEN).eventCycleMillis());long now=System.currentTimeMillis();return cycleAnchor+Math.floorDiv(now-cycleAnchor,cycle)*cycle;}
-    private boolean isEventActive(){long now=System.currentTimeMillis(),start=currentEventStart();return now>=start&&now<start+config(ZoneType.HAVEN).eventDurationMillis();}
-    private void restoreCurrentScores(){long start=currentEventStart();scores.clear();try{for(ZoneStorage.ScoreRow row:storage.loadScores(start))scores.put(row.uuid(),new Score(row.uuid(),row.name(),row.score(),row.reachedAt()));loadedScoreEvent=start;}catch(SQLException e){plugin.getLogger().log(Level.WARNING,"Could not restore zone event scores",e);}}
-    private void finishEvent(long start){List<Score> top=topScores();double[] rewards={config(ZoneType.HAVEN).firstBoost(),config(ZoneType.HAVEN).secondBoost(),config(ZoneType.HAVEN).thirdBoost()};for(PlayerState state:players.values()){state.winnerBoost=0D;state.winnerCycle=start;}List<ZoneStorage.WinnerRow> winners=new ArrayList<>();for(int i=0;i<Math.min(3,top.size());i++){Player online=Bukkit.getPlayer(top.get(i).uuid());PlayerState state=online!=null?state(online):state(top.get(i).uuid(),top.get(i).name());state.winnerBoost=rewards[i];state.winnerCycle=start;winners.add(new ZoneStorage.WinnerRow(top.get(i).uuid(),top.get(i).name(),rewards[i]));if(online!=null)online.sendMessage(messages.get(online,"zones.event-winner","place",String.valueOf(i+1),"boost",PERCENT.format(rewards[i])));}persist("winner-boosts",()->storage.replaceWinnerBoosts(start,winners));broadcastEvent("zones.event-end");}
+    private ZoneEventStorage.Settings eventSettings() {
+        ZoneConfig config = config(ZoneType.HAVEN);
+        long cycle = Math.max(60_000L, config.eventCycleMillis());
+        return new ZoneEventStorage.Settings(cycle, Math.min(cycle, config.eventDurationMillis()),
+                eventSettlementMillis, config.firstBoost(), config.secondBoost(), config.thirdBoost());
+    }
+
+    private void tickEvent(long now) {
+        if (now - lastEventRefresh >= eventRefreshMillis) {
+            lastEventRefresh = now;
+            refreshEventAsync();
+        }
+        long start = currentEventStart();
+        boolean active = isEventActive();
+        if (active && lastAnnouncedEvent != start) {
+            lastAnnouncedEvent = start;
+            broadcastEvent("zones.event-start");
+        }
+        if (now - lastBossRefresh >= config(ZoneType.HAVEN).bossRefreshMillis()) {
+            lastBossRefresh = now;
+            updateBossBar(active, start, eventNow());
+        }
+    }
+
+    private void refreshEventAsync() {
+        if (!eventRefreshPending.compareAndSet(false, true)) return;
+        ZoneEventStorage.Settings settings = eventSettings();
+        CompletableFuture<Void> refresh;
+        synchronized (writeLock) {
+            refresh = writeChain.handle((ignored, error) -> null).thenRunAsync(() -> {
+                try {
+                    ZoneEventStorage.Snapshot snapshot = eventStorage.refresh(settings);
+                    long captured = System.nanoTime();
+                    if (plugin.isEnabled()) Bukkit.getScheduler().runTask(plugin, () -> applyEventSnapshot(snapshot, captured, true));
+                } catch (Exception error) {
+                    plugin.getLogger().log(Level.WARNING, "Could not refresh shared zone event; keeping last durable projection", error);
+                } finally { eventRefreshPending.set(false); }
+            });
+            writeChain = refresh;
+            pendingWrites.add(refresh);
+        }
+        refresh.whenComplete((ignored, error) -> pendingWrites.remove(refresh));
+    }
+
+    private void applyEventSnapshot(ZoneEventStorage.Snapshot snapshot, long captured, boolean announce) {
+        eventSnapshotNanos = captured;
+        eventSnapshot = snapshot;
+        cycleAnchor = snapshot.anchor();
+        Map<UUID, Score> refreshedScores = new HashMap<>();
+        for (ZoneStorage.ScoreRow row : snapshot.scores())
+            refreshedScores.put(row.uuid(), new Score(row.uuid(), row.name(), row.score(), row.reachedAt()));
+        scores = Map.copyOf(refreshedScores);
+        if (snapshot.winnerCycle() != Long.MIN_VALUE && snapshot.winnerCycle() != lastFinishedEvent) {
+            lastFinishedEvent = snapshot.winnerCycle();
+            if (announce) {
+                for (ZoneEventStorage.Winner winner : snapshot.winners()) {
+                    Player online = Bukkit.getPlayer(winner.uuid());
+                    if (online != null) online.sendMessage(messages.get(online, "zones.event-winner",
+                            "place", String.valueOf(winner.place()), "boost", PERCENT.format(winner.boost())));
+                }
+                broadcastEvent("zones.event-end");
+            }
+        }
+    }
+
+    private long eventNow() {
+        ZoneEventStorage.Snapshot snapshot = eventSnapshot;
+        return snapshot == null ? System.currentTimeMillis()
+                : snapshot.databaseNow() + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - eventSnapshotNanos);
+    }
+    private long currentEventStart() {
+        ZoneEventStorage.Snapshot snapshot = eventSnapshot;
+        return snapshot == null ? cycleAnchor : snapshot.start();
+    }
+    private boolean isEventActive() {
+        ZoneEventStorage.Snapshot snapshot = eventSnapshot;
+        long now = eventNow();
+        return snapshot != null && now >= snapshot.start() && now < snapshot.end();
+    }
     private void broadcastEvent(String key){AnnouncementPreferenceManager preferences=announcementPreferences;if(preferences!=null){preferences.broadcast(AnnouncementCategory.MINING,key);return;}for(Player player:Bukkit.getOnlinePlayers())player.sendMessage(messages.get(player,key));}
     private List<Score> topScores(){return scores.values().stream().sorted(Comparator.comparingDouble(Score::score).reversed().thenComparingLong(Score::reachedAt).thenComparing(s->s.uuid().toString())).limit(3).toList();}
-    private void updateBossBar(boolean active,long start,long now){if(!active){for(Player p:Bukkit.getOnlinePlayers())eventBar.removePlayer(p);return;}List<Score> top=topScores();String text="Mob Kill Event | "+formatDuration(start+config(ZoneType.HAVEN).eventDurationMillis()-now);for(int i=0;i<3;i++)text+=" | #"+(i+1)+" "+(i<top.size()?top.get(i).name()+": "+PERCENT.format(top.get(i).score()):"-");eventBar.setTitle(text);eventBar.setProgress(Math.max(0D,Math.min(1D,(start+config(ZoneType.HAVEN).eventDurationMillis()-now)/(double)config(ZoneType.HAVEN).eventDurationMillis())));for(Player p:Bukkit.getOnlinePlayers()){if(isIn(p,ZoneType.HAVEN)||isIn(p,ZoneType.RIFTLANDS))eventBar.addPlayer(p);else eventBar.removePlayer(p);}}
+    private void updateBossBar(boolean active, long start, long now) {
+        if (!active || eventSnapshot == null) {
+            for (Player player : Bukkit.getOnlinePlayers()) eventBar.removePlayer(player);
+            return;
+        }
+        long end = eventSnapshot.end();
+        List<Score> top = topScores();
+        String text = "Mob Kill Event | " + formatDuration(end - now);
+        for (int i = 0; i < 3; i++) text += " | #" + (i + 1) + " "
+                + (i < top.size() ? top.get(i).name() + ": " + PERCENT.format(top.get(i).score()) : "-");
+        eventBar.setTitle(text);
+        eventBar.setProgress(Math.max(0D, Math.min(1D, (end - now) / (double) Math.max(1L, end - start))));
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (isIn(player, ZoneType.HAVEN) || isIn(player, ZoneType.RIFTLANDS)) eventBar.addPlayer(player);
+            else eventBar.removePlayer(player);
+        }
+    }
 
     // ---- persistence/config/inspection ----------------------------------
     public PlayerState state(Player player){return state(player.getUniqueId(),player.getName());}
@@ -927,13 +1084,25 @@ public final class ZoneManager {
     public boolean eventActive() { return isEventActive(); }
     public double eventScore(Player player) { Score score = scores.get(player.getUniqueId()); return score == null ? 0D : score.score(); }
     public int eventRank(Player player) { List<Score> ordered = scores.values().stream().sorted(Comparator.comparingDouble(Score::score).reversed().thenComparingLong(Score::reachedAt).thenComparing(s -> s.uuid().toString())).toList(); for (int i=0;i<ordered.size();i++) if (ordered.get(i).uuid().equals(player.getUniqueId())) return i+1; return 0; }
-    public long eventRemainingSeconds(){long now=System.currentTimeMillis(),start=currentEventStart();return isEventActive()?Math.max(0,(start+config(ZoneType.HAVEN).eventDurationMillis()-now+999)/1000):(start+config(ZoneType.HAVEN).eventCycleMillis()-now+999)/1000;}
+    public long eventRemainingSeconds() {
+        long end = isEventActive() ? eventSnapshot.end() : currentEventStart() + config(ZoneType.HAVEN).eventCycleMillis();
+        return Math.max(0L, (end - eventNow() + 999) / 1000);
+    }
     public String currentZone(Player player){ZoneRegion r=regionAt(player.getLocation());return r==null?"None":r.type().displayName();}
     public long kills(Player player,ZoneType type){return state(player).kills(type);}
     public long nextMilestone(Player player,ZoneType type){long kills=kills(player,type);return config(type).milestones().keySet().stream().filter(value->value>kills).findFirst().orElse(0L);}
     public long cooldownRemaining(Player player,ZoneType type){return Math.max(0,(state(player).cooldown(type)-System.currentTimeMillis()+999)/1000);}
-    public void forceStartEvent() { cycleAnchor = System.currentTimeMillis(); scores.clear(); loadedScoreEvent = cycleAnchor; lastFinishedEvent = Long.MIN_VALUE; long snapshot=cycleAnchor;persist("cycle-anchor",() -> storage.saveLong("cycle_anchor", snapshot)); }
-    public void forceStopEvent() { cycleAnchor = System.currentTimeMillis() - config(ZoneType.HAVEN).eventDurationMillis(); long snapshot=cycleAnchor;persist("cycle-anchor",() -> storage.saveLong("cycle_anchor", snapshot)); updateBossBar(false, currentEventStart(), System.currentTimeMillis()); }
+    public void forceStartEvent() {
+        long requested = eventNow();
+        ZoneEventStorage.Settings settings = eventSettings();
+        persist("event-start:" + requested, () -> eventStorage.start(requested, settings));
+        refreshEventAsync();
+    }
+    public void forceStopEvent() {
+        long start = currentEventStart(), stoppedAt = eventNow();
+        persist("event-stop:" + start, () -> eventStorage.stop(start, stoppedAt));
+        refreshEventAsync();
+    }
 
     private ZoneConfig readConfig(ZoneType type){String name=type.configKey()+".yml";File file=new File(plugin.getDataFolder(),name);if(!file.exists())plugin.saveResource(name,false);YamlConfiguration yaml=YamlConfiguration.loadConfiguration(file);return ZoneConfig.read(type,yaml,plugin);}
     private Optional<ZoneRoute> decodeRoute(ZoneStorage.RouteRow row){try{List<ZoneRoute.Waypoint> points=new ArrayList<>();for(String raw:row.waypoints().split(";")){if(raw.isBlank())continue;String[] p=raw.split("\\|",-1);if(p.length!=6)return Optional.empty();points.add(new ZoneRoute.Waypoint(new String(Base64.getUrlDecoder().decode(p[0]),StandardCharsets.UTF_8),Double.parseDouble(p[1]),Double.parseDouble(p[2]),Double.parseDouble(p[3]),Float.parseFloat(p[4]),Float.parseFloat(p[5])));}return points.isEmpty()?Optional.empty():Optional.of(new ZoneRoute(row.id(),row.regionId(),row.enabled(),row.speed(),row.autoDrop(),points));}catch(Exception e){return Optional.empty();}}
@@ -983,7 +1152,13 @@ public final class ZoneManager {
             ticketCandidates = Math.max(1, ticketCandidates); ticketBorder = Math.max(0, ticketBorder); ticketRouteAvoid = Math.max(0, ticketRouteAvoid);
         }
         static ZoneConfig defaults(ZoneType type){int base=type==ZoneType.HAVEN?60:72,additional=type==ZoneType.HAVEN?32:40,max=400;return new ZoneConfig(5,type==ZoneType.HAVEN?10:20,120,0.8,5,30,base,additional,max,12,2.5,80,true,120*60_000L,5*60_000L,2_000L,1D,1.5D,5D,3D,1D,20D,5D,0D,new LinkedHashMap<>(),List.of(),Material.EMERALD_BLOCK,null,"<green>Enter "+type.displayName(),List.of("<gray>Confirm entry"),"<dark_gray>Enter "+type.displayName(),27,Material.PAPER,null,"<aqua>Riftlands Ticket",List.of("<gray>Use while in Riftlands combat."),true,.75D,true,40,8,50);}
-        static ZoneConfig read(ZoneType type,YamlConfiguration y,Plugin plugin){ZoneConfig d=defaults(type);ConfigurationSection mobRoot=y.getConfigurationSection("mobs");List<MobDefinition> mobs=new ArrayList<>();if(mobRoot!=null)for(String id:mobRoot.getKeys(false)){ConfigurationSection section=mobRoot.getConfigurationSection(id);if(section!=null)MobDefinition.read(id,section,plugin).ifPresent(mobs::add);}Map<Long,Double> milestones=new LinkedHashMap<>();ConfigurationSection progression=y.getConfigurationSection("progression.milestones");if(progression!=null)for(String key:progression.getKeys(false))try{milestones.put(Long.parseLong(key),Math.max(0D,progression.getDouble(key)));}catch(NumberFormatException ignored){plugin.getLogger().warning(type.configKey()+".yml: invalid milestone '"+key+"'.");}if(milestones.isEmpty())milestones.putAll(d.milestones);Material entry=material(y.getString("entry-gui.confirm-item.material"),d.entryMaterial,plugin,type);Material ticket=material(y.getString("riftlands-ticket.item.material"),d.ticketMaterial,plugin,type);return new ZoneConfig(Math.max(1,y.getInt("entry.countdown-seconds",d.countdownSeconds)),Math.max(1,y.getInt("exit.spawn-channel-seconds",d.exitSeconds)),Math.max(0,y.getLong("reentry-cooldown.on-death-seconds",d.deathCooldownSeconds)),Math.max(.05D,y.getDouble("routes.speed",d.routeSpeed)),Math.max(1,y.getInt("mob-spawning.min-spawn-distance",d.minSpawnDistance)),Math.max(2,y.getInt("mob-spawning.max-spawn-distance",d.maxSpawnDistance)),Math.max(0,y.getInt("mob-spawning.base-local-mobs",d.baseLocalMobs)),Math.max(0,y.getInt("mob-spawning.additional-mobs-per-player",d.additionalPerPlayer)),Math.max(1,y.getInt("mob-spawning.max-local-mobs",d.maxLocalMobs)),Math.max(1,y.getInt("mob-spawning.max-spawns-per-pass",d.maxSpawnsPerPass)),Math.max(1D,Math.min(8D,y.getDouble("mob-spawning.distance-bias",d.spawnDistanceBias))),Math.max(4D,y.getDouble("mob-spawning.cluster-radius",d.clusterRadius)),y.getBoolean("mob-spawning.force-normal-difficulty",d.forceNormalDifficulty),Math.max(60_000L,y.getLong("kill-event.cycle-minutes",120)*60_000L),Math.max(10_000L,y.getLong("kill-event.duration-minutes",5)*60_000L),Math.max(1_000L,y.getLong("kill-event.bossbar.refresh-seconds",2)*1_000L),y.getDouble("kill-event.scoring.haven",d.havenScore),y.getDouble("kill-event.scoring.riftlands",d.riftScore),y.getDouble("kill-event.rewards.first",d.firstBoost),y.getDouble("kill-event.rewards.second",d.secondBoost),y.getDouble("kill-event.rewards.third",d.thirdBoost),clamp(y.getDouble("loot-pool.default-item-chance",d.defaultLootChance),0,100),clamp(y.getDouble("loot-pool.rare-multi-drop-threshold-percent",d.rareThreshold),0,100),Math.max(0D,y.getDouble("loot-pool.amplification-cap-percent",d.amplificationCap)),Map.copyOf(milestones),List.copyOf(mobs),entry,y.contains("entry-gui.confirm-item.custom-model-data")?y.getInt("entry-gui.confirm-item.custom-model-data"):null,y.getString("entry-gui.confirm-item.name",d.entryName),y.getStringList("entry-gui.confirm-item.lore").isEmpty()?d.entryLore:y.getStringList("entry-gui.confirm-item.lore"),y.getString("entry-gui.title",d.entryTitle),validSize(y.getInt("entry-gui.size",d.entrySize)),ticket,y.contains("riftlands-ticket.item.custom-model-data")?y.getInt("riftlands-ticket.item.custom-model-data"):null,y.getString("riftlands-ticket.item.name",d.ticketName),y.getStringList("riftlands-ticket.item.lore").isEmpty()?d.ticketLore:y.getStringList("riftlands-ticket.item.lore"),y.getBoolean("riftlands-ticket.item.glow",d.ticketGlow),clamp(y.getDouble("riftlands-ticket.default-loot-chance",d.ticketChance),0,100),y.getBoolean("riftlands-ticket.include-in-default-loot",d.ticketInLoot),Math.max(1,y.getInt("riftlands-ticket.teleport.candidates",d.ticketCandidates)),Math.max(0,y.getInt("riftlands-ticket.teleport.border-distance",d.ticketBorder)),Math.max(0,y.getInt("riftlands-ticket.teleport.entry-route-avoid-radius",d.ticketRouteAvoid)));}
+        static ZoneConfig read(ZoneType type,YamlConfiguration y,Plugin plugin){ZoneConfig d=defaults(type);ConfigurationSection mobRoot=y.getConfigurationSection("mobs");List<MobDefinition> mobs=new ArrayList<>();if(mobRoot!=null)for(String id:mobRoot.getKeys(false)){ConfigurationSection section=mobRoot.getConfigurationSection(id);if(section!=null)MobDefinition.read(id,section,plugin).ifPresent(mobs::add);}Map<Long,Double> milestones=new LinkedHashMap<>();ConfigurationSection progression=y.getConfigurationSection("progression.milestones");if(progression!=null)for(String key:progression.getKeys(false))try{milestones.put(Long.parseLong(key),Math.max(0D,progression.getDouble(key)));}catch(NumberFormatException ignored){plugin.getLogger().warning(type.configKey()+".yml: invalid milestone '"+key+"'.");}if(milestones.isEmpty())milestones.putAll(d.milestones);Material entry=material(y.getString("entry-gui.confirm-item.material"),d.entryMaterial,plugin,type);Material ticket=material(y.getString("riftlands-ticket.item.material"),d.ticketMaterial,plugin,type);return new ZoneConfig(Math.max(1,y.getInt("entry.countdown-seconds",d.countdownSeconds)),Math.max(1,y.getInt("exit.spawn-channel-seconds",d.exitSeconds)),Math.max(0,y.getLong("reentry-cooldown.on-death-seconds",d.deathCooldownSeconds)),Math.max(.05D,y.getDouble("routes.speed",d.routeSpeed)),Math.max(1,y.getInt("mob-spawning.min-spawn-distance",d.minSpawnDistance)),Math.max(2,y.getInt("mob-spawning.max-spawn-distance",d.maxSpawnDistance)),Math.max(0,y.getInt("mob-spawning.base-local-mobs",d.baseLocalMobs)),Math.max(0,y.getInt("mob-spawning.additional-mobs-per-player",d.additionalPerPlayer)),Math.max(1,y.getInt("mob-spawning.max-local-mobs",d.maxLocalMobs)),Math.max(1,y.getInt("mob-spawning.max-spawns-per-pass",d.maxSpawnsPerPass)),Math.max(1D,Math.min(8D,y.getDouble("mob-spawning.distance-bias",d.spawnDistanceBias))),Math.max(4D,y.getDouble("mob-spawning.cluster-radius",d.clusterRadius)),y.getBoolean("mob-spawning.force-normal-difficulty",d.forceNormalDifficulty),Math.max(60_000L,y.getLong("kill-event.cycle-minutes",120)*60_000L),Math.max(10_000L,y.getLong("kill-event.duration-minutes",5)*60_000L),Math.max(1_000L,y.getLong("kill-event.bossbar.refresh-seconds",2)*1_000L),eventNumber(y,"kill-event.scoring.haven",d.havenScore,plugin),eventNumber(y,"kill-event.scoring.riftlands",d.riftScore,plugin),eventNumber(y,"kill-event.rewards.first",d.firstBoost,plugin),eventNumber(y,"kill-event.rewards.second",d.secondBoost,plugin),eventNumber(y,"kill-event.rewards.third",d.thirdBoost,plugin),clamp(y.getDouble("loot-pool.default-item-chance",d.defaultLootChance),0,100),clamp(y.getDouble("loot-pool.rare-multi-drop-threshold-percent",d.rareThreshold),0,100),Math.max(0D,y.getDouble("loot-pool.amplification-cap-percent",d.amplificationCap)),Map.copyOf(milestones),List.copyOf(mobs),entry,y.contains("entry-gui.confirm-item.custom-model-data")?y.getInt("entry-gui.confirm-item.custom-model-data"):null,y.getString("entry-gui.confirm-item.name",d.entryName),y.getStringList("entry-gui.confirm-item.lore").isEmpty()?d.entryLore:y.getStringList("entry-gui.confirm-item.lore"),y.getString("entry-gui.title",d.entryTitle),validSize(y.getInt("entry-gui.size",d.entrySize)),ticket,y.contains("riftlands-ticket.item.custom-model-data")?y.getInt("riftlands-ticket.item.custom-model-data"):null,y.getString("riftlands-ticket.item.name",d.ticketName),y.getStringList("riftlands-ticket.item.lore").isEmpty()?d.ticketLore:y.getStringList("riftlands-ticket.item.lore"),y.getBoolean("riftlands-ticket.item.glow",d.ticketGlow),clamp(y.getDouble("riftlands-ticket.default-loot-chance",d.ticketChance),0,100),y.getBoolean("riftlands-ticket.include-in-default-loot",d.ticketInLoot),Math.max(1,y.getInt("riftlands-ticket.teleport.candidates",d.ticketCandidates)),Math.max(0,y.getInt("riftlands-ticket.teleport.border-distance",d.ticketBorder)),Math.max(0,y.getInt("riftlands-ticket.teleport.entry-route-avoid-radius",d.ticketRouteAvoid)));}
+        private static double eventNumber(YamlConfiguration config, String key, double fallback, Plugin plugin) {
+            double value = config.getDouble(key, fallback);
+            if (Double.isFinite(value) && value >= 0) return value;
+            plugin.getLogger().warning("Zone config " + key + " must be finite and nonnegative; using " + fallback);
+            return fallback;
+        }
         private static Material material(String raw,Material fallback,Plugin plugin,ZoneType type){Material m=raw==null?null:Material.matchMaterial(raw);if(m==null||m.isAir()){if(raw!=null&&!raw.isBlank())plugin.getLogger().warning(type.configKey()+".yml has invalid material '"+raw+"'; using "+fallback);return fallback;}return m;}private static int validSize(int i){return i>=9&&i<=54&&i%9==0?i:27;}private static double clamp(double n,double min,double max){return Math.max(min,Math.min(max,n));}
     }
     public static final class MobDefinition { final String id;final EntityType type;final boolean enabled;final double weight,minHealth,maxHealth;final List<MobProfile> profiles;MobDefinition(String id,EntityType type,boolean enabled,double weight,double minHealth,double maxHealth,List<MobProfile> profiles){this.id=id;this.type=type;this.enabled=enabled;this.weight=Math.max(0D,weight);this.minHealth=Math.max(1D,minHealth);this.maxHealth=Math.max(this.minHealth,maxHealth);this.profiles=profiles.isEmpty()?List.of(new MobProfile(id,2D)):List.copyOf(profiles);}static Optional<MobDefinition> read(String id,ConfigurationSection s,Plugin p){try{EntityType type=EntityType.valueOf(s.getString("type","ZOMBIE").toUpperCase(Locale.ROOT));if(!type.isAlive()){p.getLogger().warning("Zone mob "+id+" is not living.");return Optional.empty();}List<String> names=s.getStringList("names");List<MobProfile> profiles=new ArrayList<>();ConfigurationSection profile=s.getConfigurationSection("profiles");if(names.isEmpty()&&profile!=null)names.addAll(profile.getKeys(false));if(names.isEmpty())names.add(id);for(String name:names)profiles.add(new MobProfile(name,profile==null?s.getDouble("damage",2D):profile.getDouble(name+".damage",s.getDouble("damage",2D))));return Optional.of(new MobDefinition(id,type,s.getBoolean("enabled",true),s.getDouble("spawn-weight",1D),s.getDouble("health.min",20D),s.getDouble("health.max",20D),profiles));}catch(IllegalArgumentException e){p.getLogger().warning("Zone mob "+id+" has invalid entity type.");return Optional.empty();}}

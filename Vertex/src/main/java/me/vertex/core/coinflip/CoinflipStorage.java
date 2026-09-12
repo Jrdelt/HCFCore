@@ -523,6 +523,11 @@ public final class CoinflipStorage {
                     return false;
                 }
 
+                if (coinflip.type() == CoinflipType.GC) {
+                    me.vertex.core.gc.GcStorage.debitForSettlement(connection, opponentUuid,
+                            me.vertex.core.gc.GcAction.COINFLIP_WAGER, (long) coinflip.amount(),
+                            "coinflip:join:" + coinflip.id(), resolvedAt);
+                }
                 log.setString(1, coinflip.hostUuid().toString());
                 setNullableUuid(log, 2, opponentUuid);
                 log.setString(3, coinflip.type().name());

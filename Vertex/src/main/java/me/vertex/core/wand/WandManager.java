@@ -167,10 +167,12 @@ public final class WandManager {
         if (!item.hasItemMeta()) {
             return true;
         }
-        ItemMeta meta = item.getItemMeta();
-        return !meta.hasDisplayName() && !meta.hasLore() && !meta.hasEnchants()
-                && !meta.hasCustomModelData() && !meta.hasAttributeModifiers()
-                && hasNoCustomData(meta);
+        ItemStack comparable = item.clone();
+        ItemMeta meta = comparable.getItemMeta();
+        if (!hasNoCustomData(meta)) return false;
+        harmlessMarkers.forEach(meta.getPersistentDataContainer()::remove);
+        comparable.setItemMeta(meta);
+        return me.vertex.core.shop.ShopManager.isPlainStack(comparable);
     }
 
     /**

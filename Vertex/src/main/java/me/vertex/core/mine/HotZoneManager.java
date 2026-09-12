@@ -59,6 +59,7 @@ public final class HotZoneManager {
     private volatile String lastMineId;
     private volatile long nextStartAt;
     private volatile boolean preAnnounced;
+    private volatile String scheduledMineId;
 
     private BukkitTask task;
     private final Object writeLock = new Object();
@@ -78,6 +79,7 @@ public final class HotZoneManager {
     }
 
     public void load() {
+        if (preAnnounced && activeMineId == null && scheduledMineId != null) broadcast("mines.hotzone-schedule-reset");
         File file = new File(plugin.getDataFolder(), "mines.yml");
         if (!file.exists()) {
             plugin.saveResource("mines.yml", false);
@@ -183,6 +185,7 @@ public final class HotZoneManager {
         long minutes = minimumMinutes + (span <= 0 ? 0 : ThreadLocalRandom.current().nextLong(span + 1));
         nextStartAt = System.currentTimeMillis() + minutes * 60_000L;
         preAnnounced = false;
+        scheduledMineId = null;
     }
 
     private void restart() {
@@ -229,18 +232,26 @@ public final class HotZoneManager {
     }
 
     private String peekNextMine() {
+        if (scheduledMineId != null) return scheduledMineId;
         List<String> options = candidates();
-        return options.isEmpty() ? null : options.get(0);
+        scheduledMineId = options.isEmpty() ? null : options.get(ThreadLocalRandom.current().nextInt(options.size()));
+        return scheduledMineId;
     }
 
     private void start() {
         List<String> options = candidates();
         if (options.isEmpty()) {
             // Nothing placed yet -- try again later rather than every tick.
+            if (preAnnounced) broadcast("mines.hotzone-schedule-reset");
             scheduleNext();
             return;
         }
-        String chosen = options.get(ThreadLocalRandom.current().nextInt(options.size()));
+        String chosen = peekNextMine();
+        if (!options.contains(chosen)) {
+            if (preAnnounced) broadcast("mines.hotzone-schedule-reset");
+            scheduleNext();
+            return;
+        }
         long now = System.currentTimeMillis();
         activeMineId = chosen;
         activeEndsAt = now + durationMinutes * 60_000L;

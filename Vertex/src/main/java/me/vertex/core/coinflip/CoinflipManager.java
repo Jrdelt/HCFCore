@@ -652,11 +652,7 @@ public final class CoinflipManager {
             if (!EconomyHook.isAvailable() || !EconomyHook.getEconomy().has(opponent, coinflip.amount())) {
                 return PlayOutcome.failure(PlayResult.CANNOT_AFFORD);
             }
-        } else if (coinflip.type() == CoinflipType.GC) {
-            if (!gc.has(opponent.getUniqueId(), (long) coinflip.amount())) {
-                return PlayOutcome.failure(PlayResult.CANNOT_AFFORD);
-            }
-        } else if (opponent.getLevel() < coinflip.amount()) {
+        } else if (coinflip.type() != CoinflipType.GC && opponent.getLevel() < coinflip.amount()) {
             return PlayOutcome.failure(PlayResult.CANNOT_AFFORD);
         }
 
@@ -673,14 +669,7 @@ public final class CoinflipManager {
                 browserChanged();
                 return PlayOutcome.failure(PlayResult.CANNOT_AFFORD);
             }
-        } else if (coinflip.type() == CoinflipType.GC) {
-            if (!gc.tryDebit(opponent.getUniqueId(), opponent.getUniqueId(), GcAction.COINFLIP_WAGER,
-                    (long) coinflip.amount(), null)) {
-                activeCoinflips.put(coinflipId, coinflip);
-                browserChanged();
-                return PlayOutcome.failure(PlayResult.CANNOT_AFFORD);
-            }
-        } else {
+        } else if (coinflip.type() != CoinflipType.GC) {
             opponent.setLevel(opponent.getLevel() - (int) coinflip.amount());
         }
 
@@ -696,10 +685,7 @@ public final class CoinflipManager {
         if (!persistResolution(coinflip, opponent.getUniqueId(), winnerUuid, resolvedAt, null, payout, null)) {
             if (coinflip.type() == CoinflipType.MONEY) {
                 EconomyHook.getEconomy().depositPlayer(opponent, coinflip.amount());
-            } else if (coinflip.type() == CoinflipType.GC) {
-                gc.credit(opponent.getUniqueId(), opponent.getUniqueId(), GcAction.COINFLIP_REFUND,
-                        (long) coinflip.amount(), null);
-            } else {
+            } else if (coinflip.type() != CoinflipType.GC) {
                 opponent.setLevel(opponent.getLevel() + (int) coinflip.amount());
             }
             activeCoinflips.put(coinflipId, coinflip);
@@ -710,6 +696,7 @@ public final class CoinflipManager {
         processPendingPayouts(winnerUuid);
 
         if (coinflip.type() == CoinflipType.GC) {
+            gc.refreshBalance(opponent.getUniqueId());
             me.vertex.core.audit.LargeTransactionAudit.record(plugin, (long) coinflip.amount(),
                     "COINFLIP_GC", Bukkit.getOfflinePlayer(coinflip.hostUuid()), opponent);
         }
@@ -907,6 +894,9 @@ public final class CoinflipManager {
         try {
             return storage.resolveCoinflip(coinflip, opponentUuid, winnerUuid, summarize(coinflip), resolvedAt,
                     payoutItems, payoutAmount, pendingMatchId);
+        } catch (me.vertex.core.gc.GcStorage.BalanceRejectedException insufficient) {
+            if (gcManager != null) gcManager.refreshBalance(opponentUuid);
+            return false;
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE,
                     "Failed to persist resolved Coinflip " + coinflip.id() + " -- nobody was paid.", e);

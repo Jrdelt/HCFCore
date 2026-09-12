@@ -137,6 +137,8 @@ public final class StorageMigrator {
                 "currency", "decision", "actor_uuid", "actor_name", "resolved_at"));
         TABLES.put("announcement_preferences", List.of("uuid", "category", "enabled"));
         TABLES.put("trade_escrow", List.of("session_id", "owner_uuid", "items", "money", "experience"));
+        TABLES.put("trade_owners", List.of("shard_id", "boot_id", "expires_at"));
+        TABLES.put("trade_sessions", List.of("session_id", "owner_shard", "boot_id", "state"));
         TABLES.put("trade_claims", List.of("id", "owner_uuid", "item", "state", "reservation_token",
                 "reserved_at"));
         TABLES.put("trade_pending_exp", List.of("uuid", "levels"));
@@ -180,6 +182,10 @@ public final class StorageMigrator {
         TABLES.put("zone_event_scores", List.of("event_start", "player_uuid", "player_name", "score",
                 "reached_at"));
         TABLES.put("zone_event_state", List.of("state_key", "value"));
+        TABLES.put("zone_event_runs", List.of("event_start", "ends_at", "settlement_delay", "finalized_at",
+                "first_boost", "second_boost", "third_boost"));
+        TABLES.put("zone_event_score_ops", List.of("operation_id", "event_start", "player_uuid", "points", "scored_at"));
+        TABLES.put("zone_event_winners", List.of("event_start", "player_uuid", "player_name", "place", "boost"));
         TABLES.put("zone_flight_returns", List.of("player_uuid", "zone_region", "world", "x", "y", "z"));
         TABLES.put("entry_portals", List.of("id", "target", "world", "min_x", "min_y", "min_z", "max_x",
                 "max_y", "max_z"));

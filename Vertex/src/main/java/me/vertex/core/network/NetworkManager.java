@@ -135,9 +135,13 @@ public final class NetworkManager implements Listener {
     }
 
     public void reloadConfig(Database.Dialect dialect) {
-        enabled = plugin.getConfig().getBoolean("network.enabled", false);
-        shardId = normalize(plugin.getConfig().getString("network.shard-id", "standalone"));
-        if (shardId.isBlank()) shardId = "standalone";
+        NetworkDeployment deployment = NetworkDeployment.read(plugin.getConfig());
+        if (deployment.dialect() != dialect) throw new IllegalArgumentException("Configured storage does not match the open database");
+        if (shardId != null && (enabled != deployment.enabled() || !shardId.equals(deployment.shardId()))) {
+            throw new IllegalArgumentException("Network deployment identity can only change at startup");
+        }
+        enabled = deployment.enabled();
+        shardId = deployment.shardId();
         role = normalize(plugin.getConfig().getString("network.role", "base"));
         spawnShard = normalize(plugin.getConfig().getString("network.spawn-shard", "spawn"));
         hubShard = normalize(plugin.getConfig().getString("network.hub-shard", "hub"));
@@ -146,10 +150,6 @@ public final class NetworkManager implements Listener {
         queueTimeoutMillis = seconds("network.queue-timeout-seconds", 300L, 5L) * 1_000L;
         transferAlertMillis = seconds("network.transfer-alert-seconds", 30L, 5L) * 1_000L;
         transferAlertRepeatMillis = seconds("network.transfer-alert-repeat-seconds", 60L, 5L) * 1_000L;
-        if (enabled && dialect != Database.Dialect.MYSQL) {
-            enabled = false;
-            plugin.getLogger().severe("network.enabled requires storage.type: mysql; continuing in safe standalone mode.");
-        }
     }
 
     public boolean enabled() { return enabled; }

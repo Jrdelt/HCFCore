@@ -9,6 +9,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -16,7 +18,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.block.Container;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -41,15 +42,23 @@ public final class TradeListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         if (event.getView().getTopInventory().getHolder() instanceof TradeMenu.Holder holder) {
             TradeSession session = manager.session(player.getUniqueId());
-            if (session == null || !session.id.equals(holder.sessionId())) { event.setCancelled(true); return; }
+            if (!manager.canEditEscrow() || session == null || !session.id.equals(holder.sessionId()) || session.finishing) { event.setCancelled(true); return; }
+            // These actions can modify other slots even when the clicked slot
+            // is in the player's bottom inventory.
+            if (event.getAction() == InventoryAction.COLLECT_TO_CURSOR
+                    || event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY
+                    || event.getAction() == InventoryAction.UNKNOWN) { event.setCancelled(true); return; }
             boolean top = event.getRawSlot() >= 0 && event.getRawSlot() < TradeMenu.SIZE;
             if (!top) { if (event.isShiftClick() || event.getAction().name().contains("DROP")) event.setCancelled(true); return; }
             int slot = event.getRawSlot();
             ItemStack offered = event.getCurrentItem();
-            if (event.isRightClick() && TradeMenu.isTradeSlot(slot) && isPeekable(offered)) { event.setCancelled(true); openPeek(player, session, offered); return; }
+            if (event.getClick() == ClickType.RIGHT && TradeMenu.isTradeSlot(slot) && isPeekable(offered)) { event.setCancelled(true); openPeek(player, session, offered); return; }
             if (slot == (session.isRequester(player.getUniqueId()) ? TradeMenu.REQUESTER_LOCK : TradeMenu.TARGET_LOCK)) { event.setCancelled(true); lockOrComplete(player, session); return; }
             if (!TradeMenu.ownTradeSlot(session, player.getUniqueId(), slot) || session.finishing || session.locked(player.getUniqueId()) || event.isShiftClick() || event.getAction().name().contains("DROP")) { event.setCancelled(true); return; }
-            ItemStack cursor = event.getCursor(); if (cursor != null && !cursor.isEmpty() && !manager.canTradeItem(player, cursor)) { event.setCancelled(true); player.sendMessage(messages.get(player, "trade.item-blocked")); return; }
+            ItemStack incoming = event.getClick() == ClickType.SWAP_OFFHAND
+                    ? player.getInventory().getItemInOffHand()
+                    : event.getHotbarButton() >= 0 ? player.getInventory().getItem(event.getHotbarButton()) : event.getCursor();
+            if (incoming != null && !incoming.isEmpty() && !manager.canTradeItem(player, incoming)) { event.setCancelled(true); player.sendMessage(messages.get(player, "trade.item-blocked")); return; }
             Bukkit.getScheduler().runTask(plugin, () -> manager.touch(session));
             return;
         }
@@ -57,16 +66,26 @@ public final class TradeListener implements Listener {
     }
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onDrag(InventoryDragEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player) || !(event.getView().getTopInventory().getHolder() instanceof TradeMenu.Holder)) return;
-        TradeSession session = manager.session(player.getUniqueId()); if (session == null || session.finishing) { event.setCancelled(true); return; }
+        if (event.getView().getTopInventory().getHolder() instanceof TradeMenu.PeekHolder) { event.setCancelled(true); return; }
+        if (!(event.getWhoClicked() instanceof Player player) || !(event.getView().getTopInventory().getHolder() instanceof TradeMenu.Holder holder)) return;
+        TradeSession session = manager.session(player.getUniqueId()); if (!manager.canEditEscrow() || session == null || !session.id.equals(holder.sessionId()) || session.finishing) { event.setCancelled(true); return; }
         for (int raw : event.getRawSlots()) if (raw < TradeMenu.SIZE && (!TradeMenu.ownTradeSlot(session, player.getUniqueId(), raw) || session.locked(player.getUniqueId()))) { event.setCancelled(true); return; }
-        if (event.getCursor() != null && !event.getCursor().isEmpty() && !manager.canTradeItem(player, event.getCursor())) { event.setCancelled(true); player.sendMessage(messages.get(player, "trade.item-blocked")); return; }
+        if (!event.getOldCursor().isEmpty() && !manager.canTradeItem(player, event.getOldCursor())) { event.setCancelled(true); player.sendMessage(messages.get(player, "trade.item-blocked")); return; }
         Bukkit.getScheduler().runTask(plugin, () -> manager.touch(session));
     }
     @EventHandler public void onClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player player)) return;
-        if (event.getInventory().getHolder() instanceof TradeMenu.Holder) { if (!manager.isProgrammaticClose(player.getUniqueId())) manager.cancel(manager.session(player.getUniqueId()), "trade-cancelled"); return; }
-        if (event.getInventory().getHolder() instanceof TradeMenu.PeekHolder holder && activePeeks.remove(player.getUniqueId(), holder.sessionId())) { TradeSession session = manager.session(player.getUniqueId()); if (session != null && player.isOnline()) Bukkit.getScheduler().runTask(plugin, () -> player.openInventory(session.inventory)); }
+        if (event.getInventory().getHolder() instanceof TradeMenu.Holder holder) {
+            boolean preview = holder.sessionId().equals(activePeeks.get(player.getUniqueId()));
+            if (!manager.isProgrammaticClose(player.getUniqueId()) && !preview) manager.cancel(manager.session(player.getUniqueId()), "trade-cancelled");
+            return;
+        }
+        if (event.getInventory().getHolder() instanceof TradeMenu.PeekHolder holder && activePeeks.remove(player.getUniqueId(), holder.sessionId())) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                TradeSession session = manager.session(player.getUniqueId());
+                if (session != null && session.id.equals(holder.sessionId()) && !session.finishing && player.isOnline()) player.openInventory(session.inventory);
+            });
+        }
     }
     private void lockOrComplete(Player player, TradeSession session) {
         boolean finalAccept = session.bothLocked();
@@ -78,6 +97,14 @@ public final class TradeListener implements Listener {
         BlockStateMeta meta = (BlockStateMeta) item.getItemMeta(); if (!(meta.getBlockState() instanceof Container container)) return;
         ItemStack[] contents = container.getInventory().getContents(); int size = contents.length <= 27 ? 27 : 54;
         Inventory view = Bukkit.createInventory(new TradeMenu.PeekHolder(session.id), size, messages.getGui(player, "trade.peek-title"));
-        for (int i=0;i<Math.min(contents.length,size);i++) if(contents[i]!=null) view.setItem(i,contents[i].clone()); activePeeks.put(player.getUniqueId(), session.id); player.openInventory(view);
+        for (int i=0;i<Math.min(contents.length,size);i++) if(contents[i]!=null) view.setItem(i,contents[i].clone());
+        // Opening/closing an inventory inside InventoryClickEvent is unsafe.
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline() || manager.session(player.getUniqueId()) != session || session.finishing
+                    || !(player.getOpenInventory().getTopInventory().getHolder() instanceof TradeMenu.Holder holder)
+                    || !session.id.equals(holder.sessionId())) return;
+            activePeeks.put(player.getUniqueId(), session.id);
+            if (player.openInventory(view) == null) activePeeks.remove(player.getUniqueId(), session.id);
+        });
     }
 }

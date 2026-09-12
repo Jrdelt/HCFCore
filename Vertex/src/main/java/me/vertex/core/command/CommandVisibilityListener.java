@@ -80,11 +80,16 @@ public final class CommandVisibilityListener implements Listener {
     }
 
     private static String normalize(String rawLabel) {
-        String label = rawLabel.startsWith("/") ? rawLabel.substring(1) : rawLabel;
+        String label = (rawLabel.startsWith("/") ? rawLabel.substring(1) : rawLabel).toLowerCase(Locale.ROOT);
         int namespace = label.indexOf(':');
         if (namespace >= 0) {
+            if (!label.substring(0, namespace).equals("vertex")) return label;
             label = label.substring(namespace + 1);
+        } else {
+            org.bukkit.command.Command command = org.bukkit.Bukkit.getCommandMap().getCommand(label);
+            if (command instanceof org.bukkit.command.PluginIdentifiableCommand owned
+                    && !owned.getPlugin().getName().equalsIgnoreCase("Vertex")) return "external:" + label;
         }
-        return label.toLowerCase(Locale.ROOT);
+        return label;
     }
 }

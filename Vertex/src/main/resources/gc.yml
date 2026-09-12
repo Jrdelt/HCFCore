@@ -21,6 +21,16 @@ max-withdraw: 1000000000
 redeem-code-length: 12
 redeem-code-charset: "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
+# Per-player delay between redemption attempts, including invalid codes (0-60).
+# 0 disables the delay, but never allows overlapping attempts for one player.
+# Local to this server; the database transaction prevents double redemption
+# across players/servers. Reconnecting does not clear it; a restart does.
+redeem-cooldown-seconds: 3
+
+# Maximum staff-issued code lifetime when an expiry is requested. Default:
+# one year; safe range 1-3153600000 seconds (100 years). No-expiry codes remain supported.
+max-code-lifetime-seconds: 31536000
+
 # Optional, config-gated console command fired whenever a player's own
 # action credits their GC balance (for example, a redeemed code) -- for
 # example to notify a future Tebex webstore integration or a Discord
