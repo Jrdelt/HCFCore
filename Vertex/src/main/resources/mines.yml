@@ -191,3 +191,38 @@ mines:
           percent: 15.0
         - after-seconds: 7200
           percent: 20.0
+
+# Mining Hot Zones share this file with mine definitions so mining behaviour
+# is configured in one place. A Hot Zone covers one whole mine world at a
+# time, increasing qualifying ore drops and temporarily reweighting that
+# mine's generation table toward rarer ores.
+hotzones:
+  enabled: true
+  schedule:
+    # Time between Hot Zones, picked at random in this range. Set both to the
+    # same value for a fixed interval.
+    minimum-minutes: 60
+    maximum-minutes: 120
+    duration-minutes: 20
+    # Warning before one starts. 0 disables the pre-announcement.
+    pre-announce-minutes: 5
+    # Whether the pre-announcement names the world, or keeps it a surprise.
+    reveal-world-early: false
+    # Avoid running in the same world twice in a row while more than one mine
+    # is available to choose from.
+    prevent-immediate-repeat: true
+
+  booster:
+    # Added to the Ore Drop category for anyone mining in the hot world.
+    ore-drop-percent: 20.0
+
+  generation:
+    # While hot, rarer ores get proportionally more relative weight. The
+    # table is always normalized after reweighting.
+    enabled: true
+    intensity: 0.20
+    rarity-exponent: 0.5
+    # Explicit per-ore multipliers override the formula above.
+    overrides: {}
+    # DIAMOND_ORE: 1.25
+    # NETHERITE_BLOCK: 1.50

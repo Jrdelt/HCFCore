@@ -24,7 +24,7 @@ public final class WarpCommand implements CommandExecutor, TabCompleter {
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) { sender.sendMessage(messages.get(sender, "general.players-only")); return true; }
-        if (args.length == 0 || command.getName().equalsIgnoreCase("warps")) { menu.open(player); return true; }
+        if (args.length == 0) { menu.open(player); return true; }
         String name = args[0];
         if (locations.warpTarget(name) == null) { player.sendMessage(messages.get(player, "warps.not-found")); return true; }
         teleports.request(player, "warp", () -> locations.warpTarget(name), countdown, 0L, true);

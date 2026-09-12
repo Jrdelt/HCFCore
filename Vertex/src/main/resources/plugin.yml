@@ -19,7 +19,7 @@ commands:
   f:
     description: Create and manage your native Vertex faction.
     usage: /<command> [create|claim [radius]|claim <Safezone|Warzone> [radius]|home|perms|bank|tnt|upgrades|who]
-    aliases: [factions, faction, t]
+    aliases: [factions, faction]
   fa:
     description: Native Vertex faction administration commands.
     usage: /<command> help [page]
@@ -29,10 +29,7 @@ commands:
     usage: /<command> [set]
   warp:
     description: Teleport to a public network warp.
-    usage: /<command> <name>
-  warps:
-    description: Browse all public network warps.
-    usage: /<command>
+    usage: /<command> [name]
   s:
     description: Configure shared server locations.
     usage: /<command> warp set|delete <name> [description]
@@ -158,9 +155,6 @@ commands:
   tradetoggle:
     description: Toggle whether you accept incoming trade requests.
     usage: /<command>
-  tradehistory:
-    description: View player trade history as staff.
-    usage: /<command> [player]
   tradelogs:
     description: View all or one player's trade history as staff.
     usage: /<command> [all|player]

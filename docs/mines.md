@@ -256,7 +256,10 @@ Start and end are stored as **absolute timestamps**, so a restart resumes one
 mid-flight with the correct time left — and one that expired while the server
 was down is simply over, never resuming with its full duration.
 
-Everything is configured in `hotzones.yml`.
+Hot Zone settings live under the `hotzones:` section of `mines.yml`. Existing
+standalone `hotzones.yml` files are migrated into that section on first load;
+Vertex leaves the old file untouched as a rollback copy and no longer reads it
+after a successful migration.
 
 ## `/mines`
 

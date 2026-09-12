@@ -48,6 +48,9 @@ public final class EndseeCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!sender.hasPermission("vertex.staff.endersee")) {
+            return List.of();
+        }
         if (args.length != 1) {
             return List.of();
         }

@@ -73,8 +73,7 @@ Use database and world snapshots for full shard rollback. See
 |---|---|---|
 | `/spawn` | Open to all | Uses the configured five-second countdown, movement/damage/combat cancellation, destination revision checks, and shard-health gating. |
 | `/spawn set` | `vertex.spawn.set` | Stores the primary first-join location. |
-| `/warp <name>` | Open to all | Starts the configured destination countdown. |
-| `/warps` | Open to all | Opens the public warp GUI. |
+| `/warp [name]` | Open to all | With no name, opens the public warp GUI. A supplied warp name tab-completes and starts the configured destination countdown. |
 | `/s warp set <name> [description]` | `vertex.server.warp` | Creates or updates a shared warp. |
 | `/s warp delete <name>` | `vertex.server.warp` | Deletes a shared warp. |
 | `/rtp` / `/wild` | Open to all | Opens shard/world random-teleport destination GUI with safety checks before completion. |

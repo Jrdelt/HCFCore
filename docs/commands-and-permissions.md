@@ -5,6 +5,11 @@ permission is checked — anyone can run it. A row with `—` in the permission
 column also means no separate permission node exists. Permission-guarded faction
 features are usually role-gated under `/f permissions`.
 
+Administration-only root commands are omitted from a player's normal command
+suggestions unless they hold at least one permission that grants access to that
+root. Entering a hidden command manually still uses Vertex's translated denial
+message rather than Bukkit's generic permission text.
+
 ## Kits
 
 | Command | Permission | Notes |
@@ -71,7 +76,7 @@ spawner-shop entry point.
 | `/tradetoggle` | Open to all | Toggles the same persistent Trade Requests setting shown in `/settings`. |
 | `/trade payouts [key] [paid\|retry]` | `vertex.trade.payouts` | Lists or reconciles uncertain legacy Trade money/EXP payouts. |
 | `/vertex reload` | `vertex.admin` | Reloads Vertex configuration, including `traders.yml`. |
-| `/tradehistory [player]` / `/tradelogs [all\|player]` | `vertex.trade.staff.history` | Opens the read-only, paginated trade audit history. |
+| `/tradelogs [all\|player]` | `vertex.trade.staff.history` | Opens the read-only, paginated trade audit history. |
 
 `vertex.trade.staff.bypassdistance` and `vertex.trade.staff.bypassblacklist`
 are available for staff testing. See [Player Trading](trading.md).
@@ -138,8 +143,7 @@ join-time summary of any still-open cases. See
 |---|---|---|
 | `/spawn` | Open to all | Starts the shared Spawn countdown. Movement, damage, combat, or a destination revision/health change cancels it. |
 | `/spawn set` | `vertex.spawn.set` | Stores the current shard, world, coordinates, yaw, and pitch as the shared Spawn and first-join destination. |
-| `/warp <name>` | Open to all | Starts the shared countdown to a public warp, including cross-shard destinations. |
-| `/warps` | Open to all | Opens the public network-warp GUI. |
+| `/warp [name]` | Open to all | With no name, opens the public network-warp GUI. With a name, starts the shared countdown to that warp; warp names tab-complete. |
 | `/s warp set <name> [description]` / `/s warp delete <name>` | `vertex.server.warp` | Creates, updates, or deletes a shared public warp. |
 | `/rtp` (alias `/wild`) | Open to all | Opens the configured shard/world random-teleport GUI. Safe land and the claim buffer are revalidated before completion. |
 

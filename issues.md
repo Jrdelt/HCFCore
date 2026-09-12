@@ -270,3 +270,98 @@ The obsolete commands are removed, but “full revamp” is broader than a code
 fix. The remaining setup branches (`create`, `list`, `region`, `route`,
 `portal`, `lootpool`, and `admin event/inspect`) need a final desired player vs
 admin command map before they can safely be renamed, merged, or removed.
+
+## Additional unresolved findings preserved during cleanup
+
+### Critical — Shard rollback is not a complete point-in-time recovery
+
+**Files:** `network/NetworkStorage.java`, `network/NetworkManager.java`,
+`season/SeasonResetManager.java`, `staff/RollbackCommand.java`
+
+The 30-minute player handoff history is not a coordinated snapshot of faction
+membership and claims, banks, vaults, or world changes. `/rollback` restores a
+player death inventory only; it cannot safely restore an entire shard after a
+crash.
+
+**Required fix:** Create coordinated database and world snapshots outside the
+gameplay process, record their IDs in Vertex, and restore only in audited
+network-wide maintenance mode.
+
+**Simple reason:** Player transfers can recover, but the whole server cannot
+yet return to one matching moment.
+
+### Critical — Season reset lacks a network-wide write barrier and verified backup
+
+**Files:** `season/SeasonResetManager.java`, `factions/FactionAdminCommand.java`,
+`network/NetworkManager.java`
+
+The reset checks for an empty network before starting asynchronous work, but a
+player or scheduler can write immediately afterward. It also does not require
+a verified complete season snapshot before purging data.
+
+**Required fix:** Acquire a durable maintenance lease, reject joins and all
+mutations, drain writers again, create and verify the snapshot, re-check that
+the network is empty, then reset. Keep the barrier until all shards restart.
+
+**Simple reason:** An empty-network check is only a moment in time; data can
+still change while the reset runs.
+
+### High — Shield activation can race Base Claim removal
+
+**Files:** `claims/BaseClaimManager.java`, `claims/ClaimStorage.java`,
+`shield/ShieldManager.java`, `shield/ShieldStorage.java`
+
+Base removal checks the Shield before its separate SQL mutation. Another shard
+can activate Shield after that check but before the removal commits.
+
+**Required fix:** Lock and re-check the effective Shield state in the same
+transaction as Base removal, or use one shared faction-operation lease across
+all shards.
+
+**Simple reason:** Two servers can both pass checks that should exclude each
+other.
+
+### High — Interrupted Auction and Coinflip creation intents lack staff reconciliation
+
+**Files:** `auction/AuctionManager.java`, `auction/AuctionStorage.java`,
+`coinflip/CoinflipManager.java`, `coinflip/CoinflipStorage.java`
+
+An interrupted external-currency debit remains safely marked as `DEBITING`,
+but staff currently need direct SQL access to decide whether the listing or
+wager was actually charged.
+
+**Required fix:** Add audited, permission-restricted `/ah intents` and
+`/cf intents` list, inspect, and idempotent resolve commands.
+
+**Simple reason:** The safe failure state exists, but staff cannot finish it
+in-game.
+
+### Medium — Legacy Trade, Auction, and Coinflip reward imports are not exactly once
+
+**Files:** `trade/TradeStorage.java`, `trade/TradeManager.java`,
+`auction/AuctionManager.java`, `coinflip/CoinflipManager.java`
+
+Older pending money and XP rows use read/delete plus an external credit in
+separate steps. A crash while importing an older production database can lose
+or repeat a reward.
+
+**Required fix:** Move legacy records into the current payout outbox with
+deterministic operation IDs, then retire direct-delivery import paths.
+
+**Simple reason:** Old pending rewards are the remaining path without the
+newer reconciliation model.
+
+### Medium — Blueprint integration depends on APIs marked for removal
+
+**Files:** `blueprint/BlueprintManager.java`, `blueprint/BlueprintListener.java`,
+`blueprint/BlueprintOutline.java`
+
+The current build passes, but WorldEdit/JNBT APIs used by Blueprint are marked
+deprecated for removal. A future FAWE or WorldEdit update can turn this into a
+build or runtime failure.
+
+**Required fix:** Move schematic coordinate and NBT handling to the supported
+API for the pinned dependency version, then add a schematic import/build
+compatibility test.
+
+**Simple reason:** It works today, but future dependency updates are risky.

@@ -293,6 +293,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(playerStatsManager, this);
         messages = new Messages(this, userManager);
         messages.load();
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.command.CommandVisibilityListener(), this);
         staffManager = new StaffManager(this);
         try {
             deliveryManager=new me.vertex.core.storage.DeliveryManager(this,database,messages);
@@ -412,8 +414,6 @@ combatManager.start();
                     globalLocationManager, teleportManager, warpMenu, messages, teleportCountdown);
             getCommand("warp").setExecutor(warpCommand);
             getCommand("warp").setTabCompleter(warpCommand);
-            getCommand("warps").setExecutor(warpCommand);
-            getCommand("warps").setTabCompleter(warpCommand);
             me.vertex.core.teleport.ServerAdminCommand serverAdmin = new me.vertex.core.teleport.ServerAdminCommand(
                     this, globalLocationManager, messages);
             getCommand("s").setExecutor(serverAdmin);
@@ -995,8 +995,6 @@ combatManager.start();
         getCommand("tradetoggle").setExecutor(new me.vertex.core.trade.TradeToggleCommand(announcementPreferenceManager, messages));
         me.vertex.core.trade.TradeHistoryCommand tradeHistoryCommand = new me.vertex.core.trade.TradeHistoryCommand(
                 tradeManager, messages);
-        getCommand("tradehistory").setExecutor(tradeHistoryCommand);
-        getCommand("tradehistory").setTabCompleter(tradeHistoryCommand);
         getCommand("tradelogs").setExecutor(tradeHistoryCommand);
         getCommand("tradelogs").setTabCompleter(tradeHistoryCommand);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.trade.TradeHistoryListener(tradeManager, messages),

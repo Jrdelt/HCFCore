@@ -94,6 +94,9 @@ public final class GetItemCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!sender.hasPermission("vertex.ability.give")) {
+            return List.of();
+        }
         List<String> matches = new ArrayList<>();
         if (args.length == 1) {
             String partial = args[0].toLowerCase(Locale.ROOT);

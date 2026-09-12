@@ -40,7 +40,6 @@ contents. The viewer is read-only and returns to the trade on close.
 | `/tradetoggle` | Open to all | Toggle the same persistent Trade Requests setting shown in `/settings`. |
 | `/trade payouts [key] [paid\|retry]` | `vertex.trade.payouts` | Inspect or reconcile an uncertain legacy money/EXP payout. |
 | `/vertex reload` | `vertex.admin` | Reload Vertex configuration, including `traders.yml`. |
-| `/tradehistory [player]` | `vertex.trade.staff.history` | Open a player's paginated audit history. |
 | `/tradelogs [all\|player]` | `vertex.trade.staff.history` | Open the server-wide or player-filtered audit history. |
 
 Staff can use `vertex.trade.staff.bypassdistance` and

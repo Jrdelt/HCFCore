@@ -20,7 +20,7 @@ through `/f permissions`; only command-level visibility is shown below.
 | `/f ally`, `/f neutral`, `/f enemy <faction>` | Relation actions follow faction role permission model | Manage the three supported relations. Ally and Enemy-to-Neutral require request/acceptance; Enemy is unilateral and either faction can unally to Neutral. |
 | `/f open`, `/f close`, `/f description <text>`, `/f rename <tag>` | Role-gated (`Member`-level settings depend on your faction role) | Manage faction settings. |
 | `/f home`, `/f sethome`, `/f warp [name]`, `/f setwarp <name>`, `/f delwarp <name>` | Open to faction members, role checks still apply | Native faction homes and warps. |
-| `/f money [deposit\|withdraw <amount>]` | Role-gated by `/f permissions` and same bank rules as `/f bank` | View or use the same durable Vertex faction-bank money balance as `/f bank`, through Vault. |
+| `/f bank <deposit\|withdraw> <amount> <money\|experience\|tnt>` | Role-gated by `/f permissions` | The only typed faction-bank transaction path; the GUI is also available through `/f bank`. |
 | `/f chat [faction\|ally\|public]` or `/f c [f\|a\|p]`, `/f map [on\|off]` | Open to all players with faction settings | Toggle faction chat, ally chat, and map display. Both preferences persist per player; ally chat includes your faction and mutually allied factions. Map width/height are configured independently, and a green crosshair marks the player's current chunk. Hover a claimed chunk to see its faction and whether it is a Base Claim or Raid Claim; Raid Claims also show their remaining lifetime. |
 
 `/f` and `/f help` show a paginated clickable help menu. The previous and
@@ -77,9 +77,9 @@ budget are configurable under `factions.system-claims`.
 
 All native faction tables use the configured Vertex database backend. Core
 membership, leadership transfer, claim changes, and faction deletion are
-committed before cache changes or claim-bound item listeners run. `/f money`
-uses the existing durable `faction_banks` balance; the faction identity table
-does not keep a second money balance.
+committed before cache changes or claim-bound item listeners run. The faction
+identity table does not keep a second money balance: all money bank actions
+use the durable `faction_banks` ledger through `/f bank`.
 Existing FactionsUUID data is intentionally not auto-imported: its storage
 layout and server-specific custom fields vary, and an unsafe import could
 misassign land or balances. Back up its data before removing that plugin. A

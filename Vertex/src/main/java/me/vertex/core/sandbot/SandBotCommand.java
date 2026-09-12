@@ -95,9 +95,20 @@ public final class SandBotCommand implements CommandExecutor, TabCompleter {
             String partial = args[0].toLowerCase(Locale.ROOT);
             return Stream.of("give", "stop", "debug")
                     .filter(sub -> sub.startsWith(partial))
+                    .filter(sub -> switch (sub) {
+                        case "give" -> sender.hasPermission("vertex.sandbot.give");
+                        case "debug" -> sender.hasPermission("vertex.sandbot.debug");
+                        default -> true;
+                    })
                     .collect(Collectors.toList());
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("give") || args[0].equalsIgnoreCase("stop"))) {
+            if (args[0].equalsIgnoreCase("give") && !sender.hasPermission("vertex.sandbot.give")) {
+                return List.of();
+            }
+            if (args[0].equalsIgnoreCase("stop") && !sender.hasPermission("vertex.sandbot.admin")) {
+                return List.of();
+            }
             String partial = args[1].toLowerCase(Locale.ROOT);
             return Bukkit.getOnlinePlayers().stream()
                     .map(Player::getName)

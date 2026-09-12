@@ -253,6 +253,9 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!sender.hasPermission("vertex.admin")) {
+            return List.of();
+        }
         if (args.length == 1) {
             String partial = args[0].toLowerCase(Locale.ROOT);
             return Stream.of("reload", "clearmobstacks", "storage", "spawnerinfo", "spawnerdebug")

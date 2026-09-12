@@ -11,6 +11,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -77,31 +78,38 @@ public final class HotZoneManager {
     }
 
     public void load() {
-        File file = new File(plugin.getDataFolder(), "hotzones.yml");
+        File file = new File(plugin.getDataFolder(), "mines.yml");
         if (!file.exists()) {
-            plugin.saveResource("hotzones.yml", false);
+            plugin.saveResource("mines.yml", false);
         }
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+        ConfigurationSection hotZones = hotZoneSection(file, config);
+        if (hotZones == null) {
+            enabled = false;
+            restart();
+            return;
+        }
 
-        enabled = config.getBoolean("enabled", true);
-        minimumMinutes = Math.max(1L, config.getLong("schedule.minimum-minutes", 60L));
-        maximumMinutes = Math.max(minimumMinutes, config.getLong("schedule.maximum-minutes", 120L));
-        durationMinutes = Math.max(1L, config.getLong("schedule.duration-minutes", 20L));
-        preAnnounceMinutes = Math.max(0L, config.getLong("schedule.pre-announce-minutes", 5L));
-        revealWorldEarly = config.getBoolean("schedule.reveal-world-early", false);
-        preventImmediateRepeat = config.getBoolean("schedule.prevent-immediate-repeat", true);
-        oreDropPercent = Math.max(0D, config.getDouble("booster.ore-drop-percent", 20D));
-        generationEnabled = config.getBoolean("generation.enabled", true);
-        intensity = Math.max(0D, config.getDouble("generation.intensity", 0.20D));
-        rarityExponent = Math.max(0D, config.getDouble("generation.rarity-exponent", 0.5D));
+        enabled = hotZones.getBoolean("enabled", true);
+        minimumMinutes = Math.max(1L, hotZones.getLong("schedule.minimum-minutes", 60L));
+        maximumMinutes = Math.max(minimumMinutes, hotZones.getLong("schedule.maximum-minutes", 120L));
+        durationMinutes = Math.max(1L, hotZones.getLong("schedule.duration-minutes", 20L));
+        preAnnounceMinutes = Math.max(0L, hotZones.getLong("schedule.pre-announce-minutes", 5L));
+        revealWorldEarly = hotZones.getBoolean("schedule.reveal-world-early", false);
+        preventImmediateRepeat = hotZones.getBoolean("schedule.prevent-immediate-repeat", true);
+        oreDropPercent = Math.max(0D, hotZones.getDouble("booster.ore-drop-percent", 20D));
+        generationEnabled = hotZones.getBoolean("generation.enabled", true);
+        intensity = Math.max(0D, hotZones.getDouble("generation.intensity", 0.20D));
+        rarityExponent = Math.max(0D, hotZones.getDouble("generation.rarity-exponent", 0.5D));
 
         Map<Material, Double> loaded = new LinkedHashMap<>();
-        ConfigurationSection section = config.getConfigurationSection("generation.overrides");
+        ConfigurationSection section = hotZones.getConfigurationSection("generation.overrides");
         if (section != null) {
             for (String key : section.getKeys(false)) {
                 Material material = Material.matchMaterial(key.trim().toUpperCase(Locale.ROOT));
                 if (material == null) {
-                    plugin.getLogger().warning("hotzones.yml: unknown override material '" + key + "', ignoring it.");
+                    plugin.getLogger().warning("mines.yml hotzones: unknown override material '" + key
+                            + "', ignoring it.");
                     continue;
                 }
                 loaded.put(material, section.getDouble(key, 1D));
@@ -111,6 +119,40 @@ public final class HotZoneManager {
 
         recoverState();
         restart();
+    }
+
+    /**
+     * Moves the old standalone configuration into {@code mines.yml} once,
+     * keeping the old file untouched as a rollback copy. A failed migration
+     * leaves the legacy file active instead of silently resetting an event.
+     */
+    private ConfigurationSection hotZoneSection(File minesFile, YamlConfiguration minesConfig) {
+        ConfigurationSection existing = minesConfig.getConfigurationSection("hotzones");
+        if (existing != null) {
+            return existing;
+        }
+
+        File legacyFile = new File(plugin.getDataFolder(), "hotzones.yml");
+        if (!legacyFile.isFile()) {
+            plugin.getLogger().severe("mines.yml has no hotzones section and no legacy hotzones.yml exists; "
+                    + "Hot Zones are disabled until the configuration is restored.");
+            return null;
+        }
+
+        YamlConfiguration legacyConfig = YamlConfiguration.loadConfiguration(legacyFile);
+        for (Map.Entry<String, Object> entry : legacyConfig.getValues(true).entrySet()) {
+            minesConfig.set("hotzones." + entry.getKey(), entry.getValue());
+        }
+        try {
+            minesConfig.save(minesFile);
+            plugin.getLogger().info("Migrated Hot Zone settings from hotzones.yml into mines.yml. "
+                    + "The legacy file was kept as a backup and is no longer read.");
+            return minesConfig.getConfigurationSection("hotzones");
+        } catch (IOException error) {
+            plugin.getLogger().log(Level.SEVERE,
+                    "Could not migrate hotzones.yml into mines.yml; continuing with the legacy settings.", error);
+            return legacyConfig;
+        }
     }
 
     /** Restores an in-flight Hot Zone, or treats one that expired while offline as finished. */

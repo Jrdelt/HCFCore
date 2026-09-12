@@ -98,7 +98,7 @@ public final class BackpackCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             String partial = args[0].toLowerCase(Locale.ROOT);
             List<String> result = new ArrayList<>();
-            if ("give".startsWith(partial)) {
+            if ("give".startsWith(partial) && sender.hasPermission("vertex.backpack.give")) {
                 result.add("give");
             }
             if ("debug".startsWith(partial) && sender.hasPermission("vertex.backpack.debug")) {

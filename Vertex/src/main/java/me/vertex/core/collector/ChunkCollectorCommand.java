@@ -51,6 +51,9 @@ public final class ChunkCollectorCommand implements CommandExecutor, TabComplete
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!sender.hasPermission("vertex.collector.give")) {
+            return List.of();
+        }
         if (args.length == 1) {
             return "give".startsWith(args[0].toLowerCase(Locale.ROOT)) ? List.of("give") : List.of();
         }

@@ -169,8 +169,7 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
             case "faction_power" -> FactionsHook.getFactionPower(player);
             case "faction_ftop" -> FactionsHook.getFactionTop(player);
             case "faction_online" -> FactionsHook.getOnlineFactionCount(player);
-            case "faction_money" -> factionMoney(player);
-            case "faction_bank_money" -> factionBankMoney(player);
+            case "faction_money", "faction_bank_money" -> factionBankMoney(player);
             case "faction_bank_xp" -> factionBankXp(player);
 
             case "combat_tagged" -> yesNo(combatManager != null && combatManager.isTagged(player.getUniqueId()));
@@ -433,12 +432,6 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
         }
         Player opponent = Bukkit.getPlayer(opponentId);
         return opponent == null ? "Unknown" : opponent.getName();
-    }
-
-    private String factionMoney(Player player) {
-        if (factionBankManager == null) return "0";
-        int factionId = FactionsHook.getFactionId(player);
-        return factionId == FactionsHook.NO_FACTION ? "0" : EconomyHook.format(factionBankManager.money(factionId));
     }
 
     private String factionBankMoney(Player player) {

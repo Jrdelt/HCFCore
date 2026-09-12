@@ -36,7 +36,7 @@ import java.util.stream.Stream;
 
 /** Native /f command tree. Vertex extension listeners may still claim their own subcommands. */
 public final class FactionCommand implements CommandExecutor, TabCompleter {
-    private static final List<String> ROOT = List.of("help", "create", "disband", "rename", "invite", "join", "leave", "kick", "promote", "demote", "leader", "who", "list", "power", "claim", "unclaim", "unclaimall", "autoclaim", "map", "chat", "home", "sethome", "warp", "setwarp", "delwarp", "ally", "neutral", "enemy", "open", "close", "description", "money", "tnt", "perms", "permissions", "bank", "vault", "logs", "focus", "ban", "unban", "bans", "upgrades", "rally", "shield", "grace", "top", "admin");
+    private static final List<String> ROOT = List.of("help", "create", "disband", "rename", "invite", "join", "leave", "kick", "promote", "demote", "leader", "who", "list", "power", "claim", "unclaim", "unclaimall", "autoclaim", "map", "chat", "home", "sethome", "warp", "setwarp", "delwarp", "ally", "neutral", "enemy", "open", "close", "description", "tnt", "perms", "permissions", "bank", "vault", "logs", "focus", "ban", "unban", "bans", "upgrades", "rally", "shield", "grace", "top", "admin");
     private static final List<String> HELP_KEYS = List.of("help-command-1", "help-command-2", "help-command-3", "help-command-4", "help-command-5", "help-command-6", "help-command-7", "help-command-8", "help-command-9", "help-command-10", "help-command-11", "help-command-12", "help-command-13", "help-command-14", "help-command-15", "help-command-16", "help-command-17", "help-command-18", "help-command-19", "help-command-20", "help-command-21", "help-command-22", "help-command-23", "help-command-24");
     private final Plugin plugin;
     private final FactionService factions;
@@ -106,7 +106,6 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
             case "open" -> mutate(player, () -> factions.setOpen(player, true), "opened");
             case "close" -> mutate(player, () -> factions.setOpen(player, false), "closed");
             case "description", "desc" -> mutate(player, () -> factions.setDescription(player, join(args, 1)), "description-updated");
-            case "money" -> money(player, args);
             case "tnt" -> tnt(player);
             case "admin" -> admin(player, args);
             // These commands are handled by their established Vertex GUI listeners
@@ -283,45 +282,6 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
         if(home==null||network==null)return null;String shard=home.shardId()==null||home.shardId().isBlank()?network.shardId():home.shardId();
         NetworkLocation target=new NetworkLocation(shard,home.world(),home.x(),home.y(),home.z(),home.yaw(),home.pitch());
         return new TeleportManager.Target(target,java.util.Objects.hash(shard,home.world(),home.x(),home.y(),home.z(),home.yaw(),home.pitch()),display);
-    }
-
-    private void money(Player player, String[] args) {
-        FactionData faction = factions.faction(player).orElse(null);
-        if (faction == null) { send(player, "no-faction"); return; }
-        FactionBankManager bank = factionBank.get();
-        if (bank == null) { send(player, "bank-starting"); return; }
-        if (args.length < 2) { send(player, "money-balance", "amount", String.format(Locale.ROOT, "%,.2f", bank.money(faction.id()))); return; }
-        double amount; try { amount = Double.parseDouble(arg(args, 2)); } catch (NumberFormatException error) { send(player, "money-usage"); return; }
-        if (!Double.isFinite(amount) || amount <= 0D || !EconomyHook.isAvailable()) { send(player, "money-invalid"); return; }
-        if (args[1].equalsIgnoreCase("deposit")) {
-            if (!factions.hasAction(factions.member(player.getUniqueId()), "bank-deposit")) { send(player, "money-deposit-denied"); return; }
-            EconomyResponse charged = EconomyHook.getEconomy().withdrawPlayer(player, amount);
-            if (charged == null || !charged.transactionSuccess()) { send(player, "money-deposit-failed"); return; }
-            bank.depositMoney(player, faction.id(), amount, "bank-deposit")
-                    .whenComplete((saved, error) -> onMain(() -> {
-                if (error != null || !Boolean.TRUE.equals(saved)) {
-                    EconomyHook.getEconomy().depositPlayer(player, amount);
-                    send(player, "money-deposit-rolled-back");
-                    return;
-                }
-                bank.audit(faction.id(), "MONEY_DEPOSIT", player, "amount=" + amount);
-                send(player, "money-deposited", "amount", String.format(Locale.ROOT, "%,.2f", amount));
-            }));
-        } else if (args[1].equalsIgnoreCase("withdraw")) {
-            if (!factions.hasAction(factions.member(player.getUniqueId()), "bank-withdraw")) { send(player, "money-withdraw-denied"); return; }
-            bank.withdrawMoney(player, faction.id(), amount, "bank-withdraw")
-                    .whenComplete((saved, error) -> onMain(() -> {
-                if (error != null || !Boolean.TRUE.equals(saved)) { send(player, "money-insufficient"); return; }
-                EconomyResponse paid = EconomyHook.getEconomy().depositPlayer(player, amount);
-                if (paid == null || !paid.transactionSuccess()) {
-                    bank.depositMoney(faction.id(), amount);
-                    send(player, "money-withdraw-rolled-back");
-                    return;
-                }
-                bank.audit(faction.id(), "MONEY_WITHDRAW", player, "amount=" + amount);
-                send(player, "money-withdrew", "amount", String.format(Locale.ROOT, "%,.2f", amount));
-            }));
-        } else send(player, "money-usage");
     }
 
     private void bank(Player player, String[] args) {
@@ -517,18 +477,24 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
     private static FactionRole previous(FactionRole role) { return switch (role) { case COLEADER -> FactionRole.ADMIN; case ADMIN -> FactionRole.MODERATOR; case MODERATOR -> FactionRole.MEMBER; case MEMBER -> FactionRole.RECRUIT; default -> role; }; }
 
     @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1) return complete(args[0], ROOT.stream());
+        if (args.length == 1) {
+            return complete(args[0], ROOT.stream()
+                    .filter(root -> !root.equals("admin") || sender.hasPermission("vertex.factions.admin")));
+        }
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (args.length == 2 && sub.equals("help")) return complete(args[1], Stream.of("1", "2", "3"));
         if (args.length == 2 && List.of("join", "ally", "neutral", "enemy", "who").contains(sub)) return complete(args[1], factions.factions().stream().filter(faction -> !faction.system()).map(FactionData::tag));
         if (args.length == 2 && List.of("invite", "kick", "promote", "demote", "leader").contains(sub)) return complete(args[1], Bukkit.getOnlinePlayers().stream().map(Player::getName));
         if (args.length == 2 && sub.equals("map")) return complete(args[1], Stream.of("on", "off"));
         if (args.length == 2 && (sub.equals("chat") || sub.equals("c"))) return complete(args[1], Stream.of("faction", "ally", "public"));
-        if (args.length == 2 && sub.equals("money")) return complete(args[1], Stream.of("deposit", "withdraw"));
         if (args.length == 2 && sub.equals("bank")) return complete(args[1], Stream.of("deposit", "withdraw"));
         if (args.length == 4 && sub.equals("bank")) return complete(args[3], Stream.of("money", "experience", "xp", "tnt"));
-        if (args.length == 2 && sub.equals("claim")) return complete(args[1], Stream.of("Safezone", "Warzone"));
-        if (args.length == 2 && sub.equals("admin")) return complete(args[1], Stream.of("unclaim"));
+        if (args.length == 2 && sub.equals("claim") && sender.hasPermission("vertex.factions.admin")) {
+            return complete(args[1], Stream.of("Safezone", "Warzone"));
+        }
+        if (args.length == 2 && sub.equals("admin") && sender.hasPermission("vertex.factions.admin")) {
+            return complete(args[1], Stream.of("unclaim"));
+        }
         if (args.length == 2 && sub.equals("warp") && sender instanceof Player player) return complete(args[1], factions.warps(FactionsHook.getFactionId(player)).stream().map(FactionWarp::name));
         return List.of();
     }
