@@ -92,12 +92,12 @@ public final class BaseClaimManager {
         this.plugin = plugin;
         this.storage = storage;
         this.spawners = spawners;
-        this.file = new File(plugin.getDataFolder(), "claims.yml");
+        this.file = me.vertex.core.factions.FactionConfigManager.file(plugin);
     }
 
     public void load() {
         if (!file.exists()) {
-            plugin.saveResource("claims.yml", false);
+            plugin.saveResource("factions.yml", false);
         }
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         maxChunksPerRegion = Math.max(1, config.getInt("base-claim.max-chunks-per-region", 2000));

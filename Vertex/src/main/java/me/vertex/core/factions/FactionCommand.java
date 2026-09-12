@@ -8,16 +8,20 @@ import me.vertex.core.lang.Messages;
 import me.vertex.core.network.NetworkLocation;
 import me.vertex.core.network.NetworkManager;
 import me.vertex.core.teleport.TeleportManager;
+import me.vertex.core.util.Numbers;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
@@ -100,12 +104,13 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
             case "description", "desc" -> mutate(player, () -> factions.setDescription(player, join(args, 1)), "description-updated");
             case "money" -> money(player, args);
             case "tnt" -> tnt(player);
-            case "safezone" -> systemClaim(player, "safezone");
-            case "warzone" -> systemClaim(player, "warzone");
+            case "safezone" -> systemClaim(player, "safezone", args);
+            case "warzone" -> systemClaim(player, "warzone", args);
             case "admin" -> admin(player, args);
             // These commands are handled by their established Vertex GUI listeners
             // before Bukkit dispatches /f. Keep a useful fallback if one is disabled.
-            case "perms", "permissions", "bank", "vault", "logs", "focus", "ban", "unban", "bans", "upgrades", "rally", "shield", "grace", "top" -> send(player, "feature-unavailable");
+            case "bank" -> bank(player, args);
+            case "perms", "permissions", "vault", "logs", "focus", "ban", "unban", "bans", "upgrades", "rally", "shield", "grace", "top" -> send(player, "feature-unavailable");
             default -> help(player, "1");
         }
         return true;
@@ -312,6 +317,110 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
         } else send(player, "money-usage");
     }
 
+    private void bank(Player player, String[] args) {
+        if (args.length < 4) { send(player, "bank-usage"); return; }
+        FactionData faction = factions.faction(player).orElse(null);
+        FactionBankManager bank = factionBank.get();
+        if (faction == null) { send(player, "no-faction"); return; }
+        if (bank == null) { send(player, "bank-starting"); return; }
+        String operation = args[1].toLowerCase(Locale.ROOT);
+        if (!operation.equals("deposit") && !operation.equals("withdraw")) { send(player, "bank-usage"); return; }
+        String currency = args[3].toLowerCase(Locale.ROOT);
+        if (currency.equals("xp")) currency = "experience";
+        if (!List.of("money", "experience", "tnt").contains(currency)) { send(player, "bank-invalid-currency"); return; }
+        if (!factions.hasAction(factions.member(player.getUniqueId()),
+                (currency.equals("experience") ? "xp-" : "bank-") + operation)) {
+            send(player, "bank-permission-denied");
+            return;
+        }
+        if (currency.equals("money")) {
+            Double amount = Numbers.parseDoublePositive(args[2]);
+            if (amount == null || !EconomyHook.isAvailable()) { send(player, "bank-invalid-amount"); return; }
+            bankMoney(player, faction, bank, operation, amount);
+            return;
+        }
+        Long amount = Numbers.parseLongPositive(args[2]);
+        if (amount == null || amount > Integer.MAX_VALUE && currency.equals("experience")) { send(player, "bank-invalid-amount"); return; }
+        if (currency.equals("experience")) bankExperience(player, faction, bank, operation, amount);
+        else bankTnt(player, faction, bank, operation, amount);
+    }
+
+    private void bankMoney(Player player, FactionData faction, FactionBankManager bank, String operation, double amount) {
+        if (operation.equals("deposit")) {
+            if (!EconomyHook.getEconomy().has(player, amount)) { send(player, "bank-not-enough"); return; }
+            EconomyResponse charged = EconomyHook.getEconomy().withdrawPlayer(player, amount);
+            if (charged == null || !charged.transactionSuccess()) { send(player, "bank-failed"); return; }
+            bank.depositMoney(player, faction.id(), amount, "bank-deposit").whenComplete((saved, error) -> onMain(() -> {
+                if (error != null || !Boolean.TRUE.equals(saved)) { EconomyHook.getEconomy().depositPlayer(player, amount); send(player, "bank-failed"); return; }
+                bank.audit(faction.id(), "MONEY_DEPOSIT", player, "amount=" + amount);
+                send(player, "bank-success", "operation", "Deposited", "amount", Numbers.formatShort(amount), "currency", "money");
+            }));
+        } else {
+            bank.withdrawMoney(player, faction.id(), amount, "bank-withdraw").whenComplete((saved, error) -> onMain(() -> {
+                if (error != null || !Boolean.TRUE.equals(saved)) { send(player, "bank-not-enough"); return; }
+                EconomyResponse paid = EconomyHook.getEconomy().depositPlayer(player, amount);
+                if (paid == null || !paid.transactionSuccess()) { bank.depositMoney(faction.id(), amount); send(player, "bank-failed"); return; }
+                bank.audit(faction.id(), "MONEY_WITHDRAW", player, "amount=" + amount);
+                send(player, "bank-success", "operation", "Withdrew", "amount", Numbers.formatShort(amount), "currency", "money");
+            }));
+        }
+    }
+
+    private void bankExperience(Player player, FactionData faction, FactionBankManager bank, String operation, long amount) {
+        int points = (int) amount;
+        if (operation.equals("deposit")) {
+            if (player.getTotalExperience() < points) { send(player, "bank-not-enough"); return; }
+            player.giveExp(-points);
+            bank.depositExperience(player, faction.id(), amount, "xp-deposit").whenComplete((saved, error) -> onMain(() -> {
+                if (error != null || !Boolean.TRUE.equals(saved)) { player.giveExp(points); send(player, "bank-failed"); return; }
+                bank.audit(faction.id(), "EXPERIENCE_DEPOSIT", player, "amount=" + amount);
+                send(player, "bank-success", "operation", "Deposited", "amount", Numbers.formatShort(amount), "currency", "experience");
+            }));
+        } else {
+            bank.withdrawExperience(player, faction.id(), amount, "xp-withdraw").whenComplete((saved, error) -> onMain(() -> {
+                if (error != null || !Boolean.TRUE.equals(saved)) { send(player, "bank-not-enough"); return; }
+                player.giveExp(points);
+                bank.audit(faction.id(), "EXPERIENCE_WITHDRAW", player, "amount=" + amount);
+                send(player, "bank-success", "operation", "Withdrew", "amount", Numbers.formatShort(amount), "currency", "experience");
+            }));
+        }
+    }
+
+    private void bankTnt(Player player, FactionData faction, FactionBankManager bank, String operation, long amount) {
+        FactionUpgradeManager upgrades = factionUpgrades.get();
+        if (upgrades == null) { send(player, "bank-starting"); return; }
+        long capacity = upgrades.tntCapacity(faction.id());
+        if (operation.equals("deposit")) {
+            if (bank.tnt(faction.id()) > capacity - amount || amount > Integer.MAX_VALUE
+                    || !player.getInventory().containsAtLeast(new ItemStack(Material.TNT), (int) amount)) { send(player, "bank-not-enough"); return; }
+            player.getInventory().removeItem(new ItemStack(Material.TNT, (int) amount));
+            bank.depositTnt(player, faction.id(), amount, capacity, "tnt-deposit").whenComplete((saved, error) -> onMain(() -> {
+                if (error != null || !Boolean.TRUE.equals(saved)) { player.getInventory().addItem(new ItemStack(Material.TNT, (int) amount)); send(player, "bank-failed"); return; }
+                bank.audit(faction.id(), "TNT_DEPOSIT", player, "amount=" + amount);
+                send(player, "bank-success", "operation", "Deposited", "amount", Numbers.formatShort(amount), "currency", "TNT");
+            }));
+        } else {
+            if (amount > Integer.MAX_VALUE || !canFitTnt(player.getInventory(), amount)) { send(player, "bank-inventory-full"); return; }
+            bank.withdrawTnt(player, faction.id(), amount, "tnt-withdraw").whenComplete((saved, error) -> onMain(() -> {
+                if (error != null || !Boolean.TRUE.equals(saved)) { send(player, "bank-not-enough"); return; }
+                if (!canFitTnt(player.getInventory(), amount)) { bank.depositTnt(faction.id(), amount, capacity); send(player, "bank-inventory-full"); return; }
+                player.getInventory().addItem(new ItemStack(Material.TNT, (int) amount));
+                bank.audit(faction.id(), "TNT_WITHDRAW", player, "amount=" + amount);
+                send(player, "bank-success", "operation", "Withdrew", "amount", Numbers.formatShort(amount), "currency", "TNT");
+            }));
+        }
+    }
+
+    private static boolean canFitTnt(Inventory inventory, long amount) {
+        long room = 0L;
+        for (ItemStack item : inventory.getStorageContents()) {
+            if (item == null || item.isEmpty()) room += Material.TNT.getMaxStackSize();
+            else if (item.getType() == Material.TNT) room += Material.TNT.getMaxStackSize() - item.getAmount();
+            if (room >= amount) return true;
+        }
+        return room >= amount;
+    }
+
     private void tnt(Player player) {
         FactionData faction = factions.faction(player).orElse(null);
         if (faction == null) { send(player, "no-faction"); return; }
@@ -324,16 +433,38 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
 
     private void onMain(Runnable task) { Bukkit.getScheduler().runTask(plugin, task); }
 
-    private void systemClaim(Player player, String type) {
+    private void systemClaim(Player player, String type, String[] args) {
+        int radius = 0;
+        if (args.length > 1) {
+            try {
+                radius = Math.max(0, Math.min(factions.serviceClaimRadiusLimit(), Integer.parseInt(args[1])));
+            } catch (NumberFormatException ignored) {
+                send(player, "admin-usage");
+                return;
+            }
+        }
         String tag = factionsTag(type);
         ChunkKey key=ChunkKey.of(player.getLocation());
-        mutate(player,()->factions.claimSystem(player,tag,key),"system-claim-created","faction",tag);
+        int selectedRadius = radius;
+        factions.submitMutation(() -> factions.claimSystemArea(player, tag, key, selectedRadius))
+                .whenComplete((outcome, error) -> onMain(() -> {
+                    if (error != null || outcome == null) {
+                        result(player, FactionService.Result.DATABASE_ERROR, "system-claim-created", "faction", tag);
+                        return;
+                    }
+                    if (outcome.successful() == 0 && outcome.failure() != null) {
+                        result(player, outcome.failure(), "system-claim-created", "faction", tag);
+                        return;
+                    }
+                    send(player, "system-claim-created", "faction", tag,
+                            "count", String.valueOf(outcome.successful()));
+                }));
     }
 
     private void admin(Player player, String[] args) {
         if (!player.hasPermission("vertex.factions.admin")) { player.sendMessage(messages.get(player, "general.no-permission")); return; }
         if (args.length < 2) { send(player, "admin-usage"); return; }
-        if (args[1].equalsIgnoreCase("safezone") || args[1].equalsIgnoreCase("warzone")) { systemClaim(player, args[1].toLowerCase(Locale.ROOT)); return; }
+        if (args[1].equalsIgnoreCase("safezone") || args[1].equalsIgnoreCase("warzone")) { systemClaim(player, args[1].toLowerCase(Locale.ROOT), args); return; }
         if (args[1].equalsIgnoreCase("unclaim")) { ChunkKey key=ChunkKey.of(player.getLocation());factions.submitMutation(()->factions.forceUnclaim(key)).whenComplete((removed,error)->onMain(()->send(player,error==null&&Boolean.TRUE.equals(removed)?"admin-claim-removed":"admin-no-claim")));return; }
         send(player, "admin-usage");
     }
@@ -382,6 +513,8 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2 && sub.equals("map")) return complete(args[1], Stream.of("on", "off"));
         if (args.length == 2 && (sub.equals("chat") || sub.equals("c"))) return complete(args[1], Stream.of("faction", "ally", "public"));
         if (args.length == 2 && sub.equals("money")) return complete(args[1], Stream.of("deposit", "withdraw"));
+        if (args.length == 2 && sub.equals("bank")) return complete(args[1], Stream.of("deposit", "withdraw"));
+        if (args.length == 4 && sub.equals("bank")) return complete(args[3], Stream.of("money", "experience", "xp", "tnt"));
         if (args.length == 2 && sub.equals("admin")) return complete(args[1], Stream.of("safezone", "warzone", "unclaim"));
         if (args.length == 2 && sub.equals("warp") && sender instanceof Player player) return complete(args[1], factions.warps(FactionsHook.getFactionId(player)).stream().map(FactionWarp::name));
         return List.of();

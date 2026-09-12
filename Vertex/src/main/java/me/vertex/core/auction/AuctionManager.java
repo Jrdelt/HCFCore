@@ -438,6 +438,10 @@ public final class AuctionManager {
         }
         clearWatchesForListing(listing.id());
         processPendingPayouts(listing.sellerUuid());
+        if (listing.currency() == AuctionCurrency.GC) {
+            me.vertex.core.audit.LargeTransactionAudit.record(plugin, priceGc, "AUCTION_GC_SALE",
+                    Bukkit.getOfflinePlayer(listing.sellerUuid()), buyer);
+        }
         return BuyResult.OK;
     }
 

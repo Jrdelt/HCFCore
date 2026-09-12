@@ -20,7 +20,7 @@ public final class GraceManager {
     public GraceManager(Plugin plugin, GraceStorage storage) {
         this.plugin = plugin;
         this.storage = storage;
-        this.file = new File(plugin.getDataFolder(), "shield.yml");
+        this.file = me.vertex.core.factions.FactionConfigManager.file(plugin);
     }
 
     public void load() {

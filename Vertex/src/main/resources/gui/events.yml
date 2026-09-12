@@ -1,6 +1,6 @@
 # Central read-only event board. Mine KOTH and Hot Zone state is rendered
 # directly from their running managers; this file controls presentation only.
-size: 27
+size: 36
 title: "ᴇᴠᴇɴᴛꜱ"
 refresh-ticks: 40
 
@@ -18,20 +18,34 @@ items:
       - "<gray>ᴄᴏᴍɪɴɢ ꜱᴏᴏɴ"
       - "<dark_gray>Artifact events will appear here."
 
+  haven:
+    material: IRON_BLOCK
+    slot: 10
+    name: "<green><bold>ʜᴀᴠᴇɴ"
+    lore:
+      - "<gray>ᴄʟɪᴄᴋ ᴛᴏ ᴏᴘᴇɴ ʜᴀᴠᴇɴ"
+
+  riftlands:
+    material: NETHERITE_BLOCK
+    slot: 11
+    name: "<dark_purple><bold>ʀɪꜰᴛʟᴀɴᴅꜱ"
+    lore:
+      - "<gray>ᴄʟɪᴄᴋ ᴛᴏ ᴏᴘᴇɴ ʀɪꜰᴛʟᴀɴᴅꜱ"
+
   # Available: {mine} {world} {owner} {control} {held} {bonus}
-  mine-koth:
-    name: "<aqua>ᴍɪɴᴇ ᴋᴏᴛʜ: <white>{mine}"
+  mine:
+    name: "<aqua>ᴍɪɴᴇ: <white>{mine}"
     lore:
       - "<dark_gray>{world}"
-      - "<gray>ᴏᴡɴᴇʀ: <white>{owner}"
+      - "<gray>ᴋᴏᴛʜ ᴄᴏɴᴛʀᴏʟʟᴇʀ: <white>{owner}"
       - "<gray>ᴄᴏɴᴛʀᴏʟ: <white>{control}%"
       - "<gray>ʜᴇʟᴅ: <white>{held}"
-      - "<gray>ʙᴏɴᴜꜱ: <green>{bonus}"
+      - "<gray>ᴋᴏᴛʜ ʙᴏᴏꜱᴛᴇʀ: <green>{bonus}"
 
   # Available: {state} {mine} {world} {bonus} {remaining} {next}
   hot-zone:
     material: BLAZE_POWDER
-    slot: 22
+    slot: 19
     name: "<gold>ʜᴏᴛ ᴢᴏɴᴇ"
     lore:
       - "<gray>ꜱᴛᴀᴛᴜꜱ: <white>{state}"
@@ -51,4 +65,4 @@ items:
       - "{details}"
 
 layout:
-  mine-koth-slots: [10, 12, 14, 16]
+  mine-slots: [12, 13, 14, 15, 16, 19, 20, 21, 22, 23]

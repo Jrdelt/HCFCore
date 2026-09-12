@@ -5,6 +5,7 @@ import me.vertex.core.item.TrackedItemIds;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.menu.MenuPlaceholders;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
@@ -111,6 +112,7 @@ public final class EnchantManager {
     private final NamespacedKey enchantItemOriginTierKey;
     private final NamespacedKey luckyGemKey;
     private final NamespacedKey enchantsKey;
+    private final NamespacedKey enchantTiersKey;
     private final NamespacedKey baseLoreKey;
 
     private volatile Map<String, EnchantDefinition> definitions = Map.of();
@@ -129,6 +131,7 @@ public final class EnchantManager {
         this.enchantItemOriginTierKey = new NamespacedKey(plugin, "enchant_item_origin_tier");
         this.luckyGemKey = new NamespacedKey(plugin, "lucky_gem");
         this.enchantsKey = new NamespacedKey(plugin, "custom_enchants");
+        this.enchantTiersKey = new NamespacedKey(plugin, "custom_enchant_tiers");
         this.baseLoreKey = new NamespacedKey(plugin, "custom_enchants_base_lore");
     }
 
@@ -360,8 +363,12 @@ public final class EnchantManager {
         if (tier == null) {
             return "";
         }
-        String name = tier.name();
-        return name.charAt(0) + name.substring(1).toLowerCase(Locale.ROOT);
+        return switch (tier) {
+            case SIMPLE -> "ꜱɪᴍᴘʟᴇ";
+            case ELITE -> "ᴇʟɪᴛᴇ";
+            case RARE -> "ʀᴀʀᴇ";
+            case LEGENDARY -> "ʟᴇɢᴇɴᴅᴀʀʏ";
+        };
     }
 
     // ------------------------------------------------------------------
@@ -372,6 +379,11 @@ public final class EnchantManager {
         RuneCosmetic cosmetic = runeCosmetics.getOrDefault(tier, luckyGemCosmetic);
         ItemStack item = new ItemStack(cosmetic.material());
         ItemMeta meta = item.getItemMeta();
+        if (meta instanceof org.bukkit.inventory.meta.FireworkEffectMeta fireworkMeta) {
+            fireworkMeta.setEffect(org.bukkit.FireworkEffect.builder()
+                    .withColor(org.bukkit.Color.BLACK, org.bukkit.Color.WHITE)
+                    .build());
+        }
         MenuPlaceholders placeholders = MenuPlaceholders.of().put("tier", displayTier(tier));
         meta.displayName(placeholders.render(cosmetic.name()).getFirst());
         List<Component> lore = new ArrayList<>();
@@ -387,7 +399,6 @@ public final class EnchantManager {
         }
         meta.getPersistentDataContainer().set(runeTierKey, PersistentDataType.STRING, tier.name());
         item.setItemMeta(meta);
-        trackedItemIds.ensureInstanceId(item, ItemKind.RUNE);
         return item;
     }
 
@@ -465,7 +476,6 @@ public final class EnchantManager {
         pdc.set(enchantItemLevelKey, PersistentDataType.INTEGER, level);
         pdc.set(enchantItemOriginTierKey, PersistentDataType.STRING, originTier.name());
         item.setItemMeta(meta);
-        trackedItemIds.ensureInstanceId(item, ItemKind.ENCHANTMENT_ITEM);
         return item;
     }
 
@@ -595,7 +605,7 @@ public final class EnchantManager {
         double chance = effectiveChance(enchantItem, gemCount);
         boolean success = roll * 100D < chance;
         if (success) {
-            applyEnchantAndRerender(target, info.enchantId(), info.level());
+            applyEnchantAndRerender(target, info.enchantId(), info.level(), info.originTier());
             trackedItemIds.ensureInstanceId(target, ItemKind.ENCHANTED_ITEM);
         }
         return new ApplyOutcome(success ? ApplyResult.SUCCESS : ApplyResult.FAILURE, true, gemCount > 0,
@@ -667,12 +677,16 @@ public final class EnchantManager {
             return false;
         }
         String baseLore = fromMeta.getPersistentDataContainer().get(baseLoreKey, PersistentDataType.STRING);
+        String enchantTiers = fromMeta.getPersistentDataContainer().get(enchantTiersKey, PersistentDataType.STRING);
 
         ItemMeta toMeta = to.getItemMeta();
         if (toMeta == null) {
             return false;
         }
         toMeta.getPersistentDataContainer().set(enchantsKey, PersistentDataType.STRING, enchants);
+        if (enchantTiers != null) {
+            toMeta.getPersistentDataContainer().set(enchantTiersKey, PersistentDataType.STRING, enchantTiers);
+        }
         if (baseLore != null) {
             toMeta.getPersistentDataContainer().set(baseLoreKey, PersistentDataType.STRING, baseLore);
         }
@@ -685,12 +699,15 @@ public final class EnchantManager {
     // Lore rendering
     // ------------------------------------------------------------------
 
-    private void applyEnchantAndRerender(ItemStack target, String enchantId, int level) {
+    private void applyEnchantAndRerender(ItemStack target, String enchantId, int level, RuneTier originTier) {
         ItemMeta meta = target.getItemMeta();
         ensureBaseLoreSnapshot(target, meta);
         Map<String, Integer> enchants = enchantsOf(target);
         enchants.put(enchantId, level);
         writeEnchants(target, enchants);
+        Map<String, RuneTier> enchantTiers = enchantTiersOf(target);
+        enchantTiers.put(enchantId, originTier);
+        writeEnchantTiers(target, enchantTiers);
         rebuildFullLore(target);
     }
 
@@ -734,6 +751,8 @@ public final class EnchantManager {
         List<String> baseLore = readBaseLore(meta);
         Map<String, Integer> enchants = parseEnchants(
                 meta.getPersistentDataContainer().get(enchantsKey, PersistentDataType.STRING));
+        Map<String, RuneTier> enchantTiers = parseEnchantTiers(
+                meta.getPersistentDataContainer().get(enchantTiersKey, PersistentDataType.STRING));
 
         List<Component> lore = new ArrayList<>();
         for (String line : baseLore) {
@@ -748,6 +767,8 @@ public final class EnchantManager {
             if (level == null) {
                 continue;
             }
+            lore.add(Component.text(definition.displayName(), tierColor(enchantTiers.getOrDefault(entry.getKey(), RuneTier.SIMPLE)))
+                    .append(Component.text(" " + level.level(), NamedTextColor.GRAY)));
             MenuPlaceholders placeholders = levelPlaceholders(definition, level, 0D);
             for (String line : level.lore()) {
                 lore.addAll(placeholders.render(line));
@@ -810,6 +831,43 @@ public final class EnchantManager {
         return builder.toString();
     }
 
+    private Map<String, RuneTier> enchantTiersOf(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return new LinkedHashMap<>();
+        }
+        return parseEnchantTiers(item.getItemMeta().getPersistentDataContainer().get(enchantTiersKey, PersistentDataType.STRING));
+    }
+
+    private Map<String, RuneTier> parseEnchantTiers(String raw) {
+        Map<String, RuneTier> map = new LinkedHashMap<>();
+        if (raw == null || raw.isBlank()) {
+            return map;
+        }
+        for (String part : raw.split(ENTRY_SEPARATOR)) {
+            String[] fields = part.split(FIELD_SEPARATOR, 2);
+            if (fields.length != 2) {
+                continue;
+            }
+            try {
+                map.put(fields[0], RuneTier.valueOf(fields[1]));
+            } catch (IllegalArgumentException ignored) {
+                // A corrupt or legacy tier entry falls back to the simple gray style.
+            }
+        }
+        return map;
+    }
+
+    private String serializeEnchantTiers(Map<String, RuneTier> map) {
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, RuneTier> entry : map.entrySet()) {
+            if (!builder.isEmpty()) {
+                builder.append(ENTRY_SEPARATOR);
+            }
+            builder.append(entry.getKey()).append(FIELD_SEPARATOR).append(entry.getValue().name());
+        }
+        return builder.toString();
+    }
+
     private void writeEnchants(ItemStack item, Map<String, Integer> enchants) {
         ItemMeta meta = item.getItemMeta();
         if (meta == null) {
@@ -817,5 +875,23 @@ public final class EnchantManager {
         }
         meta.getPersistentDataContainer().set(enchantsKey, PersistentDataType.STRING, serializeEnchants(enchants));
         item.setItemMeta(meta);
+    }
+
+    private void writeEnchantTiers(ItemStack item, Map<String, RuneTier> enchantTiers) {
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        meta.getPersistentDataContainer().set(enchantTiersKey, PersistentDataType.STRING, serializeEnchantTiers(enchantTiers));
+        item.setItemMeta(meta);
+    }
+
+    private static NamedTextColor tierColor(RuneTier tier) {
+        return switch (tier) {
+            case SIMPLE -> NamedTextColor.GRAY;
+            case ELITE -> NamedTextColor.YELLOW;
+            case RARE -> NamedTextColor.LIGHT_PURPLE;
+            case LEGENDARY -> NamedTextColor.RED;
+        };
     }
 }

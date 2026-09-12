@@ -2,16 +2,25 @@ package me.vertex.core.enchant;
 
 import me.vertex.core.lang.Messages;
 import me.vertex.core.menu.MenuRegistry;
+import net.kyori.adventure.text.Component;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.PrepareAnvilEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Two unrelated jobs sharing one class because both are "make a Rune/
@@ -41,11 +50,13 @@ public final class RuneListener implements Listener {
     private final EnchantManager manager;
     private final Messages messages;
     private final MenuRegistry menus;
+    private final NamespacedKey luckyGemCountKey;
 
     public RuneListener(EnchantManager manager, Messages messages, MenuRegistry menus) {
         this.manager = manager;
         this.messages = messages;
         this.menus = menus;
+        this.luckyGemCountKey = new NamespacedKey(manager.plugin(), "drag_lucky_gem_count");
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -68,8 +79,54 @@ public final class RuneListener implements Listener {
         }
         if (manager.isEnchantItem(inHand)) {
             event.setCancelled(true);
-            openApplyGui(player, inHand);
+            player.sendMessage(messages.get(player, "rune.drag-apply"));
         }
+    }
+
+    /** Direct inventory flow: Lucky Gem onto enchant, then enchant onto equipment. */
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)
+                || !(event.getClickedInventory() instanceof PlayerInventory)) {
+            return;
+        }
+        ItemStack cursor = event.getCursor();
+        ItemStack clicked = event.getCurrentItem();
+        if (manager.isLuckyGem(cursor) && manager.isEnchantItem(clicked)) {
+            event.setCancelled(true);
+            ItemStack upgraded = withLuckyGem(clicked, luckyGemCount(clicked) + 1);
+            if (clicked.getAmount() > 1) {
+                event.setCurrentItem(decrease(clicked));
+                give(player, upgraded);
+            } else {
+                event.setCurrentItem(upgraded);
+            }
+            event.setCursor(decrease(cursor));
+            player.sendMessage(messages.get(player, "rune.lucky-gem-added"));
+            return;
+        }
+        if (!manager.isEnchantItem(cursor) || clicked == null || clicked.getType().isAir()) {
+            return;
+        }
+        event.setCancelled(true);
+        EnchantManager.ApplyOutcome outcome = manager.applyEnchant(clicked, cursor, luckyGemCount(cursor), Math.random());
+        if (outcome.result() == EnchantManager.ApplyResult.SUCCESS) {
+            event.setCurrentItem(clicked);
+        }
+        if (outcome.consumedEnchantItem()) {
+            event.setCursor(decrease(cursor));
+        }
+        EnchantDefinition definition = manager.definition(outcome.enchantId());
+        String name = definition == null ? String.valueOf(outcome.enchantId()) : definition.displayName();
+        String key = switch (outcome.result()) {
+            case SUCCESS -> "enchant.apply-success";
+            case FAILURE -> "enchant.apply-failure";
+            case REJECT_INCOMPATIBLE -> "enchant.apply-incompatible";
+            case REJECT_EQUAL_LEVEL -> "enchant.apply-equal-level";
+            case REJECT_HIGHER_EXISTS -> "enchant.apply-higher-exists";
+            case REJECT_INVALID -> "enchant.apply-missing-items";
+        };
+        player.sendMessage(messages.get(player, key, "enchant", name, "level", String.valueOf(outcome.level())));
     }
 
     private void rollRune(Player player, ItemStack rune, RuneTier tier) {
@@ -107,6 +164,38 @@ public final class RuneListener implements Listener {
             enchantItem.setAmount(remaining);
         }
         EnchantApplyGui.open(player, manager, messages, menus, moved);
+    }
+
+    private int luckyGemCount(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return 0;
+        Integer count = item.getItemMeta().getPersistentDataContainer().get(luckyGemCountKey, PersistentDataType.INTEGER);
+        return count == null ? 0 : Math.max(0, count);
+    }
+
+    private ItemStack withLuckyGem(ItemStack item, int count) {
+        ItemStack upgraded = item.clone();
+        upgraded.setAmount(1);
+        ItemMeta meta = upgraded.getItemMeta();
+        meta.getPersistentDataContainer().set(luckyGemCountKey, PersistentDataType.INTEGER, count);
+        List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
+        lore.removeIf(line -> net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(line).startsWith("Lucky Gems applied:"));
+        lore.add(Component.text("Lucky Gems applied: " + count));
+        meta.lore(lore);
+        upgraded.setItemMeta(meta);
+        return upgraded;
+    }
+
+    private static ItemStack decrease(ItemStack item) {
+        if (item == null || item.getAmount() <= 1) return null;
+        ItemStack result = item.clone();
+        result.setAmount(result.getAmount() - 1);
+        return result;
+    }
+
+    private static void give(Player player, ItemStack item) {
+        player.getInventory().addItem(item).values()
+                .forEach(left -> player.getWorld().dropItemNaturally(player.getLocation(), left));
     }
 
     // ------------------------------------------------------------------

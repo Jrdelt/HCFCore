@@ -117,7 +117,8 @@ public final class BoosterService {
             // Sell is the one category shipped with a ceiling: sell bonuses
             // multiply an already-dynamic price, so an uncapped stack is the
             // fastest way to wreck the economy.
-            double cap = category == BoosterCategory.SELL ? 500D : BoosterStacking.UNCAPPED;
+            double cap = category == BoosterCategory.SELL ? 500D
+                    : category == BoosterCategory.BUY_DISCOUNT ? 75D : BoosterStacking.UNCAPPED;
             defaults.put(category, new Rules(BoosterStacking.Mode.ADDITIVE, cap));
         }
         return defaults;

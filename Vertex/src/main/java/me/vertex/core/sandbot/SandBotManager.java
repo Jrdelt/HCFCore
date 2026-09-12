@@ -30,7 +30,6 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.util.ArrayList;
 import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -115,7 +114,10 @@ public final class SandBotManager {
         }
         // FancyNPCs NPCs are runtime objects. Remove only the display objects
         // on shutdown; the durable bot records must remain for the next boot.
-        for (SandBotSession session : List.copyOf(sessions.values())) removeNpcOnly(session);
+        for (SandBotSession session : List.copyOf(sessions.values())) {
+            removePendingBlocks(session);
+            removeNpcOnly(session);
+        }
         sessions.clear();
     }
 
@@ -315,7 +317,7 @@ public final class SandBotManager {
         gui.setItem(11, statusItem);
 
         Component despawnComp = messages.getGui(player, "sandbot.gui.despawn");
-        ItemStack despawnItem = new ItemStack(Material.BARRIER);
+        ItemStack despawnItem = new ItemStack(Material.NETHER_STAR);
         ItemMeta despawnMeta = despawnItem.getItemMeta();
         despawnMeta.displayName(despawnComp.decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         despawnItem.setItemMeta(despawnMeta);
@@ -371,13 +373,7 @@ public final class SandBotManager {
         World world = session.world;
         int floorY = session.centerY - 1;
 
-        session.pendingColumns.entrySet().removeIf(entry -> {
-            entry.getValue().removeIf(entityId -> {
-                org.bukkit.entity.Entity entity = Bukkit.getEntity(entityId);
-                return entity == null || !entity.isValid() || entity.isDead();
-            });
-            return entry.getValue().isEmpty();
-        });
+        reconcilePendingBlocks(session);
 
         int anchors = 0;
         int completeColumns = 0;
@@ -410,10 +406,14 @@ public final class SandBotManager {
                     blockedColumns++;
                     continue;
                 }
-                int pending = session.pendingColumns.getOrDefault(key, Set.of()).size();
-                int needed = openGap - pending;
-                if (needed > 0) {
-                    queue.add(new Column(anchor, output, key, needed, pending));
+                int pending = pendingCount(session, key);
+                // Only one falling block may be in flight for a column. The
+                // old implementation spawned several blocks at the same
+                // coordinate, which made their collision physics determine
+                // the final shape instead of the bot's column plan.
+                if (pending == 0 && openGap > 0) {
+                    int targetY = anchor.getY() - openGap;
+                    queue.add(new Column(anchor, output, key, targetY));
                 }
             }
         }
@@ -443,11 +443,14 @@ public final class SandBotManager {
                 debugOwner(session, "not-tradeable", "material", column.output.name(), "location", format(column.anchor.getLocation()));
                 continue;
             }
-            int placements = Math.min(Math.min(placementsPerColumnPerTick, column.needed), placementBudget);
+            // Keep the configured value as a compatibility setting, but cap
+            // this deterministic falling-block implementation at one
+            // in-flight placement per column.
+            int placements = Math.min(1, Math.min(placementsPerColumnPerTick, placementBudget));
             double cost = shopManager.buyPrice(column.output);
             if (!Double.isFinite(cost) || cost <= 0D) continue;
             for (int placement = 0; placement < placements; placement++) {
-                planned.add(new PaidPlacement(column.anchor, column.output, column.key, cost));
+                planned.add(new PaidPlacement(column.anchor, column.output, column.key, column.targetY(), cost));
                 totalCost += cost;
                 placementBudget--;
             }
@@ -486,22 +489,24 @@ public final class SandBotManager {
         for (PaidPlacement placement : planned) {
             if (outputFor(placement.anchor.getType()) != placement.output
                     || !isOwnedClaim(placement.anchor, session, claims)) continue;
-            int pending = session.pendingColumns.getOrDefault(placement.key, Set.of()).size();
-            if (openGapUnder(placement.anchor, placement.output) - pending <= 0) continue;
+            if (pendingCount(session, placement.key) != 0) continue;
+            int openGap = openGapUnder(placement.anchor, placement.output);
+            if (openGap <= 0) continue;
+            int targetY = placement.anchor.getY() - openGap;
+            if (targetY != placement.targetY) continue;
+
             Location drop = placement.anchor.getLocation().add(0.5D, -1D, 0.5D);
             FallingBlock falling = session.world.spawn(drop, FallingBlock.class,
                     entity -> entity.setBlockData(placement.output.createBlockData()));
             falling.setDropItem(false);
-            session.pendingColumns.computeIfAbsent(placement.key, ignored -> new HashSet<>()).add(falling.getUniqueId());
+            session.pendingColumns.computeIfAbsent(placement.key, ignored -> new HashMap<>())
+                    .put(falling.getUniqueId(), new PendingPlacement(targetY));
             spent += placement.cost;
             spawned++;
         }
         double refund = Math.max(0D, reserved - spent);
         if (refund > 0.000001D) factionBankManager.depositMoney(session.factionId, refund);
         if (spent > 0D) {
-            Player owner = Bukkit.getPlayer(session.ownerId);
-            factionBankManager.audit(session.factionId, "SANDBOT_SPEND", owner,
-                    "amount=" + spent + ";blocks=" + spawned);
             debugOwner(session, "spawned-blocks", "amount", String.valueOf(spawned), "cost", String.valueOf(spent));
         }
     }
@@ -529,7 +534,10 @@ public final class SandBotManager {
         int open = 0;
         for (int y = anchor.getY() - 1; y >= world.getMinHeight(); y--) {
             Block block = world.getBlockAt(anchor.getX(), y, anchor.getZ());
-            if (block.getType() == output || !block.isPassable()) {
+            // Fluids and other passable blocks are not valid deterministic
+            // sand targets. Treating them as air lets fluid physics move the
+            // falling block out of its column.
+            if (block.getType() == output || !block.getType().isAir()) {
                 return open;
             }
             open++;
@@ -537,9 +545,63 @@ public final class SandBotManager {
         return open;
     }
 
+    private static int pendingCount(SandBotSession session, ColumnKey key) {
+        Map<UUID, PendingPlacement> pending = session.pendingColumns.get(key);
+        return pending == null ? 0 : pending.size();
+    }
+
+    /**
+     * Removes completed or invalid falling blocks from the in-flight table.
+     * A live entity is retained until it either lands or disappears; this
+     * prevents the next tick from spawning a duplicate block into the same
+     * column while the previous one is still falling.
+     */
+    private static void reconcilePendingBlocks(SandBotSession session) {
+        session.pendingColumns.entrySet().removeIf(columnEntry -> {
+            ColumnKey key = columnEntry.getKey();
+            Map<UUID, PendingPlacement> pending = columnEntry.getValue();
+            pending.entrySet().removeIf(pendingEntry -> {
+                org.bukkit.entity.Entity entity = Bukkit.getEntity(pendingEntry.getKey());
+                if (entity == null || !entity.isValid() || entity.isDead()) {
+                    return true;
+                }
+                if (!(entity instanceof FallingBlock)) {
+                    entity.remove();
+                    return true;
+                }
+
+                Location location = entity.getLocation();
+                boolean sameColumn = location.getWorld() == session.world
+                        && Math.abs(location.getX() - (key.x() + 0.5D)) <= 0.75D
+                        && Math.abs(location.getZ() - (key.z() + 0.5D)) <= 0.75D;
+                if (!sameColumn) {
+                    // Do not allow a displaced falling block to make the bot
+                    // believe that the intended column is progressing.
+                    entity.remove();
+                    return true;
+                }
+                return false;
+            });
+            return pending.isEmpty();
+        });
+    }
+
+    private static void removePendingBlocks(SandBotSession session) {
+        for (Map<UUID, PendingPlacement> pending : session.pendingColumns.values()) {
+            for (UUID entityId : pending.keySet()) {
+                org.bukkit.entity.Entity entity = Bukkit.getEntity(entityId);
+                if (entity != null && entity.isValid()) {
+                    entity.remove();
+                }
+            }
+        }
+        session.pendingColumns.clear();
+    }
+
     public void destroy(SandBotSession session) {
         if (session == null) return;
         sessions.remove(session.npcId);
+        removePendingBlocks(session);
         removeNpcOnly(session);
         saveState();
     }
@@ -616,7 +678,7 @@ public final class SandBotManager {
         public final int centerX;
         public final int centerY;
         public final int centerZ;
-        private final Map<ColumnKey, Set<UUID>> pendingColumns = new HashMap<>();
+        private final Map<ColumnKey, Map<UUID, PendingPlacement>> pendingColumns = new HashMap<>();
         private boolean paymentPending;
         public boolean active = true;
         private long lastLowBankWarningAt;
@@ -652,10 +714,12 @@ public final class SandBotManager {
         }
     }
 
-    private record Column(Block anchor, Material output, ColumnKey key, int needed, int pending) {
+    private record Column(Block anchor, Material output, ColumnKey key, int targetY) {
     }
 
-    private record PaidPlacement(Block anchor, Material output, ColumnKey key, double cost) { }
+    private record PaidPlacement(Block anchor, Material output, ColumnKey key, int targetY, double cost) { }
+
+    private record PendingPlacement(int targetY) { }
 
     private record ColumnKey(int x, int y, int z) {
     }

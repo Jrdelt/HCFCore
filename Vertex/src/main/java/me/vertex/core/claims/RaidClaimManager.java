@@ -73,14 +73,14 @@ public final class RaidClaimManager {
                      java.util.function.ToIntFunction<ChunkKey> ownerQuery) {
         this.plugin = plugin;
         this.storage = storage;
-        this.file = new File(plugin.getDataFolder(), "claims.yml");
+        this.file = me.vertex.core.factions.FactionConfigManager.file(plugin);
         this.claimRemover = claimRemover;
         this.ownerQuery = ownerQuery;
     }
 
     public void load() {
         if (!file.exists()) {
-            plugin.saveResource("claims.yml", false);
+            plugin.saveResource("factions.yml", false);
         }
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         durationMillis = Math.max(60_000L, config.getLong("raid-claim.duration-seconds", 7L * 3_600L) * 1_000L);

@@ -35,6 +35,12 @@ categories:
     stacking: additive
     max-percent: 500
 
+  # A player never pays less than 25% of the dynamic market price, even if
+  # multiple events are active at once.
+  buy-discount:
+    stacking: additive
+    max-percent: 75
+
   mob-spawn-rate:
     stacking: additive
     max-percent: -1

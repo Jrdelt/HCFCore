@@ -197,18 +197,11 @@ commands:
     aliases: [ce, customenchants, runes]
   haven:
     description: Enter Haven or manage Haven zones as staff.
-    usage: /<command> [create|wand|list|lootpool|portal create]
+    usage: /<command> [create|wand|list|lootpool|portal create|spawnpoints|koth|outpost]
   riftlands:
     description: Enter Riftlands or manage Riftlands zones as staff.
-    usage: /<command> [create|wand|list|lootpool|portal create]
+    usage: /<command> [create|wand|list|lootpool|portal create|spawnpoints|koth|outpost]
     aliases: [rift]
-  zones:
-    description: View Haven, Riftlands, and Mob Kill Event progression.
-    usage: /<command>
-  portal:
-    description: Create physical entry portals and safe guided arrival routes.
-    usage: /<command> wand|list|create|delete|route
-    aliases: [portals]
 
 permissions:
   vertex.fa.*:
@@ -346,6 +339,12 @@ permissions:
     default: op
   vertex.auction.intents:
     description: Inspect and reconcile interrupted Auction House listing debits.
+    default: op
+  vertex.transaction.audit:
+    description: Receive staff alerts for large GC transactions.
+    default: op
+  vertex.transaction.audit.ip:
+    description: View player IP addresses in large GC transaction alerts.
     default: op
   vertex.trade.use:
     description: Request and accept player trades.
@@ -487,6 +486,9 @@ permissions:
     default: op
   vertex.zones.admin.build:
     description: Bypass the no-build terrain rule inside Haven and Riftlands.
+    default: op
+  vertex.zones.command-bypass:
+    description: Bypass commands disabled inside Haven and Riftlands.
     default: op
   vertex.portals.use:
     description: Enter configured physical portals.

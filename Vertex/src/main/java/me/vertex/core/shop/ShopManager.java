@@ -91,6 +91,14 @@ public final class ShopManager {
         return payout * boosters.multiplier(seller, BoosterCategory.SELL);
     }
 
+    /** Applies the player's active Buy Discount to an already dynamic market cost. */
+    public double applyBuyDiscount(Player buyer, double cost) {
+        if (boosters == null) {
+            return cost;
+        }
+        return cost * Math.max(0D, 1D - boosters.effectivePercent(buyer, BoosterCategory.BUY_DISCOUNT) / 100D);
+    }
+
     /**
      * Records a sale of items that were never in the player's inventory --
      * a Sell Wand emptying a container.
@@ -252,6 +260,11 @@ public final class ShopManager {
                 minMultiplier, maxMultiplier, priceChangeThresholdUnits);
     }
 
+    /** The one-unit price this player will pay, including their live discount. */
+    public double buyPrice(Player buyer, Material material) {
+        return applyBuyDiscount(buyer, buyPrice(material));
+    }
+
     /** Whether the current buy price sits above, below, or right at the block's configured base price. */
     public int priceDirection(Material material) {
         ShopEntry entry = entries.get(material);
@@ -272,6 +285,11 @@ public final class ShopManager {
         return ShopPricing.sellPrice(buyPrice(material), sellPriceRatio);
     }
 
+    /** The one-unit payout this player will receive, including their live sell bonus. */
+    public double sellPrice(Player seller, Material material) {
+        return applySellBonus(seller, sellPrice(material));
+    }
+
     /** Total cost to buy {@code amount} units right now, accounting for the price rising as the batch is bought. */
     public double totalBuyCost(Material material, int amount) {
         ShopEntry entry = entries.get(material);
@@ -288,6 +306,11 @@ public final class ShopManager {
                     priceChangeThresholdUnits);
         }
         return total;
+    }
+
+    /** Total player-specific buy cost after all dynamic price steps and the live discount. */
+    public double totalBuyCost(Player buyer, Material material, int amount) {
+        return applyBuyDiscount(buyer, totalBuyCost(material, amount));
     }
 
     /** Total payout to sell {@code amount} units right now, accounting for the price falling as the batch is sold. */
@@ -329,7 +352,7 @@ public final class ShopManager {
         if (!EconomyHook.isAvailable()) {
             return TradeOutcome.failure(TradeResult.NO_ECONOMY);
         }
-        double cost = totalBuyCost(material, amount);
+        double cost = totalBuyCost(player, material, amount);
         Economy economy = EconomyHook.getEconomy();
         EconomyResponse response = economy.withdrawPlayer(player, cost);
         if (!response.transactionSuccess()) {

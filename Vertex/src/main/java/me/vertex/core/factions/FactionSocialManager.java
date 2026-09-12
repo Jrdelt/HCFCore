@@ -269,6 +269,7 @@ public final class FactionSocialManager implements Listener {
     }
 
     public void log(int factionId,String action,Player actor,String details){
+        if ("SANDBOT_SPEND".equalsIgnoreCase(action)) return;
         UUID uuid=actor==null?null:actor.getUniqueId();String name=actor==null?null:actor.getName();
         queueWrite(()->storage.insertLog(factionId,action,uuid,name,details,System.currentTimeMillis()));
     }

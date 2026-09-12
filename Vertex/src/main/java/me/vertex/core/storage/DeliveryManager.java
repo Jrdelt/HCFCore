@@ -145,7 +145,15 @@ public final class DeliveryManager implements Listener {
         DeliveryStorage.Reservation reservation=batch.reservations().get(index);List<ClaimDelivery.TaggedItem> expected=new ArrayList<>();
         for(DeliveryStorage.Row row:reservation.rows())expected.add(ClaimDelivery.tagged(plugin,"delivery",reservation.token(),row.id(),0,row.item()));
         List<ClaimDelivery.TaggedItem> missing=ClaimDelivery.missing(player,plugin,expected);
-        if(!ClaimDelivery.canFit(player,missing)||!ClaimDelivery.add(player,missing)){releaseFresh(player.getUniqueId(),batch);retryOwners.add(player.getUniqueId());if(messages!=null)player.sendMessage(messages.get(player,"delivery.inventory-full"));active.remove(player.getUniqueId());return;}
+        if(!ClaimDelivery.canFit(player,missing)||!ClaimDelivery.add(player,missing)){
+            for(ClaimDelivery.TaggedItem item:missing)player.getWorld().dropItemNaturally(player.getLocation(),item.item().clone());
+            CompletableFuture<Integer> dropped=CompletableFuture.supplyAsync(()->{try{return storage.complete(player.getUniqueId(),reservation.token());}catch(Exception error){throw new java.util.concurrent.CompletionException(error);}});track(dropped);
+            dropped.whenComplete((changed,error)->Bukkit.getScheduler().runTask(plugin,()->{
+                if(error!=null||changed==null)plugin.getLogger().log(Level.WARNING,"Could not acknowledge dropped item delivery for "+player.getUniqueId(),error);
+                deliverAt(player,batch,index+1);
+            }));
+            return;
+        }
         CompletableFuture<Integer> complete=CompletableFuture.supplyAsync(()->{try{return storage.complete(player.getUniqueId(),reservation.token());}catch(Exception error){throw new java.util.concurrent.CompletionException(error);}});track(complete);
         complete.whenComplete((changed,error)->Bukkit.getScheduler().runTask(plugin,()->{
             if(error!=null||changed==null||changed!=reservation.rows().size()){plugin.getLogger().log(Level.SEVERE,"Could not acknowledge item delivery "+reservation.token(),error);retryOwners.add(player.getUniqueId());active.remove(player.getUniqueId());return;}

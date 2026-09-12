@@ -709,6 +709,11 @@ public final class CoinflipManager {
 
         processPendingPayouts(winnerUuid);
 
+        if (coinflip.type() == CoinflipType.GC) {
+            me.vertex.core.audit.LargeTransactionAudit.record(plugin, (long) coinflip.amount(),
+                    "COINFLIP_GC", Bukkit.getOfflinePlayer(coinflip.hostUuid()), opponent);
+        }
+
         finishResolution(coinflip, opponent.getUniqueId(), winnerUuid, resolvedAt);
         return new PlayOutcome(PlayResult.OK, opponentWon);
     }

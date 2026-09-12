@@ -44,11 +44,11 @@ public final class ShieldManager {
         this.plugin = plugin;
         this.storage = storage;
         this.baseClaims = baseClaims;
-        this.file = new File(plugin.getDataFolder(), "shield.yml");
+        this.file = me.vertex.core.factions.FactionConfigManager.file(plugin);
     }
 
     public void load() {
-        if (!file.exists()) plugin.saveResource("shield.yml", false);
+        if (!file.exists()) plugin.saveResource("factions.yml", false);
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         baseDurationSeconds = positive(config.getLong("shield.base-duration-seconds", 21_600L), 21_600L);
         cooldownSeconds = Math.max(0, config.getLong("shield.cooldown-seconds", 86_400L));

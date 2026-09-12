@@ -324,7 +324,7 @@ public final class FactionSocialStorage {
 
     public List<LogRow> logs(int factionId, int limit, int offset) throws SQLException {
         List<LogRow> rows=new ArrayList<>();
-        try(Connection c=database.getConnection();PreparedStatement s=c.prepareStatement("SELECT id,action,actor_uuid,actor_name,details,created_at FROM vertex_faction_logs WHERE faction_id=? ORDER BY id DESC LIMIT ? OFFSET ?")){s.setInt(1,factionId);s.setInt(2,Math.max(1,Math.min(100,limit)));s.setInt(3,Math.max(0,offset));try(ResultSet r=s.executeQuery()){while(r.next())rows.add(new LogRow(r.getLong(1),r.getString(2),uuid(r.getString(3)),r.getString(4),r.getString(5),r.getLong(6)));}}
+        try(Connection c=database.getConnection();PreparedStatement s=c.prepareStatement("SELECT id,action,actor_uuid,actor_name,details,created_at FROM vertex_faction_logs WHERE faction_id=? AND action<>? ORDER BY id DESC LIMIT ? OFFSET ?")){s.setInt(1,factionId);s.setString(2,"SANDBOT_SPEND");s.setInt(3,Math.max(1,Math.min(100,limit)));s.setInt(4,Math.max(0,offset));try(ResultSet r=s.executeQuery()){while(r.next())rows.add(new LogRow(r.getLong(1),r.getString(2),uuid(r.getString(3)),r.getString(4),r.getString(5),r.getLong(6)));}}
         return rows;
     }
 

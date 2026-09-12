@@ -91,5 +91,5 @@ items:
 # Where things go. Category icons are centred on the middle row; detail
 # entries fill left to right from the first slot listed.
 layout:
-  category-slots: [11, 12, 13, 14, 15]
+  category-slots: [10, 11, 12, 13, 14, 15]
   source-slots: [10, 11, 12, 13, 14, 15, 16]

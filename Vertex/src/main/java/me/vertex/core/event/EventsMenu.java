@@ -19,6 +19,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Read-only central event board. It consumes the authoritative Mine KOTH and
  * Hot Zone managers rather than maintaining another cache of event state.
@@ -26,7 +29,7 @@ import org.bukkit.inventory.InventoryHolder;
 public final class EventsMenu {
 
     public static final String MENU_ID = "events";
-    private static final int[] DEFAULT_KOTH_SLOTS = {10, 12, 14, 16};
+    private static final int[] DEFAULT_MINE_SLOTS = {14, 15, 16, 19, 20, 21, 22, 23, 24, 25};
 
     private EventsMenu() {
     }
@@ -63,6 +66,8 @@ public final class EventsMenu {
         // on every live refresh, then copy its contents into the open view.
         Inventory base = layout.createInventory(null, MenuPlaceholders.of());
         inventory.setContents(base.getContents());
+        Holder holder = inventory.getHolder() instanceof Holder value ? value : null;
+        if (holder != null) holder.actions.clear();
 
         MenuItemTemplate artifact = layout.item("artifact-unavailable");
         if (artifact != null) {
@@ -73,32 +78,38 @@ public final class EventsMenu {
             }
         }
 
-        MenuItemTemplate kothTemplate = layout.item("mine-koth");
-        int[] slots = layout.slots("mine-koth-slots", DEFAULT_KOTH_SLOTS);
+        MenuItemTemplate haven = layout.item("haven");
+        if (haven != null && haven.slot() >= 0 && haven.slot() < inventory.getSize()) {
+            inventory.setItem(haven.slot(), haven.render(MenuPlaceholders.of()
+                    .put("players", String.valueOf(0)).put("mobs", String.valueOf(0))));
+            if (holder != null) holder.actions.put(haven.slot(), ClickAction.HAVEN);
+        }
+        MenuItemTemplate riftlands = layout.item("riftlands");
+        if (riftlands != null && riftlands.slot() >= 0 && riftlands.slot() < inventory.getSize()) {
+            inventory.setItem(riftlands.slot(), riftlands.render(MenuPlaceholders.of()
+                    .put("players", String.valueOf(0)).put("mobs", String.valueOf(0))));
+            if (holder != null) holder.actions.put(riftlands.slot(), ClickAction.RIFTLANDS);
+        }
+
+        MenuItemTemplate mineTemplate = layout.item("mine");
+        int[] slots = layout.slots("mine-slots", DEFAULT_MINE_SLOTS);
         int index = 0;
-        if (kothTemplate != null) {
-            for (MineKothDefinition definition : mines.kothDefinitions()) {
-                if (!definition.isDefined() || index >= slots.length) {
-                    continue;
-                }
-                MineRegion mine = mines.region(definition.mineId());
-                if (mine == null) {
-                    continue;
-                }
-                Integer ownerId = koths.ownerOf(definition.mineId());
+        if (mineTemplate != null) {
+            for (MineRegion mine : mines.regions()) {
+                if (!mine.isDefined() || index >= slots.length) continue;
+                MineKothDefinition definition = mines.kothDefinitions().stream()
+                        .filter(candidate -> candidate.mineId().equalsIgnoreCase(mine.id()) && candidate.isDefined())
+                        .findFirst().orElse(null);
+                Integer ownerId = koths.ownerOf(mine.id());
                 String owner = ownerId == null ? messages.getRaw(viewer, "events.unclaimed") : factionName(ownerId);
-                long held = koths.heldSeconds(definition.mineId());
+                long held = koths.heldSeconds(mine.id());
+                double bonus = definition == null || ownerId == null ? 0D : definition.booster().percentFor(held);
                 MenuPlaceholders placeholders = MenuPlaceholders.of()
-                        .put("mine", mine.displayName())
-                        .put("world", mine.world())
-                        .put("owner", owner)
-                        .put("control", String.valueOf(Math.round(koths.controlOf(definition.mineId()))))
-                        .put("held", duration(held))
-                        .put("bonus", "+" + trimmed(definition.booster().percentFor(held)) + "%");
+                        .put("mine", mine.displayName()).put("world", mine.world()).put("owner", owner)
+                        .put("control", String.valueOf(Math.round(koths.controlOf(mine.id()))))
+                        .put("held", duration(held)).put("bonus", "+" + trimmed(bonus) + "%");
                 int slot = slots[index++];
-                if (slot >= 0 && slot < inventory.getSize()) {
-                    inventory.setItem(slot, kothTemplate.render(mine.icon(), placeholders));
-                }
+                if (slot >= 0 && slot < inventory.getSize()) inventory.setItem(slot, mineTemplate.render(mine.icon(), placeholders));
             }
         }
 
@@ -153,10 +164,15 @@ public final class EventsMenu {
     public static final class Holder implements InventoryHolder {
         private Inventory inventory;
         private long lastRenderTick;
+        private final Map<Integer, ClickAction> actions = new HashMap<>();
+
+        ClickAction action(int slot) { return actions.get(slot); }
 
         @Override
         public Inventory getInventory() {
             return inventory;
         }
     }
+
+    enum ClickAction { HAVEN, RIFTLANDS }
 }

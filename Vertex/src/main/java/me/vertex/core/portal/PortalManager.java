@@ -84,7 +84,7 @@ public final class PortalManager {
             for (PortalStorage.RouteRow row : storage.loadRoutes()) {
                 PortalTarget target = PortalTarget.fromStorage(row.target());
                 decodeWaypoints(row.waypoints()).ifPresent(points -> {
-                    if (target != null && points.size() >= 2) {
+                    if (target != null && !points.isEmpty()) {
                         routes.put(row.id(), new PortalRoute(row.id(), target, row.speed(), points));
                     }
                 });
@@ -122,6 +122,13 @@ public final class PortalManager {
     }
 
     public boolean isFlying(UUID playerId) { return flights.containsKey(playerId); }
+
+    /** Starts a mine-menu arrival using the configured random spawn points. */
+    public boolean startMineEntry(Player player, String mineId) {
+        if (combat.isTagged(player.getUniqueId())) return false;
+        PortalRoute route = chooseRoute(new PortalTarget(PortalTarget.Kind.MINE, mineId));
+        return route != null && startFlight(player, route, true);
+    }
 
     public ItemStack selectorItem() {
         ItemStack item = new ItemStack(Material.BLAZE_ROD);
@@ -213,13 +220,10 @@ public final class PortalManager {
     }
 
     private String saveRoute(Selection selection) {
-        if (selection.points.size() < 2) return "incomplete";
+        if (selection.points.isEmpty()) return "incomplete";
         for (ZoneRoute.Waypoint point : selection.points) {
             World world = Bukkit.getWorld(point.world());
             if (world == null || !isTargetLocation(selection.target, point.location(world))) return "outside";
-        }
-        for (int index = 1; index < selection.points.size(); index++) {
-            if (!segmentInsideTarget(selection.target, selection.points.get(index - 1), selection.points.get(index))) return "outside";
         }
         PortalRoute route = new PortalRoute(selection.id, selection.target, selection.speed, selection.points);
         try {
@@ -307,7 +311,7 @@ public final class PortalManager {
     public void releaseFlight(Player player, boolean slowFall) { releaseFlight(player.getUniqueId(), slowFall); }
 
     private PortalRoute chooseRoute(PortalTarget target) {
-        List<PortalRoute> choices = routes(target).stream().filter(route -> route.waypoints().size() >= 2).toList();
+        List<PortalRoute> choices = routes(target).stream().filter(route -> !route.waypoints().isEmpty()).toList();
         // Haven/Riftlands already have a durable route system used by their
         // normal entry GUI. Use those routes for physical portals as a safe
         // fallback too, so admins do not have to create the same flight twice.
@@ -317,7 +321,7 @@ public final class PortalManager {
             ZoneType type = target.kind() == PortalTarget.Kind.HAVEN ? ZoneType.HAVEN : ZoneType.RIFTLANDS;
             choices = zones.regions(type).stream()
                     .flatMap(region -> zones.routes(region).stream())
-                    .filter(route -> route.enabled() && route.waypoints().size() >= 2)
+                    .filter(route -> route.enabled() && !route.waypoints().isEmpty())
                     .map(route -> new PortalRoute("zone-" + route.id(), target, route.speed(), route.waypoints()))
                     .toList();
         }
@@ -326,14 +330,16 @@ public final class PortalManager {
 
     private boolean startFlight(Player player, PortalRoute route, boolean preview) {
         if (!preview && combat.isTagged(player.getUniqueId())) return false;
-        ZoneRoute.Waypoint first = route.waypoints().getFirst();
+        ZoneRoute.Waypoint first = route.waypoints().get(ThreadLocalRandom.current().nextInt(route.waypoints().size()));
         World world = Bukkit.getWorld(first.world());
         if (world == null || !isTargetLocation(route.target(), first.location(world))) return false;
         FlightState previous = new FlightState(player.getAllowFlight(), player.isFlying(), player.getFlySpeed());
         if (!player.teleport(first.location(world))) return false;
-        player.setAllowFlight(true);
-        player.setFlying(true);
-        flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), route, 0, 0D, previous));
+        player.setAllowFlight(false);
+        player.setFlying(false);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, Integer.MAX_VALUE, 0, false, false, false));
+        slowFallers.add(player.getUniqueId());
+        flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), previous));
         if (!preview && route.target().kind() == PortalTarget.Kind.RIFTLANDS) zones.startPortalRiftSession(player);
         if (!preview) player.sendMessage(messages.get(player, "portals.entered", "target", route.target().displayName()));
         return true;
@@ -367,31 +373,7 @@ public final class PortalManager {
     private void tickFlight(Flight flight) {
         Player player = Bukkit.getPlayer(flight.playerId());
         if (player == null) { flights.remove(flight.playerId()); return; }
-        List<ZoneRoute.Waypoint> points = flight.route().waypoints();
-        if (flight.index() >= points.size() - 1) { releaseFlight(player.getUniqueId(), true); return; }
-        ZoneRoute.Waypoint from = points.get(flight.index());
-        ZoneRoute.Waypoint to = points.get(flight.index() + 1);
-        World world = Bukkit.getWorld(from.world());
-        if (world == null || !from.world().equals(to.world())) { releaseFlight(player.getUniqueId(), true); return; }
-        double distance = Math.max(.001D, Math.sqrt(Math.pow(to.x() - from.x(), 2D) + Math.pow(to.y() - from.y(), 2D) + Math.pow(to.z() - from.z(), 2D)));
-        double progress = flight.progress() + flight.route().speed() / 20D / distance;
-        int index = flight.index();
-        while (progress >= 1D && index < points.size() - 1) {
-            progress -= 1D;
-            index++;
-            if (index >= points.size() - 1) break;
-            from = points.get(index);
-            to = points.get(index + 1);
-        }
-        if (index >= points.size() - 1) { releaseFlight(player.getUniqueId(), true); return; }
-        Location next = new Location(world, from.x() + (to.x() - from.x()) * progress,
-                from.y() + (to.y() - from.y()) * progress, from.z() + (to.z() - from.z()) * progress,
-                to.yaw(), to.pitch());
-        if (!isTargetLocation(flight.route().target(), next) || !player.teleport(next)) {
-            releaseFlight(player.getUniqueId(), true);
-            return;
-        }
-        flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), flight.route(), index, progress, flight.before()));
+        if (player.isOnGround()) releaseFlight(player.getUniqueId(), false);
     }
 
     private boolean targetExists(PortalTarget target) {
@@ -410,19 +392,6 @@ public final class PortalManager {
         };
     }
 
-    private boolean segmentInsideTarget(PortalTarget target, ZoneRoute.Waypoint one, ZoneRoute.Waypoint two) {
-        if (!one.world().equals(two.world())) return false;
-        World world = Bukkit.getWorld(one.world());
-        if (world == null) return false;
-        double distance = Math.sqrt(Math.pow(two.x() - one.x(), 2D) + Math.pow(two.y() - one.y(), 2D) + Math.pow(two.z() - one.z(), 2D));
-        int samples = Math.max(1, (int) Math.ceil(distance / .5D));
-        for (int sample = 0; sample <= samples; sample++) {
-            double progress = sample / (double) samples;
-            if (!isTargetLocation(target, new Location(world, one.x() + (two.x() - one.x()) * progress,
-                    one.y() + (two.y() - one.y()) * progress, one.z() + (two.z() - one.z()) * progress))) return false;
-        }
-        return true;
-    }
 
     private Optional<List<ZoneRoute.Waypoint>> decodeWaypoints(String encoded) {
         try {
@@ -460,7 +429,7 @@ public final class PortalManager {
 
     private static double bounded(double value, double min, double max) { return Math.max(min, Math.min(max, value)); }
     private record FlightState(boolean allowFlight, boolean flying, float flySpeed) { }
-    private record Flight(UUID playerId, PortalRoute route, int index, double progress, FlightState before) { }
+    private record Flight(UUID playerId, FlightState before) { }
     private static final class Selection {
         private final String id;
         private final PortalTarget target;

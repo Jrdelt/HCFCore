@@ -109,8 +109,11 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
         manager.withdrawToCode(player.getUniqueId(), amount).thenAccept(outcome -> Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
             switch (outcome.result()) {
-                case OK -> player.sendMessage(messages.get(player, "gc.withdraw-code-created",
-                        "amount", Numbers.formatFull(amount), "code", outcome.code()));
+                case OK -> {
+                    player.sendMessage(messages.get(player, "gc.withdraw-code-created",
+                            "amount", Numbers.formatFull(amount), "code", outcome.code()));
+                    me.vertex.core.audit.LargeTransactionAudit.record(plugin, amount, "GC_WITHDRAW", player, null);
+                }
                 case INSUFFICIENT -> player.sendMessage(messages.get(player, "gc.not-enough-gc"));
                 case FAILED -> player.sendMessage(messages.get(player, "gc.transaction-failed"));
             }
@@ -143,6 +146,7 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(messages.get(player, "gc.redeem-success",
                             "amount", Numbers.formatFull(outcome.amount())));
                     interopHook.onGcCredited(player, outcome.amount(), "redeem");
+                    me.vertex.core.audit.LargeTransactionAudit.record(plugin, outcome.amount(), "GC_REDEEM", player, null);
                 }
                 case NOT_FOUND -> player.sendMessage(messages.get(player, "gc.redeem-not-found"));
                 case EXPIRED -> player.sendMessage(messages.get(player, "gc.redeem-expired"));

@@ -649,6 +649,31 @@ public final class FactionService {
         catch (Exception error) { log("Could not save system faction claim", asException(error)); return Result.DATABASE_ERROR; }
     }
 
+    /** Staff-only square claim path for SafeZone and WarZone. System claims may overwrite each other. */
+    public synchronized ClaimAreaOutcome claimSystemArea(Player actor, String tag, ChunkKey centre, int radius) {
+        if (actor == null || !actor.hasPermission("vertex.factions.admin")) {
+            return new ClaimAreaOutcome(0, Result.NO_PERMISSION);
+        }
+        if (centre == null || tag == null || tag.isBlank()) {
+            return new ClaimAreaOutcome(0, Result.INVALID_NAME);
+        }
+        FactionData system = ensureSystemFaction(tag);
+        int successful = 0;
+        int boundedRadius = Math.max(0, Math.min(maxClaimRadius, radius));
+        for (int x = centre.x() - boundedRadius; x <= centre.x() + boundedRadius; x++) {
+            for (int z = centre.z() - boundedRadius; z <= centre.z() + boundedRadius; z++) {
+                Result result = forceClaim(system.id(), actor, new ChunkKey(centre.world(), x, z));
+                if (result == Result.OK) successful++;
+                else if (result != Result.ALREADY_CLAIMED && successful == 0) {
+                    return new ClaimAreaOutcome(0, result);
+                }
+            }
+        }
+        return new ClaimAreaOutcome(successful, null);
+    }
+
+    public record ClaimAreaOutcome(int successful, Result failure) {}
+
     /** Admin claim path that preserves claim events/Base-Raid metadata while bypassing normal limits. */
     public synchronized Result forceClaim(int factionId, Player actor, ChunkKey key) {
         FactionData faction = factions.get(factionId);

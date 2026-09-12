@@ -9,6 +9,7 @@ import java.util.Locale;
 public enum BoosterCategory {
     ORE_DROP,
     SELL,
+    BUY_DISCOUNT,
     MOB_SPAWN_RATE,
     MOB_DROP,
     EXP;

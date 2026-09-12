@@ -56,7 +56,7 @@ class BaseClaimManagerTest {
     }
 
     private void withMaxChunksPerRegion(int max) throws Exception {
-        File file = new File(plugin.getDataFolder(), "claims.yml");
+        File file = new File(plugin.getDataFolder(), "factions.yml");
         Files.writeString(file.toPath(), "base-claim:\n  max-chunks-per-region: " + max + "\n",
                 StandardCharsets.UTF_8);
         manager.load();

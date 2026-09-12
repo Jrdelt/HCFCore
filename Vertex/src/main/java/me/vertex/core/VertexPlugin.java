@@ -214,6 +214,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(this, this);
 
         saveDefaultConfig();
+        me.vertex.core.factions.FactionConfigManager.loadAndApply(this);
         applyWorldDifficultyConfig();
         NumberFormatConfig.load(this);
 
@@ -1028,10 +1029,31 @@ combatManager.start();
             spawnCommand.setZoneExitDispatch(uuid -> zoneManager.consumeSpawnDispatchBypass(uuid));
         }
         boosterService.register(new me.vertex.core.zone.ZoneBoosterSource(zoneManager));
+        me.vertex.core.enchant.ArenaRuneManager arenaRuneManager = new me.vertex.core.enchant.ArenaRuneManager(this, zoneManager);
+        arenaRuneManager.load();
+        me.vertex.core.enchant.RuneShopMenu.setArenaRunes(arenaRuneManager);
+        me.vertex.core.enchant.ArenaRuneListener arenaRuneListener = new me.vertex.core.enchant.ArenaRuneListener(this, arenaRuneManager, messages);
+        Bukkit.getPluginManager().registerEvents(arenaRuneListener, this);
+        boosterService.register(arenaRuneListener.boosterSource());
+        me.vertex.core.zone.ArenaControlManager arenaControls = new me.vertex.core.zone.ArenaControlManager(
+                this, database, zoneManager, pvpTopManager, messages);
+        try {
+            arenaControls.load();
+            arenaControls.start();
+        } catch (Exception error) {
+            getLogger().log(Level.SEVERE, "Failed to initialise Arena KOTH/Outpost controls.", error);
+            Bukkit.getPluginManager().disablePlugin(this);
+            return;
+        }
+        me.vertex.core.zone.ZoneCommand.setArenaControls(arenaControls);
+        Bukkit.getPluginManager().registerEvents(arenaControls, this);
+        boosterService.register(new me.vertex.core.zone.ArenaControlBoosterSource(arenaControls));
         me.vertex.core.zone.ZoneMenu zoneMenu = new me.vertex.core.zone.ZoneMenu(this, zoneManager, messages);
         Bukkit.getPluginManager().registerEvents(zoneMenu, this);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.zone.ZoneListener(zoneManager, combatManager,
                 lootProtectionListener, messages), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.zone.ZoneCommandRestrictionListener(
+                zoneManager, messages), this);
         me.vertex.core.zone.ZoneCommand havenCommand = new me.vertex.core.zone.ZoneCommand(zoneManager, zoneMenu,
                 messages, me.vertex.core.zone.ZoneType.HAVEN);
         getCommand("haven").setExecutor(havenCommand);
@@ -1040,10 +1062,6 @@ combatManager.start();
                 messages, me.vertex.core.zone.ZoneType.RIFTLANDS);
         getCommand("riftlands").setExecutor(riftlandsCommand);
         getCommand("riftlands").setTabCompleter(riftlandsCommand);
-        me.vertex.core.zone.ZoneCommand zonesCommand = new me.vertex.core.zone.ZoneCommand(zoneManager, zoneMenu,
-                messages, null);
-        getCommand("zones").setExecutor(zonesCommand);
-        getCommand("zones").setTabCompleter(zonesCommand);
         zoneManager.start();
         me.vertex.core.portal.PortalStorage portalStorage = new me.vertex.core.portal.PortalStorage(database);
         portalManager = new me.vertex.core.portal.PortalManager(this, portalStorage, mineManager, zoneManager,
@@ -1055,12 +1073,9 @@ combatManager.start();
             Bukkit.getPluginManager().disablePlugin(this);
             return;
         }
+        mineTeleportManager.setPortalManager(portalManager);
         havenCommand.setPortalManager(portalManager);
         riftlandsCommand.setPortalManager(portalManager);
-        me.vertex.core.portal.PortalCommand portalCommand = new me.vertex.core.portal.PortalCommand(portalManager,
-                mineManager, messages);
-        getCommand("portal").setExecutor(portalCommand);
-        getCommand("portal").setTabCompleter(portalCommand);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.portal.PortalListener(portalManager, messages), this);
         portalManager.start();
         playerConnectionListener = new PlayerConnectionListener(userManager, combatManager);
@@ -1467,6 +1482,7 @@ combatManager.start();
 
     public void reload() {
         reloadConfig();
+        me.vertex.core.factions.FactionConfigManager.loadAndApply(this);
         applyWorldDifficultyConfig();
         NumberFormatConfig.load(this);
         validateRuntimeDependencies();

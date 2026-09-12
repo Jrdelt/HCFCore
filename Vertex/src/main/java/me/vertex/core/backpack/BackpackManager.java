@@ -274,6 +274,11 @@ public final class BackpackManager {
         return equipped == null ? -1 : itemCapacityForLevel(equipped.data().level());
     }
 
+    public int equippedLevel(org.bukkit.entity.Player player) {
+        EquippedBackpack equipped = equippedBackpack(player);
+        return equipped == null ? -1 : equipped.data().level();
+    }
+
     /**
      * The equipped Backpack's drop bonus, or -1 when none is equipped.
      *

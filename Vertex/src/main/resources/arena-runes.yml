@@ -1,0 +1,50 @@
+# Arena Runes are separate from the legacy /runes tier tables. All values here
+# hot-load on a normal Vertex reload when the Arena Rune manager is restarted.
+
+shop:
+  # XP_LEVELS removes whole experience levels. MONEY uses the Vault economy.
+  currency: XP_LEVELS
+  arena-rune-price: 100
+  lucky-gem-price: 10
+
+lucky-gem:
+  # Added per gem during a valid application attempt. Final success is capped at 100%.
+  success-bonus-percent: 3.5
+
+corrupted-detonation:
+  # The chance is always 30%. Multiple equipped copies add only their damage value.
+  radius: 5.0
+
+controls:
+  # One faction fills 0-100 in this many seconds when uncontested.
+  capture-seconds: 180
+  multiple-members-speed-up: true
+  additional-member-speed: 0.25
+  max-counted-members: 5
+  max-speed-multiplier: 2.0
+  booster-reset-threshold: 50.0
+
+  # A KOTH resets to neutral after this hold duration. Outposts do not expire.
+  koth-hold-seconds: 10800
+
+  # Every value applies only to controller-faction members inside the same
+  # Haven/Riftlands zone. Sell and buy modifiers are applied to live dynamic
+  # market prices, and appear in both /boosters and the /shop item lore.
+  defaults:
+    koth:
+      sell-percent: 10.0
+      buy-discount-percent: 5.0
+      xp-percent: 25.0
+      mob-drop-percent: 0.0
+    outpost:
+      sell-percent: 10.0
+      buy-discount-percent: 5.0
+      xp-percent: 0.0
+      # Keeps Outposts distinct from KOTHs while KOTH supplies XP.
+      mob-drop-percent: 50.0
+
+  # Override any individual point using its generated id:
+  #   haven-koth-<name>, haven-outpost-<name>, riftlands-koth-<name>, or
+  #   riftlands-outpost-<name>. Unlisted values inherit that point type's
+  #   defaults above.
+  point-overrides: {}

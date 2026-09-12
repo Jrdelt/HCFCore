@@ -360,6 +360,12 @@ public final class LegacyCombatManager implements Listener {
         }
         event.setCancelled(true);
         consumeOne(player, event.getHand());
+        // Cancelling PlayerItemConsumeEvent also skips vanilla hunger and
+        // saturation restoration. Both golden apples restore four food
+        // points; preserve that part of vanilla consumption while replacing
+        // only their potion effects from configuration.
+        player.setFoodLevel(Math.min(20, player.getFoodLevel() + 4));
+        player.setSaturation(Math.min(player.getFoodLevel(), player.getSaturation() + 9.6F));
         for (PotionEffect effect : effects) {
             player.addPotionEffect(effect);
         }

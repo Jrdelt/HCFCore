@@ -33,7 +33,7 @@ public final class BoostersMenu {
 
     public static final String MENU_ID = "boosters";
 
-    private static final int[] DEFAULT_CATEGORY_SLOTS = {11, 12, 13, 14, 15};
+    private static final int[] DEFAULT_CATEGORY_SLOTS = {10, 11, 12, 13, 14, 15};
     private static final int[] DEFAULT_SOURCE_SLOTS = {10, 11, 12, 13, 14, 15, 16};
 
     private BoostersMenu() {
@@ -139,6 +139,7 @@ public final class BoostersMenu {
         return switch (category) {
             case ORE_DROP -> Material.DIAMOND_PICKAXE;
             case SELL -> Material.EMERALD;
+            case BUY_DISCOUNT -> Material.GOLD_INGOT;
             case MOB_SPAWN_RATE -> Material.SPAWNER;
             case MOB_DROP -> Material.ROTTEN_FLESH;
             case EXP -> Material.EXPERIENCE_BOTTLE;

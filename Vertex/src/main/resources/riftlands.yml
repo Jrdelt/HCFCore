@@ -2,6 +2,20 @@
 # Haven but enables normal PvP and stores an unsecured session-loot ledger.
 entry:
   countdown-seconds: 5
+commands:
+  # Commands blocked while a player is inside Riftlands. Staff with
+  # vertex.zones.command-bypass are exempt.
+  blocked-in-zone:
+    - rtp
+    - wild
+    - f home
+    - factions home
+    - tpa
+    - tpahere
+    - tpaccept
+    - home
+    - sethome
+    - back
 entry-gui:
   title: '<dark_gray>Enter Riftlands'
   size: 27
@@ -29,7 +43,9 @@ mob-spawning:
   # Four times the previous local budget, with a faster fill rate.
   base-local-mobs: 72
   additional-mobs-per-player: 40
-  max-local-mobs: 340
+  max-local-mobs: 400
+  # Vertex mobs farther than this many blocks from every active player despawn.
+  despawn-radius: 40
   max-spawns-per-pass: 12
   # Values above 1 bias random distances toward the player.
   distance-bias: 2.5

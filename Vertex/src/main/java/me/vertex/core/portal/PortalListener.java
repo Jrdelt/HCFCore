@@ -10,6 +10,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
 
 /** Bridges physical portal movement and the setup selector to PortalManager. */
 public final class PortalListener implements Listener {
@@ -34,7 +35,9 @@ public final class PortalListener implements Listener {
             event.setCancelled(true);
             return;
         }
-        if (!portals.isSelector(event.getItem())) return;
+        ItemStack held = event.getItem();
+        if (held == null) held = player.getInventory().getItemInMainHand();
+        if (!portals.isSelector(held)) return;
         switch (event.getAction()) {
             case LEFT_CLICK_BLOCK -> {
                 if (event.getClickedBlock() == null) return;

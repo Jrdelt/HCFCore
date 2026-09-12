@@ -53,7 +53,7 @@ public final class FactionUpgradeBoosterSource implements BoosterSource {
         return switch (category) {
             case MOB_SPAWN_RATE -> FactionUpgrade.SPAWNER_RATE;
             case EXP -> FactionUpgrade.MOB_XP;
-            case ORE_DROP, MOB_DROP, SELL -> null;
+            case ORE_DROP, MOB_DROP, SELL, BUY_DISCOUNT -> null;
         };
     }
 }

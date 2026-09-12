@@ -214,9 +214,9 @@ public final class ShopMenu {
         meta.displayName(noItalic(messages.getGui(player, "shop.block-title", "block", displayName(entry.material()))));
         int direction = manager.priceDirection(entry.material());
         Component buyLine = noItalic(messages.getGui(player, "shop.block-buy-price",
-                "price", EconomyHook.format(manager.buyPrice(entry.material()))));
+                "price", EconomyHook.format(manager.buyPrice(player, entry.material()))));
         Component sellLine = noItalic(messages.getGui(player, "shop.block-sell-price",
-                "price", EconomyHook.format(manager.sellPrice(entry.material()))));
+                "price", EconomyHook.format(manager.sellPrice(player, entry.material()))));
         if (direction != 0) {
             Component indicator = Component.space().append(noItalic(messages.getGui(player,
                     direction > 0 ? "shop.block-price-indicator-above" : "shop.block-price-indicator-below")));

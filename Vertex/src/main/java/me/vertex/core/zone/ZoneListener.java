@@ -16,6 +16,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -93,6 +94,36 @@ public final class ZoneListener implements Listener {
             }
             if (zones.isIn(victim, ZoneType.RIFTLANDS)) zones.releaseFlightFromHit(victim);
             if (zones.isIn(attacker, ZoneType.RIFTLANDS)) zones.releaseFlightFromHit(attacker);
+        }
+    }
+
+    /** Zone mobs must remain attackable even when a claim/protection listener cancels the hit. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onZoneMobDamage(EntityDamageByEntityEvent event) {
+        if (event.getCause() != EntityDamageEvent.DamageCause.ENTITY_ATTACK
+                || !(event.getDamager() instanceof Player)
+                || !zones.isZoneMob(event.getEntity())) {
+            return;
+        }
+
+        event.setCancelled(false);
+        if (event.getEntity() instanceof org.bukkit.entity.Mob mob) {
+            mob.setTarget((Player) event.getDamager());
+            mob.setAware(true);
+        }
+        // Zone combat follows the server's 1.8-style fixed-hit behavior;
+        // do not let modern attack-cooldown scaling reduce rapid swings to
+        // effectively harmless damage.
+        if (event.getDamage() < 1.0D) {
+            event.setDamage(1.0D);
+        }
+    }
+
+    /** Zone mobs have no healing or nearby-healer mechanic. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onZoneMobRegainHealth(EntityRegainHealthEvent event) {
+        if (zones.isZoneMob(event.getEntity())) {
+            event.setCancelled(true);
         }
     }
 
@@ -177,11 +208,12 @@ public final class ZoneListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Player player = event.getPlayer();
         ItemStack held = event.getItem();
+        if (held == null) held = player.getInventory().getItemInMainHand();
         if (zones.isFlying(player.getUniqueId())) {
             zones.releaseFlight(player.getUniqueId(), true);
             event.setCancelled(true);

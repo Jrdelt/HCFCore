@@ -5,9 +5,12 @@ import me.vertex.core.booster.BoosterService;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.backpack.BackpackAutoStoreListener;
 import org.bukkit.Location;
+import org.bukkit.Color;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Monster;
+import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -15,7 +18,9 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -41,6 +46,34 @@ public final class MineListener implements Listener {
         this.boosters = boosters;
         this.messages = messages;
         this.backpackDrops = backpackDrops;
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onBloodveinMobSpawn(CreatureSpawnEvent event) {
+        if (!(event.getEntity() instanceof Monster monster)) return;
+        MineRegion region = mines.regionAt(monster.getLocation());
+        if (region == null || !region.id().equalsIgnoreCase("bloodvein")) return;
+        EntityEquipment equipment = monster.getEquipment();
+        if (equipment == null) return;
+        Color[] colors = {Color.fromRGB(45, 20, 70), Color.fromRGB(75, 25, 100),
+                Color.fromRGB(35, 35, 35), Color.fromRGB(110, 20, 35), Color.fromRGB(20, 65, 80)};
+        Color color = colors[ThreadLocalRandom.current().nextInt(colors.length)];
+        equipment.setHelmet(leather(Material.LEATHER_HELMET, color));
+        equipment.setChestplate(leather(Material.LEATHER_CHESTPLATE, color));
+        equipment.setLeggings(leather(Material.LEATHER_LEGGINGS, color));
+        equipment.setBoots(leather(Material.LEATHER_BOOTS, color));
+        equipment.setHelmetDropChance(0F);
+        equipment.setChestplateDropChance(0F);
+        equipment.setLeggingsDropChance(0F);
+        equipment.setBootsDropChance(0F);
+    }
+
+    private static ItemStack leather(Material material, Color color) {
+        ItemStack item = new ItemStack(material);
+        LeatherArmorMeta meta = (LeatherArmorMeta) item.getItemMeta();
+        meta.setColor(color);
+        item.setItemMeta(meta);
+        return item;
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)

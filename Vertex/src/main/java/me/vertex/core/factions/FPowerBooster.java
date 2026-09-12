@@ -10,6 +10,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -104,15 +105,16 @@ public final class FPowerBooster implements CommandExecutor, TabCompleter, Liste
         return true;
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
     public void onRedeem(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND
                 || event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        Player player = event.getPlayer();
         ItemStack held = event.getItem();
+        if (held == null) held = player.getInventory().getItemInMainHand();
         Integer tier = tier(held);
         if (tier == null) return;
         event.setCancelled(true);
-        Player player = event.getPlayer();
         if (!pending.add(player.getUniqueId())) return;
         // Escrow the voucher on the primary thread before the durable power
         // mutation. A player cannot move/drop the item while SQL is running

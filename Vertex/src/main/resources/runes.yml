@@ -15,8 +15,8 @@
 # rest are for enchants.yml's per-level lore instead.
 
 lucky-gem:
-  material: EMERALD
-  name: "<green>Lucky Gem"
+  material: GREEN_DYE
+  name: "<green>ʟᴜᴄᴋʏ ɢᴇᴍ"
   glow: true
   lore:
     - "<gray>Boosts your next enchant application's"
@@ -37,8 +37,8 @@ lucky-gem-effectiveness:
 
 runes:
   SIMPLE:
-    material: AMETHYST_SHARD
-    name: "<white>Simple Rune"
+    material: LIGHT_GRAY_CANDLE
+    name: "<gray>ꜱɪᴍᴘʟᴇ ʀᴜɴᴇ"
     glow: false
     shop-price: 250.0
     lore:
@@ -55,8 +55,8 @@ runes:
       - { enchant: sharpened_edge, level: 2, weight: 20 }
 
   ELITE:
-    material: QUARTZ
-    name: "<aqua>Elite Rune"
+    material: YELLOW_CANDLE
+    name: "<yellow>ᴇʟɪᴛᴇ ʀᴜɴᴇ"
     glow: false
     shop-price: 900.0
     lore:
@@ -71,8 +71,8 @@ runes:
       - { enchant: sharpened_edge, level: 3, weight: 15 }
 
   RARE:
-    material: AMETHYST_CLUSTER
-    name: "<light_purple>Rare Rune"
+    material: MAGENTA_CANDLE
+    name: "<light_purple>ʀᴀʀᴇ ʀᴜɴᴇ"
     glow: true
     shop-price: 2500.0
     lore:
@@ -87,8 +87,8 @@ runes:
       - { enchant: sharpened_edge, level: 4, weight: 10 }
 
   LEGENDARY:
-    material: NETHER_STAR
-    name: "<gold><bold>Legendary Rune"
+    material: PINK_CANDLE
+    name: "<red>ʟᴇɢᴇɴᴅᴀʀʏ ʀᴜɴᴇ"
     glow: true
     shop-price: 7500.0
     lore:
