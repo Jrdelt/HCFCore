@@ -27,13 +27,13 @@ that in-game rather than by typing coordinates, exactly like `/koth create`:
 | Command | Permission | What it does |
 |---|---|---|
 | `/mines` | Open to all | Opens `/mines` overview and detail GUIs. |
-| `/mines wand <mine>` | `vertex.mines.admin` | Gives the blaze-rod selector for that mine and starts corner selection. |
+| `/mines create <mine> [koth]` | `vertex.mines.admin` | Gives the blaze-rod selector and starts the mine or mine-KOTH corner selection. |
 | `/mines cancel` | `vertex.mines.admin` | Abandons an in-progress selection. |
 | `/mines list` | `vertex.mines.admin` | Shows all placed mines. |
 | `/mines fill <mine>` | `vertex.mines.admin` | Seeds or reseeds the mine ore table after major edits. |
 
 Selection flow:
-- Use `/mines wand <mine>` (for example `stonewake`) to receive the selection rod.
+- Use `/mines create <mine>` (for example `stonewake`) to receive the selection rod.
 - Left-click once for the first corner.
 - Right-click once for the second corner.
 - Sneak + click air to save.
@@ -164,7 +164,7 @@ Each mine has a permanent, 24/7 capturable point. Place its capture zone
 with the same blaze rod:
 
 ```
-/mines wand stonewake koth
+/mines create stonewake koth
 ```
 
 Holding it gives the controlling faction an **Ore Drop bonus in that mining

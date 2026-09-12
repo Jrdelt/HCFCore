@@ -13,14 +13,20 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.List;
 
-/** Double-chest GUI for optional broadcast categories. */
+/** Double-chest GUI for every persistent player communication preference. */
 public final class SettingsMenu {
     private static final List<Entry> ENTRIES = List.of(
-            new Entry(20, AnnouncementCategory.COINFLIPS, Material.SUNFLOWER, "settings.coinflips"),
-            new Entry(21, AnnouncementCategory.KOTH, Material.NETHER_STAR, "settings.koth"),
-            new Entry(22, AnnouncementCategory.OUTPOST, Material.CAMPFIRE, "settings.outpost"),
-            new Entry(23, AnnouncementCategory.MINING, Material.DIAMOND_PICKAXE, "settings.mining"),
-            new Entry(24, AnnouncementCategory.SERVER, Material.REDSTONE_TORCH, "settings.server"));
+            new Entry(10, AnnouncementCategory.GLOBAL_CHAT, Material.WRITABLE_BOOK, "settings.global-chat", "settings.global-chat-lore"),
+            new Entry(11, AnnouncementCategory.TRADE_REQUESTS, Material.EMERALD, "settings.trade-requests", "settings.trade-requests-lore"),
+            new Entry(12, AnnouncementCategory.NOTIFICATIONS, Material.BELL, "settings.notifications", "settings.notifications-lore"),
+            new Entry(13, AnnouncementCategory.PRIVATE_MESSAGES, Material.PAPER, "settings.private-messages", "settings.private-messages-lore"),
+            new Entry(14, AnnouncementCategory.PAYMENTS, Material.GOLD_INGOT, "settings.payments", "settings.payments-lore"),
+            new Entry(15, AnnouncementCategory.TELEPORT_REQUESTS, Material.ENDER_PEARL, "settings.teleport-requests", "settings.teleport-requests-lore"),
+            new Entry(20, AnnouncementCategory.COINFLIPS, Material.SUNFLOWER, "settings.coinflips", null),
+            new Entry(21, AnnouncementCategory.KOTH, Material.NETHER_STAR, "settings.koth", null),
+            new Entry(22, AnnouncementCategory.OUTPOST, Material.CAMPFIRE, "settings.outpost", null),
+            new Entry(23, AnnouncementCategory.MINING, Material.DIAMOND_PICKAXE, "settings.mining", null),
+            new Entry(24, AnnouncementCategory.SERVER, Material.REDSTONE_TORCH, "settings.server", null));
 
     private SettingsMenu() {
     }
@@ -52,9 +58,15 @@ public final class SettingsMenu {
         ItemStack item = new ItemStack(entry.material());
         ItemMeta meta = item.getItemMeta();
         meta.displayName(noItalic(messages.getGui(player, entry.messageKey())));
-        meta.lore(List.of(
-                noItalic(messages.getGui(player, enabled ? "settings.enabled" : "settings.disabled")),
-                Component.empty(), noItalic(messages.getGui(player, "settings.toggle-hint"))));
+        java.util.ArrayList<Component> lore = new java.util.ArrayList<>();
+        if (entry.descriptionKey() != null) {
+            lore.add(noItalic(messages.getGui(player, entry.descriptionKey())));
+            lore.add(Component.empty());
+        }
+        lore.add(noItalic(messages.getGui(player, enabled ? "settings.enabled" : "settings.disabled")));
+        lore.add(Component.empty());
+        lore.add(noItalic(messages.getGui(player, "settings.toggle-hint")));
+        meta.lore(lore);
         item.setItemMeta(meta);
         return item;
     }
@@ -71,7 +83,7 @@ public final class SettingsMenu {
         return component.decoration(TextDecoration.ITALIC, false);
     }
 
-    record Entry(int slot, AnnouncementCategory category, Material material, String messageKey) {
+    record Entry(int slot, AnnouncementCategory category, Material material, String messageKey, String descriptionKey) {
     }
 
     static final class Holder implements InventoryHolder {

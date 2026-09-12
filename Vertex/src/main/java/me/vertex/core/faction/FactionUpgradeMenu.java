@@ -200,6 +200,22 @@ public final class FactionUpgradeMenu implements Listener {
     }
 
     private String effect(Player player, FactionUpgrade upgrade, int level) {
+        if (upgrade == FactionUpgrade.SHIELD_DURATION) {
+            long base = Math.max(0L, plugin.getConfig().getLong("shield.base-duration-seconds", 28_800L));
+            long maximum = Math.max(base, plugin.getConfig().getLong(
+                    "shield.maximum-duration-seconds", 43_200L));
+            long bonus = Math.max(0L, Math.round(manager.bonusAtLevel(upgrade, level)));
+            long total;
+            try {
+                total = Math.min(maximum, Math.addExact(base, bonus));
+            } catch (ArithmeticException ignored) {
+                total = maximum;
+            }
+            return messages.getRaw(player, "faction-upgrades.gui.effect.shield-duration",
+                    "bonus", String.valueOf(bonus / 3_600L),
+                    "total", String.valueOf(total / 3_600L),
+                    "level", String.valueOf(level));
+        }
         String bonus = number(manager.bonusAtLevel(upgrade, level));
         return messages.getRaw(player, "faction-upgrades.gui.effect." + upgrade.configKey(),
                 "bonus", bonus, "level", String.valueOf(level));

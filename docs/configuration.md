@@ -46,14 +46,33 @@ temporary sibling file and atomically replaced, so a crash cannot leave a
 partially written `config.yml`. See
 [Installation](installation.md#switching-backends-in-game).
 
-## Grace and faction Shield (`shield.yml`)
+## Large GC transaction audit
+
+```yaml
+transaction-audit:
+  enabled: true
+  minimum-gc: 50
+  log-directory: coinflips
+  notify-permission: vertex.transaction.audit
+  ip-permission: vertex.transaction.audit.ip
+```
+
+This optional audit records successful GC withdrawals, redemptions, GC
+coinflip settlements, and GC Auction House sales whose amount is **strictly
+greater than** `minimum-gc`. It appends a weekly UTC log beneath
+`plugins/Vertex/<log-directory>/` and alerts online holders of
+`notify-permission`. The file records the available IP addresses; the
+in-game alert includes them only for holders of `ip-permission`. Treat both
+permissions as staff-only and restrict the log directory accordingly.
+
+## Grace and faction Shield (`factions.yml`)
 
 ```yaml
 grace:
   maximum-duration-seconds: 2592000
 shield:
-  base-duration-seconds: 21600
-  maximum-duration-seconds: 86400
+  base-duration-seconds: 28800 # 8 hours
+  maximum-duration-seconds: 43200 # 12 hours
   cooldown-seconds: 86400
   new-faction-delay-seconds: 0
   combat-protection-enabled: false
@@ -67,7 +86,9 @@ shield:
 Grace is enabled with `/fa grace on <duration>`. Shield normally follows
 the faction's weekly Base-only schedule; the optional `/f shield activate`
 path uses persisted real-time deadlines and the configured duration upgrade.
-Daily limits, schedule edit locks, and activation delays are configurable. See
+The default Shield duration is 8 hours. Its four explicit upgrade levels add
+1, 2, 3, or 4 hours for a 9–12 hour total. Daily limits, schedule edit locks,
+and activation delays are configurable. See
 [Grace and Faction Shield](faction-shield.md).
 
 ## Database (MySQL only)
@@ -142,7 +163,7 @@ portals:
 ```
 
 `speed` is the default number of route blocks travelled per second. Staff may
-override it for an individual route when running `/portal route create`.
+override it for an individual mine route when running `/mines spawnpoints create`.
 `activation-cooldown-seconds` is a server-side guard against repeated starts
 and chat spam when somebody remains inside a portal trigger.
 
@@ -227,7 +248,7 @@ factions:
     regeneration-per-interval: 0.1, regeneration-interval-seconds: 60}
   pvp: {friendly-fire: false, allies-can-pvp: false}
   protection: {allies-can-build: false}
-  system-claims: {safezone-tag: SafeZone, warzone-tag: WarZone, no-pvp-tags: [SafeZone]}
+  system-claims: {safezone-tag: SafeZone, warzone-tag: WarZone, no-pvp-tags: [SafeZone], max-chunks-per-tick: 64}
 ```
 
 - **`prevent-leader-leave`** — when true, a faction leader's `/f leave`
@@ -246,7 +267,11 @@ factions:
 - **`map.width`** and **`map.height`** set the exact chat-map dimensions.
   Width is safety-capped at 41 chunks and height at 21. Existing configs
   that only contain the old `map.radius` key retain the equivalent square
-  size until the new keys are added.
+  size until the new keys are added. `/vertex reload` refreshes these values
+  immediately, so the next `/f map` uses the new dimensions without a restart.
+- **`system-claims.max-chunks-per-tick`** limits main-thread cache/event work
+  after an atomic `/f claim <Safezone|Warzone> [radius]` save. Radius claims
+  are squares: radius `1` is `3x3` chunks.
 - **`command-aliases`** is retained for existing Vertex subcommand listeners;
   Bukkit aliases themselves are declared in `plugin.yml`.
 
@@ -277,10 +302,11 @@ the same controls:
 - `levels` is an ordered map of levels (up to 100). Each entry has its own
   exact Vault `price` and total `bonus`; a price of zero makes that level
   free and no multiplier is applied.
-- `bonus` is a percentage for every item except `warps` and `tnt-bank`.
-  Crop Growth is a per-growth-stage chance; Fly Boost applies only to
-  players already flying. Warps adds native Vertex warp slots to
-  `factions.limits.warps`; TNT Bank specifies an absolute capacity.
+- Most `bonus` values are percentages. Crop Growth is a per-growth-stage
+  chance; Fly Boost applies only to players already flying. `warps` adds
+  native Vertex warp slots to `factions.limits.warps`; `tnt-bank` specifies
+  an absolute TNT capacity; `shield-duration` is an additional duration in
+  seconds; and `base-claim-slots` is the total number of unlocked slots.
 
 The owner/scope matters: Damage, Claim Protection, Armor Wear, Fall
 Protection, and Fly Boost require a faction member to be standing in their

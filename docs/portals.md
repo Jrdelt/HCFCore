@@ -1,80 +1,64 @@
 # Physical Entry Portals
 
-`/portal` lets staff build a visible portal anywhere and connect it to a
-safe, server-controlled flight into Stonewake, Bloodvein, any other placed
-mine, Haven, or Riftlands. A player cannot steer the flight or use a
-client-side teleport to choose a different destination.
+Physical portals are configured from the destination they lead to. There is
+no standalone `/portal` or selector-wand command.
 
 ## Player behavior
 
-Walk into a configured portal volume to enter it. The player is carried along
-one valid route and is given Slow Falling when the route ends. Left- or
-right-clicking during the flight releases the player early with the same Slow
-Falling effect, which ends when they reach the ground.
-
-Players who are combat-tagged cannot enter. Riftlands entry creates the same
-unsecured loot session as `/riftlands`; Haven remains PvP-safe under its
-normal zone rules. Portal activation has a short server-side cooldown to
-avoid repeated route starts from movement packets.
+Walking into a saved portal starts its destination's server-controlled route.
+The player travels through the recorded points in order and receives Slow
+Falling when the final point is reached. Left- or right-clicking during the
+flight drops the player early with Slow Falling. Combat-tagged players cannot
+enter, and a short server-side cooldown prevents repeated starts.
 
 ## Staff setup
 
-All setup uses `vertex.portals.admin`.
+All setup uses `vertex.portals.admin` for portal volumes and the destination
+admin permission for routes.
 
-| Command | Permission | What it does |
+| Destination | Portal volume | Ordered route |
 |---|---|---|
-| `/portal wand` | `vertex.portals.admin` | Gives a portal selector to mark first and second corners (or route points). |
-| `/portal create <portal-id> <haven\|riftlands\|mine-id>` | `vertex.portals.admin` | Creates a portal volume and starts a destination selection flow. |
-| `/haven portal create <portal-id>` / `/riftlands portal create <portal-id>` | `vertex.portals.admin` | Creates a zone-specific portal directly from the current location. |
-| `/portal list` | `vertex.portals.admin` | Lists configured portals and their current status. |
-| `/portal delete <portal-id>` | `vertex.portals.admin` | Removes a portal and its route bindings. |
-| `/portal route create <haven\|riftlands\|mine-id> <route-id> [speed]` | `vertex.portals.admin` | Creates a dedicated portal route entry for a destination. |
-| `/portal route list [target]` | `vertex.portals.admin` | Shows routes globally or for a target portal/mine. |
-| `/portal route preview <route-id>` | `vertex.portals.admin` | Simulates the exact route path before publishing. |
-| `/portal route delete <route-id>` | `vertex.portals.admin` | Deletes a single configured route. |
+| Haven | `/haven portal create <portal>` | `/haven spawnpoints create <region> <route>` |
+| Riftlands | `/riftlands portal create <portal>` | `/riftlands spawnpoints create <region> <route>` |
+| Mine | `/mines portal create <mine> <portal>` | `/mines spawnpoints create <mine> <route> [speed]` |
 
-Player entry through a finished portal requires `vertex.portals.use` (defaulting to everyone).
+The create command automatically gives a tagged Blaze Rod. For a portal
+volume, left-click the first corner, right-click the second, then sneak and
+air-click to save. For a route, left-click every waypoint in order,
+right-click to remove the latest point, then sneak and air-click to save.
 
-The zone-specific forms preselect Haven/Riftlands. `/portal create`, either
-zone-specific form, or `/portal route create` gives the **Portal Selector**
-(Blaze Rod). For a portal volume, left-click its first block and right-click
-its second block. For a route, left-click each route point; right-click
-removes the most recently added point. Sneak and click the air to save either
-selection.
+Every waypoint and every half-block of the line between waypoints is validated
+inside its destination. Put points at each turn or height change you want
+players to follow. A route may contain one point for a simple drop-in, but use
+two or more points for a guided path.
 
-Routes need at least two points. Every point and every 0.5-block segment is
-validated inside the selected destination before saving. This prevents a
-Haven/Riftlands route from crossing an unsafe boundary and prevents a mine
-route from travelling through ordinary terrain. Use `/portal route preview`
-to test the exact flight before opening the portal to players.
+Useful management commands:
 
-The destination must already be placed: create Haven/Riftlands regions with
-their zone commands, and place a mine with `/mines wand <mine>`, first.
+```text
+/haven portal list
+/haven portal delete <portal>
+/haven spawnpoints list|preview|delete <route>
 
-Haven and Riftlands physical portals also use a valid route created with
-`/haven route create ...` or `/riftlands route create ...` when no dedicated
-`/portal route create ...` route exists for that destination. This keeps the
-normal zone entry route and a physical portal from requiring duplicate points.
-Mine portals require their own `/portal route create` route.
+/riftlands portal list
+/riftlands portal delete <portal>
+/riftlands spawnpoints list|preview|delete <route>
 
-The Portal Selector is a PDC-tagged Blaze Rod. Left-click a block for the
-first portal corner and right-click a block for the second. For a route,
-left-click each point and right-click to remove the newest point. Hold Shift
-and click either air action to save. The selector listener intentionally
-accepts already-cancelled air events so Essentials or another item listener
-cannot prevent the save action.
+/mines portal list
+/mines portal delete <portal>
+/mines spawnpoints list|preview|delete <route>
+```
+
+Player entry through a finished portal requires `vertex.portals.use`, which is
+granted to players by default.
 
 ## Configuration and persistence
 
-`config.yml` has two global safe defaults:
+`config.yml` contains two global defaults:
 
-- `portals.flight.speed` — default route speed in blocks per second; a route
-  can override it when created.
-- `portals.activation-cooldown-seconds` — guards a source portal against
-  repeated starts and repeated error messages.
+- `portals.flight.speed` — default route speed in blocks per second. Mine
+  routes can override it as their optional final create argument.
+- `portals.activation-cooldown-seconds` — prevents repeated portal triggers.
 
-Portal volumes and route point data are stored in the configured Vertex SQL
-backend (`entry_portals` and `entry_portal_routes`), so they survive normal
-restarts. A flight in progress ends safely on shutdown; the player remains at
-the last server-confirmed location rather than receiving any item or economy
-transaction.
+Portal volumes and route points are durable SQL records (`entry_portals` and
+`entry_portal_routes`). A restart ends an in-progress flight safely at the
+last server-confirmed location; it never creates an item or economy change.

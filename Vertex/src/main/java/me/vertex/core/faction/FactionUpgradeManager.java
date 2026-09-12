@@ -375,7 +375,8 @@ public final class FactionUpgradeManager implements Listener {
         if (section != null && section.isConfigurationSection("levels")) {
             ConfigurationSection configured = section.getConfigurationSection("levels");
             List<Tier> values = new ArrayList<>();
-            for (int level = 1; level <= MAX_CONFIGURED_LEVEL; level++) {
+            int configuredMaximum = upgrade == FactionUpgrade.SHIELD_DURATION ? 4 : MAX_CONFIGURED_LEVEL;
+            for (int level = 1; level <= configuredMaximum; level++) {
                 ConfigurationSection entry = configured.getConfigurationSection(String.valueOf(level));
                 if (entry == null) {
                     if (!values.isEmpty()) {
@@ -408,8 +409,7 @@ public final class FactionUpgradeManager implements Listener {
 
     private static List<Tier> defaultShieldLevels() {
         return List.of(new Tier(10_000_000D, 3_600D), new Tier(30_000_000D, 7_200D),
-                new Tier(75_000_000D, 10_800D), new Tier(150_000_000D, 14_400D),
-                new Tier(300_000_000D, 21_600D));
+                new Tier(75_000_000D, 10_800D), new Tier(150_000_000D, 14_400D));
     }
 
     public enum PurchaseResult { SUCCESS, PENDING, DISABLED, LEADER_ONLY, MAXED, NO_ECONOMY, CANNOT_AFFORD }

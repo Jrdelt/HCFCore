@@ -42,8 +42,8 @@ integration behavior.
 | [Grace and Faction Shield](faction-shield.md) | Global Grace plus weekly Base-only Shield schedules and audited overrides |
 | [Chunk Busters](chunk-busters.md) | The 4 destructive area-clear items: batched removal, persisted operation locking, faction role permissions, and the confirmation GUI |
 | [Source Buckets](source-buckets.md) | Reusable configured-block items: flow patterns, the claim-boundary rule, per-variant combat/base-claim gates, and charge-after-success economics |
-| [Custom Enchantments](custom-enchantments.md) | Rune tiers and rolling, physical enchant items, the Enchant Application GUI, level-replacement rules, Lucky Gems, world restrictions, and persistence through anvils/smithing |
-| [Personal settings](settings.md) | Per-player optional announcement preferences |
+| [Custom Enchantments](custom-enchantments.md) | Direct-inventory Rune rolling and application, the read-only Rune Catalog, universal Lucky Gems, world restrictions, and anvil/smithing persistence |
+| [Personal settings](settings.md) | Per-player interaction and announcement preferences |
 | [Shop](shop.md) | Categorized, dynamic-price item trading |
 | [Boosters](boosters.md) | How every bonus stacks into one effective figure, and `/boosters` |
 | [Wands](wands.md) | Sell Wands and TNT Wands: dynamic-priced container selling and Gunpowder banking |

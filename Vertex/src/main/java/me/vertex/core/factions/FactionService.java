@@ -78,6 +78,7 @@ public final class FactionService {
     private volatile boolean claimsMayOverclaim;
     private volatile int mapWidth = 41;
     private volatile int mapHeight = 9;
+    private volatile int systemClaimChunksPerTick = 64;
     private volatile long inviteMillis = 300_000L;
     private volatile boolean openJoin = true;
     private volatile double powerStartingPerMember = 100D;
@@ -217,6 +218,8 @@ public final class FactionService {
         int legacyDiameter = bounded(plugin.getConfig().getInt("factions.map.radius", 4), 1, 10) * 2 + 1;
         mapWidth = bounded(plugin.getConfig().getInt("factions.map.width", legacyDiameter), 1, 41);
         mapHeight = bounded(plugin.getConfig().getInt("factions.map.height", 20), 1, 21);
+        systemClaimChunksPerTick = bounded(plugin.getConfig().getInt(
+                "factions.system-claims.max-chunks-per-tick", 64), 1, 512);
         inviteMillis = Math.max(10_000L, plugin.getConfig().getLong("factions.invite-expiry-seconds", 300L) * 1_000L);
         openJoin = plugin.getConfig().getBoolean("factions.open-join-enabled", true);
         powerMaxPerMember = positive(plugin.getConfig().getDouble("factions.power.default-max", 100D), 100D);
@@ -278,6 +281,8 @@ public final class FactionService {
     public boolean claimsMayOverclaim() { return claimsMayOverclaim; }
     public int mapWidth() { return mapWidth; }
     public int mapHeight() { return mapHeight; }
+    /** Main-thread work budget used when a persisted system-claim area is applied. */
+    public int systemClaimChunksPerTick() { return systemClaimChunksPerTick; }
     public void setClaimMapQueries(BiPredicate<Integer, ChunkKey> baseClaimQuery,
             ToLongFunction<ChunkKey> raidClaimExpiryQuery) {
         this.baseClaimQuery = baseClaimQuery == null ? (ignoredFaction, ignoredChunk) -> false : baseClaimQuery;
@@ -638,41 +643,63 @@ public final class FactionService {
                     faction,actor,key,owner==NO_FACTION?null:owner,raidExpiresAt));return Result.OK;
         }catch(Exception error){log("Could not save faction claim",asException(error));return Result.DATABASE_ERROR;}
     }
-    /** Staff-only claim path for configured system factions such as SafeZone and WarZone. */
-    public synchronized Result claimSystem(Player actor, String tag, ChunkKey key) {
-        if (actor == null || !actor.hasPermission("vertex.factions.admin")) return Result.NO_PERMISSION;
-        if (key == null || tag == null || tag.isBlank()) return Result.INVALID_NAME;
-        FactionData faction = ensureSystemFaction(tag);
-        int owner = claims.getOrDefault(key, NO_FACTION);
-        if (owner == faction.id()) return Result.ALREADY_CLAIMED;
-        try { if(!storage.saveClaimChecked(key,faction.id(),0L))return Result.NOT_FOUND;claims.put(key, faction.id()); callEvent(new FactionClaimEvent(FactionClaimEvent.Action.CLAIM, faction, actor, key, owner==NO_FACTION?null:owner, 0L)); return Result.OK; }
-        catch (Exception error) { log("Could not save system faction claim", asException(error)); return Result.DATABASE_ERROR; }
-    }
-
-    /** Staff-only square claim path for SafeZone and WarZone. System claims may overwrite each other. */
-    public synchronized ClaimAreaOutcome claimSystemArea(Player actor, String tag, ChunkKey centre, int radius) {
-        if (actor == null || !actor.hasPermission("vertex.factions.admin")) {
-            return new ClaimAreaOutcome(0, Result.NO_PERMISSION);
+    /**
+     * Validates and durably commits an entire SafeZone/WarZone area in one
+     * transaction. This method deliberately touches no Bukkit world or chunk
+     * state and is safe to execute through {@link #submitMutation}.
+     */
+    public SystemClaimArea persistSystemClaimArea(String tag, List<ChunkKey> requested) {
+        if (tag == null || tag.isBlank() || requested == null || requested.isEmpty()) {
+            throw new IllegalArgumentException("A system claim needs a tag and at least one chunk.");
         }
-        if (centre == null || tag == null || tag.isBlank()) {
-            return new ClaimAreaOutcome(0, Result.INVALID_NAME);
-        }
-        FactionData system = ensureSystemFaction(tag);
-        int successful = 0;
-        int boundedRadius = Math.max(0, Math.min(maxClaimRadius, radius));
-        for (int x = centre.x() - boundedRadius; x <= centre.x() + boundedRadius; x++) {
-            for (int z = centre.z() - boundedRadius; z <= centre.z() + boundedRadius; z++) {
-                Result result = forceClaim(system.id(), actor, new ChunkKey(centre.world(), x, z));
-                if (result == Result.OK) successful++;
-                else if (result != Result.ALREADY_CLAIMED && successful == 0) {
-                    return new ClaimAreaOutcome(0, result);
-                }
+        java.util.LinkedHashSet<ChunkKey> unique = new java.util.LinkedHashSet<>();
+        for (ChunkKey key : requested) {
+            if (key == null || key.world() == null || key.world().isBlank()) {
+                throw new IllegalArgumentException("A system claim contains an invalid chunk.");
             }
+            unique.add(key);
         }
-        return new ClaimAreaOutcome(successful, null);
+        FactionData faction = ensureSystemFaction(tag);
+        if (!faction.system()) {
+            throw new IllegalStateException("Configured system faction tag belongs to a player faction: " + tag);
+        }
+        try {
+            List<FactionStorage.ClaimOwnerChange> changes = storage.saveSystemClaimAreaChecked(
+                    faction.id(), List.copyOf(unique));
+            if (changes == null || changes.size() != unique.size()) {
+                throw new IllegalStateException("System faction was unavailable while saving its claim area.");
+            }
+            return new SystemClaimArea(faction, changes);
+        } catch (SQLException error) {
+            throw new IllegalStateException("Could not commit system claim area", error);
+        }
     }
 
-    public record ClaimAreaOutcome(int successful, Result failure) {}
+    /**
+     * Applies a persisted subset on the primary thread. Persistence finishes
+     * before this stage, so an I/O failure can never leave a partly changed
+     * SafeZone/WarZone area behind.
+     */
+    public void applySystemClaimArea(SystemClaimArea area, int fromInclusive, int toExclusive,
+            Player actor) {
+        if (!Bukkit.isPrimaryThread()) {
+            throw new IllegalStateException("System claim cache changes must run on the primary thread.");
+        }
+        if (area == null) {
+            return;
+        }
+        List<FactionStorage.ClaimOwnerChange> changes = area.changes();
+        int from = Math.max(0, Math.min(fromInclusive, changes.size()));
+        int to = Math.max(from, Math.min(toExclusive, changes.size()));
+        for (int index = from; index < to; index++) {
+            FactionStorage.ClaimOwnerChange change = changes.get(index);
+            claims.put(change.key(), area.faction().id());
+            callEvent(new FactionClaimEvent(FactionClaimEvent.Action.CLAIM, area.faction(), actor,
+                    change.key(), change.previousFactionId(), 0L));
+        }
+    }
+
+    public record SystemClaimArea(FactionData faction, List<FactionStorage.ClaimOwnerChange> changes) { }
 
     /** Admin claim path that preserves claim events/Base-Raid metadata while bypassing normal limits. */
     public synchronized Result forceClaim(int factionId, Player actor, ChunkKey key) {

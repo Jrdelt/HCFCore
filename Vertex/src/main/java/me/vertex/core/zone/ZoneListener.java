@@ -173,6 +173,7 @@ public final class ZoneListener implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Player player = event.getPlayer();
         ItemStack held = event.getItem();
+        if (held == null) held = player.getInventory().getItemInMainHand();
         if (!zones.isSelector(held)) return;
         // Preserve the flight-release precedence from the normal interaction
         // handler: a selector click during guided flight means "drop now",
@@ -185,23 +186,31 @@ public final class ZoneListener implements Listener {
         switch (event.getAction()) {
             case LEFT_CLICK_BLOCK -> {
                 event.setCancelled(true);
-                String result = zones.isRouteSelecting(player.getUniqueId())
+                boolean route = zones.isRouteSelecting(player.getUniqueId());
+                String result = route
                         ? zones.addRoutePoint(player, event.getClickedBlock().getLocation().add(.5, 1, .5))
                         : zones.selectCorner(player, event.getClickedBlock().getLocation(), true);
-                selectionFeedback(player, result, false);
+                if (route) selectionFeedback(player, result, false);
+                else regionCornerFeedback(player, result, true);
             }
             case RIGHT_CLICK_BLOCK -> {
                 event.setCancelled(true);
-                String result = zones.isRouteSelecting(player.getUniqueId())
+                boolean route = zones.isRouteSelecting(player.getUniqueId());
+                String result = route
                         ? zones.removeRoutePoint(player)
                         : zones.selectCorner(player, event.getClickedBlock().getLocation(), false);
-                selectionFeedback(player, result, false);
+                if (route) selectionFeedback(player, result, false);
+                else regionCornerFeedback(player, result, false);
             }
             case LEFT_CLICK_AIR, RIGHT_CLICK_AIR -> {
                 if (player.isSneaking()) {
                     event.setCancelled(true);
+                    boolean route = zones.isRouteSelecting(player.getUniqueId());
+                    String name = zones.selectedRegionId(player.getUniqueId());
+                    ZoneType type = zones.selectedRegionType(player.getUniqueId());
                     String result = zones.finishSelection(player);
-                    selectionFeedback(player, result, true);
+                    if (route) selectionFeedback(player, result, true);
+                    else regionSaveFeedback(player, result, name, type);
                 }
             }
             default -> { }
@@ -255,6 +264,32 @@ public final class ZoneListener implements Listener {
     private void selectionFeedback(Player player, String result, boolean saved) {
         String key = "ok".equals(result) ? (saved ? "zones.selection-saved" : "zones.selection-updated")
                 : (saved ? "zones.selection-save-failed" : "zones.selection-error");
+        player.sendMessage(messages.get(player, key, "reason", result));
+    }
+
+    private void regionCornerFeedback(Player player, String result, boolean first) {
+        if (!"ok".equals(result)) {
+            String key = "world".equals(result) ? "zones.selection-world-mismatch" : "zones.selection-error";
+            player.sendMessage(messages.get(player, key, "reason", result));
+            return;
+        }
+        Location location = zones.selectedCorner(player.getUniqueId(), first);
+        if (location == null) {
+            player.sendMessage(messages.get(player, "zones.selection-error", "reason", "missing-corner"));
+            return;
+        }
+        player.sendMessage(messages.get(player, first ? "zones.selection-first" : "zones.selection-second",
+                "x", String.valueOf(location.getBlockX()), "y", String.valueOf(location.getBlockY()),
+                "z", String.valueOf(location.getBlockZ())));
+    }
+
+    private void regionSaveFeedback(Player player, String result, String name, ZoneType type) {
+        if ("ok".equals(result)) {
+            player.sendMessage(messages.get(player, "zones.region-created", "name", name,
+                    "zone", type == null ? "Zone" : type.displayName()));
+            return;
+        }
+        String key = "incomplete".equals(result) ? "zones.selection-incomplete" : "zones.selection-save-failed";
         player.sendMessage(messages.get(player, key, "reason", result));
     }
 

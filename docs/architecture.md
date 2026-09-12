@@ -11,6 +11,7 @@ All code lives under `me.vertex.core`, one package per feature area:
 | Package | Contains |
 |---|---|
 | `ability` | Every ability item's listener/manager, cooldowns, `/abilities`, `/getitem`, `/cooldowns` |
+| `audit` | Thresholded GC transaction audit files and staff alerts |
 | `auction` | Auction House listings, escrow, sorting, history, and payouts |
 | `backpack` | Persistent backpacks, upgrades, boosters, filters, and auto-storage |
 | `blueprint` | The automated base builder |
@@ -22,6 +23,7 @@ All code lives under `me.vertex.core`, one package per feature area:
 | `claims` | Base/Raid Claim metadata, expiry, connectivity, and explosion protection |
 | `coinflip` | Money, XP, GC, and item coinflips with persisted settlement records |
 | `collector` | Chunk Collector |
+| `command` | Command-precedence routing for Vertex `/filter` and `/sell` over Essentials |
 | `dupe` | Unique tracked-item IDs and staff investigation cases |
 | `economy` | Vault wrapper |
 | `enchant` | Custom enchants, runes, and the rune shop |
@@ -57,6 +59,7 @@ All code lives under `me.vertex.core`, one package per feature area:
 | `teleport` | Network-aware Spawn, warps, RTP, and shared countdowns |
 | `trade` | Item-only player trading, escrow, history, and delivery |
 | `user` | Per-player data cache |
+| `util` | Shared parsing, number, item, and chat-input helpers |
 | `wand` | Sell and TNT Wand container transactions |
 | `worldguard` | WorldGuard wrapper |
 | `zone` | Haven/Riftlands regions, guided entry, local zone mobs, progression, loot sessions, tickets, and Mob Kill Event |

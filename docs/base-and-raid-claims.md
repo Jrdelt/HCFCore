@@ -47,7 +47,7 @@ Another faction's claims never join a region, no matter how they sit
 geometrically — adjacency is always faction-scoped.
 
 Each region has its own **independent** cap
-(`claims.yml`'s `base-claim.max-chunks-per-region`, default 2000) — this
+(`factions.yml`'s `base-claim.max-chunks-per-region`, default 2000) — this
 is *per region*, not summed across a faction's up to 3 Base Claims. Once
 a region is full, further adjacent claims stay Raid Claims (with their
 own expiration timer), and the claiming player gets a chat warning
@@ -69,7 +69,7 @@ timestamp, stored as an absolute epoch millisecond deadline
 "persist the deadline, catch up on restart" idiom `FTopManager` and
 `HotZoneManager` use elsewhere in this plugin.
 
-- Default duration: 7 hours (`claims.yml`'s
+- Default duration: 7 hours (`factions.yml`'s
   `raid-claim.duration-seconds`), counted in **real elapsed time** —
   server downtime counts too.
 - On startup, `RaidClaimManager.recoverState()` immediately unclaims any
@@ -159,9 +159,9 @@ command or separate slot-purchase permission.
 
 ## Configuration
 
-- `claims.yml` — region cap and Raid Claim duration/sweep interval.
-- `config.yml` — explicit `faction-upgrades.upgrades.base-claim-slots`
-  prices and unlocked-slot values.
+- `factions.yml` — Base Claim region cap, Raid Claim duration/sweep interval,
+  and explicit `faction-upgrades.upgrades.base-claim-slots` prices and
+  unlocked-slot values.
 - `gui/baseclaim.yml` — the info/removal GUI, following the same
   `MenuLayout`-driven format as every other Vertex GUI (see
   [GUI Framework](gui-framework.md)).

@@ -35,7 +35,7 @@ exists. Both corners must be in the same world.
 The route is tied to the region name from step 2:
 
 ```text
-/haven route create haven_main haven_arrival
+/haven spawnpoints create haven_main haven_arrival
 ```
 
 The command gives another Zone Selector. Click route waypoints in the order
@@ -45,14 +45,14 @@ players should fly:
 - Right-click to remove the newest waypoint.
 - Hold Shift and click air to validate and save.
 
-Use at least two waypoints. You do not need to click every block; Vertex
-interpolates the path between waypoints. Every waypoint and path segment must
-remain inside `haven_main`.
+One waypoint is enough for a simple drop-in. Add waypoints at turns or height
+changes; Vertex interpolates the path between them. Every waypoint and path
+segment must remain inside `haven_main`.
 
 Preview it with:
 
 ```text
-/haven route preview haven_arrival
+/haven spawnpoints preview haven_arrival
 ```
 
 ## 4. Create an optional physical portal
@@ -69,21 +69,13 @@ Use the Portal Selector it gives you:
 2. Right-click the opposite corner.
 3. Hold Shift and click air to save.
 
-The portal uses the Haven route from step 3 automatically. For a separate
-route only for this portal:
+The portal uses the Haven route from step 3 automatically. Check the saved
+portal and routes:
 
 ```text
-/portal route create haven haven_portal_route
-```
-
-Click its waypoints inside Haven and Shift-click air to save.
-
-Check the saved portal and routes:
-
-```text
-/portal list
-/portal route list haven
-/portal route preview haven_portal_route
+/haven portal list
+/haven spawnpoints list
+/haven spawnpoints preview haven_arrival
 ```
 
 ## 5. Configure the loot pool
@@ -119,9 +111,9 @@ Apply changes with:
 
 ## Common problems
 
-- `no valid entry route`: the route was not saved, has fewer than two points,
-  or points were outside the region.
-- Portal says unavailable: verify `/portal list`, the player permission, and
+- `no valid entry route`: the route was not saved, has no waypoint, or a
+  waypoint/path segment was outside the region.
+- Portal says unavailable: verify `/haven portal list`, the player permission, and
   that a portal or zone route exists.
 - Selector does nothing: use the main hand, click actual blocks for points,
   and hold Shift while clicking air to save.

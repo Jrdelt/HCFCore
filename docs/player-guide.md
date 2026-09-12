@@ -21,10 +21,10 @@ you what a click does.
 | `/cf` | Open to all | Coinflip another player for money, XP, GC, or items |
 | `/gc` | `vertex.gc.use` | Open your GC wallet, withdraw a code, or redeem a code |
 | `/trade <player>` | `vertex.trade.use` | Secure face-to-face trade |
-| `/tradetoggle` | `vertex.trade.use` | Stop receiving trade requests |
+| `/tradetoggle` | Open to all | Toggle the same Trade Requests setting shown in `/settings` |
 | `/mines` | Open to all | Mining world status: ores, KOTH, Hot Zones |
 | `/events` | Open to all | View active Mine KOTH and Hot Zone events |
-| `/haven` · `/riftlands` · `/zones` | `vertex.zones.use` | Enter farming zones or view zone progress |
+| `/haven` · `/riftlands` | `vertex.zones.use` | Enter farming zones and view their progress |
 | `/boosters` | Open to all | Every bonus currently applying to you |
 | `/filter add <material>` | Open to all | Choose what your Backpack throws away |
 | `/runes` · `/ce` | Open to all | Browse and buy Custom Enchantment Runes |
@@ -120,14 +120,15 @@ See [Coinflips](coinflips.md).
 
 ## Notification preferences
 
-Use `/settings` (or `/preferences`) to choose which optional server-wide
-announcements you want to receive. Your choices persist between sessions.
+Use `/settings` (or `/preferences`) to choose which global chat, incoming
+interactions, and optional server-wide announcements you want to receive.
+Your choices persist between sessions.
 
 ## Trading
 
 `/trade <player>` opens a secure two-sided item trade, with both sides having
-to confirm. `/tradetoggle` stops incoming
-requests.
+to confirm. `/tradetoggle` changes the same Trade Requests setting shown in
+`/settings`.
 
 See [Player Trading](trading.md).
 

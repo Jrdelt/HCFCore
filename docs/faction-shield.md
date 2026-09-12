@@ -17,7 +17,7 @@ Vertex owns both systems; no external faction plugin is required.
 
 Grace is global explosion protection for every claimed faction location. Compact
 durations support days, hours, minutes, and seconds. `grace.maximum-duration-seconds`
-in `shield.yml` is the hard configured limit.
+in `factions.yml` is the hard configured limit.
 
 Grace stores an absolute database deadline, so downtime neither pauses nor
 restarts it. Every enable/disable action is written to `faction_grace_log`.
@@ -34,15 +34,17 @@ time and duration. The defaults are:
 - A 24-hour delay before a newly saved schedule becomes active.
 - `America/Los_Angeles` as the schedule time zone.
 
-These values are configured under `shield.schedule` in `shield.yml`. The
+These values are configured under `shield.schedule` in `factions.yml`. The
 entire week and its PvP option are saved as one unit. A stale GUI cannot
 overwrite a newer role, faction, or schedule decision because authorization
 and the edit lock are rechecked in the database transaction.
 
 The optional `/f shield activate` command provides a manual activation window.
 It is limited to Leader/Co-Leader, requires `vertex.shield.activate`, and uses
-the configured duration/cooldown. The `shield-duration` faction upgrade adds
-its explicitly configured bonus, capped by `shield.maximum-duration-seconds`.
+the configured duration/cooldown. By default it lasts 8 hours. The four
+explicit `shield-duration` upgrade levels add 1, 2, 3, or 4 hours, for a
+maximum 12-hour activation; the real stored expiration uses that configured
+total, not only the GUI display.
 Manual and weekly windows coexist; either can make the Shield active.
 
 ## Protected territory and PvP

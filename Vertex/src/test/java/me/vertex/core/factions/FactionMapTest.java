@@ -75,6 +75,19 @@ class FactionMapTest {
     }
 
     @Test
+    void reloadConfigAppliesMapDimensionsToTheNextMapImmediately() {
+        plugin.getConfig().set("factions.map.width", 9);
+        plugin.getConfig().set("factions.map.height", 5);
+        factions.reloadConfig();
+
+        String plain = PlainTextComponentSerializer.plainText().serialize(factions.map(player));
+        String[] lines = plain.split("\\n", -1);
+        assertTrue(lines[0].contains("9x5"));
+        assertEquals(6, lines.length, "reload should affect the very next rendered map");
+        assertEquals(9, lines[1].length());
+    }
+
+    @Test
     void claimHoverDistinguishesBaseAndExpiringRaidClaims() {
         factions.setClaimMapQueries((factionId, chunk) -> true, chunk -> 0L);
         assertTrue(hoverText(factions.map(player)).contains("Base Claim"));

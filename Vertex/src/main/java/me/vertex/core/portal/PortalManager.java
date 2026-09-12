@@ -175,6 +175,23 @@ public final class PortalManager {
         return selection != null && selection.route;
     }
 
+    /** Read-only selection details for standardized portal-corner feedback. */
+    public String selectedPortalId(UUID playerId) {
+        Selection selection = selections.get(playerId);
+        return selection == null ? null : selection.id;
+    }
+
+    public PortalTarget selectedTarget(UUID playerId) {
+        Selection selection = selections.get(playerId);
+        return selection == null ? null : selection.target;
+    }
+
+    public Location selectedCorner(UUID playerId, boolean first) {
+        Selection selection = selections.get(playerId);
+        Location location = selection == null ? null : (first ? selection.first : selection.second);
+        return location == null ? null : location.clone();
+    }
+
     public String selectCorner(Player player, Location location, boolean first) {
         Selection selection = selections.get(player.getUniqueId());
         if (selection == null || selection.route) return "none";
@@ -221,10 +238,7 @@ public final class PortalManager {
 
     private String saveRoute(Selection selection) {
         if (selection.points.isEmpty()) return "incomplete";
-        for (ZoneRoute.Waypoint point : selection.points) {
-            World world = Bukkit.getWorld(point.world());
-            if (world == null || !isTargetLocation(selection.target, point.location(world))) return "outside";
-        }
+        if (!routeStaysInTarget(selection.target, selection.points)) return "outside";
         PortalRoute route = new PortalRoute(selection.id, selection.target, selection.speed, selection.points);
         try {
             storage.upsertRoute(route, encodeWaypoints(route.waypoints()));
@@ -234,6 +248,35 @@ public final class PortalManager {
         }
         routes.put(route.id(), route);
         return "ok";
+    }
+
+    /** Prevent a route from cutting through terrain outside its destination between two valid points. */
+    private boolean routeStaysInTarget(PortalTarget target, List<ZoneRoute.Waypoint> points) {
+        if (target == null || points.isEmpty()) return false;
+        World expected = Bukkit.getWorld(points.getFirst().world());
+        if (expected == null) return false;
+        Location previous = null;
+        for (ZoneRoute.Waypoint waypoint : points) {
+            World world = Bukkit.getWorld(waypoint.world());
+            if (world == null || !world.equals(expected)) return false;
+            Location current = waypoint.location(world);
+            if (!isTargetLocation(target, current)) return false;
+            if (previous != null && !segmentStaysInTarget(target, previous, current)) return false;
+            previous = current;
+        }
+        return true;
+    }
+
+    private boolean segmentStaysInTarget(PortalTarget target, Location from, Location to) {
+        double distance = from.distance(to);
+        int samples = Math.max(1, (int) Math.ceil(distance / .5D));
+        for (int index = 1; index <= samples; index++) {
+            double fraction = index / (double) samples;
+            Location sample = from.clone().add((to.getX() - from.getX()) * fraction,
+                    (to.getY() - from.getY()) * fraction, (to.getZ() - from.getZ()) * fraction);
+            if (!isTargetLocation(target, sample)) return false;
+        }
+        return true;
     }
 
     public boolean deletePortal(String rawId) {
@@ -250,6 +293,13 @@ public final class PortalManager {
         return true;
     }
 
+    /** Deletes only when the portal belongs to the command's destination scope. */
+    public boolean deletePortal(PortalTarget target, String rawId) {
+        String id = PortalTarget.normalize(rawId);
+        EntryPortal portal = id == null ? null : portals.get(id);
+        return portal != null && portal.target().equals(target) && deletePortal(id);
+    }
+
     public boolean deleteRoute(String rawId) {
         String id = PortalTarget.normalize(rawId);
         PortalRoute route = id == null ? null : routes.get(id);
@@ -262,6 +312,13 @@ public final class PortalManager {
         }
         routes.remove(id, route);
         return true;
+    }
+
+    /** Deletes only when the route belongs to the command's destination scope. */
+    public boolean deleteRoute(PortalTarget target, String rawId) {
+        String id = PortalTarget.normalize(rawId);
+        PortalRoute route = id == null ? null : routes.get(id);
+        return route != null && route.target().equals(target) && deleteRoute(id);
     }
 
     /** Called on block movement. Cooldown and all validation are server-side. */
@@ -330,16 +387,26 @@ public final class PortalManager {
 
     private boolean startFlight(Player player, PortalRoute route, boolean preview) {
         if (!preview && combat.isTagged(player.getUniqueId())) return false;
-        ZoneRoute.Waypoint first = route.waypoints().get(ThreadLocalRandom.current().nextInt(route.waypoints().size()));
+        // A route is an ordered flight path, not a bag of random spawn
+        // locations.  Start at its first recorded point and guide the player
+        // through every later point server-side.
+        ZoneRoute.Waypoint first = route.waypoints().getFirst();
         World world = Bukkit.getWorld(first.world());
         if (world == null || !isTargetLocation(route.target(), first.location(world))) return false;
+        for (ZoneRoute.Waypoint point : route.waypoints()) {
+            World pointWorld = Bukkit.getWorld(point.world());
+            if (pointWorld == null || !pointWorld.equals(world)
+                    || !isTargetLocation(route.target(), point.location(pointWorld))) {
+                return false;
+            }
+        }
         FlightState previous = new FlightState(player.getAllowFlight(), player.isFlying(), player.getFlySpeed());
         if (!player.teleport(first.location(world))) return false;
         player.setAllowFlight(false);
         player.setFlying(false);
         player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, Integer.MAX_VALUE, 0, false, false, false));
         slowFallers.add(player.getUniqueId());
-        flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), previous));
+        flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), previous, route.waypoints(), route.speed()));
         if (!preview && route.target().kind() == PortalTarget.Kind.RIFTLANDS) zones.startPortalRiftSession(player);
         if (!preview) player.sendMessage(messages.get(player, "portals.entered", "target", route.target().displayName()));
         return true;
@@ -371,9 +438,43 @@ public final class PortalManager {
     }
 
     private void tickFlight(Flight flight) {
-        Player player = Bukkit.getPlayer(flight.playerId());
-        if (player == null) { flights.remove(flight.playerId()); return; }
-        if (player.isOnGround()) releaseFlight(player.getUniqueId(), false);
+        Player player = Bukkit.getPlayer(flight.playerId);
+        if (player == null) {
+            flights.remove(flight.playerId);
+            return;
+        }
+        if (flight.nextWaypoint >= flight.waypoints.size()) {
+            releaseFlight(player.getUniqueId(), true);
+            return;
+        }
+        ZoneRoute.Waypoint waypoint = flight.waypoints.get(flight.nextWaypoint);
+        World world = Bukkit.getWorld(waypoint.world());
+        if (world == null || !world.equals(player.getWorld())) {
+            releaseFlight(player.getUniqueId(), false);
+            return;
+        }
+        Location target = waypoint.location(world);
+        Location current = player.getLocation();
+        double distance = current.distance(target);
+        double step = flight.speed / 20D;
+        if (distance <= step || distance < .001D) {
+            if (!player.teleport(target)) {
+                releaseFlight(player.getUniqueId(), false);
+                return;
+            }
+            flight.nextWaypoint++;
+            if (flight.nextWaypoint >= flight.waypoints.size()) {
+                releaseFlight(player.getUniqueId(), true);
+            }
+            return;
+        }
+        org.bukkit.util.Vector direction = target.toVector().subtract(current.toVector()).normalize().multiply(step);
+        Location next = current.add(direction);
+        next.setYaw(target.getYaw());
+        next.setPitch(target.getPitch());
+        if (!player.teleport(next)) {
+            releaseFlight(player.getUniqueId(), false);
+        }
     }
 
     private boolean targetExists(PortalTarget target) {
@@ -429,7 +530,21 @@ public final class PortalManager {
 
     private static double bounded(double value, double min, double max) { return Math.max(min, Math.min(max, value)); }
     private record FlightState(boolean allowFlight, boolean flying, float flySpeed) { }
-    private record Flight(UUID playerId, FlightState before) { }
+    private static final class Flight {
+        private final UUID playerId;
+        private final FlightState before;
+        private final List<ZoneRoute.Waypoint> waypoints;
+        private final double speed;
+        private int nextWaypoint;
+
+        private Flight(UUID playerId, FlightState before, List<ZoneRoute.Waypoint> waypoints, double speed) {
+            this.playerId = playerId;
+            this.before = before;
+            this.waypoints = List.copyOf(waypoints);
+            this.speed = bounded(speed, .05D, 8D);
+            this.nextWaypoint = 1;
+        }
+    }
     private static final class Selection {
         private final String id;
         private final PortalTarget target;

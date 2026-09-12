@@ -11,7 +11,6 @@ Vertex supplies two named, database-backed farming-zone types:
 |---|---|---|
 | `/haven` | `vertex.zones.use` | Open the Haven hub with entry, live activity, and its loot pool. |
 | `/riftlands` | `vertex.zones.use` | Open the Riftlands hub with entry, live activity, and its loot pool. |
-| `/zones` | `vertex.zones.use` | View both progression tracks, event standings, and active booster details. |
 | `/haven lootpool` | `vertex.zones.use` | View Haven rewards. |
 | `/riftlands lootpool` | `vertex.zones.use` | View Riftlands rewards. |
 
@@ -24,7 +23,7 @@ the explicit `lootpool` subcommand to open the editable version.
 
 Entry uses an Emerald Block confirmation followed by a configurable stationary countdown. Entry permission, player-data readiness, cooldown, combat status, and a valid enabled route are rechecked only when Enter is clicked. Movement, damage, changing world, teleportation, disconnecting, or becoming combat tagged cancels it. A valid route then carries the player server-side; clicking either mouse button, reaching the end, or being hit in Riftlands releases them with Slow Falling until ground contact.
 
-`/spawn` channels for 10 seconds in Haven and 20 seconds in Riftlands by default. Combat cancels/blocks the exit channel. A successful Riftlands exit secures that session’s tagged loot.
+`/spawn` channels for 10 seconds in Haven and 20 seconds in Riftlands by default. Combat cancels/blocks the exit channel. A successful Riftlands exit secures that session’s tagged loot. A death in Haven, Riftlands, a mine, Wilderness, or WarZone bypasses this channel and respawns at the configured shared Spawn.
 
 ## Riftlands session loot and Ticket
 
@@ -39,22 +38,21 @@ All setup requires `vertex.zones.admin`.
 | Command | Permission | What it does |
 |---|---|---|
 | `/haven create <name>` / `/riftlands create <name>` | `vertex.zones.admin` | Define the active region and metadata for each zone type. |
-| `/haven wand` / `/riftlands wand` | `vertex.zones.admin` | Give a Zone Selector for setting the first and second corners. |
 | `/haven list` / `/riftlands list` | `vertex.zones.admin` | Shows the currently defined zones for review/editing. |
-| `/haven portal create <portal-name>` / `/riftlands portal create <portal-name>` | `vertex.portals.admin` | Creates a physical portal selection for that zone type. |
-| `/haven route create <region> <name>` / `/riftlands route create <region> <name>` | `vertex.zones.admin` | Builds an explicit route for a zone. |
-| `/haven route list\|preview\|delete <name>` / `/riftlands route list\|preview\|delete <name>` | `vertex.zones.admin` | Manages or tests existing route definitions. |
+| `/haven portal create\|delete\|list` / `/riftlands portal create\|delete\|list` | `vertex.portals.admin` | Creates or manages a physical portal selection for that zone type. |
+| `/haven spawnpoints create [region] <name>` / `/riftlands spawnpoints create [region] <name>` | `vertex.zones.admin` | Builds an explicit ordered entry route. Omit `region` only while standing in a matching region or when exactly one matching region exists. |
+| `/haven spawnpoints list\|preview\|delete <name>` / `/riftlands spawnpoints list\|preview\|delete <name>` | `vertex.zones.admin` | Manages or tests existing zone routes. |
 | `/haven lootpool` / `/riftlands lootpool` | `vertex.zones.admin` | Opens the editable loot-pool editor version. |
+| `/haven koth\|outpost create\|cancel\|delete\|list` / `/riftlands koth\|outpost create\|cancel\|delete\|list` | `vertex.zones.admin` | Creates and manages the zone-local KOTH and Outpost control points. |
 | `/haven admin event start\|stop` | `vertex.zones.admin` | Starts or stops the hourly event. |
 | `/haven admin inspect <player>` | `vertex.zones.admin` | Inspects a player’s zone progression and current amplification. |
+| `/haven admin clear-mobs [all]` / `/riftlands admin clear-mobs [all]` | `vertex.zones.admin` | Removes tracked mobs from that zone, or from both zones with `all`. |
 
-The shared Zone Selector is a Blaze Rod: left-click sets the first corner (or adds a route point), right-click sets the second corner (or removes the newest route point), and sneak-air click saves. Portal creation gives its separately tagged Portal Selector automatically, so a region wand cannot accidentally save a portal selection. Regions may never overlap. Every route point and every interpolated 0.5-block segment must remain in its selected region. The `region` and `route` setup branches remain available to staff; ticket issuing and the old season-reset command are not part of the command tree.
+The shared Zone Selector is a Blaze Rod: left-click sets the first corner (or adds a route point), right-click sets the second corner (or removes the newest route point), and sneak-air click saves. Portal creation gives its separately tagged Portal Selector automatically, so a region wand cannot accidentally save a portal selection. Regions may never overlap. Every route point and every interpolated 0.5-block segment must remain in its selected region. Ticket issuing and the old season-reset command are not part of the command tree.
 
-`/haven route ...` and `/riftlands route ...` create routes used by the zone
-entry GUI. A physical Haven/Riftlands portal uses one of those routes as a
-fallback when it has no dedicated `/portal route ...` route, so admins can
-configure the flight once. Stonewake and Bloodvein are mine destinations and
-must use their own portal route. The Portal Selector save action is Shift plus
+`/haven spawnpoints ...` and `/riftlands spawnpoints ...` create routes used by the zone
+entry GUI and physical portal entry, so admins configure each flight once.
+Stonewake and Bloodvein use their own `/mines spawnpoints` routes. The Portal Selector save action is Shift plus
 an air click; it accepts cancelled air events so the save is not swallowed by
 another item listener.
 

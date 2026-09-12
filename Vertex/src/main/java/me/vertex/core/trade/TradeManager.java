@@ -2,6 +2,8 @@ package me.vertex.core.trade;
 
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.preferences.AnnouncementCategory;
+import me.vertex.core.preferences.AnnouncementPreferenceManager;
 import me.vertex.core.storage.ClaimDelivery;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -32,11 +34,10 @@ import java.util.logging.Level;
 public final class TradeManager {
     public enum Result { OK, DISABLED, SELF, BUSY, TOO_FAR, TARGET_OFF, BLOCKED, NO_REQUEST, EXPIRED, NOT_REQUESTED, COOLDOWN, LOCKED, NOT_FIRST_LOCKED, FULL }
     private record Request(UUID sender, UUID target, long expires) { }
-    private final Plugin plugin; private final TradeStorage storage; private final Messages messages; private final File file;
+    private final Plugin plugin; private final TradeStorage storage; private final AnnouncementPreferenceManager preferences; private final Messages messages; private final File file;
     private final Map<UUID, Request> requests = new ConcurrentHashMap<>();
     private final Map<UUID, TradeSession> sessions = new ConcurrentHashMap<>();
     private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
-    private final Map<UUID, Boolean> accepting = new ConcurrentHashMap<>();
     private final Set<UUID> programmaticClose = ConcurrentHashMap.newKeySet();
     private final Map<UUID, CompletableFuture<Void>> escrowChains = new ConcurrentHashMap<>();
     private final Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
@@ -48,7 +49,7 @@ public final class TradeManager {
     private volatile Material divider = Material.BLACK_STAINED_GLASS_PANE, filler = Material.GRAY_STAINED_GLASS_PANE, confirm = Material.LIME_DYE, locked = Material.GRAY_DYE;
     private volatile Set<String> worlds = Set.of(); private volatile Set<GameMode> gameModes = Set.of(); private volatile Set<Material> blockedItems = Set.of();
 
-    public TradeManager(Plugin plugin, TradeStorage storage, Messages messages) { this.plugin = plugin; this.storage = storage; this.messages = messages; this.file = new File(plugin.getDataFolder(), "traders.yml"); }
+    public TradeManager(Plugin plugin, TradeStorage storage, AnnouncementPreferenceManager preferences, Messages messages) { this.plugin = plugin; this.storage = storage; this.preferences = preferences; this.messages = messages; this.file = new File(plugin.getDataFolder(), "traders.yml"); }
     public void load() {
         if (!file.exists()) plugin.saveResource("traders.yml", false);
         YamlConfiguration c = YamlConfiguration.loadConfiguration(file);
@@ -73,7 +74,7 @@ public final class TradeManager {
 
     public Result request(Player sender, Player target) {
         if (!enabled) return Result.DISABLED; if (sender.equals(target)) return Result.SELF; if (busy(sender.getUniqueId()) || busy(target.getUniqueId())) return Result.BUSY; if (onCooldown(sender.getUniqueId()) || onCooldown(target.getUniqueId())) return Result.COOLDOWN;
-        if (!allowed(sender) || !allowed(target)) return Result.BLOCKED; if (!accepting.getOrDefault(target.getUniqueId(), true)) return Result.TARGET_OFF; if (!near(sender, target)) return Result.TOO_FAR;
+        if (!allowed(sender) || !allowed(target)) return Result.BLOCKED; if (!isAccepting(target.getUniqueId())) return Result.TARGET_OFF; if (!near(sender, target)) return Result.TOO_FAR;
         Request request = new Request(sender.getUniqueId(), target.getUniqueId(), System.currentTimeMillis() + requestTimeout); requests.put(target.getUniqueId(), request); return Result.OK;
     }
     public Result accept(Player target, Player sender) {
@@ -83,18 +84,16 @@ public final class TradeManager {
         requests.remove(target.getUniqueId()); TradeSession session = new TradeSession(sender.getUniqueId(), target.getUniqueId()); sessions.put(sender.getUniqueId(), session); sessions.put(target.getUniqueId(), session);
         org.bukkit.inventory.Inventory inventory = TradeMenu.open(session, sender, target, this, messages); sender.openInventory(inventory); target.openInventory(inventory); persistEscrow(session); return Result.OK;
     }
-    public boolean isAccepting(UUID uuid) { return accepting.getOrDefault(uuid, true); }
+    public boolean isAccepting(UUID uuid) { return preferences == null || preferences.isEnabled(uuid, AnnouncementCategory.TRADE_REQUESTS); }
 
-    public boolean toggle(Player player) { boolean value = !accepting.getOrDefault(player.getUniqueId(), true); accepting.put(player.getUniqueId(), value); track(CompletableFuture.runAsync(() -> { try { storage.saveAccepting(player.getUniqueId(), value); } catch (Exception e) { plugin.getLogger().log(Level.WARNING, "Could not save trade preference", e); } })); return value; }
     public void loadPlayer(Player player) {
         UUID playerId = player.getUniqueId();
         track(CompletableFuture.runAsync(() -> {
             try {
-                accepting.put(playerId, storage.loadAccepting(playerId));
                 applyClaims(playerId);
                 processPendingPayouts(playerId);
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Could not load trade preferences", e);
+                plugin.getLogger().log(Level.WARNING, "Could not load pending trade deliveries", e);
             }
         }));
     }

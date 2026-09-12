@@ -129,12 +129,11 @@ otherwise-identical empty Backpacks from stacking. It exposes:
   carry the same instance ID.
 
 `ItemKind` started as a placeholder enum (`GENERIC` only, nothing tagged
-with it). Custom Enchantments is the first real consumer: every physical
-Rune (`ItemKind.RUNE`) and physical enchant item (`ItemKind.ENCHANTMENT_ITEM`)
-is tagged at creation, and every target item is tagged
-(`ItemKind.ENCHANTED_ITEM`) the moment it first receives a successful
-application — see [Custom Enchantments](custom-enchantments.md) for the
-full mechanics. `DupeManager#shouldTrack` treats any item carrying a real
+with it). Custom Enchantments tags only non-stackable target gear
+(`ItemKind.ENCHANTED_ITEM`) after a successful application; base Runes,
+Lucky Gems, and rolled enchant items remain untagged so identical items can
+stack. See [Custom Enchantments](custom-enchantments.md) for the full
+mechanics. `DupeManager#shouldTrack` treats any item carrying a real
 (non-`GENERIC`) `ItemKind` as automatically worth tracking, which is the
 entire integration a new feature needs — no second detection system.
 

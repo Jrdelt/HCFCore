@@ -293,6 +293,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(playerStatsManager, this);
         messages = new Messages(this, userManager);
         messages.load();
+        staffManager = new StaffManager(this);
         try {
             deliveryManager=new me.vertex.core.storage.DeliveryManager(this,database,messages);
             deliveryManager.init();
@@ -309,7 +310,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         getCommand("f").setExecutor(factionCommand);
         getCommand("f").setTabCompleter(factionCommand);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.factions.FactionGameplayListener(this, factionService), this);
-        Bukkit.getPluginManager().registerEvents(new me.vertex.core.factions.FactionProtectionListener(this, factionService, messages), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.factions.FactionProtectionListener(
+                this, factionService, messages, staffManager), this);
         factionPowerListener = new me.vertex.core.factions.FactionPowerListener(this, factionService);
         Bukkit.getPluginManager().registerEvents(factionPowerListener, this);
         factionPowerBooster = new me.vertex.core.factions.FPowerBooster(this, factionService, messages);
@@ -348,6 +350,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 announcementPreferenceManager, messages);
         getCommand("settings").setExecutor(settingsCommand);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.preferences.SettingsMenuListener(), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.preferences.PlayerInteractionPreferenceListener(
+                announcementPreferenceManager, messages), this);
         chatAmountPrompt = new me.vertex.core.util.ChatAmountPrompt(this, messages);
         Bukkit.getPluginManager().registerEvents(chatAmountPrompt, this);
         abilityManager = new AbilityManager(this, storage);
@@ -494,8 +498,6 @@ combatManager.start();
         getCommand("tntfill").setTabCompleter(tntFillCommand);
         Bukkit.getPluginManager().registerEvents(factionBankManager, this);
         Bukkit.getPluginManager().registerEvents(factionBankMenu, this);
-
-        staffManager = new StaffManager(this);
 
         pvpTopManager = new me.vertex.core.faction.PvpTopManager(this, pvpTopStorage);
         pvpTopManager.load();
@@ -878,7 +880,8 @@ combatManager.start();
         Bukkit.getPluginManager().registerEvents(mineTeleportManager, this);
         backpackAutoStoreListener.setMineRegionPredicate(location -> mineManager.regionAt(location) != null);
         Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.mine.MineListener(mineManager, boosterService, messages, backpackAutoStoreListener), this);
+                new me.vertex.core.mine.MineListener(mineManager, boosterService, messages,
+                        backpackAutoStoreListener, staffManager), this);
 
         me.vertex.core.mine.MineKothStorage mineKothStorage = new me.vertex.core.mine.MineKothStorage(database);
         try {
@@ -981,7 +984,7 @@ combatManager.start();
         auctionSweepTask = Bukkit.getScheduler().runTaskTimer(this, auctionManager::sweepExpired,
                 auctionManager.sweepIntervalTicks(), auctionManager.sweepIntervalTicks());
 
-        tradeManager = new me.vertex.core.trade.TradeManager(this, tradeStorage, messages);
+        tradeManager = new me.vertex.core.trade.TradeManager(this, tradeStorage, announcementPreferenceManager, messages);
         tradeManager.load();
         tradeManager.restoreEscrow();
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.trade.TradeListener(this, tradeManager, messages),
@@ -989,7 +992,7 @@ combatManager.start();
         me.vertex.core.trade.TradeCommand tradeCommand = new me.vertex.core.trade.TradeCommand(tradeManager, messages);
         getCommand("trade").setExecutor(tradeCommand);
         getCommand("trade").setTabCompleter(tradeCommand);
-        getCommand("tradetoggle").setExecutor(new me.vertex.core.trade.TradeToggleCommand(tradeManager, messages));
+        getCommand("tradetoggle").setExecutor(new me.vertex.core.trade.TradeToggleCommand(announcementPreferenceManager, messages));
         me.vertex.core.trade.TradeHistoryCommand tradeHistoryCommand = new me.vertex.core.trade.TradeHistoryCommand(
                 tradeManager, messages);
         getCommand("tradehistory").setExecutor(tradeHistoryCommand);
@@ -1012,6 +1015,7 @@ combatManager.start();
         // It is initialized after those dependencies and before PlaceholderAPI.
         zoneManager = new me.vertex.core.zone.ZoneManager(this, database, messages, combatManager,
                 backpackManager, trackedItemIds);
+        zoneManager.setAnnouncementPreferences(announcementPreferenceManager);
         try {
             zoneManager.initStorage();
             zoneManager.load();
@@ -1043,7 +1047,6 @@ combatManager.start();
             Bukkit.getPluginManager().disablePlugin(this);
             return;
         }
-        me.vertex.core.zone.ZoneCommand.setArenaControls(arenaControls);
         Bukkit.getPluginManager().registerEvents(arenaControls, this);
         boosterService.register(new me.vertex.core.zone.ArenaControlBoosterSource(arenaControls));
         me.vertex.core.zone.ZoneMenu zoneMenu = new me.vertex.core.zone.ZoneMenu(this, zoneManager, messages);
@@ -1054,10 +1057,12 @@ combatManager.start();
                 zoneManager, messages), this);
         me.vertex.core.zone.ZoneCommand havenCommand = new me.vertex.core.zone.ZoneCommand(zoneManager, zoneMenu,
                 messages, me.vertex.core.zone.ZoneType.HAVEN);
+        havenCommand.setArenaControls(arenaControls);
         getCommand("haven").setExecutor(havenCommand);
         getCommand("haven").setTabCompleter(havenCommand);
         me.vertex.core.zone.ZoneCommand riftlandsCommand = new me.vertex.core.zone.ZoneCommand(zoneManager, zoneMenu,
                 messages, me.vertex.core.zone.ZoneType.RIFTLANDS);
+        riftlandsCommand.setArenaControls(arenaControls);
         getCommand("riftlands").setExecutor(riftlandsCommand);
         getCommand("riftlands").setTabCompleter(riftlandsCommand);
         zoneManager.start();
@@ -1072,10 +1077,13 @@ combatManager.start();
             return;
         }
         mineTeleportManager.setPortalManager(portalManager);
+        minesCommand.setPortalManager(portalManager);
         havenCommand.setPortalManager(portalManager);
         riftlandsCommand.setPortalManager(portalManager);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.portal.PortalListener(portalManager, messages), this);
         portalManager.start();
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.teleport.DeathSpawnListener(this,
+                globalLocationManager, networkManager, mineManager, zoneManager, factionService), this);
         playerConnectionListener = new PlayerConnectionListener(userManager, combatManager);
         playerConnectionListener.setGhostPlayerManager(ghostPlayerManager);
         playerConnectionListener.setTrustedTransfer(networkManager::isTrustedDeparture);

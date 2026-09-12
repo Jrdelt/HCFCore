@@ -173,7 +173,7 @@ cobblestone:
       - "<gray>Base Claims only. Reusable."
 
 # Faction claim names Source Buckets are always blocked in -- matches
-# whatever you named your system factions via /f safezone and /f warzone.
+# whatever you named your system factions via /f claim <Safezone|Warzone>.
 # Independent from abilities.disabled-claim-names (config.yml) and from
 # chunkbuster.yml's own list, for the same reason chunkbuster.yml gives
 # itself one instead of reusing abilities.disabled-claim-names: this

@@ -40,9 +40,9 @@ features are usually role-gated under `/f permissions`.
 ## Spawners & Chunk Collectors
 
 Spawners no longer have their own command — they're a category inside
-`/shop` now (see [Shop](#shop) below). Buying one opens the same
-per-mob-type catalog `/spawners` used to, just reached through the
-shop's category picker instead of its own top-level command.
+`/shop` now (see [Shop](#shop) below). Select **Spawners & Mob Drops**
+from the category picker; its paginated catalog is the only supported
+spawner-shop entry point.
 
 | Command | Permission | Notes |
 |---|---|---|
@@ -68,7 +68,7 @@ shop's category picker instead of its own top-level command.
 | Command | Permission | Notes |
 |---|---|---|
 | `/trade <player>` / `/trade accept <player>` / `/trade cancel` | `vertex.trade.use` | Creates, accepts, or cancels a secured direct trade. |
-| `/tradetoggle` | `vertex.trade.use` | Persists an incoming-request opt-out. |
+| `/tradetoggle` | Open to all | Toggles the same persistent Trade Requests setting shown in `/settings`. |
 | `/trade payouts [key] [paid\|retry]` | `vertex.trade.payouts` | Lists or reconciles uncertain legacy Trade money/EXP payouts. |
 | `/vertex reload` | `vertex.admin` | Reloads Vertex configuration, including `traders.yml`. |
 | `/tradehistory [player]` / `/tradelogs [all\|player]` | `vertex.trade.staff.history` | Opens the read-only, paginated trade audit history. |
@@ -130,7 +130,7 @@ join-time summary of any still-open cases. See
 
 | Command | Permission | What it does |
 |---|---|---|
-| `/settings` (alias `/preferences`) | — | Opens personal toggles for optional Coinflip, KOTH, Outpost, Mining Event, and Server announcements. |
+| `/settings` (alias `/preferences`) | — | Opens persistent Global Chat, Trade Requests, Notifications, Private Messages, Payments, Teleport Requests, and announcement toggles. `/tradetoggle` changes the same Trade Requests setting. |
 
 ## Network travel
 
@@ -160,13 +160,16 @@ its operational requirements are covered in [Velocity Shards](network-shards.md)
 |---|---|---|
 | `/mines` | Open to all | Overview of the placed mining worlds — see [Mining Worlds](mines.md). |
 | `/events` | Open to all | Opens live server KOTH, Mine KOTH, and Hot Zone state, including owner and the next configured KOTH start. |
-| `/mines wand <mine>` | `vertex.mines.admin` | Blaze-rod corner selection; saving writes the world and bounds into `mines.yml`. |
+| `/mines create <mine> [koth]` | `vertex.mines.admin` | Blaze-rod corner selection; saving writes the world and bounds into `mines.yml`. |
 | `/haven`, `/riftlands` | `vertex.zones.use` | Opens that zone's hub with live player/mob counts, entry, and a read-only loot pool with drop percentages. |
-| `/zones` | `vertex.zones.use` | View Haven/Riftlands progression and Mob Kill Event standings. |
-| `/haven\|riftlands create\|wand\|list\|lootpool` | `vertex.zones.admin` | Zone setup and loot-pool commands. Staff can use the documented `region`, `route`, and `admin event/inspect` branches for management. |
-| `/haven\|riftlands portal create <name>` | `vertex.portals.admin` | Starts a portal-volume selection already locked to that zone type and gives the correct Portal Selector. |
-| — | `vertex.zones.admin.build` | Bypass the no-build rule inside a zone for controlled maintenance. |
-| `/portal` (alias `/portals`) | `vertex.portals.admin` | Creates source portal volumes, verified destination routes, and staff previews. See [Physical Entry Portals](portals.md). |
+| `/haven\|riftlands create\|list\|lootpool` | `vertex.zones.admin` | Zone setup and loot-pool commands. `lootpool` is read-only for ordinary players and editable for admins. |
+| `/haven\|riftlands portal create\|delete\|list` | `vertex.portals.admin` | Starts or manages a portal-volume selection locked to that zone type. |
+| `/haven\|riftlands spawnpoints create [region] <route>\|delete\|preview\|list` | `vertex.zones.admin` | Creates and manages verified, ordered zone-entry routes. The region may be omitted only when the sender is inside one matching region or exactly one exists. |
+| `/haven\|riftlands koth\|outpost create\|cancel\|delete\|list` | `vertex.zones.admin` | Creates and manages the zone-local KOTH and Outpost control points. |
+| `/haven\|riftlands admin event start\|stop`, `inspect [player]`, `clear-mobs [all]` | `vertex.zones.admin` | Controls the Mob Kill Event, inspects a player's zone progress, or removes tracked zone mobs. |
+| — | `vertex.zones.admin.build` | Bypass the no-build terrain rule inside a zone for controlled maintenance. |
+| — | `vertex.zones.command-bypass` | Bypass configured blocked commands while inside Haven or Riftlands. |
+| `/mines portal` / `/mines spawnpoints` | `vertex.mines.admin` | Creates mine portal volumes and verified ordered arrival routes. See [Physical Entry Portals](portals.md). |
 | — | `vertex.portals.use` | Allows a player to enter a configured physical portal. Defaults to everyone. |
 | `/mines fill <mine>` | `vertex.mines.admin` | Seeds the region with ore from its table. Runs automatically when a region is placed; use this after rebuilding the arena or changing the ore table. |
 | `/mines cancel` / `/mines list` | `vertex.mines.admin` | Abandon a selection, or show which mines are placed. Staff subcommands are never named to players who lack the permission. |
@@ -263,8 +266,8 @@ success economics.
 
 ## Custom Enchantments
 
-Rolling a Rune is a direct right-click action with no GUI; applying a
-physical enchant item is done by dragging it onto compatible gear in the
+Rolling a Rune is a direct right-click action with no GUI; applying an
+identified Rune is done by dragging it onto compatible gear in the
 player inventory. Right-click a Rune category in the shop to open its
 read-only catalog. Runes are
 purchased from `/runes` (also `/ce`, `/customenchants`, or `/enchant`), or given by staff. See
@@ -274,7 +277,7 @@ level-replacement rules, and Lucky Gems.
 | Command | Permission | Notes |
 |---|---|---|
 | Right-click a Rune | *(none)* | Identifies it immediately against its tier's table. A full inventory drops the new identified Rune at the owner’s feet after consuming one base Rune. |
-| Drag a physical enchant item onto gear | *(none)* | Attempts to apply it to compatible gear in the player inventory. |
+| Drag an identified Rune onto gear | *(none)* | Attempts to apply it to compatible gear in the player inventory. |
 | Drag a Lucky Gem onto an identified Rune | *(none)* | Adds the universal +3.50% success chance, capped at 100%. |
 | `/runes` / `/ce` / `/customenchants` / `/enchant` | Open to all | Opens the dedicated Rune shop. |
 | `/enchant give <player> rune <tier> [amount]` | `vertex.enchant.give` | Gives a Rune of the given tier (`simple`/`elite`/`rare`/`legendary`). |
@@ -286,8 +289,8 @@ level-replacement rules, and Lucky Gems.
 |---|---|---|
 | `/koth focus [name\|off]` | Open to all | Focuses an active same-world KOTH for that player only, using a BossBar/compass instead of their faction rally. |
 | `/outpost focus [name\|off]` | Open to all | The Outpost equivalent of `/koth focus`. |
-| `/koth create\|wand\|cancel\|start\|stop\|delete\|list\|validate` | `vertex.koth.admin` | Creates cuboid KOTH regions with a Blaze Rod, starts/stops any configured KOTH, and validates KOTH config paths in-game. |
-| `/outpost create\|wand\|cancel\|start\|stop\|delete\|list\|validate` | `vertex.outpost.admin` | Creates, starts/stops, and validates Outpost regions. |
+| `/koth create <name>\|cancel\|start\|stop\|delete\|list\|validate` | `vertex.koth.admin` | `create` gives the cuboid selector; the remaining commands start, stop, remove, list, or validate configured KOTHs. |
+| `/outpost create <name>\|cancel\|start\|stop\|delete\|list\|validate` | `vertex.outpost.admin` | `create` gives the cuboid selector; the remaining commands start, stop, remove, list, or validate Outposts. |
 
 See [KOTH & Outposts](koth-and-outposts.md) for capture rules, schedules,
 rewards, and the `capture-events.yml` reference.
@@ -337,7 +340,7 @@ rewards, and the `capture-events.yml` reference.
 | `/vertex storage` | `vertex.admin` | Shows which storage backend is currently in use. |
 | `/vertex storage <local\|mysql> [confirm]` | `vertex.admin` | Copies all data into the other backend and switches `storage.type` to it. Takes effect on the next restart. `confirm` is required if the target database already has data in it, since it gets overwritten. See [Installation](installation.md#switching-backends-in-game). |
 | `/vertex performance` | `vertex.admin` | Reports the performance framework's current OFF/BASIC/DETAILED monitoring state — see [Performance](performance.md). |
-| `/f safezone`, `/f warzone`, `/f admin unclaim` | `vertex.factions.admin` | Creates/removes native system-faction claims at the current chunk. |
+| `/f claim <Safezone\|Warzone> [radius]`, `/f admin unclaim` | `vertex.factions.admin` | Creates/removes native system-faction claims. A radius is a square (`1` = `3x3` chunks); system areas save atomically and publish over bounded ticks. |
 
 ### Native faction administration
 
@@ -388,26 +391,30 @@ clearmobstacks as shown above.
 Collector ownership and role checks. It is intentionally separate from
 `vertex.staff.staffbuild`.
 
-### Notification-only nodes
+### Alert-only and zone-bypass nodes
 
-Two nodes grant no command at all — they only decide **who receives an
-alert**. That is why they are easy to miss when auditing permissions against
-the command list: nothing in `plugin.yml`'s `commands:` block points at
-them, and a player holding one sees no new command appear.
+These permissions do not add commands. They either decide who receives a
+staff alert or allow a tightly-scoped operational bypass, so they are easy to
+miss when auditing permissions against the command list.
 
 | Permission | Who holds it receives | Default |
 |---|---|---|
 | `vertex.trade.staff.alerts` | Suspicious player-trade alerts — see [Player Trading](trading.md) | op |
 | `vertex.sandbot.debug` | Sand Bot placement diagnostics in chat — see [Sand Bots](sandbots.md) | op |
 | `vertex.dupe.alert` | A live message when a new suspected-duplicate case opens, plus a join-time summary of any still-open cases — see [Dupe investigation](dupe-investigation.md) | op |
+| `vertex.transaction.audit` | Alerts for successful GC transactions above `transaction-audit.minimum-gc` — see [GC](gc-currency.md#large-gc-transaction-audit) | op |
+| `vertex.transaction.audit.ip` | The IP-address portion of those transaction alerts; grant only to staff authorized to see it. | op |
+| `vertex.zones.command-bypass` | Bypasses configured blocked-command checks while inside Haven or Riftlands. | op |
 
 Grant these to the staff who should be *notified*, which is usually a
 narrower group than those who can run the related commands.
 
 ## Tab-completion
 
-Every command with arguments registers its own `TabCompleter`, so
-suggestions appear as soon as the running jar includes them. If
+Player-facing commands with arguments register tab completion, including the
+native `/f` extensions that are routed through command listeners. `/vertex
+performance` is intentionally executable but omitted from `/vertex` tab
+completion. If suggestions don't show up in-game:
 suggestions don't show up in-game:
 
 1. Confirm the server is actually running the jar you just built —

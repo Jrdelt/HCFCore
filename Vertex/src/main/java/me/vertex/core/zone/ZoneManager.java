@@ -6,6 +6,8 @@ import me.vertex.core.item.ItemKind;
 import me.vertex.core.item.TrackedItemIds;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.preferences.AnnouncementCategory;
+import me.vertex.core.preferences.AnnouncementPreferenceManager;
 import me.vertex.core.pvp.CombatManager;
 import me.vertex.core.storage.Database;
 import net.kyori.adventure.text.Component;
@@ -115,6 +117,7 @@ public final class ZoneManager {
     private CompletableFuture<Void> writeChain = CompletableFuture.completedFuture(null);
     private final BossBar eventBar = Bukkit.createBossBar("Mob Kill Event", BarColor.PURPLE, BarStyle.SOLID);
     private volatile BoosterService boosters;
+    private volatile AnnouncementPreferenceManager announcementPreferences;
     private volatile long cycleAnchor;
     private volatile long loadedScoreEvent = Long.MIN_VALUE;
     private volatile long lastFinishedEvent = Long.MIN_VALUE;
@@ -145,6 +148,10 @@ public final class ZoneManager {
     public ZoneStorage storage() { return storage; }
     public Component message(Player player, String key, String... placeholders) { return messages.get(player, key, placeholders); }
     public void setBoosterService(BoosterService boosters) { this.boosters = boosters; }
+    /** Uses the shared /settings preferences instead of duplicating notification state. */
+    public void setAnnouncementPreferences(AnnouncementPreferenceManager preferences) {
+        this.announcementPreferences = preferences;
+    }
     public NamespacedKey sessionKey() { return sessionKey; }
     public boolean isZoneMob(Entity entity) { return entity != null && entity.getPersistentDataContainer().has(zoneMobKey, PersistentDataType.STRING); }
     public boolean isTicket(ItemStack item) { return item != null && item.hasItemMeta() && item.getItemMeta().getPersistentDataContainer().has(ticketKey, PersistentDataType.BYTE); }
@@ -223,7 +230,7 @@ public final class ZoneManager {
         if (tickTask != null) tickTask.cancel();
         tickTask = null;
         for (Player player : Bukkit.getOnlinePlayers()) eventBar.removePlayer(player);
-        for (Flight flight : List.copyOf(flights.values())) releaseFlight(flight.playerId(), false);
+        for (Flight flight : List.copyOf(flights.values())) releaseFlight(flight.playerId, false);
         entries.clear(); exits.clear(); selections.clear(); slowFalling.clear();
         awaitWrites();
     }
@@ -301,6 +308,17 @@ public final class ZoneManager {
     public Collection<ZoneRegion> regions(ZoneType type) { return regions.values().stream().filter(r -> r.type() == type).sorted(Comparator.comparing(ZoneRegion::id)).toList(); }
     public Collection<ZoneRoute> routes(ZoneRegion region) { return routes.values().stream().filter(r -> r.regionId().equals(region.id())).sorted(Comparator.comparing(ZoneRoute::id)).toList(); }
     public Collection<ZoneRoute> allRoutes() { return routes.values().stream().sorted(Comparator.comparing(ZoneRoute::id)).toList(); }
+    public Collection<ZoneRoute> routes(ZoneType type) {
+        return routes.values().stream().filter(route -> {
+            ZoneRegion region = region(route.regionId());
+            return region != null && region.type() == type;
+        }).sorted(Comparator.comparing(ZoneRoute::id)).toList();
+    }
+    public boolean routeBelongsTo(String id, ZoneType type) {
+        ZoneRoute route = routes.get(ZoneRegion.normalizeId(id));
+        ZoneRegion region = route == null ? null : region(route.regionId());
+        return region != null && region.type() == type;
+    }
     /** Current players physically inside any configured region of this zone type. */
     public int playerCount(ZoneType type) {
         int count = 0;
@@ -381,6 +399,18 @@ public final class ZoneManager {
     }
     public boolean isSelector(ItemStack item) { return item != null && item.hasItemMeta() && item.getItemMeta().getPersistentDataContainer().has(selectorKey, PersistentDataType.BYTE); }
     public boolean isRouteSelecting(UUID uuid) { Selection selection = selections.get(uuid); return selection != null && selection.routeId != null; }
+    /**
+     * Read-only details used by the selector listener to show the same
+     * coordinate feedback as every other area-selection tool.  Locations are
+     * cloned so callers cannot mutate an in-progress selection.
+     */
+    public String selectedRegionId(UUID uuid) { Selection selection = selections.get(uuid); return selection == null ? null : selection.regionId; }
+    public ZoneType selectedRegionType(UUID uuid) { Selection selection = selections.get(uuid); return selection == null ? null : selection.type; }
+    public Location selectedCorner(UUID uuid, boolean first) {
+        Selection selection = selections.get(uuid);
+        Location location = selection == null ? null : (first ? selection.first : selection.second);
+        return location == null ? null : location.clone();
+    }
     /** One-shot guard used when this module dispatches the server's real /spawn command after a successful channel. */
     public boolean consumeSpawnDispatchBypass(UUID uuid) { return spawnDispatchBypass.remove(uuid); }
     /** True while the internally dispatched /spawn command is waiting to run. */
@@ -446,7 +476,7 @@ public final class ZoneManager {
     private boolean sameWorld(Selection s, Location location) { return s.first==null || (location.getWorld()!=null&&s.first.getWorld()!=null&&s.first.getWorld().equals(location.getWorld())); }
     private String saveRoute(Selection s) {
         ZoneRegion region=region(s.regionId); if(region==null||s.points.isEmpty())return "incomplete";
-        for(ZoneRoute.Waypoint point:s.points) { World world=Bukkit.getWorld(point.world()); if(world==null||!region.contains(point.location(world)))return "outside"; }
+        if (!routeStaysInRegion(region, s.points)) return "outside";
         ZoneRoute route=new ZoneRoute(s.routeId,region.id(),true,config(region.type()).routeSpeed(),true,s.points);
         try {
             storage.upsertRoute(route, encodeRoute(route));
@@ -456,6 +486,32 @@ public final class ZoneManager {
         }
         routes.put(route.id(),route); return "ok";
     }
+    /** Validates every half-block of a recorded path, not just its endpoints. */
+    private boolean routeStaysInRegion(ZoneRegion region, List<ZoneRoute.Waypoint> points) {
+        World expected = region == null ? null : Bukkit.getWorld(region.world());
+        if (expected == null || points.isEmpty()) return false;
+        Location previous = null;
+        for (ZoneRoute.Waypoint waypoint : points) {
+            World world = Bukkit.getWorld(waypoint.world());
+            if (world == null || !world.equals(expected)) return false;
+            Location current = waypoint.location(world);
+            if (!region.contains(current)) return false;
+            if (previous != null && !segmentStaysInRegion(region, previous, current)) return false;
+            previous = current;
+        }
+        return true;
+    }
+    private static boolean segmentStaysInRegion(ZoneRegion region, Location from, Location to) {
+        double distance = from.distance(to);
+        int samples = Math.max(1, (int) Math.ceil(distance / .5D));
+        for (int index = 1; index <= samples; index++) {
+            double fraction = index / (double) samples;
+            Location sample = from.clone().add((to.getX() - from.getX()) * fraction,
+                    (to.getY() - from.getY()) * fraction, (to.getZ() - from.getZ()) * fraction);
+            if (!region.contains(sample)) return false;
+        }
+        return true;
+    }
     public boolean deleteRegion(String id) { String normalized=ZoneRegion.normalizeId(id);ZoneRegion removed=regions.get(normalized);if(removed==null)return false;try{storage.deleteRegion(removed.id());}catch(SQLException error){plugin.getLogger().log(Level.SEVERE,"Could not delete zone region "+removed.id(),error);return false;}regions.remove(normalized,removed);routes.values().removeIf(route->route.regionId().equals(removed.id()));return true; }
     public boolean deleteRoute(String id) { String normalized=ZoneRegion.normalizeId(id);ZoneRoute removed=routes.get(normalized);if(removed==null)return false;try{storage.deleteRoute(removed.id());}catch(SQLException error){plugin.getLogger().log(Level.SEVERE,"Could not delete zone route "+removed.id(),error);return false;}routes.remove(normalized,removed);return true; }
     /** Staff preview uses the same server-authoritative path as a real entry, but does not create a Riftlands session. */
@@ -463,13 +519,18 @@ public final class ZoneManager {
         ZoneRoute route = routes.get(ZoneRegion.normalizeId(id)); if (route == null || route.waypoints().isEmpty()) return false;
         ZoneRegion region = region(route.regionId()); World world = region == null ? null : Bukkit.getWorld(region.world());
         if (world == null) return false;
-        ZoneRoute.Waypoint first = route.waypoints().get(ThreadLocalRandom.current().nextInt(route.waypoints().size()));
+        ZoneRoute.Waypoint first = route.waypoints().getFirst();
+        for (ZoneRoute.Waypoint point : route.waypoints()) {
+            World pointWorld = Bukkit.getWorld(point.world());
+            if (pointWorld == null || !pointWorld.equals(world) || !region.contains(point.location(pointWorld))) return false;
+        }
         if (!player.teleport(first.location(world))) return false;
         FlightState before = new FlightState(player.getAllowFlight(), player.isFlying(), player.getFlySpeed());
         player.setAllowFlight(false); player.setFlying(false);
         player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,Integer.MAX_VALUE,0,false,false,false));
         slowFalling.add(player.getUniqueId());
-        flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), region.type(), route.regionId(), before));
+        flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), region.type(), route.regionId(), before,
+                route.waypoints(), route.speed()));
         return true;
     }
 
@@ -481,7 +542,7 @@ public final class ZoneManager {
     /**
      * Validates a physical portal entry without requiring a route from the
      * zone-entry GUI. PortalManager validates and selects its own route after
-     * this check, so a dedicated /portal route is sufficient by itself.
+     * this check, so a dedicated PortalManager route is sufficient by itself.
      */
     public String requestPortalEntry(Player player, ZoneType type) {
         return requestEntryChecks(player, type);
@@ -510,19 +571,41 @@ public final class ZoneManager {
     }
     public void cancelExit(Player player,String reason){if(exits.remove(player.getUniqueId())!=null)player.sendMessage(messages.get(player,"zones.spawn-cancelled","reason",reason));}
     public boolean startFlight(Player player, ZoneType type) {
-        if(combat.isTagged(player.getUniqueId()))return false;
-        ZoneRoute route=chooseRoute(player,type); if(route==null)return false;
-        if(type==ZoneType.RIFTLANDS){PlayerState state=state(player); if(!state.operational())return false;if(state.sessionId==null){state.sessionId=UUID.randomUUID().toString();persistPlayer(state);}}
-        ZoneRoute.Waypoint spawn=route.waypoints().get(ThreadLocalRandom.current().nextInt(route.waypoints().size()));
-        World world=Bukkit.getWorld(spawn.world()); ZoneRegion spawnRegion=region(route.regionId());
-        if(world==null||spawnRegion==null||!spawnRegion.contains(spawn.location(world)))return false;
-        FlightState before=new FlightState(player.getAllowFlight(),player.isFlying(),player.getFlySpeed());
-        if(!player.teleport(spawn.location(world)))return false;
-        player.setAllowFlight(false); player.setFlying(false);
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,Integer.MAX_VALUE,0,false,false,false));
+        if (combat.isTagged(player.getUniqueId())) return false;
+        ZoneRoute route = chooseRoute(player, type);
+        if (route == null) return false;
+        if (type == ZoneType.RIFTLANDS) {
+            PlayerState state = state(player);
+            if (!state.operational()) return false;
+            if (state.sessionId == null) {
+                state.sessionId = UUID.randomUUID().toString();
+                persistPlayer(state);
+            }
+        }
+
+        // Each recorded point is an ordered waypoint.  The first starts the
+        // flight; later points are followed by the server flight tick.
+        ZoneRoute.Waypoint first = route.waypoints().getFirst();
+        World world = Bukkit.getWorld(first.world());
+        ZoneRegion spawnRegion = region(route.regionId());
+        if (world == null || spawnRegion == null || !spawnRegion.contains(first.location(world))) return false;
+        for (ZoneRoute.Waypoint point : route.waypoints()) {
+            World pointWorld = Bukkit.getWorld(point.world());
+            if (pointWorld == null || !pointWorld.equals(world) || !spawnRegion.contains(point.location(pointWorld))) {
+                return false;
+            }
+        }
+
+        FlightState before = new FlightState(player.getAllowFlight(), player.isFlying(), player.getFlySpeed());
+        if (!player.teleport(first.location(world))) return false;
+        player.setAllowFlight(false);
+        player.setFlying(false);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, Integer.MAX_VALUE, 0, false, false, false));
         slowFalling.add(player.getUniqueId());
-        flights.put(player.getUniqueId(),new Flight(player.getUniqueId(),type,route.regionId(),before));
-        player.sendMessage(messages.get(player,"zones.entered","zone",type.displayName())); return true;
+        flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), type, route.regionId(), before,
+                route.waypoints(), route.speed()));
+        player.sendMessage(messages.get(player, "zones.entered", "zone", type.displayName()));
+        return true;
     }
     /** Starts a Riftlands loot ledger after a separately validated portal arrival. */
     public void startPortalRiftSession(Player player) {
@@ -551,7 +634,7 @@ public final class ZoneManager {
         if(slowFall){player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,Integer.MAX_VALUE,0,false,false,false));slowFalling.add(uuid);}
     }
     public void releaseFlightFromHit(Player player){if(flights.containsKey(player.getUniqueId()))releaseFlight(player.getUniqueId(),true);}
-    public void recordFlightDisconnect(Player player) { Flight flight=flights.get(player.getUniqueId());if(flight==null||combat.isTagged(player.getUniqueId()))return;ZoneRegion region=region(flight.regionId());if(region==null)return;Location current=player.getLocation().clone();Location safe=findSafeGround(region,current);Location stored=safe==null?current:safe;releaseFlight(player.getUniqueId(),false);ZoneStorage.FlightReturn row=new ZoneStorage.FlightReturn(region.id(),stored.getWorld().getName(),stored.getX(),stored.getY(),stored.getZ());pendingFlightReturns.put(player.getUniqueId(),row);persist("flight-return:"+player.getUniqueId(),()->storage.saveFlightReturn(player.getUniqueId(),region.id(),stored.getWorld().getName(),stored.getX(),stored.getY(),stored.getZ())); }
+    public void recordFlightDisconnect(Player player) { Flight flight=flights.get(player.getUniqueId());if(flight==null||combat.isTagged(player.getUniqueId()))return;ZoneRegion region=region(flight.regionId);if(region==null)return;Location current=player.getLocation().clone();Location safe=findSafeGround(region,current);Location stored=safe==null?current:safe;releaseFlight(player.getUniqueId(),false);ZoneStorage.FlightReturn row=new ZoneStorage.FlightReturn(region.id(),stored.getWorld().getName(),stored.getX(),stored.getY(),stored.getZ());pendingFlightReturns.put(player.getUniqueId(),row);persist("flight-return:"+player.getUniqueId(),()->storage.saveFlightReturn(player.getUniqueId(),region.id(),stored.getWorld().getName(),stored.getX(),stored.getY(),stored.getZ())); }
     /** Compatibility alias retained for older listeners; performs no JDBC. */
     public void returnAfterFlightDisconnect(Player player) { completePlayerJoin(player); }
 
@@ -635,7 +718,47 @@ public final class ZoneManager {
     private void tickCountdowns(long now){for(var entry:List.copyOf(entries.entrySet())){Player player=Bukkit.getPlayer(entry.getKey());Countdown countdown=entry.getValue();if(player==null||invalidCountdown(player,countdown)){if(player!=null)cancelEntry(player,"movement/combat");else entries.remove(entry.getKey());continue;}long remaining=Math.max(0L,countdown.until-now);if(remaining==0L){entries.remove(entry.getKey());if(!startFlight(player,countdown.type))player.sendMessage(messages.get(player,"zones.no-route"));}else if(remaining%1000L<1000L){player.sendMessage(messages.get(player,"zones.entry-countdown","zone",countdown.type.displayName(),"seconds",String.valueOf((remaining+999)/1000)));}}
         for(var entry:List.copyOf(exits.entrySet())){Player player=Bukkit.getPlayer(entry.getKey());Countdown countdown=entry.getValue();if(player==null||invalidCountdown(player,countdown)){if(player!=null)cancelExit(player,"movement/combat");else exits.remove(entry.getKey());continue;}long remaining=Math.max(0L,countdown.until-now);if(remaining==0L){exits.remove(entry.getKey());secureRiftSession(player);spawnDispatchBypass.add(player.getUniqueId());Bukkit.dispatchCommand(player,"spawn");}else if(remaining%1000L<1000L)player.sendMessage(messages.get(player,"zones.spawn-countdown","seconds",String.valueOf((remaining+999)/1000)));}}
     private boolean invalidCountdown(Player player,Countdown countdown){return combat.isTagged(player.getUniqueId())||!Objects.equals(player.getWorld(),countdown.origin.getWorld())||player.getLocation().distanceSquared(countdown.origin)>0.01D;}
-    private void tickFlights(){for(Flight flight:List.copyOf(flights.values())){Player player=Bukkit.getPlayer(flight.playerId());if(player==null){flights.remove(flight.playerId());continue;}if(player.isOnGround())releaseFlight(player.getUniqueId(),false);}}
+    private void tickFlights() {
+        for (Flight flight : List.copyOf(flights.values())) {
+            Player player = Bukkit.getPlayer(flight.playerId);
+            if (player == null) {
+                flights.remove(flight.playerId);
+                continue;
+            }
+            if (flight.nextWaypoint >= flight.waypoints.size()) {
+                releaseFlight(player.getUniqueId(), true);
+                continue;
+            }
+            ZoneRoute.Waypoint waypoint = flight.waypoints.get(flight.nextWaypoint);
+            World world = Bukkit.getWorld(waypoint.world());
+            if (world == null || !world.equals(player.getWorld())) {
+                releaseFlight(player.getUniqueId(), false);
+                continue;
+            }
+            Location target = waypoint.location(world);
+            Location current = player.getLocation();
+            double distance = current.distance(target);
+            double step = flight.speed / 20D;
+            if (distance <= step || distance < .001D) {
+                if (!player.teleport(target)) {
+                    releaseFlight(player.getUniqueId(), false);
+                    continue;
+                }
+                flight.nextWaypoint++;
+                if (flight.nextWaypoint >= flight.waypoints.size()) {
+                    releaseFlight(player.getUniqueId(), true);
+                }
+                continue;
+            }
+            Vector direction = target.toVector().subtract(current.toVector()).normalize().multiply(step);
+            Location next = current.add(direction);
+            next.setYaw(target.getYaw());
+            next.setPitch(target.getPitch());
+            if (!player.teleport(next)) {
+                releaseFlight(player.getUniqueId(), false);
+            }
+        }
+    }
     private void tickSlowFalling(){for(UUID uuid:List.copyOf(slowFalling)){Player player=Bukkit.getPlayer(uuid);if(player==null||player.isOnGround()){if(player!=null)player.removePotionEffect(PotionEffectType.SLOW_FALLING);slowFalling.remove(uuid);}}}
     private void tickMobs(){for(ZoneType type:ZoneType.values()){Map<String,List<Player>> byRegion=new HashMap<>();for(Player p:Bukkit.getOnlinePlayers()){ZoneRegion r=regionAt(p.getLocation());if(r!=null&&r.type()==type)byRegion.computeIfAbsent(r.id(),ignored->new ArrayList<>()).add(p);}for(ZoneRegion r:regions(type)){List<Player> active=byRegion.getOrDefault(r.id(),List.of());if(active.isEmpty()){despawnZoneMobs(r);continue;}maintainMobs(r,active);despawnFarZoneMobs(r,active,mobDespawnRadii.getOrDefault(type,40D));}}}
     private void maintainMobs(ZoneRegion region,List<Player> active){if(region==null)return;ZoneConfig c=config(region.type());if(active.isEmpty()||!prepareMobWorld(active.getFirst().getWorld(),c))return;int zoneMobCount=countZoneMobs(region,active.getFirst().getWorld());for(Player player:active){if(!player.isOnGround()||zoneMobCount>=c.maxLocalMobs())continue;int target=ThreadLocalRandom.current().nextInt(10,21);int nearby=(int)player.getWorld().getNearbyEntities(player.getLocation(),10D,10D,10D,entity->isZoneMob(entity)&&region.id().equals(entity.getPersistentDataContainer().get(mobRegionKey,PersistentDataType.STRING))&&entity.getLocation().distanceSquared(player.getLocation())<=100D).size();for(int count=nearby;count<target&&zoneMobCount<c.maxLocalMobs();count++){Location at=randomMobLocation(region,player,c,2D,10D);if(at==null)break;spawnMob(region,at);zoneMobCount++;}}}
@@ -681,11 +804,12 @@ public final class ZoneManager {
     private ItemStack leather(Material material,Color color){ItemStack item=new ItemStack(material);LeatherArmorMeta meta=(LeatherArmorMeta)item.getItemMeta();meta.setColor(color);item.setItemMeta(meta);return item;}
     private <T extends LivingEntity>T spawnTaggedMob(Location at,Class<T> entityClass,ZoneRegion region,MobDefinition definition){return at.getWorld().spawn(at,entityClass,org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM,false,entity->{entity.getPersistentDataContainer().set(zoneMobKey,PersistentDataType.STRING,region.type().name());entity.getPersistentDataContainer().set(mobRegionKey,PersistentDataType.STRING,region.id());entity.getPersistentDataContainer().set(mobDefinitionKey,PersistentDataType.STRING,definition.id);});}
     private void despawnZoneMobs(ZoneRegion region){Set<UUID> ids=zoneMobsByRegion.remove(region.id());if(ids==null)return;for(UUID id:ids){Entity entity=Bukkit.getEntity(id);if(entity!=null&&isZoneMob(entity))entity.remove();}}
-    private void tickEvent(long now){long start=currentEventStart();boolean active=now>=start&&now<start+config(ZoneType.HAVEN).eventDurationMillis();if(active&&loadedScoreEvent!=start)restoreCurrentScores();if(active&&lastAnnouncedEvent!=start){lastAnnouncedEvent=start;for(Player player:Bukkit.getOnlinePlayers())player.sendMessage(messages.get(player,"zones.event-start"));}if(!active&&loadedScoreEvent==start&&lastFinishedEvent!=start){finishEvent(start);lastFinishedEvent=start;}if(now-lastBossRefresh>=config(ZoneType.HAVEN).bossRefreshMillis()){lastBossRefresh=now;updateBossBar(active,start,now);}}
+    private void tickEvent(long now){long start=currentEventStart();boolean active=now>=start&&now<start+config(ZoneType.HAVEN).eventDurationMillis();if(active&&loadedScoreEvent!=start)restoreCurrentScores();if(active&&lastAnnouncedEvent!=start){lastAnnouncedEvent=start;broadcastEvent("zones.event-start");}if(!active&&loadedScoreEvent==start&&lastFinishedEvent!=start){finishEvent(start);lastFinishedEvent=start;}if(now-lastBossRefresh>=config(ZoneType.HAVEN).bossRefreshMillis()){lastBossRefresh=now;updateBossBar(active,start,now);}}
     private long currentEventStart(){long cycle=Math.max(60_000L,config(ZoneType.HAVEN).eventCycleMillis());long now=System.currentTimeMillis();return cycleAnchor+Math.floorDiv(now-cycleAnchor,cycle)*cycle;}
     private boolean isEventActive(){long now=System.currentTimeMillis(),start=currentEventStart();return now>=start&&now<start+config(ZoneType.HAVEN).eventDurationMillis();}
     private void restoreCurrentScores(){long start=currentEventStart();scores.clear();try{for(ZoneStorage.ScoreRow row:storage.loadScores(start))scores.put(row.uuid(),new Score(row.uuid(),row.name(),row.score(),row.reachedAt()));loadedScoreEvent=start;}catch(SQLException e){plugin.getLogger().log(Level.WARNING,"Could not restore zone event scores",e);}}
-    private void finishEvent(long start){List<Score> top=topScores();double[] rewards={config(ZoneType.HAVEN).firstBoost(),config(ZoneType.HAVEN).secondBoost(),config(ZoneType.HAVEN).thirdBoost()};for(PlayerState state:players.values()){state.winnerBoost=0D;state.winnerCycle=start;}List<ZoneStorage.WinnerRow> winners=new ArrayList<>();for(int i=0;i<Math.min(3,top.size());i++){Player online=Bukkit.getPlayer(top.get(i).uuid());PlayerState state=online!=null?state(online):state(top.get(i).uuid(),top.get(i).name());state.winnerBoost=rewards[i];state.winnerCycle=start;winners.add(new ZoneStorage.WinnerRow(top.get(i).uuid(),top.get(i).name(),rewards[i]));if(online!=null)online.sendMessage(messages.get(online,"zones.event-winner","place",String.valueOf(i+1),"boost",PERCENT.format(rewards[i])));}persist("winner-boosts",()->storage.replaceWinnerBoosts(start,winners));for(Player p:Bukkit.getOnlinePlayers())p.sendMessage(messages.get(p,"zones.event-end"));}
+    private void finishEvent(long start){List<Score> top=topScores();double[] rewards={config(ZoneType.HAVEN).firstBoost(),config(ZoneType.HAVEN).secondBoost(),config(ZoneType.HAVEN).thirdBoost()};for(PlayerState state:players.values()){state.winnerBoost=0D;state.winnerCycle=start;}List<ZoneStorage.WinnerRow> winners=new ArrayList<>();for(int i=0;i<Math.min(3,top.size());i++){Player online=Bukkit.getPlayer(top.get(i).uuid());PlayerState state=online!=null?state(online):state(top.get(i).uuid(),top.get(i).name());state.winnerBoost=rewards[i];state.winnerCycle=start;winners.add(new ZoneStorage.WinnerRow(top.get(i).uuid(),top.get(i).name(),rewards[i]));if(online!=null)online.sendMessage(messages.get(online,"zones.event-winner","place",String.valueOf(i+1),"boost",PERCENT.format(rewards[i])));}persist("winner-boosts",()->storage.replaceWinnerBoosts(start,winners));broadcastEvent("zones.event-end");}
+    private void broadcastEvent(String key){AnnouncementPreferenceManager preferences=announcementPreferences;if(preferences!=null){preferences.broadcast(AnnouncementCategory.MINING,key);return;}for(Player player:Bukkit.getOnlinePlayers())player.sendMessage(messages.get(player,key));}
     private List<Score> topScores(){return scores.values().stream().sorted(Comparator.comparingDouble(Score::score).reversed().thenComparingLong(Score::reachedAt).thenComparing(s->s.uuid().toString())).limit(3).toList();}
     private void updateBossBar(boolean active,long start,long now){if(!active){for(Player p:Bukkit.getOnlinePlayers())eventBar.removePlayer(p);return;}List<Score> top=topScores();String text="Mob Kill Event | "+formatDuration(start+config(ZoneType.HAVEN).eventDurationMillis()-now);for(int i=0;i<3;i++)text+=" | #"+(i+1)+" "+(i<top.size()?top.get(i).name()+": "+PERCENT.format(top.get(i).score()):"-");eventBar.setTitle(text);eventBar.setProgress(Math.max(0D,Math.min(1D,(start+config(ZoneType.HAVEN).eventDurationMillis()-now)/(double)config(ZoneType.HAVEN).eventDurationMillis())));for(Player p:Bukkit.getOnlinePlayers()){if(isIn(p,ZoneType.HAVEN)||isIn(p,ZoneType.RIFTLANDS))eventBar.addPlayer(p);else eventBar.removePlayer(p);}}
 
@@ -821,7 +945,26 @@ public final class ZoneManager {
     public record Score(UUID uuid,String name,double score,long reachedAt) { }
     private record Countdown(ZoneType type,Location origin,long until) { }
     private record FlightState(boolean allowFlight,boolean flying,float flySpeed) { }
-    private record Flight(UUID playerId,ZoneType type,String regionId,FlightState before) { }
+    private static final class Flight {
+        private final UUID playerId;
+        private final ZoneType type;
+        private final String regionId;
+        private final FlightState before;
+        private final List<ZoneRoute.Waypoint> waypoints;
+        private final double speed;
+        private int nextWaypoint;
+
+        private Flight(UUID playerId, ZoneType type, String regionId, FlightState before,
+                List<ZoneRoute.Waypoint> waypoints, double speed) {
+            this.playerId = playerId;
+            this.type = type;
+            this.regionId = regionId;
+            this.before = before;
+            this.waypoints = List.copyOf(waypoints);
+            this.speed = Math.max(.05D, Math.min(8D, speed));
+            this.nextWaypoint = 1;
+        }
+    }
     private static final class Selection { final ZoneType type;final String regionId;final String routeId;Location first,second;final List<ZoneRoute.Waypoint> points=new ArrayList<>();private Selection(ZoneType type,String regionId,String routeId){this.type=type;this.regionId=regionId;this.routeId=routeId;}static Selection region(ZoneType type,String id){return new Selection(type,id,null);}static Selection route(ZoneType type,String region,String route){return new Selection(type,region,route);}void clear(){first=null;second=null;points.clear();} }
     public static final class PlayerState { final UUID uuid;String name;long havenKills,riftKills,havenCooldown,riftCooldown;String sessionId;double winnerBoost;long winnerCycle;volatile boolean loaded;volatile boolean persistenceHealthy=true;PlayerState(UUID uuid,String name){this.uuid=uuid;this.name=name;}static PlayerState from(ZoneStorage.PlayerRow row){PlayerState s=new PlayerState(row.uuid(),row.name());s.havenKills=row.havenKills();s.riftKills=row.riftKills();s.havenCooldown=row.havenCooldown();s.riftCooldown=row.riftCooldown();s.sessionId=row.sessionId();s.winnerBoost=row.winnerBoost();s.winnerCycle=row.winnerCycle();return s;}boolean operational(){return loaded&&persistenceHealthy;}long kills(ZoneType type){return type==ZoneType.HAVEN?havenKills:riftKills;}long cooldown(ZoneType type){return type==ZoneType.HAVEN?havenCooldown:riftCooldown;}void setCooldown(ZoneType type,long value){if(type==ZoneType.HAVEN)havenCooldown=value;else riftCooldown=value;}ZoneStorage.PlayerRow toRow(){return new ZoneStorage.PlayerRow(uuid,name,havenKills,riftKills,havenCooldown,riftCooldown,sessionId,winnerBoost,winnerCycle);} }
 

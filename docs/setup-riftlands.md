@@ -36,7 +36,7 @@ The short alias `/rift` can be used for the Riftlands command tree.
 Tie the route to the region created above:
 
 ```text
-/riftlands route create riftlands_main rift_arrival
+/riftlands spawnpoints create riftlands_main rift_arrival
 ```
 
 Use the Zone Selector to click waypoints in flight order:
@@ -45,13 +45,14 @@ Use the Zone Selector to click waypoints in flight order:
 - Right-click removes the newest waypoint.
 - Shift + air-click saves the route.
 
-Use at least two waypoints. Click turns and height changes, not every block.
-All points and the interpolated path must remain inside `riftlands_main`.
+One waypoint is enough for a simple drop-in. Click turns and height changes,
+not every block. All points and the interpolated path must remain inside
+`riftlands_main`.
 
 Preview it with:
 
 ```text
-/riftlands route preview rift_arrival
+/riftlands spawnpoints preview rift_arrival
 ```
 
 ## 4. Create an optional physical portal
@@ -65,20 +66,12 @@ Run:
 With the Portal Selector, left-click the first corner, right-click the second
 corner, then Shift-click air to save.
 
-The portal can reuse `rift_arrival`. A dedicated physical-portal route can be
-created with:
+The portal uses `rift_arrival`. Verify the setup:
 
 ```text
-/portal route create riftlands rift_portal_route
-```
-
-Click at least two waypoints inside the Riftlands region and Shift-click air to
-save. Verify the setup:
-
-```text
-/portal list
-/portal route list riftlands
-/portal route preview rift_portal_route
+/riftlands portal list
+/riftlands spawnpoints list
+/riftlands spawnpoints preview rift_arrival
 ```
 
 ## 5. Configure the loot pool
@@ -119,10 +112,9 @@ Apply changes with:
 
 ## Common problems
 
-- `route-region-required`: use `/riftlands route create riftlands_main <route-name>`.
-- Route will not save: use at least two points and keep every point inside the
-  region.
-- Portal has no route: check `/portal list` and `/riftlands route list`; a
-  dedicated `/portal route` can also be created.
+- `route-region-required`: use `/riftlands spawnpoints create riftlands_main <route-name>`.
+- Route will not save: add at least one point and keep every point/path
+  segment inside the region.
+- Portal has no route: check `/riftlands portal list` and `/riftlands spawnpoints list`.
 - A player cannot enter: check combat status, zone permissions, and whether
   the player's Vertex data has finished loading.

@@ -41,6 +41,7 @@ public final class FactionConfigManager {
                 changed = true;
             }
         }
+        changed |= migrateShieldDurationDefaults(factions);
 
         if (changed) {
             try {
@@ -96,5 +97,36 @@ public final class FactionConfigManager {
                 copySection(destination, nested, childPath);
             }
         }
+    }
+
+    /**
+     * Upgrade only Vertex's old shipped Shield defaults. Deliberately leave
+     * operator-custom values alone: the new 8–12 hour range remains fully
+     * configurable, while existing servers on the previous defaults receive
+     * the requested behavior without manual YAML surgery.
+     */
+    private static boolean migrateShieldDurationDefaults(YamlConfiguration factions) {
+        long base = factions.getLong("shield.base-duration-seconds", Long.MIN_VALUE);
+        long maximum = factions.getLong("shield.maximum-duration-seconds", Long.MIN_VALUE);
+        boolean changed = false;
+        if (base == 21_600L && maximum == 86_400L) {
+            factions.set("shield.base-duration-seconds", 28_800L);
+            factions.set("shield.maximum-duration-seconds", 43_200L);
+            changed = true;
+        }
+        ConfigurationSection levels = factions.getConfigurationSection(
+                "faction-upgrades.upgrades.shield-duration.levels");
+        if (levels != null && levels.contains("5")) {
+            double oldPrice = levels.getDouble("5.price", Double.NaN);
+            double oldBonus = levels.getDouble("5.bonus", Double.NaN);
+            // Remove only the old generated fifth tier. A customized extra
+            // tier is retained in YAML for auditability but ignored by the
+            // enforced four-level runtime definition.
+            if (oldPrice == 300_000_000D && oldBonus == 21_600D) {
+                levels.set("5", null);
+                changed = true;
+            }
+        }
+        return changed;
     }
 }

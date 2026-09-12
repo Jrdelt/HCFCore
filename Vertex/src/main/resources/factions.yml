@@ -6,7 +6,7 @@ base-claim:
   # tuning knob -- not purchasable by players.
   max-chunks-per-region: 2000
   # Slots 2 and 3 are unlocked through the explicit base-claim-slots levels
-  # in config.yml under faction-upgrades.
+  # in this file under faction-upgrades.
 
 raid-claim:
   # How long a Raid Claim chunk stays claimed with no activity, in real
@@ -23,8 +23,8 @@ grace:
 
 shield:
   # Duration before faction-upgrade bonus seconds are added.
-  base-duration-seconds: 21600 # 6 hours
-  maximum-duration-seconds: 86400 # 24 hours
+  base-duration-seconds: 28800 # 8 hours
+  maximum-duration-seconds: 43200 # 12 hours
   # Cooldown starts when protection ends.
   cooldown-seconds: 86400 # 24 hours
   # Optional wait before a newly created faction can activate Shield.
@@ -98,6 +98,10 @@ factions:
     safezone-tag: SafeZone
     warzone-tag: WarZone
     no-pvp-tags: [SafeZone]
+    # /f claim <Safezone|Warzone> [radius] uses a square. The durable
+    # transaction is all-or-nothing; only cache/event publication is spread
+    # over ticks to keep large areas responsive.
+    max-chunks-per-tick: 64
   # These are safe defaults. Faction leaders can override an action per role
   # in /f permissions; each action is persisted in the database.
   permissions:
@@ -183,7 +187,7 @@ faction-upgrades:
     # `bonus` is the total additional Shield duration in seconds at that level.
     shield-duration:
       enabled: true
-      levels: {1: {price: 10000000.0, bonus: 3600.0}, 2: {price: 30000000.0, bonus: 7200.0}, 3: {price: 75000000.0, bonus: 10800.0}, 4: {price: 150000000.0, bonus: 14400.0}, 5: {price: 300000000.0, bonus: 21600.0}}
+      levels: {1: {price: 10000000.0, bonus: 3600.0}, 2: {price: 30000000.0, bonus: 7200.0}, 3: {price: 75000000.0, bonus: 10800.0}, 4: {price: 150000000.0, bonus: 14400.0}}
     # Bonus is the total number of usable rows, not an automatic multiplier.
     vault-rows:
       enabled: true
@@ -201,4 +205,3 @@ faction-vault:
     materials: [SPAWNER]
     # Exact namespaced PDC keys, for example vertex:f_power_booster.
     pdc-keys: []
-

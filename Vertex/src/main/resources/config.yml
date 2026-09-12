@@ -408,7 +408,7 @@ abilities:
   # everywhere else (wilderness and any other faction's claimed land),
   # this is only a blocklist. Matches the faction's tag/name
   # case-insensitively, including the system SafeZone/WarZone factions
-  # (set via /f safezone, /f warzone) if you've named them this way.
+  # (set via /f claim <Safezone|Warzone>) if you've named them this way.
   disabled-claim-names:
     - safezone
 
@@ -419,11 +419,12 @@ abilities:
 # flat radius: andesite -> gravel, sandstone -> sand, red sandstone -> red
 # sand, and colored concrete -> matching concrete powder. Anchors remain;
 # each column can receive multiple falling blocks per tick until its stack
-# reaches the anchor. Every block is paid from native faction money, then /fbank.
+# reaches the anchor. Every block is paid from the native `/f bank` balance.
 # ============================================
 # ============================================
 # PHYSICAL ENTRY PORTALS
-# /portal creates a source cuboid and a verified route that takes players
+# /mines portal, /haven portal, and /riftlands portal create source cuboids.
+# Their matching spawnpoints branches record verified routes that take players
 # through a configured mine, Haven, or Riftlands region.
 # ============================================
 portals:

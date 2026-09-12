@@ -2,8 +2,8 @@
 
 `/trade <player>` opens a direct two-player trade after the target accepts
 the request. Players must be in the same world and within the configured
-3D distance. `/tradetoggle` permanently opts a player out of incoming
-requests; `/trade cancel` returns both offers immediately.
+3D distance. `/tradetoggle` changes the persistent Trade Requests toggle in
+`/settings`; `/trade cancel` returns both offers immediately.
 
 ## Safety model
 
@@ -37,7 +37,7 @@ contents. The viewer is read-only and returns to the trade on close.
 | `/trade <player>` | `vertex.trade.use` | Request a trade. |
 | `/trade accept <player>` | `vertex.trade.use` | Accept a pending request. |
 | `/trade cancel` | `vertex.trade.use` | Cancel and refund the current trade. |
-| `/tradetoggle` | `vertex.trade.use` | Toggle incoming requests; setting persists. |
+| `/tradetoggle` | Open to all | Toggle the same persistent Trade Requests setting shown in `/settings`. |
 | `/trade payouts [key] [paid\|retry]` | `vertex.trade.payouts` | Inspect or reconcile an uncertain legacy money/EXP payout. |
 | `/vertex reload` | `vertex.admin` | Reload Vertex configuration, including `traders.yml`. |
 | `/tradehistory [player]` | `vertex.trade.staff.history` | Open a player's paginated audit history. |

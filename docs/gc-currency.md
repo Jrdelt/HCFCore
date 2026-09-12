@@ -36,6 +36,18 @@ the code with `\` bypasses the warning intentionally.
 All staff balance actions are logged. Keep the adjust and logs permissions
 restricted: GC code values and balances are sensitive data.
 
+## Large GC transaction audit
+
+When `transaction-audit.enabled` is true, successful GC transactions strictly
+above `transaction-audit.minimum-gc` also append to a weekly UTC audit file
+under `plugins/Vertex/<log-directory>/`. Holders of
+`vertex.transaction.audit` receive a live staff alert. The separate
+`vertex.transaction.audit.ip` permission exposes the IP-address portion of
+that alert and should be granted only where that access is appropriate.
+
+See [Configuration](configuration.md#large-gc-transaction-audit) for the
+full config keys and retention considerations.
+
 ## Configuration (`gc.yml`)
 
 | Key | Purpose |

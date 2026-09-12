@@ -2,13 +2,13 @@
 # CUSTOM ENCHANTMENTS -- RUNES & LUCKY GEMS
 # ============================================
 # Right-clicking a Rune rolls it immediately (no GUI) using its tier's
-# table below and gives you the resulting physical enchant item. See
+# table below and gives you the resulting identified Rune. See
 # enchants.yml for what each (enchant, level) combo referenced in a table
 # actually looks like and does -- this file only controls which combos are
 # reachable per tier, their relative weights, each tier's material/model/glow
 # cosmetic and shop price. Lucky Gems always add a universal +3.50% success chance.
-# Base Runes and Lucky Gems
-# stack to 64; rolled enchant items stack only when their stored data matches.
+# Base Runes and Lucky Gems stack to 64; identified Runes stack only when
+# their stored data matches.
 #
 # Rune names and lore are standardized by Vertex so the item presentation
 # stays consistent. The configurable fields below affect material, optional

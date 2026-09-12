@@ -63,7 +63,7 @@ protected-blocks:
   - REINFORCED_DEEPSLATE
 
 # Faction claim names Chunk Busters are always blocked in -- matches
-# whatever you named your system factions via /f safezone and /f warzone.
+# whatever you named your system factions via /f claim <Safezone|Warzone>.
 # Unlike abilities.disabled-claim-names (config.yml), there is no admin
 # bypass for this list at all: staff cannot use a Chunk Buster in a listed
 # claim either, per spec.

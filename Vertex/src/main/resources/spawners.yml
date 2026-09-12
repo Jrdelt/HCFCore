@@ -54,7 +54,8 @@ spawn-in-air: true
 override-other-plugins: true
 
 # --- SHOP CATALOG & DROP TABLES ---
-# Each entry here is buyable from /spawners and placeable in claimed land.
+# Each entry here is buyable from `/shop` → Spawners & Mob Drops and placeable
+# in claimed land. There is no standalone `/spawners` command.
 # "drops" replace the mob's vanilla death drops entirely -- leave it empty
 # to keep vanilla drops instead.
 mobs:

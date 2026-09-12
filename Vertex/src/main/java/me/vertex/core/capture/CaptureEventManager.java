@@ -482,18 +482,30 @@ public final class CaptureEventManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
     public void onWandInteract(PlayerInteractEvent event) {
-        if (event.getHand() != EquipmentSlot.HAND || !isSelectionWand(event.getItem())) {
+        if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
-        CaptureEventType wandType = CaptureEventType.from(event.getItem().getItemMeta()
+        Player player = event.getPlayer();
+        ItemStack held = event.getItem();
+        if (held == null) {
+            held = player.getInventory().getItemInMainHand();
+        }
+        if (!isSelectionWand(held)) {
+            return;
+        }
+        CaptureEventType wandType = CaptureEventType.from(held.getItemMeta()
                 .getPersistentDataContainer().get(wandKey, PersistentDataType.STRING));
         if (wandType == null) {
             return;
         }
-        Player player = event.getPlayer();
-        Selection selection = selections.computeIfAbsent(player.getUniqueId(), ignored -> new Selection());
-        if (selection.type == null) {
-            selection.type = wandType;
+        Selection selection = selections.get(player.getUniqueId());
+        // A selector wand is only valid for the selection started by its
+        // corresponding create command.  Never let a stale traded/old wand
+        // create a partially configured event.
+        if (selection == null || selection.type != wandType) {
+            event.setCancelled(true);
+            player.sendMessage(messages.get(player, "capture.selection-none"));
+            return;
         }
 
         switch (event.getAction()) {

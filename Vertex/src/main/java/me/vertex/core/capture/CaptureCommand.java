@@ -13,7 +13,7 @@ import java.util.Locale;
 
 /** Commands shared by /koth and /outpost. Staff setup is deliberately kept separate from player focus. */
 public final class CaptureCommand implements CommandExecutor, TabCompleter {
-    private static final List<String> STAFF_ACTIONS = List.of("create", "wand", "cancel", "start", "stop", "delete", "list", "validate");
+    private static final List<String> STAFF_ACTIONS = List.of("create", "cancel", "start", "stop", "delete", "list", "validate");
 
     private final CaptureEventManager manager;
     private final Messages messages;
@@ -50,14 +50,6 @@ public final class CaptureCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 manager.beginSelection(player, type, args[1]);
-            }
-            case "wand" -> {
-                if (!(sender instanceof Player player)) {
-                    sender.sendMessage(messages.get(sender, "general.players-only"));
-                    return true;
-                }
-                manager.giveWand(player, type);
-                sender.sendMessage(messages.get(sender, "capture.wand-given", "type", type.display()));
             }
             case "cancel" -> {
                 if (!(sender instanceof Player player)) {

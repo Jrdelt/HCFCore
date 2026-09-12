@@ -28,13 +28,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** Native /f command tree. Vertex extension listeners may still claim their own subcommands. */
 public final class FactionCommand implements CommandExecutor, TabCompleter {
-    private static final List<String> ROOT = List.of("help", "create", "disband", "rename", "invite", "join", "leave", "kick", "promote", "demote", "leader", "who", "list", "power", "claim", "unclaim", "unclaimall", "autoclaim", "map", "chat", "home", "sethome", "warp", "setwarp", "delwarp", "ally", "neutral", "enemy", "open", "close", "description", "money", "tnt", "perms", "permissions", "bank", "vault", "logs", "focus", "ban", "unban", "bans", "upgrades", "rally", "shield", "grace", "top", "safezone", "warzone", "admin");
+    private static final List<String> ROOT = List.of("help", "create", "disband", "rename", "invite", "join", "leave", "kick", "promote", "demote", "leader", "who", "list", "power", "claim", "unclaim", "unclaimall", "autoclaim", "map", "chat", "home", "sethome", "warp", "setwarp", "delwarp", "ally", "neutral", "enemy", "open", "close", "description", "money", "tnt", "perms", "permissions", "bank", "vault", "logs", "focus", "ban", "unban", "bans", "upgrades", "rally", "shield", "grace", "top", "admin");
     private static final List<String> HELP_KEYS = List.of("help-command-1", "help-command-2", "help-command-3", "help-command-4", "help-command-5", "help-command-6", "help-command-7", "help-command-8", "help-command-9", "help-command-10", "help-command-11", "help-command-12", "help-command-13", "help-command-14", "help-command-15", "help-command-16", "help-command-17", "help-command-18", "help-command-19", "help-command-20", "help-command-21", "help-command-22", "help-command-23", "help-command-24");
     private final Plugin plugin;
     private final FactionService factions;
@@ -43,6 +45,8 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
     private volatile Supplier<FactionUpgradeManager> factionUpgrades = () -> null;
     private volatile TeleportManager teleports;
     private volatile NetworkManager network;
+    /** System-claim persistence and cache publication must remain ordered. */
+    private final AtomicBoolean systemClaimInProgress = new AtomicBoolean();
 
     public FactionCommand(Plugin plugin, FactionService factions, Supplier<FactionBankManager> factionBank,
             Messages messages) {
@@ -104,8 +108,6 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
             case "description", "desc" -> mutate(player, () -> factions.setDescription(player, join(args, 1)), "description-updated");
             case "money" -> money(player, args);
             case "tnt" -> tnt(player);
-            case "safezone" -> systemClaim(player, "safezone", args);
-            case "warzone" -> systemClaim(player, "warzone", args);
             case "admin" -> admin(player, args);
             // These commands are handled by their established Vertex GUI listeners
             // before Bukkit dispatches /f. Keep a useful fallback if one is disabled.
@@ -206,6 +208,11 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
     }
 
     private void claim(Player player, String[] args) {
+        String systemType = args.length > 1 ? systemClaimType(args[1]) : null;
+        if (systemType != null) {
+            startSystemClaim(player, systemType, args);
+            return;
+        }
         int radius = 0;
         if (args.length > 1) try { radius = Math.max(0, Math.min(factions.serviceClaimRadiusLimit(), Integer.parseInt(args[1]))); } catch (NumberFormatException ignored) { send(player, "claim-usage"); return; }
         ChunkKey centre = ChunkKey.of(player.getLocation()); int selectedRadius=radius;
@@ -433,38 +440,43 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
 
     private void onMain(Runnable task) { Bukkit.getScheduler().runTask(plugin, task); }
 
-    private void systemClaim(Player player, String type, String[] args) {
+    private void startSystemClaim(Player player, String type, String[] args) {
+        if (!player.hasPermission("vertex.factions.admin")) {
+            player.sendMessage(messages.get(player, "general.no-permission"));
+            return;
+        }
+        if (args.length > 3) {
+            send(player, "system-claim-usage");
+            return;
+        }
         int radius = 0;
-        if (args.length > 1) {
+        if (args.length == 3) {
             try {
-                radius = Math.max(0, Math.min(factions.serviceClaimRadiusLimit(), Integer.parseInt(args[1])));
+                radius = Integer.parseInt(args[2]);
             } catch (NumberFormatException ignored) {
-                send(player, "admin-usage");
+                send(player, "system-claim-usage");
+                return;
+            }
+            if (radius < 0 || radius > factions.serviceClaimRadiusLimit()) {
+                send(player, "system-claim-radius-invalid", "maximum",
+                        String.valueOf(factions.serviceClaimRadiusLimit()));
                 return;
             }
         }
+        if (!systemClaimInProgress.compareAndSet(false, true)) {
+            send(player, "system-claim-busy");
+            return;
+        }
+        ChunkKey centre = ChunkKey.of(player.getLocation());
+        List<ChunkKey> chunks = square(centre, radius);
         String tag = factionsTag(type);
-        ChunkKey key=ChunkKey.of(player.getLocation());
-        int selectedRadius = radius;
-        factions.submitMutation(() -> factions.claimSystemArea(player, tag, key, selectedRadius))
-                .whenComplete((outcome, error) -> onMain(() -> {
-                    if (error != null || outcome == null) {
-                        result(player, FactionService.Result.DATABASE_ERROR, "system-claim-created", "faction", tag);
-                        return;
-                    }
-                    if (outcome.successful() == 0 && outcome.failure() != null) {
-                        result(player, outcome.failure(), "system-claim-created", "faction", tag);
-                        return;
-                    }
-                    send(player, "system-claim-created", "faction", tag,
-                            "count", String.valueOf(outcome.successful()));
-                }));
+        new SystemClaimBatch(player.getUniqueId(), tag, chunks, factions, plugin, messages,
+                () -> systemClaimInProgress.set(false)).start();
     }
 
     private void admin(Player player, String[] args) {
         if (!player.hasPermission("vertex.factions.admin")) { player.sendMessage(messages.get(player, "general.no-permission")); return; }
         if (args.length < 2) { send(player, "admin-usage"); return; }
-        if (args[1].equalsIgnoreCase("safezone") || args[1].equalsIgnoreCase("warzone")) { systemClaim(player, args[1].toLowerCase(Locale.ROOT), args); return; }
         if (args[1].equalsIgnoreCase("unclaim")) { ChunkKey key=ChunkKey.of(player.getLocation());factions.submitMutation(()->factions.forceUnclaim(key)).whenComplete((removed,error)->onMain(()->send(player,error==null&&Boolean.TRUE.equals(removed)?"admin-claim-removed":"admin-no-claim")));return; }
         send(player, "admin-usage");
     }
@@ -515,9 +527,108 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2 && sub.equals("money")) return complete(args[1], Stream.of("deposit", "withdraw"));
         if (args.length == 2 && sub.equals("bank")) return complete(args[1], Stream.of("deposit", "withdraw"));
         if (args.length == 4 && sub.equals("bank")) return complete(args[3], Stream.of("money", "experience", "xp", "tnt"));
-        if (args.length == 2 && sub.equals("admin")) return complete(args[1], Stream.of("safezone", "warzone", "unclaim"));
+        if (args.length == 2 && sub.equals("claim")) return complete(args[1], Stream.of("Safezone", "Warzone"));
+        if (args.length == 2 && sub.equals("admin")) return complete(args[1], Stream.of("unclaim"));
         if (args.length == 2 && sub.equals("warp") && sender instanceof Player player) return complete(args[1], factions.warps(FactionsHook.getFactionId(player)).stream().map(FactionWarp::name));
         return List.of();
     }
     private static List<String> complete(String partial, Stream<String> values) { String safe = partial.toLowerCase(Locale.ROOT); return values.filter(value -> value.toLowerCase(Locale.ROOT).startsWith(safe)).sorted(String.CASE_INSENSITIVE_ORDER).toList(); }
+
+    private static String systemClaimType(String raw) {
+        if (raw == null) return null;
+        if (raw.equalsIgnoreCase("safezone")) return "safezone";
+        if (raw.equalsIgnoreCase("warzone")) return "warzone";
+        return null;
+    }
+
+    /** Radius claims are squares: radius 1 contains a 3 by 3 chunk area. */
+    private static List<ChunkKey> square(ChunkKey centre, int radius) {
+        List<ChunkKey> chunks = new ArrayList<>((radius * 2 + 1) * (radius * 2 + 1));
+        for (int x = centre.x() - radius; x <= centre.x() + radius; x++) {
+            for (int z = centre.z() - radius; z <= centre.z() + radius; z++) {
+                chunks.add(new ChunkKey(centre.world(), x, z));
+            }
+        }
+        return List.copyOf(chunks);
+    }
+
+    /** Commits first, then amortizes only cache/event work across server ticks. */
+    private static final class SystemClaimBatch {
+        private final UUID actorId;
+        private final String tag;
+        private final List<ChunkKey> chunks;
+        private final FactionService factions;
+        private final Plugin plugin;
+        private final Messages messages;
+        private final Runnable finish;
+
+        private SystemClaimBatch(UUID actorId, String tag, List<ChunkKey> chunks, FactionService factions,
+                Plugin plugin, Messages messages, Runnable finish) {
+            this.actorId = actorId;
+            this.tag = tag;
+            this.chunks = chunks;
+            this.factions = factions;
+            this.plugin = plugin;
+            this.messages = messages;
+            this.finish = finish;
+        }
+
+        private void start() {
+            send("system-claim-started", "faction", tag, "count", String.valueOf(chunks.size()));
+            factions.submitMutation(() -> factions.persistSystemClaimArea(tag, chunks))
+                    .whenComplete((area, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+                        if (error != null || area == null) {
+                            send("system-claim-failed", "faction", tag);
+                            finish.run();
+                            return;
+                        }
+                        apply(area);
+                    }));
+        }
+
+        private void apply(FactionService.SystemClaimArea area) {
+            new org.bukkit.scheduler.BukkitRunnable() {
+                private int cursor;
+                private int lastProgress;
+
+                @Override public void run() {
+                    int next = Math.min(area.changes().size(), cursor + factions.systemClaimChunksPerTick());
+                    try {
+                        factions.applySystemClaimArea(area, cursor, next, Bukkit.getPlayer(actorId));
+                    } catch (RuntimeException error) {
+                        plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                                "Could not publish a persisted system claim area", error);
+                        send("system-claim-failed-after-save", "faction", tag);
+                        finish.run();
+                        cancel();
+                        return;
+                    }
+                    cursor = next;
+                    int progress = area.changes().isEmpty() ? 100
+                            : (int) ((cursor * 100L) / area.changes().size());
+                    // Always report the first and final bounded batch, then
+                    // roughly every ten percent in between. This keeps even
+                    // a one-chunk claim observable without flooding chat if
+                    // an administrator chooses a tiny tick budget.
+                    if (lastProgress == 0 || progress == 100 || progress >= lastProgress + 10) {
+                        lastProgress = progress;
+                        send("system-claim-progress", "faction", tag, "completed", String.valueOf(cursor),
+                                "count", String.valueOf(area.changes().size()), "percent", String.valueOf(progress));
+                    }
+                    if (cursor >= area.changes().size()) {
+                        send("system-claim-created", "faction", tag, "count", String.valueOf(cursor));
+                        finish.run();
+                        cancel();
+                    }
+                }
+            }.runTaskTimer(plugin, 1L, 1L);
+        }
+
+        private void send(String key, String... placeholders) {
+            Player player = Bukkit.getPlayer(actorId);
+            if (player != null && player.isOnline()) {
+                player.sendMessage(messages.get(player, "native-factions." + key, placeholders));
+            }
+        }
+    }
 }

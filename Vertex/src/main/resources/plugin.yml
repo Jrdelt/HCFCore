@@ -18,7 +18,7 @@ softdepend:
 commands:
   f:
     description: Create and manage your native Vertex faction.
-    usage: /<command> [create|claim|home|perms|bank|tnt|upgrades|who]
+    usage: /<command> [create|claim [radius]|claim <Safezone|Warzone> [radius]|home|perms|bank|tnt|upgrades|who]
     aliases: [factions, faction, t]
   fa:
     description: Native Vertex faction administration commands.
@@ -87,7 +87,7 @@ commands:
     description: Browse and select server tags.
     usage: /<command>
   settings:
-    description: Configure your personal optional server announcements.
+    description: Configure your personal interaction and notification preferences.
     usage: /<command>
     aliases: [preferences]
   reboot:
@@ -134,7 +134,7 @@ commands:
     usage: /<command> hand|all
   koth:
     description: Focus an active KOTH or manage KOTH regions as staff.
-    usage: /<command> focus [name|off]|create|wand|cancel|start|stop|delete|list|validate
+    usage: /<command> focus [name|off]|create <name>|cancel|start|stop|delete|list|validate
   cf:
     description: Browse, host, or play a coinflip.
     usage: /<command> [amount [exp|xp|money|gc] [player]|hand [player]|review <id>|approve <id>|deny <id>|ban|unban|cancel <id>|logs [player]]
@@ -151,7 +151,7 @@ commands:
     aliases: [auctionhouse]
   outpost:
     description: Focus an active Outpost or manage Outpost regions as staff.
-    usage: /<command> focus [name|off]|create|wand|cancel|start|stop|delete|list|validate
+    usage: /<command> focus [name|off]|create <name>|cancel|start|stop|delete|list|validate
   trade:
     description: Request, accept, or cancel a secure player trade.
     usage: /<command> <player>|accept <player>|cancel
@@ -169,7 +169,7 @@ commands:
     usage: /<command> give <player>|stop [player]
   mines:
     description: View the mining worlds, or place their regions as staff.
-    usage: /<command> [wand <mine>|cancel|list]
+    usage: /<command> [create <mine> [koth]|fill <mine>|portal|spawnpoints|cancel|list]
   events:
     description: View live Mine KOTH and Hot Zone events.
     usage: /<command>
@@ -197,10 +197,10 @@ commands:
     aliases: [ce, customenchants, runes]
   haven:
     description: Enter Haven or manage Haven zones as staff.
-    usage: /<command> [create|wand|list|lootpool|portal create|spawnpoints|koth|outpost]
+    usage: /<command> [create <name>|list|lootpool|portal create|spawnpoints|koth|outpost]
   riftlands:
     description: Enter Riftlands or manage Riftlands zones as staff.
-    usage: /<command> [create|wand|list|lootpool|portal create|spawnpoints|koth|outpost]
+    usage: /<command> [create <name>|list|lootpool|portal create|spawnpoints|koth|outpost]
     aliases: [rift]
 
 permissions:
@@ -269,7 +269,7 @@ permissions:
     description: Create and delete public network warps with /s.
     default: op
   vertex.factions.admin:
-    description: Create or remove native SafeZone/WarZone system claims.
+    description: Use /f claim <Safezone|Warzone> and remove native system claims.
     default: op
   vertex.factions.bypass:
     description: Bypass native Vertex faction build and container protection.

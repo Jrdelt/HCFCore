@@ -135,7 +135,6 @@ public final class StorageMigrator {
                 "currency", "listed_at", "expires_at", "state"));
         TABLES.put("auction_creation_intent_audit", List.of("intent_key", "seller_uuid", "item_summary", "price",
                 "currency", "decision", "actor_uuid", "actor_name", "resolved_at"));
-        TABLES.put("trade_preferences", List.of("uuid", "accepting"));
         TABLES.put("announcement_preferences", List.of("uuid", "category", "enabled"));
         TABLES.put("trade_escrow", List.of("session_id", "owner_uuid", "items", "money", "experience"));
         TABLES.put("trade_claims", List.of("id", "owner_uuid", "item", "state", "reservation_token",

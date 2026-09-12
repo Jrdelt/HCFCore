@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/** SQL storage for preferences, short-lived escrow and immutable audit rows. */
+/** SQL storage for short-lived escrow and immutable audit rows. */
 public final class TradeStorage {
     private static final String CREATE_PENDING_PAYOUTS = """
             CREATE TABLE IF NOT EXISTS trade_pending_payouts (
@@ -56,7 +56,6 @@ public final class TradeStorage {
 
     public void init() throws SQLException {
         try (Connection c = database.getConnection(); Statement s = c.createStatement()) {
-            s.executeUpdate("CREATE TABLE IF NOT EXISTS trade_preferences (uuid CHAR(36) PRIMARY KEY, accepting BOOLEAN NOT NULL)");
             s.executeUpdate(database.dialect() == Database.Dialect.MYSQL
                     ? "CREATE TABLE IF NOT EXISTS trade_claims (id BIGINT AUTO_INCREMENT PRIMARY KEY, owner_uuid CHAR(36) NOT NULL, item LONGBLOB NOT NULL, state VARCHAR(16) NOT NULL DEFAULT 'READY', reservation_token CHAR(36) NULL, reserved_at BIGINT NULL)"
                     : "CREATE TABLE IF NOT EXISTS trade_claims (id INTEGER PRIMARY KEY AUTOINCREMENT, owner_uuid CHAR(36) NOT NULL, item BLOB NOT NULL, state VARCHAR(16) NOT NULL DEFAULT 'READY', reservation_token CHAR(36) NULL, reserved_at BIGINT NULL)");
@@ -83,25 +82,6 @@ public final class TradeStorage {
         }
     }
 
-    public boolean loadAccepting(UUID uuid) throws SQLException {
-        try (Connection c = database.getConnection(); PreparedStatement s = c.prepareStatement(
-                "SELECT accepting FROM trade_preferences WHERE uuid = ?")) {
-            s.setString(1, uuid.toString());
-            try (ResultSet r = s.executeQuery()) { return !r.next() || r.getBoolean(1); }
-        }
-    }
-    public void saveAccepting(UUID uuid, boolean accepting) throws SQLException {
-        try (Connection c = database.getConnection(); PreparedStatement s = c.prepareStatement(
-                "INSERT INTO trade_preferences (uuid, accepting) VALUES (?, ?) ON CONFLICT(uuid) DO UPDATE SET accepting = excluded.accepting")) {
-            s.setString(1, uuid.toString()); s.setBoolean(2, accepting); s.executeUpdate();
-        } catch (SQLException unsupportedUpsert) {
-            // MySQL's equivalent syntax; SQLite never reaches this branch.
-            try (Connection c = database.getConnection(); PreparedStatement s = c.prepareStatement(
-                    "INSERT INTO trade_preferences (uuid, accepting) VALUES (?, ?) ON DUPLICATE KEY UPDATE accepting = VALUES(accepting)")) {
-                s.setString(1, uuid.toString()); s.setBoolean(2, accepting); s.executeUpdate();
-            }
-        }
-    }
     public void replaceEscrow(TradeSnapshot snapshot) throws SQLException {
         try (Connection c = database.getConnection()) {
             c.setAutoCommit(false);

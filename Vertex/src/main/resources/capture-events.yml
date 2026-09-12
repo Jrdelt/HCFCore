@@ -1,7 +1,8 @@
 # Faction KOTH and Outpost definitions. Events are created in game with
-# /koth create <id> or /outpost create <id>; the staff wand writes their
-# selected bounds below. Edit display names, schedules, capture pace, rewards,
-# and the hologram after creation, then run /vertex reload.
+# /koth create <id> or /outpost create <id>; each command gives the selector
+# and saving its two selected corners writes the bounds below. Edit display
+# names, schedules, capture pace, rewards, and the hologram after creation,
+# then run /vertex reload.
 enabled: true
 
 # Java time-zone ID used by schedule-times. Examples: America/Los_Angeles, UTC.
@@ -18,9 +19,9 @@ defaults:
   # Direction bossbars recalculate from the live player position/yaw at this interval.
   direction-update-ticks: 10
 
-# Text used in holograms, broadcasts, and reward commands for a solo player
-# who is not in a faction. Factionless players capture individually; they do
-# not combine their speed with other factionless players.
+# Text used in holograms, broadcasts, and reward commands for a solo Outpost
+# player who is not in a faction. KOTH requires faction membership; separate
+# factionless Outpost players capture individually and do not combine speed.
 neutral-display-name: 'No Faction'
 
 selection:

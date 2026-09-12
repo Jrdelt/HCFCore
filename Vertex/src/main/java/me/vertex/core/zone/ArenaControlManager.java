@@ -7,8 +7,7 @@ import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.mine.MineKothControl;
 import me.vertex.core.storage.Database;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import me.vertex.core.storage.DeliveryManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -19,6 +18,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -59,7 +59,9 @@ public final class ArenaControlManager implements Listener {
                 && location.getX() >= minX && location.getX() <= maxX + 1 && location.getY() >= minY && location.getY() <= maxY + 1 && location.getZ() >= minZ && location.getZ() <= maxZ + 1; }
     }
     private record State(Integer owner, double control, long ownedSince, Integer capturing) { static final State EMPTY = new State(null, 0D, 0L, null); }
-    private record Selection(ZoneType zone, ControlType type, String name, Location first) { }
+    /** Mirrors the KOTH/mines region flow: two corners are selected, then a
+     * sneaking air-click explicitly commits the selection. */
+    private record Selection(ZoneType zone, ControlType type, String name, Location first, Location second) { }
     private record PointBonuses(double sell, double buyDiscount, double exp, double mobDrop) { }
 
     private final Plugin plugin;
@@ -108,16 +110,20 @@ public final class ArenaControlManager implements Listener {
     }
     public SelectionResult beginSelection(Player player, ZoneType zone, ControlType type, String name) {
         String normalized = normalize(name); if (normalized == null) return SelectionResult.INVALID_NAME;
-        selections.put(player.getUniqueId(), new Selection(zone, type, normalized, null));
+        selections.put(player.getUniqueId(), new Selection(zone, type, normalized, null, null));
         giveWand(player, zone, type);
         return SelectionResult.STARTED;
     }
     public void giveWand(Player player, ZoneType zone, ControlType type) {
         ItemStack wand = new ItemStack(Material.BLAZE_ROD); ItemMeta meta = wand.getItemMeta();
-        meta.displayName(Component.text(zone.displayName() + " " + type.display() + " Selector", NamedTextColor.GOLD));
-        meta.lore(List.of(Component.text("Left-click first corner; right-click second corner.", NamedTextColor.GRAY)));
+        meta.displayName(messages.getGui(player, "arena-controls.wand-name", "zone", zone.displayName(),
+                "type", type.display()));
+        meta.lore(messages.getGuiList(player, "arena-controls.wand-lore"));
         meta.getPersistentDataContainer().set(wandKey, PersistentDataType.STRING, zone.name() + ":" + type.name());
-        wand.setItemMeta(meta); player.getInventory().addItem(wand).values().forEach(left -> player.getWorld().dropItemNaturally(player.getLocation(), left));
+        wand.setItemMeta(meta);
+        if (!DeliveryManager.queueOverflow(plugin, player, List.of(wand), "arena-control-selector")) {
+            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+        }
     }
     public boolean cancelSelection(Player player) { return selections.remove(player.getUniqueId()) != null; }
     public List<String> names(ZoneType zone, ControlType type) { return points.values().stream().filter(point -> point.zone == zone && point.type == type).map(Point::name).sorted().toList(); }
@@ -143,22 +149,65 @@ public final class ArenaControlManager implements Listener {
         return total;
     }
 
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
     public void onSelect(PlayerInteractEvent event) {
-        if (event.getHand() != EquipmentSlot.HAND || event.getClickedBlock() == null) return;
-        Selection selection = selections.get(event.getPlayer().getUniqueId());
+        if (event.getHand() != EquipmentSlot.HAND) return;
+        Player player = event.getPlayer();
+        Selection selection = selections.get(player.getUniqueId());
         ItemStack item = event.getItem();
-        if (selection == null || item == null || !item.hasItemMeta() || !item.getItemMeta().getPersistentDataContainer().has(wandKey, PersistentDataType.STRING)) return;
-        event.setCancelled(true); Location clicked = event.getClickedBlock().getLocation();
-        if (event.getAction().isLeftClick()) { selections.put(event.getPlayer().getUniqueId(), new Selection(selection.zone, selection.type, selection.name, clicked)); event.getPlayer().sendMessage(messages.get(event.getPlayer(), "arena-controls.first-corner")); return; }
-        if (!event.getAction().isRightClick() || selection.first == null) return;
-        ZoneRegion firstRegion = zones.regionAt(selection.first), secondRegion = zones.regionAt(clicked);
-        if (firstRegion == null || secondRegion == null || firstRegion.type() != selection.zone || secondRegion.type() != selection.zone || !firstRegion.id().equals(secondRegion.id())) { event.getPlayer().sendMessage(messages.get(event.getPlayer(), "arena-controls.corners-not-same-region", "zone", selection.zone.displayName())); return; }
-        Point point = point(selection, clicked); try { storage.savePoint(point); points.put(point.id(), point); states.put(point.id(), State.EMPTY); dirty.put(point.id(), State.EMPTY); selections.remove(event.getPlayer().getUniqueId()); event.getPlayer().sendMessage(messages.get(event.getPlayer(), "arena-controls.created", "type", selection.type.display(), "name", point.name())); }
-        catch (SQLException error) { plugin.getLogger().log(Level.SEVERE, "Could not save arena control point.", error); event.getPlayer().sendMessage(messages.get(event.getPlayer(), "arena-controls.save-failed")); }
+        if (item == null) item = player.getInventory().getItemInMainHand();
+        if (selection == null || item == null || !item.hasItemMeta()
+                || !item.getItemMeta().getPersistentDataContainer().has(wandKey, PersistentDataType.STRING)) return;
+        String expectedWand = selection.zone.name() + ":" + selection.type.name();
+        String actualWand = item.getItemMeta().getPersistentDataContainer().get(wandKey, PersistentDataType.STRING);
+        if (!expectedWand.equals(actualWand)) {
+            event.setCancelled(true);
+            player.sendMessage(messages.get(player, "arena-controls.no-selection"));
+            return;
+        }
+
+        switch (event.getAction()) {
+            case LEFT_CLICK_BLOCK -> {
+                event.setCancelled(true);
+                Location clicked = event.getClickedBlock().getLocation();
+                selections.put(player.getUniqueId(), new Selection(selection.zone, selection.type, selection.name,
+                        clicked, null));
+                player.sendMessage(messages.get(player, "arena-controls.first-corner",
+                        "x", String.valueOf(clicked.getBlockX()), "y", String.valueOf(clicked.getBlockY()),
+                        "z", String.valueOf(clicked.getBlockZ())));
+            }
+            case RIGHT_CLICK_BLOCK -> {
+                event.setCancelled(true);
+                if (selection.first == null) {
+                    player.sendMessage(messages.get(player, "arena-controls.selection-incomplete"));
+                    return;
+                }
+                Location clicked = event.getClickedBlock().getLocation();
+                ZoneRegion firstRegion = zones.regionAt(selection.first);
+                ZoneRegion secondRegion = zones.regionAt(clicked);
+                if (!sameRegion(selection, firstRegion, secondRegion)) {
+                    player.sendMessage(messages.get(player, "arena-controls.corners-not-same-region",
+                            "zone", selection.zone.displayName()));
+                    return;
+                }
+                selections.put(player.getUniqueId(), new Selection(selection.zone, selection.type, selection.name,
+                        selection.first, clicked));
+                player.sendMessage(messages.get(player, "arena-controls.second-corner",
+                        "x", String.valueOf(clicked.getBlockX()), "y", String.valueOf(clicked.getBlockY()),
+                        "z", String.valueOf(clicked.getBlockZ())));
+            }
+            case LEFT_CLICK_AIR, RIGHT_CLICK_AIR -> {
+                if (player.isSneaking()) {
+                    event.setCancelled(true);
+                    completeSelection(player, selection);
+                }
+            }
+            default -> { }
+        }
     }
+    @EventHandler public void onQuit(PlayerQuitEvent event) { selections.remove(event.getPlayer().getUniqueId()); }
     @EventHandler public void onPluginDisable(PluginDisableEvent event) { if (event.getPlugin() == plugin) shutdown(); }
-    public void shutdown() { if (tickTask != null) { tickTask.cancel(); tickTask = null; } if (persistTask != null) { persistTask.cancel(); persistTask = null; } flushDirty(); }
+    public void shutdown() { if (tickTask != null) { tickTask.cancel(); tickTask = null; } if (persistTask != null) { persistTask.cancel(); persistTask = null; } selections.clear(); flushDirty(); }
 
     private void tick() {
         long now = System.currentTimeMillis();
@@ -180,7 +229,47 @@ public final class ArenaControlManager implements Listener {
                 state.owner, actor, "arena-" + point.id(), String.valueOf(now));
     }
     private void flushDirty() { Map<String, State> snapshot = new HashMap<>(dirty); for (Map.Entry<String, State> entry : snapshot.entrySet()) try { storage.saveState(entry.getKey(), entry.getValue()); dirty.remove(entry.getKey(), entry.getValue()); } catch (SQLException error) { plugin.getLogger().log(Level.SEVERE, "Could not persist arena control state.", error); } }
-    private Point point(Selection selection, Location second) { Location first = selection.first; return new Point(id(selection.zone, selection.type, selection.name), selection.name, selection.zone, selection.type, first.getWorld().getName(), Math.min(first.getBlockX(), second.getBlockX()), Math.min(first.getBlockY(), second.getBlockY()), Math.min(first.getBlockZ(), second.getBlockZ()), Math.max(first.getBlockX(), second.getBlockX()), Math.max(first.getBlockY(), second.getBlockY()), Math.max(first.getBlockZ(), second.getBlockZ())); }
+    private boolean sameRegion(Selection selection, ZoneRegion first, ZoneRegion second) {
+        return first != null && second != null && first.type() == selection.zone && second.type() == selection.zone
+                && first.id().equals(second.id());
+    }
+
+    private void completeSelection(Player player, Selection selection) {
+        if (selection.first == null || selection.second == null) {
+            player.sendMessage(messages.get(player, "arena-controls.selection-incomplete"));
+            return;
+        }
+        ZoneRegion firstRegion = zones.regionAt(selection.first);
+        ZoneRegion secondRegion = zones.regionAt(selection.second);
+        if (!sameRegion(selection, firstRegion, secondRegion)) {
+            player.sendMessage(messages.get(player, "arena-controls.corners-not-same-region",
+                    "zone", selection.zone.displayName()));
+            return;
+        }
+        Point point = point(selection);
+        try {
+            storage.savePoint(point);
+            points.put(point.id(), point);
+            states.put(point.id(), State.EMPTY);
+            dirty.put(point.id(), State.EMPTY);
+            selections.remove(player.getUniqueId());
+            player.sendMessage(messages.get(player, "arena-controls.created", "type", selection.type.display(),
+                    "name", point.name()));
+        } catch (SQLException error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not save arena control point.", error);
+            player.sendMessage(messages.get(player, "arena-controls.save-failed"));
+        }
+    }
+
+    private Point point(Selection selection) {
+        Location first = selection.first;
+        Location second = selection.second;
+        return new Point(id(selection.zone, selection.type, selection.name), selection.name, selection.zone,
+                selection.type, first.getWorld().getName(), Math.min(first.getBlockX(), second.getBlockX()),
+                Math.min(first.getBlockY(), second.getBlockY()), Math.min(first.getBlockZ(), second.getBlockZ()),
+                Math.max(first.getBlockX(), second.getBlockX()), Math.max(first.getBlockY(), second.getBlockY()),
+                Math.max(first.getBlockZ(), second.getBlockZ()));
+    }
     private PointBonuses bonusesFor(Point point) { return readBonuses(controlConfig, "controls.point-overrides." + point.id,
             point.type == ControlType.KOTH ? kothDefaults : outpostDefaults); }
     private static PointBonuses readBonuses(YamlConfiguration config, String path, PointBonuses fallback) {

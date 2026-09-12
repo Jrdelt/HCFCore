@@ -42,20 +42,31 @@ public final class PortalListener implements Listener {
             case LEFT_CLICK_BLOCK -> {
                 if (event.getClickedBlock() == null) return;
                 event.setCancelled(true);
-                feedback(player, portals.isRouteSelecting(player.getUniqueId())
+                boolean route = portals.isRouteSelecting(player.getUniqueId());
+                String result = route
                         ? portals.addRoutePoint(player, event.getClickedBlock().getLocation().add(.5D, 1D, .5D))
-                        : portals.selectCorner(player, event.getClickedBlock().getLocation(), true));
+                        : portals.selectCorner(player, event.getClickedBlock().getLocation(), true);
+                if (route) feedback(player, result);
+                else portalCornerFeedback(player, result, true);
             }
             case RIGHT_CLICK_BLOCK -> {
                 if (event.getClickedBlock() == null) return;
                 event.setCancelled(true);
-                feedback(player, portals.isRouteSelecting(player.getUniqueId()) ? portals.removeRoutePoint(player)
-                        : portals.selectCorner(player, event.getClickedBlock().getLocation(), false));
+                boolean route = portals.isRouteSelecting(player.getUniqueId());
+                String result = route ? portals.removeRoutePoint(player)
+                        : portals.selectCorner(player, event.getClickedBlock().getLocation(), false);
+                if (route) feedback(player, result);
+                else portalCornerFeedback(player, result, false);
             }
             case LEFT_CLICK_AIR, RIGHT_CLICK_AIR -> {
                 if (player.isSneaking()) {
                     event.setCancelled(true);
-                    feedback(player, portals.finishSelection(player));
+                    boolean route = portals.isRouteSelecting(player.getUniqueId());
+                    String id = portals.selectedPortalId(player.getUniqueId());
+                    PortalTarget target = portals.selectedTarget(player.getUniqueId());
+                    String result = portals.finishSelection(player);
+                    if (route) feedback(player, result);
+                    else portalSaveFeedback(player, result, id, target);
                 }
             }
             default -> { }
@@ -84,5 +95,31 @@ public final class PortalListener implements Listener {
     private void feedback(Player player, String result) {
         player.sendMessage(messages.get(player, "ok".equals(result) ? "portals.selection-updated" : "portals.selection-error",
                 "reason", result));
+    }
+
+    private void portalCornerFeedback(Player player, String result, boolean first) {
+        if (!"ok".equals(result)) {
+            String key = "world".equals(result) ? "portals.selection-world-mismatch" : "portals.selection-error";
+            player.sendMessage(messages.get(player, key, "reason", result));
+            return;
+        }
+        org.bukkit.Location location = portals.selectedCorner(player.getUniqueId(), first);
+        if (location == null) {
+            player.sendMessage(messages.get(player, "portals.selection-error", "reason", "missing-corner"));
+            return;
+        }
+        player.sendMessage(messages.get(player, first ? "portals.selection-first" : "portals.selection-second",
+                "x", String.valueOf(location.getBlockX()), "y", String.valueOf(location.getBlockY()),
+                "z", String.valueOf(location.getBlockZ())));
+    }
+
+    private void portalSaveFeedback(Player player, String result, String id, PortalTarget target) {
+        if ("ok".equals(result)) {
+            player.sendMessage(messages.get(player, "portals.created", "name", id,
+                    "target", target == null ? "destination" : target.displayName()));
+            return;
+        }
+        String key = "incomplete".equals(result) ? "portals.selection-incomplete" : "portals.selection-save-failed";
+        player.sendMessage(messages.get(player, key, "reason", result));
     }
 }

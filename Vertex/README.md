@@ -41,6 +41,18 @@ Arena controls use these forms:
 /riftlands outpost create <name>
 ```
 
+All staff region creation follows the same selector flow: the `create`
+command gives the selector, left-click selects the first corner, right-click
+selects the second corner, and sneak-clicking air saves it. There are no
+standalone selector-wand commands.
+
+Mine creation accepts only a preconfigured `mines.yml` template name, keeping
+its ore table intact:
+
+```text
+/mines create <mine-template> [koth]
+```
+
 Use Shift-left-click in `/runes` or `/ce` to confirm a purchase of up to 64
 runes, or Shift-right-click to confirm the largest purchase permitted by the
 player's current balance and inventory space.

@@ -66,10 +66,12 @@ are configurable in `factions.power`. Power is native Vertex state and is
 shown by the normal faction placeholders/`/f who`; it is separate from F Top.
 
 Staff with `vertex.factions.admin` can claim the current chunk for the
-configured SafeZone or WarZone with `/f safezone`, `/f warzone`, or
-`/f admin <safezone|warzone>`. `/f admin unclaim` removes the current claim.
-System-faction tags and no-PvP tags are configurable under
-`factions.system-claims`.
+configured SafeZone or WarZone with `/f claim <Safezone|Warzone>`. Adding a
+radius creates a square: radius `1` claims `3x3` chunks, radius `2` claims
+`5x5`, and so on. The area is validated and saved atomically, then its live
+claim updates are applied in bounded tick batches. `/f admin unclaim` removes
+the current claim. System-faction tags, no-PvP tags, and the per-tick batch
+budget are configurable under `factions.system-claims`.
 
 ## Storage and migration
 

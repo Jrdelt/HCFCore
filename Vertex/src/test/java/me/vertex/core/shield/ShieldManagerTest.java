@@ -84,6 +84,12 @@ class ShieldManagerTest {
         assertEquals(manager.durationSeconds(4) + 3_600, manager.durationSeconds(3));
     }
 
+    @Test void defaultManualShieldDurationIsEightHoursAndCapsAtTwelve() {
+        assertEquals(28_800L, manager.durationSeconds(4));
+        manager.setDurationBonusProvider(id -> id == 3 ? 14_400L : 0L);
+        assertEquals(43_200L, manager.durationSeconds(3));
+    }
+
     @Test void expiredShieldHonorsPersistedCooldown() throws Exception {
         long now = System.currentTimeMillis();
         storage.upsertActivation(new ShieldStorage.ActivationRow(5, now - 1_000, now + 60_000, now - 10_000, now - 20_000, null));

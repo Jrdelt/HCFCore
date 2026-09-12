@@ -566,7 +566,6 @@ capture:
   already-exists: "<red>✖ <gray>An event named <white>{name}</white> already exists."
   wand-name: "<gold><bold>ᴄᴀᴘᴛᴜʀᴇ ꜱᴇʟᴇᴄᴛɪᴏɴ ᴡᴀɴᴅ"
   wand-lore: ["<gray>Left-click a block for corner one.", "<gray>Right-click a block for corner two.", "<yellow>Sneak + click air <gray>to save the event."]
-  wand-given: "<green>✔ <gray>Given a {type} selection wand."
   selection-started: "<green>✔ <gray>Select the two corners for <white>{name}</white> ({type}), then sneak + click air."
   selection-first: "<green>✔ <gray>First corner: <white>{x}, {y}, {z}</white>."
   selection-second: "<green>✔ <gray>Second corner: <white>{x}, {y}, {z}</white>."

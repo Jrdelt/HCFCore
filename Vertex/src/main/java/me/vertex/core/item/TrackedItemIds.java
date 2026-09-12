@@ -14,8 +14,8 @@ import java.util.UUID;
  * Generalizes {@code BackpackManager}'s per-item instance-ID pattern
  * ({@code instanceKey}/{@code ensureInstanceId}/{@code isSameInstance}) into
  * a shared utility any feature can tag a physical item with. Every future
- * item-identity feature -- starting with Custom Enchantments' Runes and
- * enchanted items -- should tag through this class rather than inventing
+ * item-identity feature -- starting with Custom Enchantments' applied gear
+ * and other non-stackable valuables -- should tag through this class rather than inventing
  * its own instance-ID PDC key, so {@code DupeManager} only ever has to
  * understand one identity marker.
  *

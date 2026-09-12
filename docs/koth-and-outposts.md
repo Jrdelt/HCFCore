@@ -23,10 +23,11 @@ rally takes precedence, so its members keep rally navigation instead.
 
 Focus is personal; it never changes a faction rally for anyone else.
 
-Faction members capture together; a player without a faction may also capture
-as a solo neutral claimant. Separate factionless players are competing sides,
-not teammates, so they cannot combine capture speed. Vanished staff and
-spectators never count. A controlling side must have at least one eligible
+KOTH is a faction objective: a player without a faction cannot contribute to
+its capture or participate in PvP involving an active KOTH. Outposts retain
+their separate neutral-contestant behavior: each factionless player captures
+alone and cannot combine speed with another factionless player. Vanished staff
+and spectators never count. A controlling side must have at least one eligible
 player inside the selected cuboid:
 
 - One uncontested faction makes progress toward 100%.
@@ -56,7 +57,6 @@ Requires `vertex.koth.admin` or `vertex.outpost.admin` (both default to OP).
 | Command | Permission | What it does |
 |---|---|---|
 | `/koth create <id>` / `/outpost create <id>` | `vertex.koth.admin` / `vertex.outpost.admin` | Creates a new event definition; IDs must be unique across both systems. |
-| `/koth wand` / `/outpost wand` | `vertex.koth.admin` / `vertex.outpost.admin` | Gives a replacement Blaze Rod for cuboid selection. |
 | `/koth cancel` / `/outpost cancel` | `vertex.koth.admin` / `vertex.outpost.admin` | Discards an unfinished selection. |
 | `/koth start <id>` / `/outpost start <id>` | `vertex.koth.admin` / `vertex.outpost.admin` | Starts a configured event manually for testing or admin runs. |
 | `/koth stop <id>` / `/outpost stop <id>` | `vertex.koth.admin` / `vertex.outpost.admin` | Stops a running event immediately. |
@@ -79,9 +79,8 @@ Requires `vertex.koth.admin` or `vertex.outpost.admin` (both default to OP).
 5. Test manually with `/koth start <id>` or `/outpost start <id>`. Use `stop`,
 `delete`, and `list` with the same command family as needed.
 
-`/koth wand` and `/outpost wand` give a replacement selection rod.
-`/koth cancel` and `/outpost cancel` discard the caller's unfinished
-selection.
+Run `create <id>` again to start a fresh selector flow. `/koth cancel` and
+`/outpost cancel` discard the caller's unfinished selection.
 
 `/koth validate` and `/outpost validate` check the relevant YAML entries in
 game. Each staff-tagged message identifies the exact configuration path that
@@ -105,7 +104,7 @@ settings are:
 | `defaults.capture-seconds` | Base time for one uncontested faction member. |
 | `defaults.max-duration-seconds` | Maximum live event duration; defaults to `2700` (45 minutes). |
 | `defaults.additional-member-speed` | Added speed fraction per extra member; `0.25` makes two players 1.25× as fast. |
-| `neutral-display-name` | Label for a factionless solo claimant in captures, holograms, and reward commands. |
+| `neutral-display-name` | Label for a factionless solo **Outpost** claimant in holograms and reward commands. KOTH requires a faction. |
 | `selection.maximum-volume` | Maximum inclusive cuboid size a staff selection may save. |
 | `hologram.lines` | DecentHolograms text; supports `{type}`, `{name}`, `{progress}`, `{remaining}`, `{faction}`. |
 | `events.<id>.hologram` | Explicit `{ x, y, z }` hologram position. New staff selections default to the cuboid centre at X/Z and `minimum.y + 2`; change this only when a custom position is wanted. |

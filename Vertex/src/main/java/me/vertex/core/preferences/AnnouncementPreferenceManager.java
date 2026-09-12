@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
-/** Delivers optional broadcasts only to players who have opted into their category. */
+/** Delivers optional broadcasts and owns every persistent player communication toggle. */
 public final class AnnouncementPreferenceManager implements Listener {
     private final Plugin plugin;
     private final AnnouncementPreferenceStorage storage;
@@ -52,7 +52,20 @@ public final class AnnouncementPreferenceManager implements Listener {
     }
 
     public boolean isEnabled(UUID uuid, AnnouncementCategory category) {
-        return !disabled.getOrDefault(uuid, Set.of()).contains(category);
+        Set<AnnouncementCategory> values = disabled.getOrDefault(uuid, Set.of());
+        if (values.contains(category)) {
+            return false;
+        }
+        // Notifications is the master opt-out for optional Vertex broadcasts;
+        // focused announcement toggles still let players opt out of only one
+        // category while leaving the rest enabled.
+        return !isOptionalAnnouncement(category) || !values.contains(AnnouncementCategory.NOTIFICATIONS);
+    }
+
+    private static boolean isOptionalAnnouncement(AnnouncementCategory category) {
+        return category == AnnouncementCategory.COINFLIPS || category == AnnouncementCategory.KOTH
+                || category == AnnouncementCategory.OUTPOST || category == AnnouncementCategory.MINING
+                || category == AnnouncementCategory.SERVER;
     }
 
     /** Changes the runtime value first so a click immediately affects the next broadcast. */

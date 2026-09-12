@@ -1012,6 +1012,46 @@ public final class FactionStorage {
         }
     }
 
+    /**
+     * Persists a complete SafeZone/WarZone claim operation as one database
+     * transaction. The caller can then apply the returned cache/event changes
+     * in bounded main-thread batches without risking a partially saved area.
+     * A {@code null} result means the target system faction disappeared before
+     * the transaction could begin.
+     */
+    public List<ClaimOwnerChange> saveSystemClaimAreaChecked(int factionId, List<ChunkKey> keys)
+            throws SQLException {
+        if (keys == null || keys.isEmpty()) {
+            return List.of();
+        }
+        try (Connection connection = database.getConnection()) {
+            boolean previous = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                FactionCapacity target = lockFaction(connection, factionId);
+                if (target == null || !target.system()) {
+                    connection.rollback();
+                    return null;
+                }
+                List<ClaimOwnerChange> changes = new ArrayList<>(keys.size());
+                for (ChunkKey key : keys) {
+                    Integer previousOwner = lockClaimOwner(connection, key);
+                    saveClaim(connection, key, factionId);
+                    // System claims never carry raid expiry metadata.
+                    replaceClaimClassification(connection, key, factionId, 0L);
+                    changes.add(new ClaimOwnerChange(key, previousOwner));
+                }
+                connection.commit();
+                return List.copyOf(changes);
+            } catch (SQLException error) {
+                connection.rollback();
+                throw error;
+            } finally {
+                connection.setAutoCommit(previous);
+            }
+        }
+    }
+
     /** Atomically checks durable owner and faction capacity before a normal claim write. */
     public ClaimWriteResult claim(ChunkKey key,int factionId,Integer expectedOwner,int maximumClaims,
             boolean allowOverclaim)throws SQLException{
@@ -1953,6 +1993,8 @@ public final class FactionStorage {
     public record WarpKey(int factionId,String name) { }
     public record InviteKey(int factionId,UUID playerUuid) { }
     public record Invite(int factionId,UUID playerUuid,UUID invitedBy,long expiresAtMillis) { }
+    /** Previous durable owner captured while an all-or-nothing system claim is committed. */
+    public record ClaimOwnerChange(ChunkKey key, Integer previousFactionId) { }
     public record PlayerSettings(String chatMode,boolean autoclaim,boolean mapEnabled) { public static final PlayerSettings DEFAULT=new PlayerSettings("PUBLIC",false,false); }
     public enum CreateFactionWriteResult { OK, ALREADY_MEMBER, COOLDOWN, NAME_TAKEN }
     public record CreateFactionOutcome(CreateFactionWriteResult result, int factionId) { }

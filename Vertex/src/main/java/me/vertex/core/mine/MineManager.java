@@ -305,7 +305,11 @@ public final class MineManager {
     }
 
     public void setCorner(Player player, Location location, boolean first) {
-        Selection selection = selections.computeIfAbsent(player.getUniqueId(), ignored -> new Selection());
+        Selection selection = selections.get(player.getUniqueId());
+        if (selection == null || selection.mineId == null) {
+            player.sendMessage(messages.get(player, "mines.selection-none"));
+            return;
+        }
         if (first) {
             selection.first = location;
         } else {

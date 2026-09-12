@@ -3,6 +3,7 @@ package me.vertex.core.preferences;
 import me.vertex.core.storage.Database;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -23,6 +24,36 @@ public final class AnnouncementPreferenceStorage {
             statement.executeUpdate("CREATE TABLE IF NOT EXISTS announcement_preferences ("
                     + "uuid CHAR(36) NOT NULL, category VARCHAR(32) NOT NULL, enabled BOOLEAN NOT NULL, "
                     + "PRIMARY KEY(uuid, category))");
+            migrateLegacyTradePreferences(connection, statement);
+        }
+    }
+
+    /**
+     * `/tradetoggle` used to keep a second preference row in
+     * `trade_preferences`.  Copy it once without overwriting a newer
+     * Settings choice, then remove the obsolete table so the two controls can
+     * never disagree again.
+     */
+    private void migrateLegacyTradePreferences(Connection connection, Statement statement) throws SQLException {
+        if (!tableExists(connection, "trade_preferences")) {
+            return;
+        }
+        String sql = database.dialect() == Database.Dialect.SQLITE
+                ? "INSERT OR IGNORE INTO announcement_preferences (uuid, category, enabled) "
+                + "SELECT uuid, ?, accepting FROM trade_preferences"
+                : "INSERT IGNORE INTO announcement_preferences (uuid, category, enabled) "
+                + "SELECT uuid, ?, accepting FROM trade_preferences";
+        try (PreparedStatement copy = connection.prepareStatement(sql)) {
+            copy.setString(1, AnnouncementCategory.TRADE_REQUESTS.name());
+            copy.executeUpdate();
+        }
+        statement.executeUpdate("DROP TABLE trade_preferences");
+    }
+
+    private static boolean tableExists(Connection connection, String table) throws SQLException {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet rows = metadata.getTables(null, null, table, null)) {
+            return rows.next();
         }
     }
 

@@ -4,6 +4,7 @@ import me.vertex.core.booster.BoosterCategory;
 import me.vertex.core.booster.BoosterService;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.backpack.BackpackAutoStoreListener;
+import me.vertex.core.staff.StaffManager;
 import org.bukkit.Location;
 import org.bukkit.Color;
 import org.bukkit.Material;
@@ -39,13 +40,15 @@ public final class MineListener implements Listener {
     private final BoosterService boosters;
     private final Messages messages;
     private final BackpackAutoStoreListener backpackDrops;
+    private final StaffManager staffManager;
 
     public MineListener(MineManager mines, BoosterService boosters, Messages messages,
-            BackpackAutoStoreListener backpackDrops) {
+            BackpackAutoStoreListener backpackDrops, StaffManager staffManager) {
         this.mines = mines;
         this.boosters = boosters;
         this.messages = messages;
         this.backpackDrops = backpackDrops;
+        this.staffManager = staffManager;
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -78,6 +81,9 @@ public final class MineListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
+        if (staffBuild(event.getPlayer())) {
+            return;
+        }
         if (!mines.denyBlockPlace() || mines.regionAt(event.getBlock().getLocation()) == null) {
             return;
         }
@@ -93,6 +99,9 @@ public final class MineListener implements Listener {
             return;
         }
         Player player = event.getPlayer();
+        if (staffBuild(player)) {
+            return;
+        }
 
         if (!region.isMineBlock(block.getType())) {
             // Structure, walls, floor, decoration -- anything the mine does
@@ -134,13 +143,24 @@ public final class MineListener implements Listener {
         mines.scheduleRegen(region, block);
     }
 
+    private boolean staffBuild(Player player) {
+        return staffManager != null && staffManager.isStaffBuild(player.getUniqueId());
+    }
+
     /** Blaze-rod corner selection, mirroring the KOTH wand. */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
     public void onWand(PlayerInteractEvent event) {
-        if (event.getHand() != EquipmentSlot.HAND || !mines.isSelectionWand(event.getItem())) {
+        if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
         Player player = event.getPlayer();
+        ItemStack held = event.getItem();
+        if (held == null) {
+            held = player.getInventory().getItemInMainHand();
+        }
+        if (!mines.isSelectionWand(held)) {
+            return;
+        }
         switch (event.getAction()) {
             case LEFT_CLICK_BLOCK -> {
                 event.setCancelled(true);

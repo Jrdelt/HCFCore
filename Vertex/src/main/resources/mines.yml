@@ -3,7 +3,7 @@
 # The two mines ship fully configured except for WHERE they are. Define that
 # in-game rather than by typing coordinates:
 #
-#   /mines wand stonewake     gives the blaze rod and starts a selection
+#   /mines create stonewake   gives the blaze rod and starts a selection
 #   left-click                first corner
 #   right-click               second corner
 #   sneak + click air         saves it
@@ -46,7 +46,7 @@ protection:
 mines:
   stonewake:
     display-name: "ꜱᴛᴏɴᴇᴡᴀᴋᴇ"
-    # Filled in by /mines wand stonewake -- leave blank.
+    # Filled in by /mines create stonewake -- leave blank.
     world: ''
     pvp: koth-zone-only
     icon: IRON_BLOCK
@@ -76,7 +76,7 @@ mines:
         drop-material: REDSTONE
 
     # The Mine KOTH capture zone, a sub-region of this mine. Place it with
-    #   /mines wand stonewake koth
+    #   /mines create stonewake koth
     # using the same blaze rod; the corners are written back here.
     #
     # Control runs 0-100%. An attacker wears the holder's control down first
@@ -153,7 +153,7 @@ mines:
         drop-material: NETHERITE_INGOT
 
     # The Mine KOTH capture zone, a sub-region of this mine. Place it with
-    #   /mines wand bloodvein koth
+    #   /mines create bloodvein koth
     # using the same blaze rod; the corners are written back here.
     #
     # Control runs 0-100%. An attacker wears the holder's control down first

@@ -20,13 +20,13 @@ settings are in `plugins/Vertex/mines.yml`.
 For Stonewake:
 
 ```text
-/mines wand stonewake
+/mines create stonewake
 ```
 
 For Bloodvein:
 
 ```text
-/mines wand bloodvein
+/mines create bloodvein
 ```
 
 With the Mine Selector:
@@ -63,13 +63,13 @@ during the initial fill, run the fill command again.
 Stonewake KOTH:
 
 ```text
-/mines wand stonewake koth
+/mines create stonewake koth
 ```
 
 Bloodvein KOTH:
 
 ```text
-/mines wand bloodvein koth
+/mines create bloodvein koth
 ```
 
 Use the same Mine Selector flow: left-click the first corner, right-click the
@@ -82,13 +82,13 @@ Review the KOTH timing, control, hologram, and booster settings in
 Create the portal volume for Stonewake:
 
 ```text
-/portal create stonewake_gate stonewake
+/mines portal create stonewake stonewake_gate
 ```
 
 Create the portal volume for Bloodvein:
 
 ```text
-/portal create bloodvein_gate bloodvein
+/mines portal create bloodvein bloodvein_gate
 ```
 
 Use the Portal Selector to left-click the first portal corner, right-click the
@@ -99,13 +99,13 @@ second, and Shift-click air to save.
 Stonewake:
 
 ```text
-/portal route create stonewake stonewake_arrival
+/mines spawnpoints create stonewake stonewake_arrival
 ```
 
 Bloodvein:
 
 ```text
-/portal route create bloodvein bloodvein_arrival
+/mines spawnpoints create bloodvein bloodvein_arrival
 ```
 
 With the Portal Selector:
@@ -114,18 +114,18 @@ With the Portal Selector:
 - Right-click to remove the newest waypoint.
 - Shift + air-click to save.
 
-Use at least two points. The points and interpolated flight path must remain
-inside the corresponding mine region. Mine portals require their own portal
-route; they cannot use a Haven or Riftlands route.
+One point is enough for a simple drop-in. Add points at turns or height
+changes; every point and interpolated flight path must remain inside the
+corresponding mine region. Mine portals require their own route; they cannot
+use a Haven or Riftlands route.
 
 Verify the result:
 
 ```text
-/portal list
-/portal route list stonewake
-/portal route list bloodvein
-/portal route preview stonewake_arrival
-/portal route preview bloodvein_arrival
+/mines portal list
+/mines spawnpoints list
+/mines spawnpoints preview stonewake_arrival
+/mines spawnpoints preview bloodvein_arrival
 ```
 
 ## 7. Test mining behavior
@@ -151,7 +151,7 @@ Confirm that:
   region contains the configured base blocks.
 - Portal says unknown destination: use the exact IDs `stonewake` or
   `bloodvein`, and confirm the mine has been placed first.
-- Route will not save: use at least two points and click inside the mine, not
-  in the portal room or outside the mine region.
-- Portal does not start: check `/portal list`, `/portal route list <mine>`,
+- Route will not save: add at least one point inside the mine, not in the
+  portal room or outside the mine region.
+- Portal does not start: check `/mines portal list`, `/mines spawnpoints list`,
   `vertex.portals.use`, and combat status.

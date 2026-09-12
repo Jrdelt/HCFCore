@@ -50,9 +50,9 @@ public final class ShieldManager {
     public void load() {
         if (!file.exists()) plugin.saveResource("factions.yml", false);
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-        baseDurationSeconds = positive(config.getLong("shield.base-duration-seconds", 21_600L), 21_600L);
+        baseDurationSeconds = positive(config.getLong("shield.base-duration-seconds", 28_800L), 28_800L);
         cooldownSeconds = Math.max(0, config.getLong("shield.cooldown-seconds", 86_400L));
-        maximumDurationSeconds = positive(config.getLong("shield.maximum-duration-seconds", 86_400L), 86_400L);
+        maximumDurationSeconds = positive(config.getLong("shield.maximum-duration-seconds", 43_200L), 43_200L);
         newFactionDelaySeconds = Math.max(0, config.getLong("shield.new-faction-delay-seconds", 0L));
         combatProtectionEnabled = config.getBoolean("shield.combat-protection-enabled", false);
         maximumDailyMinutes = Math.max(0, Math.min(1_440, config.getInt("shield.schedule.maximum-hours-per-day", 8) * 60));
