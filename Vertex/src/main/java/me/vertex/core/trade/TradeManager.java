@@ -2,8 +2,7 @@ package me.vertex.core.trade;
 
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
-import me.vertex.core.util.AmountParser;
-import net.milkbowl.vault.economy.EconomyResponse;
+import me.vertex.core.storage.ClaimDelivery;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
@@ -14,9 +13,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import java.io.File;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -29,11 +25,12 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 /** Owns requests, sessions, escrow, cooldowns and all trade safety rules. */
 public final class TradeManager {
-    public enum Result { OK, DISABLED, SELF, BUSY, TOO_FAR, TARGET_OFF, BLOCKED, NO_REQUEST, EXPIRED, NOT_REQUESTED, COOLDOWN, NO_ECONOMY, CANNOT_AFFORD, INVALID_AMOUNT, LOCKED, NOT_FIRST_LOCKED, FULL }
+    public enum Result { OK, DISABLED, SELF, BUSY, TOO_FAR, TARGET_OFF, BLOCKED, NO_REQUEST, EXPIRED, NOT_REQUESTED, COOLDOWN, LOCKED, NOT_FIRST_LOCKED, FULL }
     private record Request(UUID sender, UUID target, long expires) { }
     private final Plugin plugin; private final TradeStorage storage; private final Messages messages; private final File file;
     private final Map<UUID, Request> requests = new ConcurrentHashMap<>();
@@ -43,9 +40,12 @@ public final class TradeManager {
     private final Set<UUID> programmaticClose = ConcurrentHashMap.newKeySet();
     private final Map<UUID, CompletableFuture<Void>> escrowChains = new ConcurrentHashMap<>();
     private final Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
-    private volatile boolean enabled, compact; private volatile int decimalPlaces;
-    private volatile double maxDistance, maxMoney; private volatile int maxExperience; private volatile long requestTimeout, idleTimeout, cooldown;
-    private volatile Material divider = Material.BLACK_STAINED_GLASS_PANE, filler = Material.GRAY_STAINED_GLASS_PANE, confirm = Material.LIME_DYE, locked = Material.GRAY_DYE, xp = Material.EXPERIENCE_BOTTLE, currency = Material.GOLD_INGOT;
+    private final Set<UUID> claimDeliveries = ConcurrentHashMap.newKeySet();
+    private final Set<String> pendingPayoutsInProgress = ConcurrentHashMap.newKeySet();
+    private final AtomicBoolean shuttingDown = new AtomicBoolean();
+    private volatile boolean enabled;
+    private volatile double maxDistance; private volatile long requestTimeout, idleTimeout, cooldown;
+    private volatile Material divider = Material.BLACK_STAINED_GLASS_PANE, filler = Material.GRAY_STAINED_GLASS_PANE, confirm = Material.LIME_DYE, locked = Material.GRAY_DYE;
     private volatile Set<String> worlds = Set.of(); private volatile Set<GameMode> gameModes = Set.of(); private volatile Set<Material> blockedItems = Set.of();
 
     public TradeManager(Plugin plugin, TradeStorage storage, Messages messages) { this.plugin = plugin; this.storage = storage; this.messages = messages; this.file = new File(plugin.getDataFolder(), "traders.yml"); }
@@ -53,11 +53,9 @@ public final class TradeManager {
         if (!file.exists()) plugin.saveResource("traders.yml", false);
         YamlConfiguration c = YamlConfiguration.loadConfiguration(file);
         enabled = c.getBoolean("enabled", true); maxDistance = positive(c, "trade.max-distance", 10); requestTimeout = seconds(c, "trade.request-timeout-seconds", 30); idleTimeout = seconds(c, "trade.idle-timeout-seconds", 60); cooldown = seconds(c, "trade.cooldown-seconds", 15);
-        // Trades are item-only. The legacy money/XP fields remain in the SQL
-        // schema solely to return any escrow created before this update.
-        maxMoney = 0; maxExperience = 0;
-        compact = !"full".equalsIgnoreCase(c.getString("number-formatting.style", "compact")); decimalPlaces = Math.max(0, Math.min(4, c.getInt("number-formatting.decimal-places", 1)));
-        divider = material(c, "gui.divider-material", Material.BLACK_STAINED_GLASS_PANE); filler = material(c, "gui.filler-material", Material.GRAY_STAINED_GLASS_PANE); confirm = material(c, "gui.confirm-item", Material.LIME_DYE); locked = material(c, "gui.locked-item", Material.GRAY_DYE); xp = material(c, "gui.xp-item", Material.EXPERIENCE_BOTTLE); currency = material(c, "gui.currency-item", Material.GOLD_INGOT);
+        // Trades are item-only. Legacy money/XP columns remain solely so old
+        // escrow can be returned after an upgrade.
+        divider = material(c, "gui.divider-material", Material.BLACK_STAINED_GLASS_PANE); filler = material(c, "gui.filler-material", Material.GRAY_STAINED_GLASS_PANE); confirm = material(c, "gui.confirm-item", Material.LIME_DYE); locked = material(c, "gui.locked-item", Material.GRAY_DYE);
         worlds = lower(c.getStringList("blacklist.worlds")); blockedItems = materials(c.getStringList("blacklist.items")); Set<GameMode> modes = new HashSet<>(); for (String raw : c.getStringList("blacklist.gamemodes")) try { modes.add(GameMode.valueOf(raw.toUpperCase(Locale.ROOT))); } catch (IllegalArgumentException e) { warn("blacklist.gamemodes", raw); } gameModes = Set.copyOf(modes);
     }
     private double positive(YamlConfiguration c, String key, double fallback) { double v = c.getDouble(key, fallback); if (!Double.isFinite(v) || v < 0) { warn(key, "using " + fallback); return fallback; } return v; }
@@ -66,8 +64,8 @@ public final class TradeManager {
     private Set<Material> materials(Collection<String> values) { Set<Material> out = new HashSet<>(); for (String raw : values) { Material m = Material.matchMaterial(raw); if (m == null) warn("blacklist.items", raw); else out.add(m); } return Set.copyOf(out); }
     private Set<String> lower(Collection<String> values) { return values.stream().filter(s -> s != null && !s.isBlank()).map(s -> s.toLowerCase(Locale.ROOT)).collect(java.util.stream.Collectors.toUnmodifiableSet()); }
     private void warn(String key, String value) { plugin.getLogger().warning("Invalid traders.yml " + key + " (" + value + "); using a safe fallback."); }
-    public boolean isEnabled() { return enabled; } public boolean moneyEnabled() { return false; } public boolean experienceEnabled() { return false; }
-    public Material dividerMaterial() { return divider; } public Material fillerMaterial() { return filler; } public Material confirmMaterial() { return confirm; } public Material lockedMaterial() { return locked; } public Material experienceMaterial() { return xp; } public Material currencyMaterial() { return currency; }
+    public boolean isEnabled() { return enabled; }
+    public Material dividerMaterial() { return divider; } public Material fillerMaterial() { return filler; } public Material confirmMaterial() { return confirm; } public Material lockedMaterial() { return locked; }
     public double maxDistance() { return maxDistance; }
     public boolean isProgrammaticClose(UUID id) { return programmaticClose.remove(id); }
     public boolean isInSession(UUID id) { return sessions.containsKey(id); }
@@ -94,11 +92,7 @@ public final class TradeManager {
             try {
                 accepting.put(playerId, storage.loadAccepting(playerId));
                 applyClaims(playerId);
-                int levels = storage.takePendingExperience(playerId);
-                double money = storage.takePendingMoney(playerId);
-                if (levels > 0 || money > 0) {
-                    Bukkit.getScheduler().runTask(plugin, () -> applyLegacyCredits(playerId, levels, money));
-                }
+                processPendingPayouts(playerId);
             } catch (Exception e) {
                 plugin.getLogger().log(Level.WARNING, "Could not load trade preferences", e);
             }
@@ -110,12 +104,6 @@ public final class TradeManager {
     private boolean busy(UUID id) { return sessions.containsKey(id) || requests.containsKey(id) || requests.values().stream().anyMatch(r -> r.sender.equals(id)); }
     private boolean onCooldown(UUID id) { return cooldowns.getOrDefault(id, 0L) > System.currentTimeMillis(); }
     private void endRequest(Request request) { requests.remove(request.target, request); cooldowns.put(request.sender, System.currentTimeMillis() + cooldown); cooldowns.put(request.target, System.currentTimeMillis() + cooldown); }
-    public Result setValue(Player player, TradeSession session, TradeValueType type, String raw) {
-        if (session == null || session.locked(player.getUniqueId())) return Result.LOCKED; Long parsed = AmountParser.parse(raw); if (parsed == null) return Result.INVALID_AMOUNT;
-        if (type == TradeValueType.MONEY) { if (!moneyEnabled() || parsed > maxMoney) return Result.INVALID_AMOUNT; if (!EconomyHook.isAvailable()) return Result.NO_ECONOMY; if (EconomyHook.getEconomy().getBalance(player) + 1.0E-8 < parsed) return Result.CANNOT_AFFORD; if (session.isRequester(player.getUniqueId())) session.requesterMoney = parsed; else session.targetMoney = parsed; }
-        else { if (!experienceEnabled() || parsed > maxExperience) return Result.INVALID_AMOUNT; if (player.getLevel() < parsed) return Result.CANNOT_AFFORD; if (session.isRequester(player.getUniqueId())) session.requesterExperience = parsed.intValue(); else session.targetExperience = parsed.intValue(); }
-        touch(session); return Result.OK;
-    }
     public Result lock(Player player, TradeSession session) {
         if (session == null || session.locked(player.getUniqueId())) return Result.LOCKED;
         session.lock(player.getUniqueId()); touch(session); return Result.OK;
@@ -123,24 +111,45 @@ public final class TradeManager {
     public Result complete(Player actor, TradeSession session) {
         if (session == null || !session.bothLocked() || !actor.getUniqueId().equals(session.firstLocked)) return Result.NOT_FIRST_LOCKED; if (session.finishing) return Result.LOCKED;
         Player requester = Bukkit.getPlayer(session.requester); Player target = Bukkit.getPlayer(session.target); if (requester == null || target == null || !near(requester, target) || !allowed(requester) || !allowed(target) || !canFit(requester, session.itemsFor(session.target)) || !canFit(target, session.itemsFor(session.requester))) { cancel(session, "trade-cancelled"); return Result.FULL; }
-        session.finishing = true; ItemStack[] left = session.itemsFor(session.requester), right = session.itemsFor(session.target); give(requester, right); give(target, left);
-        finish(session, "COMPLETED", requester, target); return Result.OK;
+        session.finishing = true;
+        settleEscrowAsync(session, "COMPLETED", requester, target, true, null);
+        return Result.OK;
     }
     public void cancel(TradeSession session, String messageKey) {
         if (session == null || session.finishing) return; session.finishing = true; Player requester = Bukkit.getPlayer(session.requester); Player target = Bukkit.getPlayer(session.target);
-        if (requester != null) { give(requester, session.itemsFor(session.requester)); }
-        if (target != null) { give(target, session.itemsFor(session.target)); }
-        finish(session, "CANCELLED", requester, target); if (requester != null) requester.sendMessage(messages.get(requester, "trade." + messageKey, "player", target == null ? "player" : target.getName())); if (target != null) target.sendMessage(messages.get(target, "trade." + messageKey, "player", requester == null ? "player" : requester.getName()));
+        settleEscrowAsync(session, "CANCELLED", requester, target, false, messageKey);
     }
     private void finish(TradeSession s, String status, Player requester, Player target) {
         sessions.remove(s.requester, s); sessions.remove(s.target, s); cooldowns.put(s.requester, System.currentTimeMillis() + cooldown); cooldowns.put(s.target, System.currentTimeMillis() + cooldown);
-        if (requester != null) { programmaticClose.add(s.requester); requester.closeInventory(); if ("COMPLETED".equals(status)) requester.sendMessage(messages.get(requester, "trade.complete", "player", target == null ? "player" : target.getName())); }
-        if (target != null) { programmaticClose.add(s.target); target.closeInventory(); if ("COMPLETED".equals(status)) target.sendMessage(messages.get(target, "trade.complete", "player", requester == null ? "player" : requester.getName())); }
-        persistClear(s, requester == null ? s.requester.toString() : requester.getName(), target == null ? s.target.toString() : target.getName(), status);
+        closeTradeView(s, requester); closeTradeView(s, target);
+        if (requester != null && "COMPLETED".equals(status)) requester.sendMessage(messages.get(requester, "trade.complete", "player", target == null ? "player" : target.getName()));
+        if (target != null && "COMPLETED".equals(status)) target.sendMessage(messages.get(target, "trade.complete", "player", requester == null ? "player" : requester.getName()));
     }
-    public void touch(TradeSession session) { session.lastActivity = System.currentTimeMillis(); Player a = Bukkit.getPlayer(session.requester), b = Bukkit.getPlayer(session.target); TradeMenu.render(session, Bukkit.getOfflinePlayer(session.requester), Bukkit.getOfflinePlayer(session.target), this, messages); if (a != null && b != null) { Player other = a; other.playSound(other.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING, .2f, 1.7f); } persistEscrow(session); }
+    private void closeTradeView(TradeSession session, Player player) {
+        if (player == null || !(player.getOpenInventory().getTopInventory().getHolder() instanceof TradeMenu.Holder holder)
+                || !session.id.equals(holder.sessionId())) return;
+        programmaticClose.add(player.getUniqueId()); player.closeInventory();
+    }
+    public void touch(TradeSession session) { if (session == null || session.finishing || sessions.get(session.requester) != session) return; session.lastActivity = System.currentTimeMillis(); Player a = Bukkit.getPlayer(session.requester), b = Bukkit.getPlayer(session.target); TradeMenu.render(session, Bukkit.getOfflinePlayer(session.requester), Bukkit.getOfflinePlayer(session.target), this, messages); if (a != null && b != null) { Player other = a; other.playSound(other.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING, .2f, 1.7f); } persistEscrow(session); }
     public void sweep() { long now = System.currentTimeMillis(); for (Request request : List.copyOf(requests.values())) if (request.expires <= now) endRequest(request); Set<TradeSession> unique = new HashSet<>(sessions.values()); for (TradeSession s : unique) { Player a = Bukkit.getPlayer(s.requester), b = Bukkit.getPlayer(s.target); if (a == null || b == null || !allowed(a) || !allowed(b) || !near(a,b)) cancel(s, "trade-cancelled"); else if (now - s.lastActivity >= idleTimeout) cancel(s, "trade-idle-cancelled"); } cooldowns.entrySet().removeIf(e -> e.getValue() <= now); }
-    public void shutdown() { for (TradeSession session : new HashSet<>(sessions.values())) cancel(session, "trade-cancelled"); awaitWrites(); }
+    public void shutdown() {
+        shuttingDown.set(true);
+        for (TradeSession session : new HashSet<>(sessions.values())) {
+            cancel(session, "trade-cancelled");
+        }
+        awaitWrites();
+        for (String key : List.copyOf(pendingPayoutsInProgress)) {
+            try {
+                storage.releasePendingPayout(key);
+            } catch (Exception error) {
+                plugin.getLogger().log(Level.SEVERE,
+                        "Could not release Trade payout " + key + " during shutdown", error);
+            } finally {
+                pendingPayoutsInProgress.remove(key);
+            }
+        }
+        awaitWrites();
+    }
     private void persistEscrow(TradeSession session) {
         TradeSnapshot snapshot = TradeSnapshot.capture(session);
         CompletableFuture<Void> next = escrowChains.compute(snapshot.sessionId(), (id, previous) ->
@@ -151,20 +160,52 @@ public final class TradeManager {
                         }));
         track(next);
     }
-    private void persistClear(TradeSession session, String requester, String target, String status) {
+    private void settleEscrowAsync(TradeSession session, String status, Player requesterPlayer,
+            Player targetPlayer, boolean completed, String cancellationMessageKey) {
         TradeSnapshot snapshot = TradeSnapshot.capture(session);
-        CompletableFuture<Void> next = escrowChains.compute(snapshot.sessionId(), (id, previous) ->
+        String requesterName = requesterPlayer == null ? session.requester.toString() : requesterPlayer.getName();
+        String targetName = targetPlayer == null ? session.target.toString() : targetPlayer.getName();
+        CompletableFuture<Void> settlement = escrowChains.compute(snapshot.sessionId(), (id, previous) ->
                 (previous == null ? CompletableFuture.<Void>completedFuture(null) : previous.handle((v, e) -> null))
                         .thenRunAsync(() -> {
-                            try { storage.deleteEscrow(snapshot.sessionId()); storage.insertHistory(snapshot, requester, target, status); }
-                            catch (Exception e) { plugin.getLogger().log(Level.WARNING, "Failed to write trade audit row", e); }
+                            try { storage.settleEscrow(snapshot, requesterName, targetName, status, completed); }
+                            catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
                         }));
-        track(next);
-        next.whenComplete((ignored, error) -> escrowChains.remove(snapshot.sessionId(), next));
+        track(settlement);
+        settlement.whenComplete((ignored, error) -> {
+            escrowChains.remove(snapshot.sessionId(), settlement);
+            if (!plugin.isEnabled()) return;
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                Player requester = Bukkit.getPlayer(session.requester);
+                Player target = Bukkit.getPlayer(session.target);
+                if (error != null) {
+                    session.finishing = false;
+                    plugin.getLogger().log(Level.SEVERE, "Failed to durably "
+                            + status.toLowerCase(Locale.ROOT) + " trade " + snapshot.sessionId(), error);
+                    if (requester != null) requester.sendMessage(messages.get(requester, "trade.settle-failed"));
+                    if (target != null) target.sendMessage(messages.get(target, "trade.settle-failed"));
+                    return;
+                }
+                finish(session, status, requester, target);
+                if (requester != null) applyClaims(session.requester);
+                if (target != null) applyClaims(session.target);
+                if (!completed && cancellationMessageKey != null) {
+                    if (requester != null) requester.sendMessage(messages.get(requester,
+                            "trade." + cancellationMessageKey, "player", target == null ? "player" : target.getName()));
+                    if (target != null) target.sendMessage(messages.get(target,
+                            "trade." + cancellationMessageKey, "player", requester == null ? "player" : requester.getName()));
+                }
+            });
+        });
     }
     public void restoreEscrow() {
         track(CompletableFuture.supplyAsync(() -> {
-            try { return storage.loadEscrow(); }
+            try {
+                List<TradeStorage.PendingPayout> uncertain = storage.loadUncertainPayouts();
+                if (!uncertain.isEmpty()) plugin.getLogger().severe("Trade has " + uncertain.size()
+                        + " uncertain legacy payout(s). Inspect with /trade payouts before retrying them.");
+                return storage.loadEscrow();
+            }
             catch (Exception e) { throw new java.util.concurrent.CompletionException(e); }
         }).thenAccept(escrows -> Bukkit.getScheduler().runTask(plugin, () -> {
             for (TradeEscrow escrow : escrows) {
@@ -182,75 +223,245 @@ public final class TradeManager {
             }
         })).exceptionally(error -> { plugin.getLogger().log(Level.SEVERE, "Failed to load trade escrow", error); return null; }));
     }
-    /** Deletes first, then delivers only the claims this invocation owns. */
+    /** Reserves durable rows, then reconciles/acknowledges them after inventory delivery. */
     private void applyClaims(UUID playerId) {
-        try {
-            List<ItemStack> claims = storage.takeClaims(playerId);
-            if (claims.isEmpty()) {
-                return;
+        if (!claimDeliveries.add(playerId)) return;
+        CompletableFuture<Void> load = CompletableFuture.supplyAsync(() -> {
+            try {
+                List<TradeStorage.ClaimReservation> reservations = new ArrayList<>(
+                        storage.loadDeliveringClaims(playerId));
+                TradeStorage.ClaimReservation fresh = storage.reserveClaims(playerId);
+                if (!fresh.claims().isEmpty()) reservations.add(fresh);
+                return new TradeClaimBatch(reservations, fresh.claims().isEmpty() ? null : fresh.token());
+            } catch (Exception error) {
+                throw new java.util.concurrent.CompletionException(error);
             }
+        }).thenAccept(batch ->
             Bukkit.getScheduler().runTask(plugin, () -> {
                 Player player = Bukkit.getPlayer(playerId);
                 if (player == null || !player.isOnline()) {
-                    restoreClaims(playerId, claims);
+                    releaseFreshClaim(playerId, batch).whenComplete((ignored, error) ->
+                            claimDeliveries.remove(playerId));
                     return;
                 }
-                for (ItemStack item : claims) {
-                    give(player, new ItemStack[]{item});
+                if (batch.reservations().isEmpty()) {
+                    ClaimDelivery.clearSourceMarkers(player, plugin, "trade");
+                    claimDeliveries.remove(playerId);
                 }
-            });
-        } catch (Exception e) {
-            plugin.getLogger().log(Level.WARNING, "Failed to claim returned trade items", e);
-        }
-    }
-
-    /** A player may quit between the asynchronous claim reservation and its main-thread delivery. */
-    private void restoreClaims(UUID playerId, List<ItemStack> claims) {
-        track(CompletableFuture.runAsync(() -> {
-            try {
-                for (ItemStack item : claims) {
-                    if (item != null && !item.isEmpty()) {
-                        storage.insertClaim(playerId, item);
-                    }
-                }
-            } catch (Exception error) {
-                plugin.getLogger().log(Level.SEVERE, "Failed to restore undelivered trade claims for " + playerId, error);
-            }
+                else deliverTradeReservation(player, batch, 0);
+            })
+        );
+        track(load.whenComplete((ignored, error) -> {
+            if (error == null) return;
+            plugin.getLogger().log(Level.WARNING, "Failed to claim returned trade items", error);
+            claimDeliveries.remove(playerId);
         }));
     }
 
-    /** Legacy money/XP escrow is re-queued if a player leaves before delivery. */
-    private void applyLegacyCredits(UUID playerId, int levels, double money) {
-        Player player = Bukkit.getPlayer(playerId);
-        if (player == null || !player.isOnline()) {
-            track(CompletableFuture.runAsync(() -> {
-                try {
-                    storage.addPendingExperience(playerId, levels);
-                    if (money > 0) {
-                        storage.addPendingMoney(playerId, money);
-                    }
-                } catch (Exception error) {
-                    plugin.getLogger().log(Level.SEVERE, "Failed to restore pending legacy trade credits for " + playerId, error);
-                }
-            }));
+    private record TradeClaimBatch(List<TradeStorage.ClaimReservation> reservations, String freshToken) { }
+
+    private void deliverTradeReservation(Player player, TradeClaimBatch batch, int index) {
+        List<TradeStorage.ClaimReservation> reservations = batch.reservations();
+        if (index >= reservations.size() || !player.isOnline()) {
+            claimDeliveries.remove(player.getUniqueId());
             return;
         }
-        if (levels > 0) {
-            player.setLevel(player.getLevel() + levels);
+        TradeStorage.ClaimReservation reservation = reservations.get(index);
+        List<ClaimDelivery.TaggedItem> expected = new ArrayList<>();
+        for (TradeStorage.ClaimRow row : reservation.claims()) expected.add(ClaimDelivery.tagged(plugin, "trade",
+                reservation.token(), row.id(), 0, row.item()));
+        List<ClaimDelivery.TaggedItem> missing = ClaimDelivery.missing(player, plugin, expected);
+        if (!ClaimDelivery.canFit(player, missing) || !ClaimDelivery.add(player, missing)) {
+            releaseFreshClaim(player.getUniqueId(), batch).whenComplete((ignored, error) ->
+                    claimDeliveries.remove(player.getUniqueId()));
+            return;
         }
-        if (money > 0 && EconomyHook.isAvailable()) {
-            EconomyHook.getEconomy().depositPlayer(player, money);
+        CompletableFuture<Integer> complete = CompletableFuture.supplyAsync(() -> {
+            try { return storage.completeReservation(player.getUniqueId(), reservation.token()); }
+            catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
+        });
+        track(complete);
+        complete.whenComplete((changed, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+            if (error != null || changed == null || changed != reservation.claims().size()) {
+                plugin.getLogger().log(Level.SEVERE, "Could not acknowledge trade claim reservation "
+                        + reservation.token() + "; tagged items remain reconcilable.", error);
+                claimDeliveries.remove(player.getUniqueId());
+                return;
+            }
+            ClaimDelivery.clearMarkers(player, plugin, "trade", reservation.token());
+            deliverTradeReservation(player, batch, index + 1);
+        }));
+    }
+
+    private CompletableFuture<Void> releaseFreshClaim(UUID playerId, TradeClaimBatch batch) {
+        if (batch.freshToken() == null) return CompletableFuture.completedFuture(null);
+        return releaseClaims(playerId, batch.reservations().stream()
+                .filter(reservation -> reservation.token().equals(batch.freshToken())).toList());
+    }
+
+    private CompletableFuture<Void> releaseClaims(UUID playerId, List<TradeStorage.ClaimReservation> reservations) {
+        CompletableFuture<Void> release = CompletableFuture.runAsync(() -> {
+            try {
+                for (TradeStorage.ClaimReservation reservation : reservations)
+                    storage.releaseReservation(playerId, reservation.token());
+            } catch (Exception error) {
+                plugin.getLogger().log(Level.SEVERE, "Failed to release undelivered trade claims for " + playerId,
+                        error);
+            }
+        });
+        track(release);
+        return release;
+    }
+
+    /** Loads and reserves legacy currency credits off-thread before touching Bukkit on the main thread. */
+    public void processPendingPayouts(UUID ownerFilter) {
+        if (shuttingDown.get()) return;
+        CompletableFuture<List<TradeStorage.PendingPayout>> load = CompletableFuture.supplyAsync(() -> {
+            List<TradeStorage.PendingPayout> reserved = new ArrayList<>();
+            try {
+                for (TradeStorage.PendingPayout payout : storage.loadPendingPayouts()) {
+                    if (ownerFilter != null && !ownerFilter.equals(payout.owner())) continue;
+                    if (!pendingPayoutsInProgress.add(payout.key())) continue;
+                    try {
+                        if (storage.reservePendingPayout(payout.key(), System.currentTimeMillis())) {
+                            reserved.add(payout);
+                        } else {
+                            pendingPayoutsInProgress.remove(payout.key());
+                        }
+                    } catch (Exception error) {
+                        pendingPayoutsInProgress.remove(payout.key());
+                        plugin.getLogger().log(Level.SEVERE,
+                                "Could not reserve Trade legacy payout " + payout.key(), error);
+                    }
+                }
+                return reserved;
+            } catch (Exception error) {
+                throw new java.util.concurrent.CompletionException(error);
+            }
+        });
+        track(load);
+        load.whenComplete((reserved, error) -> {
+            if (error != null) {
+                plugin.getLogger().log(Level.SEVERE, "Could not load Trade legacy payouts", error);
+                return;
+            }
+            if (reserved.isEmpty()) return;
+            if (shuttingDown.get() || !plugin.isEnabled()) {
+                reserved.forEach(payout -> finishPendingPayout(payout.key(), false));
+                return;
+            }
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (shuttingDown.get()) {
+                    reserved.forEach(payout -> finishPendingPayout(payout.key(), false));
+                } else {
+                    reserved.forEach(this::deliverPendingPayout);
+                }
+            });
+        });
+    }
+
+    private void deliverPendingPayout(TradeStorage.PendingPayout payout) {
+        if (shuttingDown.get()) {
+            finishPendingPayout(payout.key(), false);
+            return;
+        }
+        Player player = Bukkit.getPlayer(payout.owner());
+        if (player == null || !player.isOnline()) {
+            finishPendingPayout(payout.key(), false);
+            return;
+        }
+        boolean delivered = false;
+        boolean definitelyNotDelivered = false;
+        try {
+            if (payout.currency() == TradeStorage.PayoutCurrency.EXP) {
+                if (payout.amount() != Math.rint(payout.amount()) || payout.amount() > Integer.MAX_VALUE) {
+                    plugin.getLogger().severe("Trade payout " + payout.key() + " has an invalid EXP amount; "
+                            + "it remains uncertain for staff review.");
+                    pendingPayoutsInProgress.remove(payout.key());
+                    return;
+                }
+                player.setLevel(player.getLevel() + (int) payout.amount());
+                delivered = true;
+            } else if (!EconomyHook.isAvailable()) {
+                definitelyNotDelivered = true;
+            } else {
+                delivered = EconomyHook.getEconomy().depositPlayer(player, payout.amount()).transactionSuccess();
+                definitelyNotDelivered = !delivered;
+            }
+        } catch (RuntimeException uncertain) {
+            plugin.getLogger().log(Level.SEVERE, "Trade payout " + payout.key()
+                    + " has an uncertain external result and will not be replayed automatically.", uncertain);
+        }
+        if (delivered) finishPendingPayout(payout.key(), true);
+        else if (definitelyNotDelivered) finishPendingPayout(payout.key(), false);
+        else pendingPayoutsInProgress.remove(payout.key());
+    }
+
+    private void finishPendingPayout(String key, boolean delivered) {
+        CompletableFuture<Void> finish = CompletableFuture.runAsync(() -> {
+            try {
+                boolean changed = delivered ? storage.acknowledgePendingPayout(key)
+                        : storage.releasePendingPayout(key);
+                if (!changed) plugin.getLogger().severe("Trade payout " + key
+                        + " changed while its result was being recorded.");
+            } catch (Exception error) {
+                plugin.getLogger().log(Level.SEVERE, "Could not record the result of Trade payout " + key, error);
+            }
+        });
+        track(finish);
+        finish.whenComplete((ignored, error) -> pendingPayoutsInProgress.remove(key));
+    }
+
+    public List<TradeStorage.PendingPayout> uncertainPayouts() {
+        try { return storage.loadUncertainPayouts(); }
+        catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not inspect uncertain Trade payouts", error);
+            return List.of();
+        }
+    }
+
+    public boolean resolveUncertainPayout(String key, boolean paid, Player actor) {
+        try {
+            boolean changed = paid ? storage.acknowledgePendingPayout(key) : storage.releasePendingPayout(key);
+            if (!changed) return false;
+            plugin.getLogger().warning(actor.getName() + " resolved Trade payout " + key + " as "
+                    + (paid ? "PAID" : "RETRY") + ".");
+            if (!paid) processPendingPayouts(null);
+            return true;
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not reconcile Trade payout " + key, error);
+            return false;
         }
     }
     private static boolean canFit(Player player, ItemStack[] items) { ItemStack[] contents = player.getInventory().getStorageContents().clone(); for (ItemStack need : items) { if (need == null || need.isEmpty()) continue; int remaining = need.getAmount(); for (int i=0;i<contents.length && remaining>0;i++) { ItemStack have=contents[i]; if (have != null && have.isSimilar(need)) { int room=have.getMaxStackSize()-have.getAmount(); if(room>0){int move=Math.min(room,remaining);have=have.clone();have.setAmount(have.getAmount()+move);contents[i]=have;remaining-=move;}} } for(int i=0;i<contents.length&&remaining>0;i++) if(contents[i]==null||contents[i].isEmpty()){int move=Math.min(need.getMaxStackSize(),remaining);ItemStack placed=need.clone();placed.setAmount(move);contents[i]=placed;remaining-=move;} if(remaining>0)return false; } return true; }
-    private void give(Player player, ItemStack[] items) { for (ItemStack item : items) if (item != null && !item.isEmpty()) player.getInventory().addItem(item.clone()).values().forEach(left -> player.getWorld().dropItemNaturally(player.getLocation(), left)); }
     private void track(CompletableFuture<?> future) { pendingWrites.add(future); future.whenComplete((v,e)->pendingWrites.remove(future)); }
-    public void awaitWrites() { for (CompletableFuture<?> write : List.copyOf(pendingWrites)) try { write.get(5, TimeUnit.SECONDS); } catch (Exception ignored) { } }
+    public void awaitWrites() {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        int emptyRounds = 0;
+        try {
+            while (System.nanoTime() < deadline) {
+                CompletableFuture<?>[] snapshot = pendingWrites.toArray(new CompletableFuture[0]);
+                if (snapshot.length == 0) {
+                    if (++emptyRounds >= 3) return;
+                    TimeUnit.MILLISECONDS.sleep(2L);
+                    continue;
+                }
+                emptyRounds = 0;
+                long remaining = Math.max(1L, deadline - System.nanoTime());
+                CompletableFuture.allOf(snapshot).get(remaining, TimeUnit.NANOSECONDS);
+            }
+            plugin.getLogger().warning("Timed out waiting for pending Trade writes.");
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            plugin.getLogger().log(Level.WARNING, "Interrupted while waiting for Trade writes.", error);
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.WARNING, "Timed out waiting for pending Trade writes.", error);
+        }
+    }
     public void openHistory(Player viewer, UUID filter, String label, int page) {
         int safePage = Math.max(0, page);
         track(CompletableFuture.supplyAsync(() -> { try { return storage.loadHistory(filter, 45, safePage * 45); } catch (Exception e) { plugin.getLogger().log(Level.WARNING, "Failed to load trade history", e); return List.<TradeLogEntry>of(); } }).thenAccept(entries -> Bukkit.getScheduler().runTask(plugin, () -> {
             if (viewer.isOnline()) TradeHistoryMenu.open(viewer, messages, filter, label, safePage, entries);
         })));
     }
-    public String format(double amount) { if (!compact) return new DecimalFormat("#,##0." + "#".repeat(decimalPlaces)).format(amount); String[] suffix={"","K","M","B"}; int i=0; while(amount>=1000&&i<3){amount/=1000;i++;} return new DecimalFormat("0."+"#".repeat(decimalPlaces)).format(amount)+suffix[i]; }
 }

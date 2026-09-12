@@ -1,6 +1,7 @@
 package me.vertex.core.menu;
 
 import me.vertex.core.lang.MessageFormatter;
+import me.vertex.core.lang.SmallCaps;
 import net.kyori.adventure.text.Component;
 
 import java.util.ArrayList;
@@ -103,6 +104,6 @@ public final class MenuPlaceholders {
         if (blockKey != null) {
             return new ArrayList<>(blocks.get(blockKey));
         }
-        return List.of(MessageFormatter.deserialize(apply(template)));
+        return List.of(MessageFormatter.deserialize(apply(SmallCaps.template(template))));
     }
 }

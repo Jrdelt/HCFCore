@@ -11,29 +11,29 @@ you what a click does.
 
 ## Quick reference
 
-| Command | What it does |
-|---|---|
-| `/kits` · `/kit <name>` | Browse and claim kits |
-| `/abilities` · `/cooldowns` | Browse ability items, check your cooldowns |
-| `/tags` | Browse and equip cosmetic chat tags |
-| `/shop` | Buy and sell at live market prices |
-| `/ah` | Auction House — buy, sell, collect |
-| `/cf` | Coinflip another player for money, XP, GC, or items |
-| `/gc` | Open your GC wallet, withdraw a code, or redeem a code |
-| `/trade <player>` | Secure face-to-face trade |
-| `/tradetoggle` | Stop receiving trade requests |
-| `/mines` | Mining world status: ores, KOTH, Hot Zones |
-| `/events` | View active Mine KOTH and Hot Zone events |
-| `/haven` · `/riftlands` · `/zones` | Enter farming zones or view zone progress |
-| `/boosters` | Every bonus currently applying to you |
-| `/filter <material>` | Choose what your Backpack throws away |
-| `/runes` · `/ce` | Browse and buy Custom Enchantment Runes |
-| `/koth focus` · `/outpost focus` | Track an active event with a bossbar |
-| `/f rally` · `/frally` | Set a faction rally point |
-| `/f bank` · `/f upgrades` | Faction money/XP/TNT bank and upgrades |
-| `/tntfill <radius> <amount> bank\|inventory` | Bulk-fill dispensers in your claim |
-| `/language [code]` | Change your language |
-| `/nextreboot` | When the next restart is |
+| Command | Permission | What it does |
+|---|---|---|
+| `/kits` · `/kit <name>` | Open to all | Browse and claim kits |
+| `/abilities` · `/cooldowns` | Open to all | Browse ability items, check your cooldowns |
+| `/tags` | Open to all (some are permission-locked) | Browse and equip cosmetic chat tags |
+| `/shop` | Open to all | Buy and sell at live market prices |
+| `/ah` | Open to all | Auction House: buy, sell, collect |
+| `/cf` | Open to all | Coinflip another player for money, XP, GC, or items |
+| `/gc` | `vertex.gc.use` | Open your GC wallet, withdraw a code, or redeem a code |
+| `/trade <player>` | `vertex.trade.use` | Secure face-to-face trade |
+| `/tradetoggle` | `vertex.trade.use` | Stop receiving trade requests |
+| `/mines` | Open to all | Mining world status: ores, KOTH, Hot Zones |
+| `/events` | Open to all | View active Mine KOTH and Hot Zone events |
+| `/haven` · `/riftlands` · `/zones` | `vertex.zones.use` | Enter farming zones or view zone progress |
+| `/boosters` | Open to all | Every bonus currently applying to you |
+| `/filter add <material>` | Open to all | Choose what your Backpack throws away |
+| `/runes` · `/ce` | Open to all | Browse and buy Custom Enchantment Runes |
+| `/koth focus` · `/outpost focus` | Open to all | Track an active event with a bossbar |
+| `/f rally` · `/frally` | Faction role / `/f permissions` | Set a faction rally point |
+| `/f bank` · `/f upgrades` | Faction role / `/f permissions` | Faction money/XP/TNT bank and upgrades |
+| `/tntfill <radius> <amount> bank\|inventory` | `vertex.tntfill.use` | Bulk-fill dispensers in your claim |
+| `/language [code]` | Open to all | Change your language |
+| `/nextreboot` | Open to all | When the next restart is |
 
 Numbers accept shorthand almost everywhere: `10k`, `1.5m`, `2b`.
 
@@ -63,16 +63,16 @@ is currently above or below its usual price.
 ### `/ah` — Auction House
 
 Buy-it-now marketplace. `/ah sell <price> [money|exp|gc]` lists whatever you're
-holding; the first person to buy it gets it.
+holding; the first person to buy it gets it in their Collection Box.
 
 In the browser: **left-click** buys, **shift-click** cancels your own
 listing, **right-click** adds it to your watchlist. Your own head opens
 *Your Auction Page* — active listings, expired items, collection box,
 watchlist, and history.
 
-Cancelled and expired listings wait in your **collection box** (`/ah collect`)
-before delivery; other returns use it whenever direct inventory delivery is
-not possible. Nothing is ever lost to a restart.
+Bought, cancelled, and expired listing items wait in the **collection box**
+(`/ah collect`) before delivery. Items are never dropped because an inventory
+is full.
 
 See [Auction House](auctionhouse.md).
 
@@ -136,9 +136,9 @@ See [Player Trading](trading.md).
 A Backpack goes in your **offhand** and auto-collects what you mine or farm,
 with a drop bonus that grows as you upgrade it.
 
-`/filter <material>` toggles a material your Backpack **throws away** —
-useful for cobblestone while mining. `/filter clear` empties the list, and
-`/filter` on its own shows it.
+`/filter add <material>` adds a material your Backpack **throws away** —
+useful for cobblestone while mining. Use `/filter remove <material>` to keep
+it again, `/filter clear` to empty the list, and `/filter list` to view it.
 
 See [Backpacks](backpacks.md).
 
@@ -197,15 +197,15 @@ See [Boosters](boosters.md).
 
 ## Factions
 
-Vertex adds to FactionsUUID rather than replacing it, so all the normal
+Vertex provides the normal faction system directly, so all the normal
 faction commands still work. On top of them:
 
-| Command | What it does |
-|---|---|
-| `/f rally [set\|clear]` · `/frally` | A 4-minute rally point your faction can track |
-| `/f bank` | Faction money, experience, and TNT |
-| `/f upgrades` | Buy persistent faction upgrades |
-| `/f permissions` | Leaders configure who can do what |
+| Command | Permission / Audience | What it does |
+|---|---|---|
+| `/f rally [set\|clear]` · `/frally` | Faction role permission (`Set Rally` / `Clear Rally`) | A 4-minute rally point your faction can track |
+| `/f bank` | Faction bank role checks | Faction money, experience, and TNT |
+| `/f upgrades` | Leaders/Co-Leaders | Buy persistent faction upgrades |
+| `/f permissions` | Leaders/Co-Leaders/Admins depending on action | Leaders configure who can do what |
 
 The **TNT bank** holds up to 1,000,000 TNT, raised to 10,000,000 by the TNT
 Bank upgrade. `/tntfill <radius> <amount> bank|inventory` fills every

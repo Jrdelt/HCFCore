@@ -12,6 +12,14 @@ language:
   default: en_us
 
 # ============================================
+# WORLD DEFAULTS
+# ============================================
+world-defaults:
+  # Applied to every loaded world during startup and whenever another world
+  # loads. Valid values: PEACEFUL, EASY, NORMAL, HARD, or DISABLED.
+  difficulty: NORMAL
+
+# ============================================
 # STORAGE
 # ============================================
 storage:
@@ -25,6 +33,51 @@ storage:
   #           plugin's data (e.g. a proxied network), or you already run
   #           a MySQL server and prefer to keep everything there.
   type: local
+  retry:
+    # Idempotent background saves are retried with bounded exponential backoff.
+    attempts: 3
+    initial-delay-millis: 100
+    maximum-delay-millis: 1000
+
+# ============================================
+# VELOCITY / SHARD NETWORK
+# ============================================
+network:
+  # Requires storage.type: mysql. Leave false for a standalone server.
+  enabled: false
+  # Must exactly match this backend's Velocity server name.
+  shard-id: standalone
+  role: base
+  max-players: 100
+  spawn-shard: spawn
+  hub-shard: hub
+  heartbeat-stale-seconds: 20
+  transfer-alert-seconds: 30
+  transfer-alert-repeat-seconds: 60
+  queue-timeout-seconds: 300
+  # The reboot manager drains this backend before shutdown. Configure planned
+  # restart schedules at least 30 minutes apart on different backends.
+  restart-drain-seconds: 60
+
+# ============================================
+# SHARED TELEPORTS
+# ============================================
+teleports:
+  countdown-seconds: 5
+  rtp:
+    attempts: 5
+    claim-buffer-chunks: 5
+    countdown-seconds: 5
+    cooldown-seconds: 300
+    retry-delay-seconds: 5
+    destinations:
+      local:
+        # "local" resolves to network.shard-id on every backend.
+        shard: local
+        world: world
+        display: Local Wild
+        world-size: 20000
+        icon: GRASS_BLOCK
 
 # ============================================
 # DATABASE (MySQL/MariaDB) -- only used when storage.type is "mysql"
@@ -299,31 +352,108 @@ pvp:
 # FACTIONS
 # ============================================
 factions:
-  # Prevent faction leaders from using /f leave
+  lifecycle:
+    create-after-disband-cooldown-seconds: 60
+    rename-cooldown-seconds: 21600
+  # Vertex owns all faction state. FactionsUUID is not needed at runtime.
+  # Tags must match this Java regular expression. Invalid expressions safely
+  # fall back to [A-Za-z0-9_]{3,16}.
+  tag-pattern: '[A-Za-z0-9_]{3,16}'
+
+  # Prevent faction leaders from using /f leave until leadership is transferred.
   prevent-leader-leave: true
 
-  # Command aliases for /factions
+  open-join-enabled: true
+  invite-expiry-seconds: 300
+  power:
+    # Personal power follows a player between factions and survives seasons.
+    # Faction power is derived from all current members, including offline members.
+    default-current: 100.0
+    default-max: 100.0
+    absolute-player-cap: 5000.0
+    death-loss: 1.0
+    regeneration-per-interval: 1.0
+    regeneration-interval-seconds: 120
+    booster:
+      material: NETHER_STAR
+      custom-model-data: 0
+      glowing: true
+      tiers: [10, 25, 50, 75, 100]
+  limits:
+    members: 16
+    claims: 250
+    claim-radius: 5
+    warps: 5
+  claims:
+    # One current faction power allows one claimed chunk.
+    require-connected: false
+    overclaiming:
+      enabled: false
+  relations:
+    ally-limit: 1
+    request-expiry-seconds: 7200
+  focus:
+    duration-seconds: 900
+    concurrent-targets: 2
+  map:
+    # Chat map dimensions. Width is safely capped at 41 and height at 21.
+    # 41x20 fills the normal expanded chat box while leaving room for the header.
+    width: 41
+    height: 20
+  pvp:
+    friendly-fire: false
+    allies-can-pvp: false
+  protection:
+    allies-can-build: false
+  # System faction tags can be used for staff-created SafeZone/WarZone land.
+  # PvP is disabled in claims owned by one of these tags.
+  system-claims:
+    safezone-tag: SafeZone
+    warzone-tag: WarZone
+    no-pvp-tags: [SafeZone]
+  # These are safe defaults. Faction leaders can override an action per role
+  # in /f permissions; each action is persisted in the database.
+  permissions:
+    defaults:
+      admin: {}
+      mod:
+        build: true
+        containers: true
+        doors: true
+        home: true
+        invite: true
+        kick: true
+        bank-deposit: true
+        bank-withdraw: true
+        chunkbuster-use: true
+      member:
+        build: true
+        containers: true
+        doors: true
+        home: true
+        bank-deposit: true
+      recruit:
+        home: true
+
+  # Retained for command-preprocess compatibility with established Vertex
+  # extension GUIs. Configure aliases in plugin.yml for Bukkit itself.
   command-aliases:
     - f
     - factions
+    - faction
     - t
 
 # ============================================
 # FACTION UPGRADES
 # ============================================
-# `/f upgrades` (or `/f upgrade`) opens Vertex's persistent purchase GUI for
-# roles allowed FactionsUUID's native UPGRADE action. Costs are withdrawn from
-# the clicking member through Vault. Each level has its own explicit price and
-# total bonus, so no multiplier is applied. Set a level's price to 0 for a
-# free level. Player effects require the member to be in their own claim;
-# Spawner Rate and Crop Growth apply to managed blocks/crops in that claim.
-# Warps is the native FactionsUUID bridge: its `bonus` is display-only because
-# FactionsUUID controls the number of allowed warps. Keep matching native
-# FactionsUUID upgrades disabled unless you deliberately want effects to stack.
+# `/f upgrades` opens Vertex's persistent purchase GUI. Only the faction
+# Leader and Co-Leader may purchase. Costs are withdrawn from the clicking
+# member through Vault. Every level has an explicit price and total bonus;
+# no automatic multiplier is applied. Player effects require own claimed land.
+# The Warps bonus adds to `factions.limits.warps` and controls Vertex's native
+# `/f setwarp` limit directly.
 faction-upgrades:
   enabled: true
-  # With the native UPGRADE action allowed, members may view and buy upgrades.
-  leader-only: false
   # TNT bank size for a faction that has not bought the tnt-bank upgrade.
   # Each purchased level below replaces this with its own absolute capacity.
   tnt-base-capacity: 1000000
@@ -343,9 +473,7 @@ faction-upgrades:
     fly-boost:
       enabled: true
       levels: {1: {price: 50000.0, bonus: 20.0}, 2: {price: 250000.0, bonus: 40.0}, 3: {price: 1250000.0, bonus: 60.0}, 4: {price: 6250000.0, bonus: 80.0}, 5: {price: 31250000.0, bonus: 100.0}}
-    # This sets FactionsUUID's native Warps upgrade level. Configure matching
-    # maximum levels and complete warp-count values in FactionsUUID's upgrade
-    # configuration; Vertex's price/bonus controls only its own GUI.
+    # `bonus` is additional native Vertex faction warp slots at this level.
     warps:
       enabled: true
       levels: {1: {price: 500000.0, bonus: 1.0}, 2: {price: 1000000.0, bonus: 2.0}, 3: {price: 2000000.0, bonus: 3.0}, 4: {price: 4000000.0, bonus: 4.0}, 5: {price: 8000000.0, bonus: 5.0}, 6: {price: 16000000.0, bonus: 6.0}, 7: {price: 32000000.0, bonus: 7.0}, 8: {price: 64000000.0, bonus: 8.0}, 9: {price: 128000000.0, bonus: 9.0}, 10: {price: 256000000.0, bonus: 10.0}, 11: {price: 512000000.0, bonus: 11.0}, 12: {price: 1000000000.0, bonus: 12.0}, 13: {price: 1000000000.0, bonus: 13.0}, 14: {price: 1000000000.0, bonus: 14.0}, 15: {price: 1000000000.0, bonus: 15.0}}
@@ -365,29 +493,44 @@ faction-upgrades:
     tnt-bank:
       enabled: true
       levels: {1: {price: 25000000.0, bonus: 2000000.0}, 2: {price: 75000000.0, bonus: 4000000.0}, 3: {price: 200000000.0, bonus: 6000000.0}, 4: {price: 500000000.0, bonus: 8000000.0}, 5: {price: 1000000000.0, bonus: 10000000.0}}
+    # `bonus` is the total additional Shield duration in seconds at that level.
+    shield-duration:
+      enabled: true
+      levels: {1: {price: 10000000.0, bonus: 3600.0}, 2: {price: 30000000.0, bonus: 7200.0}, 3: {price: 75000000.0, bonus: 10800.0}, 4: {price: 150000000.0, bonus: 14400.0}, 5: {price: 300000000.0, bonus: 21600.0}}
+    # Bonus is the total number of usable rows, not an automatic multiplier.
+    vault-rows:
+      enabled: true
+      levels: {1: {price: 5000000.0, bonus: 2.0}, 2: {price: 15000000.0, bonus: 3.0}, 3: {price: 40000000.0, bonus: 4.0}, 4: {price: 100000000.0, bonus: 5.0}, 5: {price: 250000000.0, bonus: 6.0}}
+    # Bonus is the total unlocked Base Claim slot count. Slot 1 is always available.
+    base-claim-slots:
+      enabled: true
+      levels: {1: {price: 50000000.0, bonus: 2.0}, 2: {price: 150000000.0, bonus: 3.0}}
+
+faction-vault:
+  # A renewable database lease prevents two shards from editing the same
+  # faction vault at once. Values below 10 seconds are clamped to 10.
+  lease-seconds: 20
+  blacklist:
+    materials: [SPAWNER]
+    # Exact namespaced PDC keys, for example vertex:f_power_booster.
+    pdc-keys: []
 
 rally:
   # Live player position/yaw interval for the faction-rally direction bar.
   direction-update-ticks: 10
-  # Faction leaders open the complete permission matrix with /f permissions
-  # or /f perms. Left-click allows and right-click denies. FactionsUUID saves
-  # its built-in actions; this section supplies Vertex-specific actions.
+  # Faction leaders open the complete native Vertex permission matrix with
+  # /f permissions or /f perms. Left-click allows and right-click denies.
   # Permission states always use green/red stained-glass panes, so that an
   # allowed action can never look blocked because of a custom item material.
   permission-gui:
     title: '<gold>Faction Permissions'
     roles:
-      mod: {slot: 2, material: DIAMOND_SWORD, name: '<blue>Moderator', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, collector-withdraw: true, collector-sell: true, collector-upgrade: true, collector-filter: true, bank-deposit: true, bank-withdraw: true, chunkbuster-use: true}
+      coleader: {slot: 1, material: NETHERITE_SWORD, name: '<light_purple>Co-Leader'}
+      admin: {slot: 2, material: DIAMOND_SWORD, name: '<red>Admin'}
+      mod: {slot: 3, material: IRON_SWORD, name: '<blue>Mod', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, collector-withdraw: true, collector-sell: true, collector-upgrade: true, collector-filter: true, bank-deposit: true, bank-withdraw: true, chunkbuster-use: true}
       member: {slot: 4, material: GOLDEN_SWORD, name: '<yellow>Member', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, collector-withdraw: true, collector-sell: true, collector-upgrade: false, collector-filter: false, bank-deposit: true, bank-withdraw: true, chunkbuster-use: false}
-      recruit: {slot: 6, material: WOODEN_SWORD, name: '<gray>Recruit', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, collector-withdraw: false, collector-sell: false, collector-upgrade: false, collector-filter: false, bank-deposit: true, bank-withdraw: true, chunkbuster-use: false}
-    actions:
-      vertex-rally-set: {name: 'Set Rally'}
-      vertex-rally-clear: {name: 'Clear Rally'}
-      vertex-bank-deposit: {name: 'Deposit Bank Resources'}
-      vertex-bank-withdraw: {name: 'Withdraw Bank Resources'}
-      vertex-chunkbuster-use: {name: 'Use Chunk Busters'}
-      # Add a FactionsUUID action here to customize its label. Example:
-      # build: {name: 'Build'}
+      recruit: {slot: 5, material: WOODEN_SWORD, name: '<gray>Recruit', rally-set: true, rally-clear: true, spawner-add: true, spawner-remove: true, collector-open: true, collector-break: true, collector-withdraw: false, collector-sell: false, collector-upgrade: false, collector-filter: false, bank-deposit: true, bank-withdraw: true, chunkbuster-use: false}
+      ally: {slot: 7, material: PURPLE_DYE, name: '<light_purple>Allies'}
 
 # ============================================
 # KITS
@@ -454,9 +597,9 @@ sandbot:
   enabled: true
 
   # How many blocks in each direction from the placement point the bot
-  # operates across (2 = a 5x5 footprint). Capped at 5 regardless of this
+  # operates across (5 = an 11x11 footprint). Capped at 5 regardless of this
   # value.
-  radius-blocks: 2
+  radius-blocks: 5
 
   # How often the bot attempts a conversion pass (in ticks; 20 = 1 second).
   tick-interval-ticks: 1
@@ -467,14 +610,15 @@ sandbot:
   # Global safety cap across one Sand Bot in one conversion pass. A radius of
   # 2 has at most 25 columns, so 50 permits the two-per-column default.
   max-placements-per-tick: 50
+  # Warn faction members only while an active Bot is trying to place.
+  low-bank-warning-threshold: 500000.0
+  low-bank-warning-cooldown-seconds: 60
 
 # ============================================
 # TNT FILL
 # /tntfill <radius> <amount> <bank|inventory> tops up every dispenser
 # within radius blocks of the player, drawing TNT from either
-# FactionsUUID's own native TNT bank (the same balance /f tnt,
-# /f tntdeposit, and /f tntwithdraw manage -- Vertex doesn't keep a
-# second, separate TNT ledger) or the player's own inventory. Only
+# Vertex's native faction TNT bank or the player's own inventory. Only
 # dispensers inside the player's own faction's claimed land count.
 # ============================================
 tntfill:

@@ -38,16 +38,16 @@ import java.util.function.ToIntFunction;
  * zone/base-claim/combat validation, claim-boundary-aware flow computation,
  * and the validate-place-then-charge economic flow.
  *
- * <p><b>Testability.</b> Every live-FactionsUUID/CombatManager/BaseClaimManager
+ * <p><b>Testability.</b> Every native-faction/CombatManager/BaseClaimManager
  * lookup this class needs is injected as a plain functional interface,
  * mirroring {@code ChunkBusterManager}'s exact pattern (itself mirroring
  * {@code ExplosionProtectionListener}'s {@code Predicate<Location>
- * isBaseClaim}): {@code FactionsHook}'s claim queries reach FactionsUUID's
- * live {@code Board} singleton, which is never initialized in a unit test.
+ * isBaseClaim}): claim queries are injected rather than resolving a live
+ * faction service in a unit test.
  * Production wiring (see {@code VertexPlugin}) passes real method
  * references; tests pass lambdas returning canned values, so every zone and
  * flow rule below can be exercised without MockBukkit's world or a running
- * FactionsUUID at all -- only actual block mutation needs a real (mock)
+ * external faction API at all -- only actual block mutation needs a real (mock)
  * {@code World}.
  *
  * <p><b>Why no new database table.</b> A Source Bucket is a physical,
@@ -224,10 +224,10 @@ public final class SourceBucketManager {
     public ItemStack createItem(SourceBucketType variant) {
         ItemStack item = new ItemStack(variant.material());
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(MessageFormatter.deserialize(variant.name()));
+        meta.displayName(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(variant.name())));
         List<Component> lore = new ArrayList<>();
         for (String line : variant.lore()) {
-            lore.add(MessageFormatter.deserialize(line));
+            lore.add(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(line)));
         }
         meta.lore(lore);
         if (variant.customModelData() != null) {

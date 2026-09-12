@@ -16,11 +16,12 @@ the same style as the faction-rally BossBar, pointing to the closest active
 KOTH (KOTH takes priority if an Outpost is also active). An active faction
 rally takes precedence, so its members keep rally navigation instead.
 
-`/koth focus [name]` or `/outpost focus [name]` is available to every player.
-It replaces only that player's rally direction with a BossBar and compass
-pointing at the selected active event. Run `/koth focus off` or `/outpost
-focus off` to restore rally navigation. Focus is personal; it never changes a
-faction rally for anyone else.
+| Command | Permission | Purpose |
+|---|---|---|
+| `/koth focus [name\|off]` | Open to all | Focuses the closest same-world KOTH; optional `off` restores normal faction rally navigation for your player. |
+| `/outpost focus [name\|off]` | Open to all | Focuses Outpost events with the same personal override behavior. |
+
+Focus is personal; it never changes a faction rally for anyone else.
 
 Faction members capture together; a player without a faction may also capture
 as a solo neutral claimant. Separate factionless players are competing sides,
@@ -51,6 +52,18 @@ event with `max-duration-seconds`.
 ## Staff setup
 
 Requires `vertex.koth.admin` or `vertex.outpost.admin` (both default to OP).
+
+| Command | Permission | What it does |
+|---|---|---|
+| `/koth create <id>` / `/outpost create <id>` | `vertex.koth.admin` / `vertex.outpost.admin` | Creates a new event definition; IDs must be unique across both systems. |
+| `/koth wand` / `/outpost wand` | `vertex.koth.admin` / `vertex.outpost.admin` | Gives a replacement Blaze Rod for cuboid selection. |
+| `/koth cancel` / `/outpost cancel` | `vertex.koth.admin` / `vertex.outpost.admin` | Discards an unfinished selection. |
+| `/koth start <id>` / `/outpost start <id>` | `vertex.koth.admin` / `vertex.outpost.admin` | Starts a configured event manually for testing or admin runs. |
+| `/koth stop <id>` / `/outpost stop <id>` | `vertex.koth.admin` / `vertex.outpost.admin` | Stops a running event immediately. |
+| `/koth delete <id>` / `/outpost delete <id>` | `vertex.koth.admin` / `vertex.outpost.admin` | Removes event definition/state. |
+| `/koth list` / `/outpost list` | `vertex.koth.admin` / `vertex.outpost.admin` | Shows configured events and current state. |
+| `/koth validate` / `/outpost validate` | `vertex.koth.admin` / `vertex.outpost.admin` | Validates YAML entries in-game and reports precise config path issues. |
+| `/vertex reload` | `vertex.admin` | Reloads plugin config after setup changes. |
 
 1. Run `/koth create <id>` or `/outpost create <id>`. IDs use lowercase
    letters, numbers, `_`, and `-` and must be unique across both event types.

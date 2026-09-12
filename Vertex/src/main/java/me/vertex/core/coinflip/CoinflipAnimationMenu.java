@@ -36,7 +36,7 @@ public final class CoinflipAnimationMenu {
     public static void play(Plugin plugin, Player viewer, Messages messages, OfflinePlayer host, OfflinePlayer opponent,
             boolean hostWon, long durationTicks) {
         Holder holder = new Holder();
-        Inventory inventory = Bukkit.createInventory(holder, SIZE, messages.get(viewer, "coinflip.animation-gui-title"));
+        Inventory inventory = Bukkit.createInventory(holder, SIZE, messages.getGui(viewer, "coinflip.animation-gui-title"));
         holder.inventory = inventory;
         for (int slot = 0; slot < SIZE; slot++) {
             if (slot == SLOT_REEL - 1 || slot == SLOT_REEL + 1) {

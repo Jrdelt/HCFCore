@@ -52,8 +52,7 @@ public final class InvRestoreMenu {
 
                 Holder holder = new Holder(deaths, targetUUID);
                 Inventory inventory = Bukkit.createInventory(holder, GRID_SIZE,
-                        Component.text("ᴅᴇᴀᴛʜs")
-                                .color(NamedTextColor.LIGHT_PURPLE));
+                        messages.getGui(staffPlayer, "staff.deaths-title"));
                 holder.inventory = inventory;
 
                 NamespacedKey deathIndexKey = new NamespacedKey(plugin, DEATH_INDEX_KEY);
@@ -79,8 +78,7 @@ public final class InvRestoreMenu {
     public static void openContentsView(Player staffPlayer, Death death, Plugin plugin, java.util.UUID targetUUID, Messages messages) {
         Holder holder = new Holder(List.of(death), targetUUID);
         Inventory inventory = Bukkit.createInventory(holder, GRID_SIZE,
-                Component.text("ᴅᴇᴀᴛʜ ᴄᴏɴᴛᴇɴᴛs")
-                        .color(NamedTextColor.LIGHT_PURPLE));
+                messages.getGui(staffPlayer, "staff.death-contents-title"));
         holder.inventory = inventory;
 
         NamespacedKey deathActionKey = new NamespacedKey(plugin, DEATH_ACTION_KEY);
@@ -131,13 +129,11 @@ public final class InvRestoreMenu {
             List<Component> lore = new ArrayList<>();
             lore.add(Component.text(playerUUID.toString()).color(NamedTextColor.GRAY));
             lore.add(Component.empty());
-            String causeText = messages.getRaw(player, "staff.death-cause").replace("{cause}", cause);
-            String killerText = messages.getRaw(player, "staff.death-killer").replace("{killer}", killer);
-            lore.add(MessageFormatter.deserialize(causeText));
-            lore.add(MessageFormatter.deserialize(killerText));
+            lore.add(messages.getGui(player, "staff.death-cause", "cause", cause));
+            lore.add(messages.getGui(player, "staff.death-killer", "killer", killer));
             lore.add(Component.empty());
-            lore.add(MessageFormatter.deserialize(messages.getRaw(player, "staff.death-lore-left")));
-            lore.add(MessageFormatter.deserialize(messages.getRaw(player, "staff.death-lore-right")));
+            lore.add(messages.getGui(player, "staff.death-lore-left"));
+            lore.add(messages.getGui(player, "staff.death-lore-right"));
 
             meta.lore(lore);
             icon.setItemMeta(meta);

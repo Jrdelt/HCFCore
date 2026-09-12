@@ -13,6 +13,11 @@ import java.util.Set;
 import java.util.logging.Level;
 
 public final class RebootManager {
+    public interface PlannedRestartHook {
+        void onDraining(long restartAtMillis);
+        void onRestarting();
+        void onCancelled();
+    }
 
     private final Plugin plugin;
     private final Messages messages;
@@ -23,6 +28,8 @@ public final class RebootManager {
     private List<Integer> reminderMinutes;
     private long rebootAt;
     private int taskId = -1;
+    private volatile PlannedRestartHook plannedRestartHook;
+    private boolean drainingPublished;
 
     public RebootManager(Plugin plugin, Messages messages) {
         this(plugin, messages, null);
@@ -38,6 +45,10 @@ public final class RebootManager {
     public void start() {
         stopTask();
         taskId = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L).getTaskId();
+    }
+
+    public void setPlannedRestartHook(PlannedRestartHook hook) {
+        this.plannedRestartHook = hook;
     }
 
     public void stop() {
@@ -66,6 +77,7 @@ public final class RebootManager {
             return false;
         }
         rebootAt = System.currentTimeMillis() + (long) Math.max(1, delayMinutes) * 60_000L;
+        drainingPublished = false;
         sentReminders.clear();
         sentFinalCountdownSeconds.clear();
         broadcast("reboot.started", "minutes", String.valueOf(Math.max(1, delayMinutes)));
@@ -76,6 +88,8 @@ public final class RebootManager {
             return false;
         }
         rebootAt = 0;
+        if (drainingPublished && plannedRestartHook != null) plannedRestartHook.onCancelled();
+        drainingPublished = false;
         sentReminders.clear();
         sentFinalCountdownSeconds.clear();
         broadcast("reboot.cancelled");
@@ -108,8 +122,14 @@ public final class RebootManager {
         }
 
         long remainingSeconds = getRemainingSeconds();
+        long drainAt = Math.max(10L, plugin.getConfig().getLong("network.restart-drain-seconds", 60L));
+        if (!drainingPublished && remainingSeconds <= drainAt && plannedRestartHook != null) {
+            drainingPublished = true;
+            plannedRestartHook.onDraining(rebootAt);
+        }
         if (remainingSeconds <= 0) {
             broadcast("reboot.now");
+            if (plannedRestartHook != null) plannedRestartHook.onRestarting();
             rebootAt = 0;
             plugin.getLogger().log(Level.INFO, "Reboot countdown reached zero; scheduling graceful shutdown.");
             Bukkit.getScheduler().runTask(plugin, () -> Bukkit.shutdown());

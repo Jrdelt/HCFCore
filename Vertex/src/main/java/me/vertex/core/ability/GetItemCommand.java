@@ -67,9 +67,9 @@ public final class GetItemCommand implements CommandExecutor, TabCompleter {
             items.add(abilityManager.createItem(ability));
         }
 
-        PlayerInventory inventory = target.getInventory();
-        for (ItemStack dropped : inventory.addItem(items.toArray(new ItemStack[0])).values()) {
-            target.getWorld().dropItemNaturally(target.getLocation(), dropped);
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(plugin, target, items, "ability-admin-give")) {
+            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
+            return true;
         }
 
         Component abilityName = MessageFormatter.deserialize(ability.getDisplayName());

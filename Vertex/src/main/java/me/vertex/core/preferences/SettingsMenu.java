@@ -13,22 +13,30 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.List;
 
-/** Small self-contained GUI for optional broadcast categories. */
+/** Double-chest GUI for optional broadcast categories. */
 public final class SettingsMenu {
     private static final List<Entry> ENTRIES = List.of(
-            new Entry(10, AnnouncementCategory.COINFLIPS, Material.SUNFLOWER, "settings.coinflips"),
-            new Entry(12, AnnouncementCategory.KOTH, Material.NETHER_STAR, "settings.koth"),
-            new Entry(14, AnnouncementCategory.OUTPOST, Material.CAMPFIRE, "settings.outpost"),
-            new Entry(16, AnnouncementCategory.MINING, Material.DIAMOND_PICKAXE, "settings.mining"),
-            new Entry(22, AnnouncementCategory.SERVER, Material.REDSTONE_TORCH, "settings.server"));
+            new Entry(20, AnnouncementCategory.COINFLIPS, Material.SUNFLOWER, "settings.coinflips"),
+            new Entry(21, AnnouncementCategory.KOTH, Material.NETHER_STAR, "settings.koth"),
+            new Entry(22, AnnouncementCategory.OUTPOST, Material.CAMPFIRE, "settings.outpost"),
+            new Entry(23, AnnouncementCategory.MINING, Material.DIAMOND_PICKAXE, "settings.mining"),
+            new Entry(24, AnnouncementCategory.SERVER, Material.REDSTONE_TORCH, "settings.server"));
 
     private SettingsMenu() {
     }
 
     public static void open(Player player, AnnouncementPreferenceManager preferences, Messages messages) {
         Holder holder = new Holder(preferences, messages);
-        Inventory inventory = Bukkit.createInventory(holder, 27, messages.get(player, "settings.title"));
+        Inventory inventory = Bukkit.createInventory(holder, 54, messages.getGui(player, "settings.title"));
         holder.inventory = inventory;
+        ItemStack border = border();
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            int row = slot / 9;
+            int column = slot % 9;
+            if (row == 0 || row == 5 || column == 0 || column == 8) {
+                inventory.setItem(slot, border);
+            }
+        }
         for (Entry entry : ENTRIES) {
             inventory.setItem(entry.slot(), button(player, preferences, messages, entry));
         }
@@ -43,12 +51,20 @@ public final class SettingsMenu {
         boolean enabled = preferences.isEnabled(player.getUniqueId(), entry.category());
         ItemStack item = new ItemStack(entry.material());
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, entry.messageKey())));
+        meta.displayName(noItalic(messages.getGui(player, entry.messageKey())));
         meta.lore(List.of(
-                noItalic(messages.get(player, enabled ? "settings.enabled" : "settings.disabled")),
-                Component.empty(), noItalic(messages.get(player, "settings.toggle-hint"))));
+                noItalic(messages.getGui(player, enabled ? "settings.enabled" : "settings.disabled")),
+                Component.empty(), noItalic(messages.getGui(player, "settings.toggle-hint"))));
         item.setItemMeta(meta);
         return item;
+    }
+
+    private static ItemStack border() {
+        ItemStack pane = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        ItemMeta meta = pane.getItemMeta();
+        meta.displayName(noItalic(Component.text(" ")));
+        pane.setItemMeta(meta);
+        return pane;
     }
 
     private static Component noItalic(Component component) {

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PluginDependencySafetyTest {
 
@@ -22,8 +23,8 @@ class PluginDependencySafetyTest {
     }
 
     @Test
-    void pluginReportsMissingFactionsDependencyAsUnsafe() {
-        assertFalse(VertexPlugin.hasRequiredDependency(Bukkit.getPluginManager()));
+    void pluginDoesNotRequireAnExternalFactionsDependency() {
+        assertTrue(VertexPlugin.hasRequiredDependency(Bukkit.getPluginManager()));
     }
 
     @Test

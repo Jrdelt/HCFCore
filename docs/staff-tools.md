@@ -10,7 +10,7 @@ rejoin, the same as combat tags — and each is gated behind its own
 |---|---|---|
 | `/vanish` | `vertex.staff.vanish` | Hides you from anyone without this permission. Applies immediately to every online viewer and to anyone who joins afterward. Your quit message is suppressed while vanished. Mobs stop targeting you instantly (any mid-chase mob has its target cleared, and nothing can pick you as a target while vanished), and you can't deal damage to anything — mobs or players, melee or projectile — while vanished. Both rules exist for the same reason: a mob swinging at empty air, or a player getting hit by nothing, gives away that someone invisible is there. |
 | `/staffchat` | `vertex.staff.staffchat` | Toggles routing *all* your normal chat to a staff-only channel (visible to the same permission) instead of public chat, until toggled off. |
-| `/staffbuild` | `vertex.staff.staffbuild` | Bypasses FactionsUUID's claim protection entirely — block break/place, containers/doors, buckets, item frames/paintings, and entity interaction all work in any claim while on. |
+| `/staffbuild` | `vertex.staff.staffbuild` | Bypasses Vertex claim protection entirely — block break/place, containers/doors, buckets, item frames/paintings, and entity interaction all work in any claim while on. |
 | `/staff` | `vertex.staff.mode` | Toggles vanish + staff-build together as one switch, and also grants **godmode** and **flight** for the duration. Treats everything as "on" only when vanish and staff-build are *both* already on — so if you'd turned one off individually, `/staff` turns everything back on rather than finishing the job of turning it off. |
 
 ## Freeze
@@ -45,7 +45,7 @@ path.
 | `/invsee <player>` | `vertex.staff.invsee` | Opens a custom GUI showing the target's hotbar, main storage, **and their equipped armor and offhand** — there's no vanilla container type that exposes someone else's equipment. Unlike `/endersee`, this is not a live shared reference: edits sync back to the target one tick after each click, and armor slots reject anything that isn't actually that armor piece. A change the target makes to their own gear while the menu is open won't show up until it's reopened. |
 
 Block breaking in WarZone/SafeZone claims is left entirely to
-FactionsUUID's own native protection — Vertex doesn't duplicate it.
+Vertex's native protection — staff-build is the explicit bypass.
 
 ## Death rollback (`/rollback`)
 

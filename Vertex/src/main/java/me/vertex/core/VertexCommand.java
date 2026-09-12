@@ -11,6 +11,7 @@ import org.bukkit.command.TabCompleter;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -51,16 +52,12 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
             }
             org.bukkit.block.Block target = player.getTargetBlockExact(8);
             if (target == null) {
-                player.sendMessage(net.kyori.adventure.text.Component.text(
-                        "Look at a spawner within 8 blocks and run this again.",
-                        net.kyori.adventure.text.format.NamedTextColor.RED));
+                player.sendMessage(messages.getChat(player, "admin.spawner-report-no-target"));
                 return true;
             }
-            player.sendMessage(net.kyori.adventure.text.Component.text(
-                    "--- Spawner report ---", net.kyori.adventure.text.format.NamedTextColor.AQUA));
+            player.sendMessage(messages.getChat(player, "admin.spawner-report-header"));
             for (String line : plugin.spawnerManager().describe(target.getLocation())) {
-                player.sendMessage(net.kyori.adventure.text.Component.text(
-                        line, net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                player.sendMessage(messages.getChat(player, "admin.spawner-report-line", "detail", line));
             }
             return true;
         }
@@ -71,11 +68,8 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             boolean enabled = plugin.spawnerManager().toggleDebug(player.getUniqueId());
-            player.sendMessage(net.kyori.adventure.text.Component.text(enabled
-                    ? "Spawner debugging enabled. Stand within 64 blocks of the spawner; run it again to turn it off."
-                    : "Spawner debugging disabled.", enabled
-                    ? net.kyori.adventure.text.format.NamedTextColor.GREEN
-                    : net.kyori.adventure.text.format.NamedTextColor.GRAY));
+            player.sendMessage(messages.getChat(player,
+                    enabled ? "admin.spawner-debug-enabled" : "admin.spawner-debug-disabled"));
             return true;
         }
 
@@ -183,6 +177,8 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
         // history table -- it must not run on the main thread.
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             Database targetDatabase = null;
+            boolean configSwitched = false;
+            boolean sourceSealed = false;
             try {
                 plugin.awaitStorageWritesForMigration();
                 targetDatabase = new Database(plugin.getConfig(), plugin.getDataFolder(), target);
@@ -199,20 +195,44 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
                     return;
                 }
 
-                StorageMigrator.Result result =
-                        StorageMigrator.migrate(plugin.database(), targetDatabase);
-                StorageMigrator.writeStorageType(new java.io.File(plugin.getDataFolder(), "config.yml"),
-                        target == Database.Dialect.MYSQL ? "mysql" : "local");
+                Database sourceDatabase = plugin.database();
+                StorageMigrator.prepare(sourceDatabase, targetDatabase);
+                plugin.awaitStorageWritesForMigration();
+
+                StorageMigrator.Result result;
+                try (Database.ExclusiveLease lease =
+                             sourceDatabase.beginExclusiveMaintenance(30L, TimeUnit.SECONDS)) {
+                    result = StorageMigrator.migrate(sourceDatabase, targetDatabase, lease);
+                    StorageMigrator.writeStorageType(new java.io.File(plugin.getDataFolder(), "config.yml"),
+                            target == Database.Dialect.MYSQL ? "mysql" : "local");
+                    configSwitched = true;
+                    // Once config.yml points at the verified copy, permanently
+                    // seal the old pool. No task can write to it in the gap
+                    // before the main thread performs the shutdown.
+                    lease.closeBackend();
+                    sourceSealed = true;
+                }
 
                 Database toClose = targetDatabase;
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     toClose.close();
                     sender.sendMessage(messages.getChat(sender, "admin.storage-migrated",
                             "rows", String.valueOf(result.total()), "type", nameOf(target)));
-                    plugin.finishStorageMigration();
+                    Bukkit.shutdown();
                 });
             } catch (Exception e) {
                 plugin.getLogger().log(Level.SEVERE, "Storage migration failed", e);
+                if (configSwitched && !sourceSealed) {
+                    try {
+                        StorageMigrator.writeStorageType(
+                                new java.io.File(plugin.getDataFolder(), "config.yml"),
+                                current == Database.Dialect.MYSQL ? "mysql" : "local");
+                    } catch (Exception rollbackError) {
+                        e.addSuppressed(rollbackError);
+                        plugin.getLogger().log(Level.SEVERE,
+                                "Could not restore storage.type after a failed migration", rollbackError);
+                    }
+                }
                 Database toClose = targetDatabase;
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     if (toClose != null) {

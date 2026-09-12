@@ -5,11 +5,6 @@ import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormat;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormats;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardReader;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
-import com.sk89q.jnbt.CompoundTag;
-import com.sk89q.jnbt.NBTInputStream;
-import com.sk89q.jnbt.NBTOutputStream;
-import com.sk89q.jnbt.NamedTag;
-import com.sk89q.jnbt.Tag;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.world.block.BaseBlock;
 import me.vertex.core.factions.FactionsHook;
@@ -28,6 +23,8 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -43,6 +40,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+import org.enginehub.linbus.stream.LinBinaryIO;
+import org.enginehub.linbus.tree.LinCompoundTag;
+import org.enginehub.linbus.tree.LinRootEntry;
+import org.enginehub.linbus.tree.LinTag;
 
 /**
  * Owns blueprint config (templates, timing), the active-build registry
@@ -470,9 +471,9 @@ public final class BlueprintManager {
 
         // Build bottom-to-top, layer-by-layer
         blocks.sort(Comparator
-                .comparingInt((ActiveBuild.PendingBlock b) -> b.relativeOffset().getBlockY())
-                .thenComparingInt(b -> b.relativeOffset().getBlockZ())
-                .thenComparingInt(b -> b.relativeOffset().getBlockX()));
+                .comparingInt((ActiveBuild.PendingBlock b) -> b.relativeOffset().y())
+                .thenComparingInt(b -> b.relativeOffset().z())
+                .thenComparingInt(b -> b.relativeOffset().x()));
 
         BlockVector3 relMin = BlockVector3.at(0, 1, 0);
         BlockVector3 relMax = BlockVector3.at(maxX - minX, (maxY - minY) + 1, maxZ - minZ);
@@ -510,26 +511,24 @@ public final class BlueprintManager {
     }
 
     private byte[] normalizeLegacyPalette(BlueprintTemplate template, File schematic) throws IOException {
-        NamedTag named;
+        LinRootEntry named;
         try (InputStream fileInput = new FileInputStream(schematic);
                 GZIPInputStream gzipInput = new GZIPInputStream(fileInput);
-                NBTInputStream nbtInput = new NBTInputStream(gzipInput)) {
-            named = nbtInput.readNamedTag();
+                DataInputStream nbtInput = new DataInputStream(gzipInput)) {
+            named = LinBinaryIO.readUsing(nbtInput, LinRootEntry::readFrom);
         } catch (java.util.zip.ZipException ignored) {
             return null;
         }
-        if (!(named.getTag() instanceof CompoundTag root)) {
-            return null;
-        }
+        LinCompoundTag root = named.value();
 
-        Map<String, Tag<?, ?>> rootValues = new LinkedHashMap<>(root.getValue());
+        Map<String, LinTag<?>> rootValues = new LinkedHashMap<>(root.value());
         Set<String> replaced = ConcurrentHashMap.newKeySet();
         boolean changed = normalizePalette(rootValues, "Palette", replaced);
-        Tag<?, ?> blocks = rootValues.get("Blocks");
-        if (blocks instanceof CompoundTag blocksCompound) {
-            Map<String, Tag<?, ?>> blockValues = new LinkedHashMap<>(blocksCompound.getValue());
+        LinTag<?> blocks = rootValues.get("Blocks");
+        if (blocks instanceof LinCompoundTag blocksCompound) {
+            Map<String, LinTag<?>> blockValues = new LinkedHashMap<>(blocksCompound.value());
             if (normalizePalette(blockValues, "Palette", replaced)) {
-                rootValues.put("Blocks", new CompoundTag(blockValues));
+                rootValues.put("Blocks", LinCompoundTag.of(blockValues));
                 changed = true;
             }
         }
@@ -546,20 +545,21 @@ public final class BlueprintManager {
         }
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (GZIPOutputStream gzipOutput = new GZIPOutputStream(bytes);
-                NBTOutputStream nbtOutput = new NBTOutputStream(gzipOutput)) {
-            nbtOutput.writeNamedTag(named.getName(), new CompoundTag(rootValues));
+                DataOutputStream nbtOutput = new DataOutputStream(gzipOutput)) {
+            LinBinaryIO.write(nbtOutput, new LinRootEntry(named.name(), LinCompoundTag.of(rootValues)));
         }
         return bytes.toByteArray();
     }
 
-    private static boolean normalizePalette(Map<String, Tag<?, ?>> container, String paletteKey, Set<String> replaced) {
-        Tag<?, ?> rawPalette = container.get(paletteKey);
-        if (!(rawPalette instanceof CompoundTag palette)) {
+    private static boolean normalizePalette(Map<String, LinTag<?>> container, String paletteKey,
+            Set<String> replaced) {
+        LinTag<?> rawPalette = container.get(paletteKey);
+        if (!(rawPalette instanceof LinCompoundTag palette)) {
             return false;
         }
-        Map<String, Tag<?, ?>> entries = new LinkedHashMap<>();
+        Map<String, LinTag<?>> entries = new LinkedHashMap<>();
         boolean changed = false;
-        for (Map.Entry<String, Tag<?, ?>> entry : palette.getValue().entrySet()) {
+        for (Map.Entry<String, LinTag<?>> entry : palette.value().entrySet()) {
             String normalized = normalizeLegacyPaletteKey(entry.getKey());
             if (!normalized.equals(entry.getKey())) {
                 replaced.add(legacyId(entry.getKey()));
@@ -568,7 +568,7 @@ public final class BlueprintManager {
             entries.put(normalized, entry.getValue());
         }
         if (changed) {
-            container.put(paletteKey, new CompoundTag(entries));
+            container.put(paletteKey, LinCompoundTag.of(entries));
         }
         return changed;
     }
@@ -604,16 +604,16 @@ public final class BlueprintManager {
             return false;
         }
 
-        int lowestY = anchor.getBlockY() + Math.min(relativeMin.getBlockY(), relativeMax.getBlockY());
-        int highestY = anchor.getBlockY() + Math.max(relativeMin.getBlockY(), relativeMax.getBlockY());
+        int lowestY = anchor.getBlockY() + Math.min(relativeMin.y(), relativeMax.y());
+        int highestY = anchor.getBlockY() + Math.max(relativeMin.y(), relativeMax.y());
         if (lowestY < world.getMinHeight() || highestY >= world.getMaxHeight()) {
             return false;
         }
 
-        int startChunkX = (anchor.getBlockX() + relativeMin.getBlockX()) >> 4;
-        int endChunkX = (anchor.getBlockX() + relativeMax.getBlockX()) >> 4;
-        int startChunkZ = (anchor.getBlockZ() + relativeMin.getBlockZ()) >> 4;
-        int endChunkZ = (anchor.getBlockZ() + relativeMax.getBlockZ()) >> 4;
+        int startChunkX = (anchor.getBlockX() + relativeMin.x()) >> 4;
+        int endChunkX = (anchor.getBlockX() + relativeMax.x()) >> 4;
+        int startChunkZ = (anchor.getBlockZ() + relativeMin.z()) >> 4;
+        int endChunkZ = (anchor.getBlockZ() + relativeMax.z()) >> 4;
 
         int minChunkX = Math.min(startChunkX, endChunkX);
         int maxChunkX = Math.max(startChunkX, endChunkX);

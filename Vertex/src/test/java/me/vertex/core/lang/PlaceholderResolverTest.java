@@ -13,15 +13,14 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Only exercises placeholders that don't reach into FactionsUUID's live
+ * Only exercises placeholders that don't reach into the native faction
  * state ({@code {faction}}, {@code {ftop}}, {@code {power}},
  * {@code {faction_role}}, {@code {fplayers_online}}) -- unlike the other
  * integrations this resolver touches (LuckPerms, Essentials, Vault, all
  * genuinely optional and therefore defensive about not being installed),
- * FactionsUUID is a hard dependency Vertex refuses to start without, so
- * its hook methods don't check availability first and throw when called
- * with no live FactionsUUID plugin registered -- which a bare MockBukkit
- * server never has. The guard this test relies on (skip a placeholder's
+ * The native faction service starts only during a full plugin boot, so
+ * this unit test deliberately leaves it unavailable. The guard this test
+ * relies on (skip a placeholder's
  * lookup entirely when the template doesn't contain it) is exactly what
  * keeps a template with no faction tokens safe to resolve here at all.
  */
@@ -62,7 +61,7 @@ class PlaceholderResolverTest {
     @Test
     void unusedFactionTokenNeverTouchesFactionsHook() {
         // If the guard were missing, this would throw before ever reaching
-        // the assertion -- FactionsUUID isn't registered in this test server.
+        // the assertion -- the native faction service is not booted here.
         assertEquals("plain text, no placeholders", resolve("plain text, no placeholders"));
     }
 

@@ -14,6 +14,7 @@ import org.bukkit.block.BlockState;
 import org.bukkit.block.ShulkerBox;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -284,8 +285,13 @@ public final class ChunkCollectorManager {
     }
 
     public List<Map.Entry<Location, ChunkCollectorData>> getCollectorsInChunk(Chunk chunk) {
+        return getCollectorsInChunk(chunk.getWorld(),chunk.getX(),chunk.getZ());
+    }
+
+    /** Indexed lookup by coordinates; does not synchronously load the chunk. */
+    public List<Map.Entry<Location, ChunkCollectorData>> getCollectorsInChunk(World world,int chunkX,int chunkZ) {
         List<Map.Entry<Location, ChunkCollectorData>> found = new ArrayList<>();
-        for (Location location : locationsInChunk(chunk)) {
+        for (Location location : locationsInChunk(world,chunkX,chunkZ)) {
             ChunkCollectorData data = readData(location);
             if (data != null) {
                 found.add(Map.entry(location, data));
@@ -294,7 +300,10 @@ public final class ChunkCollectorManager {
         return found;
     }
 
-    /** Uses the index, not FactionsUUID's full claim list, to avoid loading empty claimed chunks. */
+    public boolean hasCollectorInChunk(World world,int chunkX,int chunkZ){return !collectorsByChunk.getOrDefault(chunkKey(world,chunkX,chunkZ),java.util.Set.of()).isEmpty();}
+    public boolean queueOverflow(Player player,java.util.Collection<ItemStack> items,String source){return me.vertex.core.storage.DeliveryManager.queueOverflow(plugin,player,items,source);}
+
+    /** Uses the index, not a full claim scan, to avoid loading empty claimed chunks. */
     public List<Map.Entry<Location, ChunkCollectorData>> getCollectorsOwnedBy(String factionTag) {
         if (factionTag == null) {
             return List.of();
@@ -377,9 +386,11 @@ public final class ChunkCollectorManager {
         collectorsByOwner.values().forEach(locations -> locations.remove(locationKey));
         queue(location, () -> {
             try {
-                storage.delete(location);
+                me.vertex.core.storage.SqlRetry.run(plugin, "Chunk Collector delete at " + key(location),
+                        () -> storage.delete(location));
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to delete chunk collector from the database.", e);
+                plugin.getLogger().log(Level.SEVERE,
+                        "Failed to delete chunk collector from the database after retries.", e);
             }
         });
     }
@@ -389,9 +400,11 @@ public final class ChunkCollectorManager {
         String ownerUuid = data.ownerUuid().toString();
         queue(location, () -> {
             try {
-                storage.save(location, ownerFaction, ownerUuid);
+                me.vertex.core.storage.SqlRetry.run(plugin, "Chunk Collector save at " + key(location),
+                        () -> storage.save(location, ownerFaction, ownerUuid));
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to save chunk collector to the database.", e);
+                plugin.getLogger().log(Level.SEVERE,
+                        "Failed to save chunk collector to the database after retries.", e);
             }
         });
     }
@@ -419,15 +432,30 @@ public final class ChunkCollectorManager {
      * any physical block change) already reflected it.
      */
     public void awaitWrites() {
-        try {
-            CompletableFuture.allOf(pendingWrites.toArray(new CompletableFuture[0]))
-                    .get(5, java.util.concurrent.TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (java.util.concurrent.TimeoutException e) {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+        int stableEmptyRounds = 0;
+        while (System.nanoTime() < deadline && stableEmptyRounds < 3) {
+            CompletableFuture<?>[] snapshot = pendingWrites.toArray(new CompletableFuture[0]);
+            if (snapshot.length == 0) {
+                stableEmptyRounds++;
+                Thread.onSpinWait();
+                continue;
+            }
+            stableEmptyRounds = 0;
+            try {
+                CompletableFuture.allOf(snapshot).get(
+                        Math.max(1L, deadline - System.nanoTime()), java.util.concurrent.TimeUnit.NANOSECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (java.util.concurrent.TimeoutException e) {
+                break;
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "Failed while waiting for chunk collector writes.", e);
+            }
+        }
+        if (!pendingWrites.isEmpty()) {
             plugin.getLogger().warning("Timed out waiting for chunk collector writes during shutdown.");
-        } catch (Exception e) {
-            plugin.getLogger().log(Level.WARNING, "Failed while waiting for chunk collector writes.", e);
         }
     }
 
@@ -602,8 +630,12 @@ public final class ChunkCollectorManager {
     }
 
     private List<Location> locationsInChunk(Chunk chunk) {
+        return locationsInChunk(chunk.getWorld(),chunk.getX(),chunk.getZ());
+    }
+
+    private List<Location> locationsInChunk(World world,int chunkX,int chunkZ) {
         List<Location> locations = new ArrayList<>();
-        for (String locationKey : collectorsByChunk.getOrDefault(chunkKey(chunk), java.util.Set.of())) {
+        for (String locationKey : collectorsByChunk.getOrDefault(chunkKey(world,chunkX,chunkZ), java.util.Set.of())) {
             Location location = collectors.get(locationKey);
             if (location != null) {
                 locations.add(location);

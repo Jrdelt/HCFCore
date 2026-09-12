@@ -73,6 +73,7 @@ public final class GcManager {
         if (redeemCodeCharset == null || redeemCodeCharset.isBlank()) {
             redeemCodeCharset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         }
+        redeemCodeCharset = redeemCodeCharset.toUpperCase(java.util.Locale.ROOT);
         logPageSize = Math.max(1, config.getInt("log-page-size", 8));
         interopCommandTemplate = config.getString("interop-command", "");
     }
@@ -100,6 +101,20 @@ public final class GcManager {
 
     public int logPageSize() {
         return logPageSize;
+    }
+
+    public int redeemCodeLength() {
+        return redeemCodeLength;
+    }
+
+    /** True when a token has the exact configured GC-code shape. */
+    public boolean isRedeemCodeCandidate(String token) {
+        if (token == null || token.length() != redeemCodeLength) return false;
+        String upper = token.toUpperCase(java.util.Locale.ROOT);
+        for (int index = 0; index < upper.length(); index++) {
+            if (redeemCodeCharset.indexOf(upper.charAt(index)) < 0) return false;
+        }
+        return true;
     }
 
     // ---- Balance reads ----
@@ -146,8 +161,26 @@ public final class GcManager {
                 return false;
             }
             balances.merge(target, -amount, Long::sum);
-            queuePersist(target, actor, action, -amount, amount, note, onPersistFailure);
+            queuePersist(target, actor, action, -amount, amount, note, null, onPersistFailure);
             return true;
+        }
+    }
+
+    public record DurableDebit(boolean accepted, CompletableFuture<Boolean> persisted) { }
+
+    /**
+     * Starts an idempotent GC debit and exposes the actual ledger commit.
+     * Escrow callers must remain non-interactable until {@code persisted}
+     * succeeds; an optimistic cache change alone is not a durable wager.
+     */
+    public DurableDebit tryDebitDurably(UUID target,UUID actor,GcAction action,long amount,String note,
+            String operationKey){
+        if(amount<=0)return new DurableDebit(false,CompletableFuture.completedFuture(false));
+        synchronized(writeChains){
+            long current=balances.getOrDefault(target,0L);
+            if(current<amount)return new DurableDebit(false,CompletableFuture.completedFuture(false));
+            balances.merge(target,-amount,Long::sum);
+            return new DurableDebit(true,queuePersist(target,actor,action,-amount,amount,note,operationKey,null));
         }
     }
 
@@ -167,27 +200,40 @@ public final class GcManager {
         }
         synchronized (writeChains) {
             balances.merge(target, amount, Long::sum);
-            queuePersist(target, actor, action, amount, amount, note, onPersistFailure);
+            queuePersist(target, actor, action, amount, amount, note, null, onPersistFailure);
+        }
+    }
+
+    /**
+     * Credits GC and reports when the ledger write itself has committed. This
+     * is used by durable outboxes: their row must not be acknowledged merely
+     * because an asynchronous GC write was queued.
+     */
+    public CompletableFuture<Boolean> creditDurably(UUID target, UUID actor, GcAction action, long amount,
+            String note) {
+        if (amount <= 0) return CompletableFuture.completedFuture(true);
+        synchronized (writeChains) {
+            balances.merge(target, amount, Long::sum);
+            return queuePersist(target, actor, action, amount, amount, note, note, null);
         }
     }
 
     /** Staff-only: overwrites a balance to an exact value. Deliberately absolute, not additive -- see the class doc. */
-    public void setBalance(UUID target, UUID actor, GcAction action, long newBalance, String note) {
+    public boolean setBalance(UUID target, UUID actor, GcAction action, long newBalance, String note) {
         long clamped = Math.max(0L, newBalance);
         synchronized (writeChains) {
-            balances.put(target, clamped);
             CompletableFuture<Void> previous = writeChains.getOrDefault(target, CompletableFuture.completedFuture(null));
-            CompletableFuture<Void> next = previous.handle((ignored, error) -> null).thenRunAsync(() -> {
-                try {
-                    storage.setAbsolute(target, actor, action, clamped, note, System.currentTimeMillis());
-                } catch (Exception e) {
-                    plugin.getLogger().log(Level.SEVERE,
-                            "Failed to persist a GC staff balance override (" + action + ") for " + target, e);
-                }
-            });
-            writeChains.put(target, next);
-            next.whenComplete((ignored, error) -> writeChains.remove(target, next));
-            track(next);
+            try {
+                previous.get(10, TimeUnit.SECONDS);
+                storage.setAbsolute(target, actor, action, clamped, note, System.currentTimeMillis());
+                balances.put(target, clamped);
+                return true;
+            } catch (Exception error) {
+                plugin.getLogger().log(Level.SEVERE,
+                        "Failed to persist a GC staff balance override (" + action + ") for " + target
+                                + "; the live balance was not changed.", error);
+                return false;
+            }
         }
     }
 
@@ -198,13 +244,23 @@ public final class GcManager {
      * applying the opposite delta -- a relative correction, safe regardless
      * of whatever else has mutated the cache in the meantime.
      */
-    private void queuePersist(UUID target, UUID actor, GcAction action, long delta, long logAmount, String note,
+    private CompletableFuture<Boolean> queuePersist(UUID target, UUID actor, GcAction action, long delta,
+            long logAmount, String note, String operationKey,
             Runnable onPersistFailure) {
         long now = System.currentTimeMillis();
         CompletableFuture<Void> previous = writeChains.getOrDefault(target, CompletableFuture.completedFuture(null));
+        CompletableFuture<Boolean> result = new CompletableFuture<>();
         CompletableFuture<Void> next = previous.handle((ignored, error) -> null).thenRunAsync(() -> {
             try {
-                storage.applyDelta(target, actor, action, delta, note, now);
+                GcStorage.DeltaResult applied = storage.applyDeltaOnce(target, actor, action, delta, note, now,
+                        operationKey);
+                if (!applied.applied()) {
+                    // The database already contains this durable payout (for
+                    // example after a crash before its outbox acknowledgement).
+                    // Undo only the speculative cache increment made above.
+                    balances.merge(target, -delta, Long::sum);
+                }
+                result.complete(true);
             } catch (Exception e) {
                 plugin.getLogger().log(Level.SEVERE, "Failed to persist a GC balance " + (delta < 0 ? "debit" : "credit")
                         + " (" + action + ", " + Math.abs(logAmount) + ") for " + target
@@ -213,11 +269,13 @@ public final class GcManager {
                 if (onPersistFailure != null) {
                     Bukkit.getScheduler().runTask(plugin, onPersistFailure);
                 }
+                result.complete(false);
             }
         });
         writeChains.put(target, next);
         next.whenComplete((ignored, error) -> writeChains.remove(target, next));
         track(next);
+        return result;
     }
 
     // ---- Redeem codes ----

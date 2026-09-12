@@ -17,7 +17,13 @@ public enum FactionUpgrade {
     CROP_GROWTH("crop-growth", Material.WHEAT),
     MOB_XP("mob-xp", Material.EXPERIENCE_BOTTLE),
     /** Its per-level "bonus" is an absolute TNT capacity, not a percentage. */
-    TNT_BANK("tnt-bank", Material.TNT);
+    TNT_BANK("tnt-bank", Material.TNT),
+    /** Bonus is the total number of unlocked faction-vault rows. */
+    VAULT_ROWS("vault-rows", Material.ENDER_CHEST),
+    /** Bonus is the total number of unlocked Base Claim slots (1..3). */
+    BASE_CLAIM_SLOTS("base-claim-slots", Material.BEACON),
+    /** Bonus is an explicitly configured number of additional Shield seconds. */
+    SHIELD_DURATION("shield-duration", Material.SHIELD);
 
     private final String configKey;
     private final Material icon;

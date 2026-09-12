@@ -115,17 +115,21 @@ class AuctionManagerTest {
     }
 
     @Test
-    void buyingTransfersMoneyAndTheItemAndRemovesTheListing() {
+    void buyingTransfersMoneyAndCreatesADurableBuyerClaim() {
         manager.list(seller, new ItemStack(Material.DIAMOND, 5), 200.0, AuctionCurrency.MONEY);
         settle();
         int listingId = manager.activeListings().get(0).id();
 
         AuctionManager.BuyResult result = manager.buy(listingId, buyer);
+        settle();
 
         assertEquals(AuctionManager.BuyResult.OK, result);
         assertEquals(800.0, economy.get(buyer.getUniqueId()), 0.0001);
         assertEquals(1200.0, economy.get(seller.getUniqueId()), 0.0001);
-        assertEquals(5, countInInventory(buyer, Material.DIAMOND));
+        assertEquals(0, countInInventory(buyer, Material.DIAMOND));
+        List<ItemStack> claims = manager.loadClaimItems(buyer.getUniqueId());
+        assertEquals(1, claims.size());
+        assertEquals(5, claims.get(0).getAmount());
         assertTrue(manager.activeListings().isEmpty());
     }
 
@@ -251,6 +255,7 @@ class AuctionManagerTest {
         assertEquals(50, seller.getLevel());
 
         AuctionManager.BuyResult result = manager.buy(listingId, buyer);
+        settle();
 
         assertEquals(AuctionManager.BuyResult.OK, result);
         assertEquals(30, buyer.getLevel(), "the buyer must pay in levels, not money");
@@ -617,7 +622,19 @@ class AuctionManagerTest {
                 return;
             }
         }
-        scheduler.performTicks(1L);
+        // A completed SQL reservation schedules its Vault/EXP phase back on
+        // the primary thread, which may itself enqueue an acknowledgement.
+        // Alternate ticks and drains so every generation becomes visible.
+        for (int attempt = 0; attempt < 10; attempt++) {
+            scheduler.performTicks(1L);
+            manager.awaitWrites();
+            try {
+                Thread.sleep(2L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
 

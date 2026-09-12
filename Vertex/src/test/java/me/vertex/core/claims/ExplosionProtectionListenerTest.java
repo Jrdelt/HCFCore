@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Covers {@link ExplosionProtectionListener} without touching FactionsUUID's
+ * Covers {@link ExplosionProtectionListener} without booting the native faction
  * live {@code Board} singleton -- the Base Claim query is a plain
  * {@code Predicate<Location>} here (see the class doc for why), standing in
  * for what {@code BaseClaimManager.isBaseClaim} reports in production.
@@ -103,7 +103,7 @@ class ExplosionProtectionListenerTest {
     }
 
     @Test
-    void explosionDamageIsCancelledForPlayersEverywhere() {
+    void explosionDamageOutsideProtectionIsNotCancelled() {
         ExplosionProtectionListener listener = new ExplosionProtectionListener(loc -> false);
         PlayerMock player = server.addPlayer();
 
@@ -111,7 +111,7 @@ class ExplosionProtectionListenerTest {
                 EntityDamageEvent.DamageCause.ENTITY_EXPLOSION, 6D);
         listener.onExplosionDamage(event);
 
-        assertTrue(event.isCancelled(), "TNT must never damage players, even outside a Base Claim");
+        assertFalse(event.isCancelled(), "normal explosion damage must remain outside Grace/Shield claims");
     }
 
     @Test

@@ -5,10 +5,8 @@ base-claim:
   # 2000-chunk budget), not a combined faction-wide total. Developer-only
   # tuning knob -- not purchasable by players.
   max-chunks-per-region: 2000
-  # Price of the 2nd and 3rd Base Claim slot, in server currency, paid from
-  # the purchasing member's personal balance.
-  slot-2-price: 50000
-  slot-3-price: 150000
+  # Slots 2 and 3 are unlocked through the explicit base-claim-slots levels
+  # in config.yml under faction-upgrades.
 
 raid-claim:
   # How long a Raid Claim chunk stays claimed with no activity, in real

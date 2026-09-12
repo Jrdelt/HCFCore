@@ -2,8 +2,8 @@ package me.vertex.core.util;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import me.vertex.core.lang.Messages;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -43,10 +43,12 @@ public final class ChatAmountPrompt implements Listener {
     private static final long TIMEOUT_TICKS = 20L * 60; // 60 seconds
 
     private final Plugin plugin;
+    private final Messages messages;
     private final Map<UUID, Pending> pending = new ConcurrentHashMap<>();
 
-    public ChatAmountPrompt(Plugin plugin) {
+    public ChatAmountPrompt(Plugin plugin, Messages messages) {
         this.plugin = plugin;
+        this.messages = messages;
     }
 
     /**
@@ -61,7 +63,7 @@ public final class ChatAmountPrompt implements Listener {
         cancelSilently(player.getUniqueId());
         BukkitTask timeout = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (pending.remove(player.getUniqueId()) != null && player.isOnline()) {
-                player.sendMessage(Component.text("Timed out waiting for an amount.", NamedTextColor.RED));
+                player.sendMessage(messages.get(player, "prompt.amount-timeout"));
                 onCancel.run();
             }
         }, TIMEOUT_TICKS);
@@ -104,7 +106,7 @@ public final class ChatAmountPrompt implements Listener {
             pending.remove(player.getUniqueId());
             prompt.timeout().cancel();
             Bukkit.getScheduler().runTask(plugin, () -> {
-                player.sendMessage(Component.text("Cancelled.", NamedTextColor.GRAY));
+                player.sendMessage(messages.get(player, "prompt.cancelled"));
                 prompt.onCancel().run();
             });
             return;
@@ -114,8 +116,8 @@ public final class ChatAmountPrompt implements Listener {
         if (amount == null) {
             // Stays pending -- let them try again rather than forcing a
             // full restart of whatever menu flow led here over one typo.
-            Bukkit.getScheduler().runTask(plugin, () -> player.sendMessage(Component.text(
-                    "Not a valid amount. Type a number (e.g. 100k, 1.5m), or 'cancel'.", NamedTextColor.RED)));
+            Bukkit.getScheduler().runTask(plugin,
+                    () -> player.sendMessage(messages.get(player, "prompt.invalid-amount")));
             return;
         }
 

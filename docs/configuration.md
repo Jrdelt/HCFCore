@@ -46,6 +46,30 @@ temporary sibling file and atomically replaced, so a crash cannot leave a
 partially written `config.yml`. See
 [Installation](installation.md#switching-backends-in-game).
 
+## Grace and faction Shield (`shield.yml`)
+
+```yaml
+grace:
+  maximum-duration-seconds: 2592000
+shield:
+  base-duration-seconds: 21600
+  maximum-duration-seconds: 86400
+  cooldown-seconds: 86400
+  new-faction-delay-seconds: 0
+  combat-protection-enabled: false
+  schedule:
+    maximum-hours-per-day: 8
+    edit-lock-seconds: 86400
+    activation-delay-seconds: 86400
+    time-zone: America/Los_Angeles
+```
+
+Grace is enabled with `/fa grace on <duration>`. Shield normally follows
+the faction's weekly Base-only schedule; the optional `/f shield activate`
+path uses persisted real-time deadlines and the configured duration upgrade.
+Daily limits, schedule edit locks, and activation delays are configurable. See
+[Grace and Faction Shield](faction-shield.md).
+
 ## Database (MySQL only)
 
 Ignored entirely unless `storage.type` is `mysql`.
@@ -191,8 +215,19 @@ config shape. A quick summary of what lives here:
 
 ```yaml
 factions:
+  tag-pattern: '[A-Za-z0-9_]{3,16}'
   prevent-leader-leave: true
-  command-aliases: [f, factions, t]
+  open-join-enabled: true
+  invite-expiry-seconds: 300
+  limits: {members: 30, claims: 250, claim-radius: 5, warps: 5}
+  claims: {require-connected: false, power-per-chunk: 0.0, allow-overclaim: false,
+    overclaim-power-ratio: 1.0}
+  map: {width: 41, height: 20} # Fills expanded chat; limits are 41x21.
+  power: {starting-per-member: 10.0, max-per-member: 10.0, death-loss: 2.0,
+    regeneration-per-interval: 0.1, regeneration-interval-seconds: 60}
+  pvp: {friendly-fire: false, allies-can-pvp: false}
+  protection: {allies-can-build: false}
+  system-claims: {safezone-tag: SafeZone, warzone-tag: WarZone, no-pvp-tags: [SafeZone]}
 ```
 
 - **`prevent-leader-leave`** — when true, a faction leader's `/f leave`
@@ -200,12 +235,20 @@ factions:
   message instead of going through. This stops a leader from
   accidentally (or exploit-ably) leaving their own faction without
   transferring leadership first.
-- **`command-aliases`** — every alias your server actually uses for
-  FactionsUUID's command. This list is also what the `/f rally` command
-  and the faction permissions GUI (`/f permissions` / `/f perms`) and
-  faction-upgrades GUI (`/f upgrades`) listen
-  on to route themselves ahead of FactionsUUID's own command handling —
-  add any custom alias here too or those won't be reachable from it.
+- **`tag-pattern`** — Java regular expression accepted by `/f create` and
+  `/f rename`; an invalid expression safely uses the default.
+- **`open-join-enabled`**, **`invite-expiry-seconds`**, **`limits`**,
+  **`claims`**,
+  **`map`**, **`power`**, **`pvp`**, **`protection`**, and
+  **`system-claims`** configure native faction behavior. Changes reload
+  safely. The rank-action defaults live in `factions.permissions.defaults`;
+  leaders can override them per faction in `/f permissions`.
+- **`map.width`** and **`map.height`** set the exact chat-map dimensions.
+  Width is safety-capped at 41 chunks and height at 21. Existing configs
+  that only contain the old `map.radius` key retain the equivalent square
+  size until the new keys are added.
+- **`command-aliases`** is retained for existing Vertex subcommand listeners;
+  Bukkit aliases themselves are declared in `plugin.yml`.
 
 See [Factions Integration](factions-integration.md) for rallies, the
 permissions GUI and upgrades/bank behavior.
@@ -215,7 +258,6 @@ permissions GUI and upgrades/bank behavior.
 ```yaml
 faction-upgrades:
   enabled: true
-  leader-only: false
   upgrades:
     claim-damage:
       enabled: true
@@ -225,11 +267,9 @@ faction-upgrades:
         3: {price: 153125.0, bonus: 15.0}
 ```
 
-`enabled` is the global off switch. The native FactionsUUID `UPGRADE`
-permission in `/f permissions` determines which roles may open or purchase
-from this menu. `leader-only: true` lets allowed members browse while
-preventing them from spending their own Vault balance; set it to `false` if
-any allowed member should be able to buy levels. Every individual entry has
+`enabled` is the global off switch. Only the faction Leader or Co-Leader may
+open and purchase from this menu; the decision is revalidated against the
+durable faction role during the database update. Every individual entry has
 the same controls:
 
 - `enabled` hides its gameplay effect and prevents new purchases without
@@ -237,19 +277,17 @@ the same controls:
 - `levels` is an ordered map of levels (up to 100). Each entry has its own
   exact Vault `price` and total `bonus`; a price of zero makes that level
   free and no multiplier is applied.
-- `bonus` is a percentage for every item except `warps`. Crop Growth is a
-  per-growth-stage chance; Fly Boost applies only to players already
-  flying. Warps writes FactionsUUID's native Warp level; Vertex's `bonus`
-  is display-only for that entry.
+- `bonus` is a percentage for every item except `warps` and `tnt-bank`.
+  Crop Growth is a per-growth-stage chance; Fly Boost applies only to
+  players already flying. Warps adds native Vertex warp slots to
+  `factions.limits.warps`; TNT Bank specifies an absolute capacity.
 
 The owner/scope matters: Damage, Claim Protection, Armor Wear, Fall
 Protection, and Fly Boost require a faction member to be standing in their
 own claim. Spawner Rate and Crop Growth apply to the managed block/crop in
 the upgraded claim even when no member is nearby. Mob XP requires a member
-to kill a mob in that faction's claim. Configure Warp maximum/count values
-in FactionsUUID as well, and do not enable duplicate native FactionsUUID
-upgrades unless you intentionally want their effects to stack. The complete
-compatibility rules are in [Factions Integration](factions-integration.md#faction-upgrades).
+to kill a mob in that faction's claim. The complete native behavior is in
+[Native Factions](factions-integration.md).
 
 GUI labels, lore, and purchase/failure messages are configurable in
 `lang/en_us.yml` under `faction-upgrades` (and can be translated per locale).
@@ -292,24 +330,12 @@ check whether one is currently scheduled.
 
 ## Rally permission GUI
 
-```yaml
-rally:
-  permission-gui:
-    title: '<gold>Faction Permissions'
-    roles:
-      mod: {slot: 2, material: DIAMOND_SWORD, name: '<aqua>Moderator', ...}
-      member: {slot: 4, material: GOLDEN_SWORD, name: '<yellow>Member', ...}
-      recruit: {slot: 6, material: WOODEN_SWORD, name: '<gray>Recruit', ...}
-    actions:
-      vertex-rally-set: {name: 'Set Rally'}
-      vertex-rally-clear: {name: 'Clear Rally'}
-      vertex-chunkbuster-use: {name: 'Use Chunk Busters'}
-```
-
-Controls the title, per-role slot/icon/name in the top row, and the label
-for Vertex's custom permission actions shown alongside FactionsUUID's own
-native permission list. Every permission is always a green stained-glass
+The role icon materials and slots remain under `rally.permission-gui` in
+`config.yml`. All visible title, role, status, hint, and action text is under
+`faction-permissions` in `lang/en_us.yml`, alongside the rest of Vertex's GUI
+copy. Every permission is always a green stained-glass
 pane when allowed and a red stained-glass pane when denied; this is not
 overridable, so allowed actions are never mistaken for blocked ones. The
-GUI renders all its visible text in small caps. Full behavior
+shared GUI renderer converts static wording to small caps while preserving
+placeholder values. Full behavior
 in [Factions Integration](factions-integration.md#rally-permission-gui).

@@ -1,6 +1,7 @@
 package me.vertex.core.faction;
 
 import me.vertex.core.storage.Database;
+import me.vertex.core.storage.SqlSchema;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -8,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /** SQL persistence for the small, stable faction-upgrade level matrix. */
 public final class FactionUpgradeStorage {
@@ -57,12 +59,84 @@ public final class FactionUpgradeStorage {
     }
 
     public void save(int factionId, String upgradeKey, int level) throws SQLException {
-        try (Connection connection = database.getConnection();
-             PreparedStatement statement = connection.prepareStatement(upsert)) {
-            statement.setInt(1, factionId);
-            statement.setString(2, upgradeKey);
-            statement.setInt(3, level);
-            statement.executeUpdate();
+        try (Connection connection = database.getConnection()) {
+            boolean previous = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                if (!SqlSchema.lockFactionIfPresent(connection, database.dialect(), factionId)) {
+                    connection.rollback();
+                    throw new SQLException("Faction no longer exists");
+                }
+                try (PreparedStatement statement = connection.prepareStatement(upsert)) {
+                    statement.setInt(1, factionId);
+                    statement.setString(2, upgradeKey);
+                    statement.setInt(3, level);
+                    statement.executeUpdate();
+                }
+                connection.commit();
+            } catch (SQLException error) {
+                connection.rollback();
+                throw error;
+            } finally {
+                connection.setAutoCommit(previous);
+            }
+        }
+    }
+
+    /** Atomic compare-and-set used to prevent two shards buying the same level. */
+    public boolean advance(int factionId, String upgradeKey, int expectedLevel, int nextLevel) throws SQLException {
+        return advance(factionId, upgradeKey, expectedLevel, nextLevel, null);
+    }
+
+    /** Runtime purchase path: the durable purchaser must still be Leader/Co-Leader. */
+    public boolean advanceAuthorized(int factionId, UUID purchaser, String upgradeKey,
+            int expectedLevel, int nextLevel) throws SQLException {
+        if (purchaser == null) return false;
+        return advance(factionId, upgradeKey, expectedLevel, nextLevel, purchaser);
+    }
+
+    private boolean advance(int factionId, String upgradeKey, int expectedLevel, int nextLevel,
+            UUID purchaser) throws SQLException {
+        try (Connection connection = database.getConnection()) {
+            boolean previous = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                if (!SqlSchema.lockFactionIfPresent(connection, database.dialect(), factionId)) {
+                    connection.rollback();
+                    return false;
+                }
+                if (purchaser != null) {
+                    String suffix = database.dialect() == Database.Dialect.MYSQL ? " FOR UPDATE" : "";
+                    try (PreparedStatement member = connection.prepareStatement(
+                            "SELECT role FROM vertex_faction_members WHERE player_uuid=? AND faction_id=?" + suffix)) {
+                        member.setString(1, purchaser.toString());
+                        member.setInt(2, factionId);
+                        try (ResultSet row = member.executeQuery()) {
+                            if (!row.next() || !(row.getString(1).equalsIgnoreCase("LEADER")
+                                    || row.getString(1).equalsIgnoreCase("COLEADER"))) {
+                                connection.rollback();
+                                return false;
+                            }
+                        }
+                    }
+                }
+                String ensureSql = database.dialect() == Database.Dialect.SQLITE
+                        ? "INSERT OR IGNORE INTO faction_upgrade_levels(faction_id,upgrade_key,level) VALUES(?,?,0)"
+                        : "INSERT IGNORE INTO faction_upgrade_levels(faction_id,upgrade_key,level) VALUES(?,?,0)";
+                try (PreparedStatement ensure = connection.prepareStatement(ensureSql)) {
+                    ensure.setInt(1, factionId); ensure.setString(2, upgradeKey); ensure.executeUpdate();
+                }
+                try (PreparedStatement update = connection.prepareStatement(
+                        "UPDATE faction_upgrade_levels SET level=? WHERE faction_id=? AND upgrade_key=? AND level=?")) {
+                    update.setInt(1, nextLevel); update.setInt(2, factionId);
+                    update.setString(3, upgradeKey); update.setInt(4, expectedLevel);
+                    boolean changed = update.executeUpdate() == 1;
+                    if (changed) connection.commit(); else connection.rollback();
+                    return changed;
+                }
+            } catch (SQLException error) {
+                connection.rollback(); throw error;
+            } finally { connection.setAutoCommit(previous); }
         }
     }
 

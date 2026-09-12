@@ -38,7 +38,7 @@ public final class CoinflipMatchReviewMenu {
 
     public static void open(Player host, CoinflipManager manager, Messages messages, Coinflip coinflip, CoinflipPendingMatch match) {
         Holder holder = new Holder(coinflip.id());
-        Inventory inventory = Bukkit.createInventory(holder, SIZE, messages.get(host, "coinflip.review-title"));
+        Inventory inventory = Bukkit.createInventory(holder, SIZE, messages.getGui(host, "coinflip.review-title"));
         holder.inventory = inventory;
 
         for (int slot = 0; slot < SIZE; slot++) {
@@ -71,7 +71,7 @@ public final class CoinflipMatchReviewMenu {
         SkullMeta meta = (SkullMeta) head.getItemMeta();
         meta.setOwningPlayer(subject);
         String name = subject.getName();
-        meta.displayName(noItalic(messages.get(viewer, "coinflip.review-whose-wager", "player", name == null ? "?" : name)));
+        meta.displayName(noItalic(messages.getGui(viewer, "coinflip.review-whose-wager", "player", name == null ? "?" : name)));
         head.setItemMeta(meta);
         return head;
     }
@@ -79,7 +79,7 @@ public final class CoinflipMatchReviewMenu {
     private static ItemStack confirmButton(Player viewer, Messages messages) {
         ItemStack item = new ItemStack(Material.LIME_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(viewer, "coinflip.review-confirm-button")));
+        meta.displayName(noItalic(messages.getGui(viewer, "coinflip.review-confirm-button")));
         item.setItemMeta(meta);
         return item;
     }
@@ -87,7 +87,7 @@ public final class CoinflipMatchReviewMenu {
     private static ItemStack denyButton(Player viewer, Messages messages) {
         ItemStack item = new ItemStack(Material.RED_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(viewer, "coinflip.review-deny-button")));
+        meta.displayName(noItalic(messages.getGui(viewer, "coinflip.review-deny-button")));
         item.setItemMeta(meta);
         return item;
     }

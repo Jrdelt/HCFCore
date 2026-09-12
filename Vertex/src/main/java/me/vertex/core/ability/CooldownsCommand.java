@@ -73,9 +73,8 @@ public final class CooldownsCommand implements CommandExecutor {
             return true;
         }
         for (CooldownEntry entry : entries) {
-            player.sendMessage(Component.text(entry.name(), NamedTextColor.GRAY)
-                    .append(Component.text(": ", NamedTextColor.DARK_GRAY))
-                    .append(Component.text(entry.seconds() + "s", NamedTextColor.YELLOW)));
+            player.sendMessage(messages.get(player, "cooldowns.entry", "name", entry.name(),
+                    "seconds", String.valueOf(entry.seconds())));
         }
         return true;
     }

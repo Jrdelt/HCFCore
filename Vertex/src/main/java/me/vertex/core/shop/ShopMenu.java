@@ -62,7 +62,7 @@ public final class ShopMenu {
     public static void openCategories(Player player, ShopManager manager, SpawnerManager ignoredSpawnerManager,
                                       Messages messages) {
         Holder holder = new Holder(Mode.CATEGORIES, null, 0);
-        Inventory inventory = Bukkit.createInventory(holder, 9, messages.get(player, "shop.gui-title"));
+        Inventory inventory = Bukkit.createInventory(holder, 9, messages.getGui(player, "shop.gui-title"));
         holder.inventory = inventory;
 
         List<ShopCategory> categories = manager.categories();
@@ -92,7 +92,7 @@ public final class ShopMenu {
 
         Holder holder = new Holder(Mode.ITEMS, categoryId, page);
         Inventory inventory = Bukkit.createInventory(holder, 54,
-                messages.get(player, "shop.category-gui-title", "category", category.displayName()));
+                messages.getGui(player, "shop.category-gui-title", "category", category.displayName()));
         holder.inventory = inventory;
         for (int slot = 0; slot < 9; slot++) inventory.setItem(slot, border());
         for (int slot = 45; slot < 54; slot++) inventory.setItem(slot, border());
@@ -163,8 +163,8 @@ public final class ShopMenu {
         ItemStack item = SpawnerManager.createSpawnerItem(type, MessageFormatter.deserialize(config.displayName()));
         ItemMeta meta = item.getItemMeta();
         meta.displayName(noItalic(meta.displayName()));
-        meta.lore(List.of(noItalic(messages.get(player, "spawner.shop-price", "amount", EconomyHook.format(config.price()))),
-                noItalic(messages.get(player, "spawner.shop-hint"))));
+        meta.lore(List.of(noItalic(messages.getGui(player, "spawner.shop-price", "amount", EconomyHook.format(config.price()))),
+                noItalic(messages.getGui(player, "spawner.shop-hint"))));
         item.setItemMeta(meta);
         return item;
     }
@@ -174,8 +174,8 @@ public final class ShopMenu {
         ItemStack item = manager.createItem(type);
         ItemMeta meta = item.getItemMeta();
         List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
-        lore.add(noItalic(messages.get(player, "chunkbuster.shop-price", "amount", EconomyHook.format(manager.price(type)))));
-        lore.add(noItalic(messages.get(player, "chunkbuster.shop-hint")));
+        lore.add(noItalic(messages.getGui(player, "chunkbuster.shop-price", "amount", EconomyHook.format(manager.price(type)))));
+        lore.add(noItalic(messages.getGui(player, "chunkbuster.shop-hint")));
         meta.displayName(noItalic(meta.displayName()));
         meta.lore(lore);
         item.setItemMeta(meta);
@@ -187,8 +187,8 @@ public final class ShopMenu {
         ItemStack item = manager.createItem(type);
         ItemMeta meta = item.getItemMeta();
         List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
-        lore.add(noItalic(messages.get(player, "sourcebucket.shop-price", "amount", EconomyHook.format(type.shopPrice()))));
-        lore.add(noItalic(messages.get(player, "sourcebucket.shop-hint")));
+        lore.add(noItalic(messages.getGui(player, "sourcebucket.shop-price", "amount", EconomyHook.format(type.shopPrice()))));
+        lore.add(noItalic(messages.getGui(player, "sourcebucket.shop-hint")));
         meta.displayName(noItalic(meta.displayName()));
         meta.lore(lore);
         item.setItemMeta(meta);
@@ -202,8 +202,8 @@ public final class ShopMenu {
     private static ItemStack categoryIcon(Player player, Messages messages, ShopCategory category) {
         ItemStack icon = new ItemStack(category.icon());
         ItemMeta meta = icon.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "shop.category-title", "category", category.displayName())));
-        meta.lore(List.of(noItalic(messages.get(player, "shop.category-open-lore"))));
+        meta.displayName(noItalic(messages.getGui(player, "shop.category-title", "category", category.displayName())));
+        meta.lore(List.of(noItalic(messages.getGui(player, "shop.category-open-lore"))));
         icon.setItemMeta(meta);
         return icon;
     }
@@ -211,23 +211,23 @@ public final class ShopMenu {
     private static ItemStack blockIcon(Player player, ShopManager manager, Messages messages, ShopEntry entry) {
         ItemStack icon = new ItemStack(entry.material());
         ItemMeta meta = icon.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "shop.block-title", "block", displayName(entry.material()))));
+        meta.displayName(noItalic(messages.getGui(player, "shop.block-title", "block", displayName(entry.material()))));
         int direction = manager.priceDirection(entry.material());
-        Component buyLine = noItalic(messages.get(player, "shop.block-buy-price",
+        Component buyLine = noItalic(messages.getGui(player, "shop.block-buy-price",
                 "price", EconomyHook.format(manager.buyPrice(entry.material()))));
-        Component sellLine = noItalic(messages.get(player, "shop.block-sell-price",
+        Component sellLine = noItalic(messages.getGui(player, "shop.block-sell-price",
                 "price", EconomyHook.format(manager.sellPrice(entry.material()))));
         if (direction != 0) {
-            Component indicator = Component.space().append(noItalic(messages.get(player,
+            Component indicator = Component.space().append(noItalic(messages.getGui(player,
                     direction > 0 ? "shop.block-price-indicator-above" : "shop.block-price-indicator-below")));
             buyLine = buyLine.append(indicator);
             sellLine = sellLine.append(indicator);
         }
         List<Component> lore = new ArrayList<>(List.of(buyLine, sellLine));
-        lore.add(noItalic(messages.get(player, "shop.block-buy-lore")));
-        lore.add(noItalic(messages.get(player, "shop.block-buy-stack-lore")));
-        lore.add(noItalic(messages.get(player, "shop.block-sell-lore")));
-        lore.add(noItalic(messages.get(player, "shop.block-sell-stack-lore")));
+        lore.add(noItalic(messages.getGui(player, "shop.block-buy-lore")));
+        lore.add(noItalic(messages.getGui(player, "shop.block-buy-stack-lore")));
+        lore.add(noItalic(messages.getGui(player, "shop.block-sell-lore")));
+        lore.add(noItalic(messages.getGui(player, "shop.block-sell-stack-lore")));
         meta.lore(lore);
         icon.setItemMeta(meta);
         return icon;
@@ -246,8 +246,8 @@ public final class ShopMenu {
     private static ItemStack balanceIcon(Player player, Messages messages) {
         ItemStack item = new ItemStack(Material.GOLD_INGOT);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "shop.balance-title")));
-        meta.lore(List.of(noItalic(messages.get(player, "shop.balance-lore", "balance", EconomyHook.getBalance(player)))));
+        meta.displayName(noItalic(messages.getGui(player, "shop.balance-title")));
+        meta.lore(List.of(noItalic(messages.getGui(player, "shop.balance-lore", "balance", EconomyHook.getBalance(player)))));
         item.setItemMeta(meta);
         return item;
     }
@@ -255,7 +255,7 @@ public final class ShopMenu {
     private static ItemStack backButton(Player player, Messages messages) {
         ItemStack item = new ItemStack(Material.ARROW);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "shop.back-button")));
+        meta.displayName(noItalic(messages.getGui(player, "shop.back-button")));
         item.setItemMeta(meta);
         return item;
     }
@@ -263,7 +263,7 @@ public final class ShopMenu {
     private static ItemStack pageButton(Messages messages, Player player, String key, Material material, boolean enabled) {
         ItemStack item = new ItemStack(enabled ? material : Material.GRAY_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, key)));
+        meta.displayName(noItalic(messages.getGui(player, key)));
         item.setItemMeta(meta);
         return item;
     }

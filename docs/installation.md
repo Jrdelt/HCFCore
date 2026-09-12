@@ -5,7 +5,6 @@
 | | Requirement | Notes |
 |---|---|---|
 | Required | **Paper 1.21.10+** | The plugin targets Paper's API directly (not just Spigot/Bukkit) and is currently built against Paper 1.21.11's API. |
-| Required | **FactionsUUID** | Must be installed and enabled before Vertex starts, or Vertex refuses to enable. |
 | Optional | **MySQL 5.7+ or MariaDB** | Only if you set `storage.type: mysql`. By default Vertex uses a local SQLite file and needs no database server at all. See [Storage](#storage-local-or-mysql) below. |
 | Optional | Vault, WorldGuard, LuckPerms, PlaceholderAPI, EssentialsX, FastAsyncWorldEdit, DecentHolograms | Each unlocks specific features. See [Integrations](integrations.md) for exactly what each one does and what happens without it. |
 
@@ -31,7 +30,7 @@ cd Vertex
 ## First deploy
 
 1. Build (or download) `vertex-1.0.0.jar`.
-2. Drop it into `plugins/`, alongside `FactionsUUID.jar`.
+2. Drop it into `plugins/`.
 3. Start the server. Vertex creates `plugins/Vertex/config.yml`, its local
    database at `plugins/Vertex/vertex.db`, language files, and the active
    feature files (`kits.yml`, `abilities.yml`, `tags.yml`, `spawners.yml`,
@@ -107,14 +106,16 @@ The copy is idempotent: running it twice replaces the target's contents
 again rather than duplicating rows.
 
 The command requires an **idle server**: no online players and no active
-Blueprint builds. It drains pending Vertex writes before taking the copy,
-so the result is a consistent snapshot and active Blueprint beacon IDs
-remain valid after the restart. The local backend uses a single pooled
+Blueprint builds. It drains all manager writes known at the start of the copy
+and blocks new logins. Until the background-scheduler migration issue listed in
+the root `issues.md` is fixed, run this during maintenance with automated events
+disabled and verify source/target row counts before restarting. The local backend uses a single pooled
 connection (SQLite serializes writes anyway), so a large death-history
 table can still take time to copy.
 
-If `FactionsUUID` isn't present and enabled, Vertex logs why and disables
-itself immediately rather than running in a half-working state.
+Vertex owns its faction data itself and starts without any external faction
+plugin. Back up external faction data before replacing an older setup; see
+[Native Factions](factions-integration.md#storage-and-migration).
 
 ## Migrating from an HCFCore-branded install
 
@@ -188,8 +189,8 @@ live. It reapplies current spawner tuning and faction upgrade definitions.
 
 For anything that isn't a config/content change (a plugin update, a JVM
 flag change, a dependency being added/removed), perform a full server
-restart instead of `/reload`. A bare `/reload` doesn't give Paper,
-FactionsUUID, or optional integrations a clean chance to tear down and
+restart instead of `/reload`. A bare `/reload` doesn't give Paper or
+optional integrations a clean chance to tear down and
 re-initialize their own state, and Vertex's own pending database writes
 are only guaranteed to flush on a real shutdown.
 

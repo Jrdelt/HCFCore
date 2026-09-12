@@ -1,19 +1,21 @@
-# Faction Shield -- see docs/faction-shield.md.
+# Native Vertex Grace and Faction Shield settings.
+grace:
+  # Hard safety limit accepted by /fa grace on <duration>.
+  maximum-duration-seconds: 2592000 # 30 days
+
 shield:
-  # How long a newly submitted Shield schedule waits before it takes effect
-  # server-wide, in real elapsed seconds -- continues counting during
-  # downtime. If a Shield window from the OLD schedule is still active when
-  # this delay completes, the old window is allowed to finish first; the
-  # new schedule takes over the moment that window ends.
-  activation-delay-seconds: 86400
-  # How long a brand new faction must wait, in real elapsed seconds
-  # (continues counting during downtime), before it may submit its first
-  # Shield schedule. A disbanded-and-recreated faction gets a fresh wait.
-  new-faction-delay-seconds: 21600
-  # How often the bounded pending-schedule-activation sweep runs. It only
-  # ever iterates factions with a pending schedule swap outstanding, never
-  # a full scan.
-  sweep-interval-seconds: 30
-  # Whether an active Shield disables PvP inside that faction's Base Claims.
-  # Raid Claims are never protected by Shield regardless of this setting.
-  combat-protection-enabled: true
+  # Duration before faction-upgrade bonus seconds are added.
+  base-duration-seconds: 21600 # 6 hours
+  maximum-duration-seconds: 86400 # 24 hours
+  # Cooldown starts when protection ends.
+  cooldown-seconds: 86400 # 24 hours
+  # Optional wait before a newly created faction can activate Shield.
+  new-faction-delay-seconds: 0
+  # Shield primarily protects against explosions. Enable only if Shield
+  # should also prevent PvP inside the protected faction's claims.
+  combat-protection-enabled: false
+  schedule:
+    maximum-hours-per-day: 8
+    edit-lock-seconds: 86400
+    activation-delay-seconds: 86400
+    time-zone: America/Los_Angeles

@@ -87,8 +87,15 @@ public final class MineListener implements Listener {
         int amount = applyOreBooster(player, entry.dropAmount());
         if (amount > 0) {
             java.util.List<ItemStack> drops = java.util.List.of(new ItemStack(entry.dropMaterial(), amount));
-            for (ItemStack leftover : backpackDrops == null ? drops : backpackDrops.routePlayerMiningDrops(player, drops)) {
-                giveOrDrop(player, leftover);
+            ItemStack offhandBefore = player.getInventory().getItemInOffHand().clone();
+            java.util.List<ItemStack> leftovers = backpackDrops == null
+                    ? drops : backpackDrops.routePlayerMiningDrops(player, drops);
+            if (!mines.queueOverflow(player, leftovers, "mine-ore")) {
+                player.getInventory().setItemInOffHand(offhandBefore);
+                player.updateInventory();
+                event.setCancelled(true);
+                player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+                return;
             }
         }
         mines.scheduleRegen(region, block);
@@ -145,8 +152,4 @@ public final class MineListener implements Listener {
         return baseAmount + extra;
     }
 
-    private void giveOrDrop(Player player, ItemStack item) {
-        player.getInventory().addItem(item).values()
-                .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
-    }
 }

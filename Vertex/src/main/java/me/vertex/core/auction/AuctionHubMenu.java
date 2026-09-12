@@ -51,7 +51,7 @@ public final class AuctionHubMenu {
     private static void openLoaded(Player player, AuctionManager manager, Messages messages,
             List<AuctionLogEntry> logs, List<ItemStack> claims) {
         Holder holder = new Holder();
-        Inventory inventory = Bukkit.createInventory(holder, SIZE, messages.get(player, "auction.hub-gui-title"));
+        Inventory inventory = Bukkit.createInventory(holder, SIZE, messages.getGui(player, "auction.hub-gui-title"));
         holder.inventory = inventory;
 
         for (int slot = 0; slot < SIZE; slot++) {
@@ -80,12 +80,12 @@ public final class AuctionHubMenu {
             String titleKey, String loreKey, String countKey, long count) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, titleKey)));
+        meta.displayName(noItalic(messages.getGui(player, titleKey)));
         java.util.List<Component> lore = new java.util.ArrayList<>();
         if (countKey != null) {
-            lore.add(noItalic(messages.get(player, countKey, "count", String.valueOf(count))));
+            lore.add(noItalic(messages.getGui(player, countKey, "count", String.valueOf(count))));
         }
-        lore.add(noItalic(messages.get(player, loreKey)));
+        lore.add(noItalic(messages.getGui(player, loreKey)));
         meta.lore(lore);
         item.setItemMeta(meta);
         return item;
@@ -94,7 +94,7 @@ public final class AuctionHubMenu {
     private static ItemStack closeButton(Player player, Messages messages) {
         ItemStack item = new ItemStack(Material.BARRIER);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "auction.hub-close-button")));
+        meta.displayName(noItalic(messages.getGui(player, "auction.hub-close-button")));
         item.setItemMeta(meta);
         return item;
     }

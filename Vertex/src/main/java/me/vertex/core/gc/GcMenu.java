@@ -109,11 +109,11 @@ public final class GcMenu implements Listener {
         switch (action) {
             case "withdraw" -> {
                 player.closeInventory();
-                player.sendMessage(messages.get(player, "gc.withdraw-hint"));
+                player.sendMessage(messages.getGui(player, "gc.withdraw-hint"));
             }
             case "redeem" -> {
                 player.closeInventory();
-                player.sendMessage(messages.get(player, "gc.redeem-hint"));
+                player.sendMessage(messages.getGui(player, "gc.redeem-hint"));
             }
             case "logs" -> GcLogMenu.open(player, manager, messages, 0);
             default -> { }

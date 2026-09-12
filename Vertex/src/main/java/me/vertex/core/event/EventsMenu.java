@@ -1,6 +1,8 @@
 package me.vertex.core.event;
 
 import me.vertex.core.factions.FactionsHook;
+import me.vertex.core.capture.CaptureEventManager;
+import me.vertex.core.capture.CaptureEventType;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.menu.MenuItemTemplate;
 import me.vertex.core.menu.MenuLayout;
@@ -30,18 +32,19 @@ public final class EventsMenu {
     }
 
     public static void open(Player viewer, MineManager mines, MineKothManager koths,
-            HotZoneManager hotZones, Messages messages, MenuRegistry menus) {
+            HotZoneManager hotZones, CaptureEventManager captureEvents, Messages messages, MenuRegistry menus) {
         MenuLayout layout = menus.layout(MENU_ID);
         Holder holder = new Holder();
         Inventory inventory = layout.createInventory(holder, MenuPlaceholders.of());
         holder.inventory = inventory;
-        render(inventory, viewer, mines, koths, hotZones, messages, menus);
+        render(inventory, viewer, mines, koths, hotZones, captureEvents, messages, menus);
         viewer.openInventory(inventory);
     }
 
     /** Re-renders an open hub at its configured interval without reopening it. */
     public static void refreshOpen(Player viewer, MineManager mines, MineKothManager koths,
-            HotZoneManager hotZones, Messages messages, MenuRegistry menus, long currentTick) {
+            HotZoneManager hotZones, CaptureEventManager captureEvents, Messages messages, MenuRegistry menus,
+            long currentTick) {
         if (!(viewer.getOpenInventory().getTopInventory().getHolder() instanceof Holder holder)) {
             return;
         }
@@ -49,12 +52,12 @@ public final class EventsMenu {
         if (interval <= 0L || currentTick - holder.lastRenderTick < interval) {
             return;
         }
-        render(holder.inventory, viewer, mines, koths, hotZones, messages, menus);
+        render(holder.inventory, viewer, mines, koths, hotZones, captureEvents, messages, menus);
         holder.lastRenderTick = currentTick;
     }
 
     private static void render(Inventory inventory, Player viewer, MineManager mines, MineKothManager koths,
-            HotZoneManager hotZones, Messages messages, MenuRegistry menus) {
+            HotZoneManager hotZones, CaptureEventManager captureEvents, Messages messages, MenuRegistry menus) {
         MenuLayout layout = menus.layout(MENU_ID);
         // Build an empty layout first so configured filler panes are restored
         // on every live refresh, then copy its contents into the open view.
@@ -111,6 +114,22 @@ public final class EventsMenu {
                         : duration(hotZones.remainingSeconds()))
                 .put("next", hotMine == null ? duration(hotZones.secondsUntilNext())
                         : messages.getRaw(viewer, "events.none")));
+
+        CaptureEventManager.EventSnapshot koth = captureEvents.snapshot(CaptureEventType.KOTH);
+        java.util.List<net.kyori.adventure.text.Component> details = new java.util.ArrayList<>();
+        if (koth.active()) {
+            details.add(messages.getGui(viewer, "events.koth-status", "name", koth.name()));
+            details.add(messages.getGui(viewer, "events.koth-owner", "owner", koth.owner()));
+            details.add(messages.getGui(viewer, "events.koth-remaining",
+                    "time", duration(koth.remainingSeconds())));
+        }
+        if (koth.nextScheduledSeconds() >= 0L) {
+            details.add(messages.getGui(viewer, "events.koth-next",
+                    "time", duration(koth.nextScheduledSeconds())));
+        }
+        // No active/loaded KOTH deliberately produces no status line. The
+        // configured icon is still placed and remains visible.
+        layout.place(inventory, "koth", MenuPlaceholders.of().putBlock("details", details));
     }
 
     private static String factionName(int factionId) {

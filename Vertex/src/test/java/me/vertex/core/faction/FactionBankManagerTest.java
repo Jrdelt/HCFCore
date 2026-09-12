@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Covers the TNT balance Vertex took over from FactionsUUID, against a real
+ * Covers the native Vertex TNT balance against a real
  * local (SQLite) database -- the whole point of the move was that TNT must
  * survive a restart, so the round-trip assertions matter more than the
  * in-memory ones.
@@ -115,9 +115,8 @@ class FactionBankManagerTest {
 
     /**
      * The guarantee the TNT-bank migration is built on: a deposit reports
-     * true only once it is durable. The migration clears FactionsUUID's
-     * native balance on the strength of that answer, so a false here is what
-     * stops the TNT being erased from both stores.
+     * true only once it is durable, so callers never report a deposit that
+     * was not actually written to the native faction bank.
      */
     @Test
     void aDepositThatCannotBePersistedReportsFailure() throws Exception {

@@ -1,6 +1,5 @@
 package me.vertex.core.trade;
 
-import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -12,7 +11,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,7 +33,7 @@ final class TradeMenu {
 
     static Inventory open(TradeSession session, OfflinePlayer requester, OfflinePlayer target, TradeManager manager, Messages messages) {
         Inventory inventory = Bukkit.createInventory(new Holder(session.id), SIZE,
-                messages.get(requester.getPlayer() == null ? Bukkit.getConsoleSender() : requester.getPlayer(), "trade.gui-title", "player", target.getName() == null ? "player" : target.getName()));
+                messages.getGui(requester.getPlayer() == null ? Bukkit.getConsoleSender() : requester.getPlayer(), "trade.gui-title", "player", target.getName() == null ? "player" : target.getName()));
         session.inventory = inventory;
         render(session, requester, target, manager, messages);
         return inventory;
@@ -52,26 +50,14 @@ final class TradeMenu {
     }
     private static ItemStack head(OfflinePlayer player, Messages messages, String key, String fallback) {
         ItemStack head = new ItemStack(Material.PLAYER_HEAD); SkullMeta meta = (SkullMeta) head.getItemMeta();
-        meta.setOwningPlayer(player); meta.displayName(messages.get(player.getPlayer() == null ? Bukkit.getConsoleSender() : player.getPlayer(), key, "player", fallback == null ? "player" : fallback)); head.setItemMeta(meta); return head;
-    }
-    private static ItemStack value(TradeManager manager, Messages messages, org.bukkit.command.CommandSender viewer, TradeValueType type, double amount, boolean locked) {
-        boolean enabled = type == TradeValueType.MONEY ? manager.moneyEnabled() : manager.experienceEnabled();
-        if (!enabled) return named(manager.fillerMaterial(), Component.empty());
-        ItemStack item = new ItemStack(type == TradeValueType.MONEY ? manager.currencyMaterial() : manager.experienceMaterial());
-        ItemMeta meta = item.getItemMeta();
-        org.bukkit.command.CommandSender sender = viewer == null ? Bukkit.getConsoleSender() : viewer;
-        meta.displayName(messages.get(sender, type == TradeValueType.MONEY ? "trade.money-title" : "trade.exp-title", "amount", manager.format(amount)));
-        List<Component> lore = new ArrayList<>();
-        lore.add(messages.get(sender, "trade.value-lore", "amount", manager.format(amount)));
-        lore.add(messages.get(sender, locked ? "trade.locked-lore" : "trade.value-click-lore"));
-        meta.lore(lore); item.setItemMeta(meta); return item;
+        meta.setOwningPlayer(player); meta.displayName(messages.getGui(player.getPlayer() == null ? Bukkit.getConsoleSender() : player.getPlayer(), key, "player", fallback == null ? "player" : fallback)); head.setItemMeta(meta); return head;
     }
     private static ItemStack button(TradeManager manager, Messages messages, org.bukkit.command.CommandSender viewer, TradeSession session, UUID owner) {
         boolean locked = session.locked(owner); boolean confirm = session.bothLocked() && owner.equals(session.firstLocked);
         ItemStack item = new ItemStack(locked && !confirm ? manager.lockedMaterial() : manager.confirmMaterial());
         ItemMeta meta = item.getItemMeta(); org.bukkit.command.CommandSender sender = viewer == null ? Bukkit.getConsoleSender() : viewer;
-        meta.displayName(messages.get(sender, confirm ? "trade.final-accept-title" : locked ? "trade.locked-title" : "trade.lock-title"));
-        meta.lore(List.of(messages.get(sender, confirm ? "trade.final-accept-lore" : locked ? "trade.locked-lore" : "trade.lock-lore"))); item.setItemMeta(meta); return item;
+        meta.displayName(messages.getGui(sender, confirm ? "trade.final-accept-title" : locked ? "trade.locked-title" : "trade.lock-title"));
+        meta.lore(List.of(messages.getGui(sender, confirm ? "trade.final-accept-lore" : locked ? "trade.locked-lore" : "trade.lock-lore"))); item.setItemMeta(meta); return item;
     }
     static ItemStack named(Material material, Component name) { ItemStack item = new ItemStack(material); ItemMeta meta = item.getItemMeta(); meta.displayName(name); item.setItemMeta(meta); return item; }
     record Holder(UUID sessionId) implements InventoryHolder { @Override public Inventory getInventory() { return null; } }

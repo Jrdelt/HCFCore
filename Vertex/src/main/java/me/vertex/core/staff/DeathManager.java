@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
@@ -100,8 +101,14 @@ public final class DeathManager {
 
     /** Flushes queued writes then permanently stops this executor at plugin shutdown. */
     public void shutdown() {
-        awaitWrites();
         ioExecutor.shutdown();
+        try {
+            if (!ioExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
+                plugin.getLogger().warning("Death-history database work did not finish before shutdown.");
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     public interface DeathLoadCallback {

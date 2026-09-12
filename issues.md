@@ -1,162 +1,272 @@
-# Vertex audit — 2026-09-10
 
-Scope: 353 production Java files, 70 test Java files, bundled configuration/language files, and repository documentation. mvn test passed during this audit. Its database-failure logs are intentional test paths, not test failures. This is a source audit; FactionsUUID, Vault, Paper, and each database backend still need staging-server smoke tests.
+### 3. Live storage migration is not a consistent cutover
 
-## Release blockers
+**In plain terms**
 
-### VTX-01 — Auction settlement has no durable delivery state
+A database copy can complete while the live server is still writing to old tables in places.
 
-Evidence: AuctionManager.buy charges the buyer, then settle calls AuctionStorage.settleListing. That SQL transaction removes the listing and writes history before the buyer receives the item and before the seller's external money payout is confirmed. Overflow is dropped into the world (AuctionManager lines 314 and 498).
+**Files**
+- `VertexCommand.java`
+- `VertexPlugin.java`
+- `storage/StorageMigrator.java`
 
-Failure path: A crash, failed Vault deposit, or despawned overflow drop can leave a permanently sold listing while the buyer, seller, or both never receive their entitlement. A retry cannot safely decide whether it already paid.
+### Technical detail
+Migration blocks logins and drains known writes, but normal commands/events and recurring schedulers (F Top, PvP Top, zone claim-expiry, market, collector, etc.) do not share a mutation barrier. They can write to source tables while others are copied. After copy, logins are reenabled even though the live server still uses old storage until restart; any write before restart can be missing from new backend.
 
-Required fix: In the same SQL transaction as the listing change, create idempotent buyer-item, seller-payout, and refund delivery records. Deliver only from that outbox/claim data, mark each record complete after success, retry at startup, and never make a world drop the only delivery copy. Check every Vault EconomyResponse for success.
+The migration manifest now includes every durable SQL table, and migration draining no longer shuts down vault or delivery retry workers. These fixes alone do not solve the inconsistent cutover window.
 
-Acceptance: Forced restart/failure at every settlement step creates no duplicate and loses no item, money, EXP, or GC.
+### Required fix
+- Add one global maintenance gate checked by every mutating command, listener, and scheduler.
+- Acquire it before final drain.
+- Copy a database-consistent snapshot.
+- Verify row counts and checksums.
+- Either hot-swap under gate or stop server immediately without reopening old backend.
+- Release gate only on failed copy.
 
-### VTX-02 — Coinflip resolution can outlive its payout
+### Simple reason
+Different tables can be from different moments and post-copy writes can be lost.
 
-Evidence: CoinflipManager.persistResolution calls CoinflipStorage.resolveCoinflip before winning currency/item claims are delivered. Similar ordering exists in cancellation/refund paths.
+## High
 
-Failure path: Once the predetermined winner is committed, a crash or failed external payout can remove the open wager without a durable retryable record of exactly what the winner/refund recipient is still owed.
+### 4. Native claim ownership and Base/Raid metadata commit separately
 
-Required fix: Use OPEN -> RESOLVED -> DELIVERED transaction states. Persist immutable winner/refund entitlements in the same transaction that locks or resolves the flip. Deliver through idempotency keys and recover incomplete deliveries on startup.
+**In plain terms**
 
-Acceptance: Restarting during creation, acceptance, cancellation, animation, and payout produces exactly one final outcome and payout/refund.
+Claim ownership and claim classification are not always written as one atomic action, so crashes can leave mixed state.
 
-### VTX-03 — GC write-behind is unsafe as auction/coinflip escrow
+**Files**
+- `factions/FactionService.java`
+- `claims/ClaimEventListener.java`
+- `claims/BaseClaimManager.java`
+- `claims/RaidClaimManager.java`
+- `claims/ClaimStorage.java`
 
-Evidence: GcManager.tryDebit changes memory and queues a database delta. Auction and coinflip accept this result as completed payment immediately (AuctionManager line 281; CoinflipManager line 591).
+### Technical detail
+Native claim commit completes and publishes a Bukkit event first. A second async operation then adds/removes Base membership or Raid expiry. A crash or SQL failure between those steps can leave claim type/timer incorrect while user sees success. Startup reconciliation covers many local cases, but mismatch can persist until reconciliation happens.
 
-Failure path: If the queued GC write fails after another system grants an item/payout, compensation can restore GC while the other effect remains. A process crash before the write has the same unpaid-value risk.
+### Required fix
+- Commit ownership + Base/Raid classification in one storage transaction, or
+- Add durable claim-operation journal in the ownership transaction.
+- Keep claim unusable until worker completes operation.
+- Update cache/success messages only after durable completion.
 
-Required fix: Create a durable GC reservation/ledger row before any dependent external transaction, then finalize or release it with an idempotency key. Recover in-progress reservations on startup; do not use cache-only debit as cross-system escrow.
+### Simple reason
+Claim owner and claim type can disagree after a badly-timed failure.
 
-Acceptance: Database failure/restart at each debit/finalize point cannot create, delete, or pay value twice.
+---
 
-### VTX-04 — Trade escrow is not durable at handoff
+### 5. Trade offer edits can still beat their escrow snapshot
 
-Evidence: TradeManager accepts items into memory and only then queues TradeStorage.replaceEscrow. Complete/cancel calls give(...) before final state persistence. give drops inventory overflow into the world.
+**In plain terms**
 
-Failure path: Restart after inventory removal but before escrow persistence loses items. Restart after delivery but before escrow clear restores old escrow and duplicates items. Drops can also despawn.
+Trade UI can show item movement before the database has safely recorded the final state.
 
-Required fix: Persist each accepted escrow revision before treating it as accepted. Complete/cancel by converting escrow to durable recipient claims in one SQL transaction, then deliver each claim idempotently. Block completion until the latest revision is durable.
+**Files**
+- `trade/TradeListener.java`
+- `trade/TradeManager.java`
+- `trade/TradeStorage.java`
 
-Acceptance: Repeated forced restarts during offer edits, complete, cancel, and full-inventory delivery preserve each offered item exactly once.
+### Technical detail
+Completion and cancellation now settle asynchronously while session is locked, but Bukkit still moves offered item in/out of GUI before async escrow snapshot commits. A hard stop in that window can reload an older offer and lose/duplicate movement.
 
-### VTX-05 — Claim collection has a delete-before-delivery loss window
+### Required fix
+- Block normal GUI movement during settlement.
+- Use durable per-edit operation ID.
+- Persist source slot, destination slot, item identity, and prior escrow version before inventory change.
+- Reconcile unfinished edits idempotently on startup before returning/exchanging items.
 
-Evidence: Auction, coinflip, and trade claim flows consume/delete the durable claim before directly adding its items to an inventory. This blocks an easy replay but has no recovery after a hard stop between operations.
+### Simple reason
+The screen can change before DB knows which item actually moved.
 
-Failure path: A process termination in that gap permanently loses the serialized item because its only durable copy is gone.
+---
 
-Required fix: Use claim states such as PENDING, DELIVERING, and DELIVERED; retain the serialized item until acknowledged delivery. Attach a stable transaction ID and retry pending delivery after restart. Validate space first or leave the item in the claim GUI.
+### 6. Spawner stack mutations are not crash-atomic
 
-Acceptance: Crashing after every database/inventory step leaves an item either collectable or exactly once in its recipient inventory.
+**In plain terms**
 
-### VTX-06 — Zone player state writes race and can stall the server thread
+Stack operations can partially apply: you may be paid without item removal or keep items without payout after a crash.
 
-Evidence: ZoneManager.state(UUID, String) calls ZoneStorage.loadPlayer synchronously inside computeIfAbsent from gameplay paths. Its persist method starts unrelated runTaskAsynchronously writes with no per-player ordering, tracking, shutdown drain, or migration drain.
+**Files**
+- `spawner/SpawnerMenuListener.java`
+- `spawner/SpawnerListener.java`
+- `spawner/SpawnerManager.java`
+- `spawner/SpawnerStorage.java`
 
-Failure path: First zone interaction can block a server tick on SQL. Two quick updates can finish out of order and restore an older cooldown/session/score. A clean shutdown can close the database with queued state still absent.
+### Technical detail
+Stack withdraw/sell/break flows mutate age rows, block/PDC state, player inventory, F Top, and occasionally Vault in separate steps. Youngest-first behavior is correct but process stop can still desync these steps.
 
-Required fix: Preload zone player state asynchronously on join, serve all events from a main-thread cache, serialize writes per player/record, and expose awaitWrites() for shutdown/migration. Version snapshots so stale writes cannot overwrite newer state.
+### Required fix
+- Add persistent operation ID + state machine per stack mutation.
+- Lock stack and transactionally reserve youngest rows.
+- Commit stack/F Top change first.
+- Complete idempotent item delivery or Vault payout.
+- Block other stack actions while operation is pending.
 
-Acceptance: Delayed/out-of-order SQL tests and immediate shutdown after a zone action retain the newest state without main-thread database I/O.
+### Simple reason
+High-value spawners can duplicate or disappear during crash.
 
-### VTX-07 — Portal edits are fire-and-forget
+---
 
-Evidence: PortalManager.persist uses untracked asynchronous work. PortalManager.shutdown and VertexPlugin.awaitStorageWritesForMigration() do not wait for portal writes.
+### 7. Several mixed economy operations still rely on compensation
 
-Failure path: Create, replace, or delete followed immediately by reload, migration, or restart can restore an old portal/route set even after staff see a success message.
+**In plain terms**
 
-Required fix: Queue portal and route mutations by ID, track futures, report the actual persistence error, and drain all writes before database close/migration. Only update the live cache after durable success, or compensate on failure.
+Some economy flows still assume a rollback/refund can be done later, but the process may stop first.
 
-Acceptance: Immediate restart/reload after every portal mutation reopens the exact saved definitions.
+**Files**
+- `faction/FactionBankMenu.java`
+- `faction/FactionBankManager.java`
+- `faction/FactionUpgradeManager.java`
+- `claims/BaseClaimManager.java`
+- `shop/ShopManager.java`
+- `wand/WandListener.java`
+- `wand/WandManager.java`
 
-## High-priority correctness and protection issues
+### Technical detail
+Faction bank, upgrades, Base slot purchases, shop trades, and wand flows touch SQL, Vault/XP, inventories, and containers. They compensate on normal failure, but JVM stop can occur before compensation. Auction, Coinflip, GC, and legacy trade now have durable intents; these systems do not.
 
-### VTX-08 — Zone terrain protection misses indirect block changes
+### Required fix
+- Persist unique operation states: `PREPARED/COMMITTING/COMPLETE/UNCERTAIN`.
+- Make SQL/inventory/container actions idempotent.
+- Route uncertain Vault/XP states to a permission-restricted staff reconciliation queue.
+- Lock affected faction/container until completion.
 
-Evidence: ZoneListener blocks player break/place and bucket fill/empty, but has no rules for pistons, explosions, fluid flow, dispensers, or structure growth across Haven/Riftlands boundaries.
+### Simple reason
+Refills/refunds only work if the server keeps running after the failure point.
 
-Failure path: A player can change protected terrain indirectly or push a mechanism/effect from outside a boundary into it.
+---
 
-Required fix: Define allowed terrain behaviour and check both source and destination regions for piston extend/retract, block/entity explosions, fluid flow, dispenser placement, structure growth, and relevant dependency events. Add boundary tests for every protected event.
+### 8. A delivery-WAL rejection is not propagated to its caller
 
-Acceptance: No unprivileged action can modify a zone block even when the player or mechanism begins outside the zone.
+**In plain terms**
 
-### VTX-09 — Dupe reconciliation is not periodic and can false-flag movement
+The queue can reject write-ahead logging, but callers may still remove or pay items.
 
-Evidence: DupeManager.load reads/registers scan-interval-ticks, but it does not start a repeating task. A scan only starts after another event. A reconciliation cycle combines observations from multiple loaded-chunk passes over time.
+**Files**
+- `storage/DeliveryManager.java`
+- `storage/DeliveryWal.java`
+- Callers of `DeliveryManager.queueOverflow`
 
-Failure path: A quiet server never receives the promised periodic scan. A legitimate tracked item moved between containers/chunks during one cycle can be observed twice and reported as a duplicate with stale holder information.
+### Technical detail
+Crash window is fixed with synchronous local WAL before async SQL and stable replay IDs. But the helper returns `void`, so callers ignore the admission result. If WAL cannot be written (disk full/read-only/corrupt), it logs and rejects batch after source item may already be removed or paid.
 
-Required fix: Start/stop a genuine repeating task at the configured interval. Use scan epochs and stable snapshots: scan evidence in one consistent window, invalidate/retry on holder change, or compare simultaneous observations. Keep event scans as debounced supplements.
+### Required fix
+- Make WAL admission return immediate required result.
+- Update all callers to remove payment only after admission succeeds.
+- On admission failure, leave source untouched or do verified rollback.
+- Treat failed WAL as degraded storage and fail new high-value overflow operations closed.
 
-Acceptance: A passive server scans on schedule, and moving one unique item during a scan never opens a dupe case.
+### Simple reason
+Overflow survives normal crash replay, but a failed WAL write can still lose an item.
 
-### VTX-10 — Dupe scans miss nested high-value items
+## Medium
 
-Evidence: Direct inventories, ender chests, tile inventories, and drops are inspected, but Backpack serialized contents, carried shulkers, and other nested storage can contain tracked items without being scanned.
+### 9. Failed asynchronous state writes are not generally retried
 
-Failure path: A duplicate tracked wand, armor piece, or blueprint can hide in a nested container and escape detection until a later transfer.
+**In plain terms**
 
-Required fix: Add read-only recursive scanners for Vertex serialized inventories and supported vanilla nested containers. Bound depth/size, record the full holder path, and avoid confusing the container's ID with an item's ID. Test backpack, shulker, collector, trade, and move scenarios.
+Some async writes fail in logs but continue in memory, causing old values to reappear after restart.
 
-### VTX-11 — Mine/Riftlands entry can select unsafe or invalid locations
+**Files**
+- `spawner/SpawnerManager.java`
+- `collector/ChunkCollectorManager.java`
+- `shop/ShopManager.java`
+- `faction/FactionBankManager.java`
+- `faction/FactionUpgradeManager.java`
+- `faction/FTopManager.java`
+- `faction/PvpTopManager.java`
+- `mine/MineKothManager.java`
+- `mine/HotZoneManager.java`
+- `backpack/BackpackFilterManager.java`
+- `staff/DeathManager.java`
 
-Evidence: MineTeleportManager.destination uses exact region center plus getHighestBlockYAt, without validating headroom, a non-hazardous floor, or a nearby fallback. ZoneManager.findSafeTicketLocation uses a random range that throws when region width/depth is no larger than twice ticketBorder.
+### Technical detail
+Most write paths are ordered, but final SQL exceptions are often logged and discarded while in-memory state moves on. On restart, older DB state can overwrite newer runtime state for balances, filters, spawners, market volume, leaderboards, or event state.
 
-Failure path: Mine entry can put a player into a blocked/damaging center structure. A small but valid Riftlands region can throw from ticket use instead of returning the configured no-safe-location response.
+### Required fix
+- Add bounded retry queue with backoff and monotonic versions.
+- Expose degraded storage health to staff.
+- Fail high-value mutations when persistence cannot keep up.
+- Prevent older retries from overwriting newer state.
 
-Required fix: Share a bounded safe-location finder that verifies world, region, two passable blocks, and non-hazardous solid floor, then tries nearby candidates. Clamp/validate effective ticket border against dimensions before random selection.
+### Simple reason
+A feature can appear correct now and still load as old data after restart.
 
-### VTX-12 — PvP Top awards synchronously write to SQL
+---
 
-Evidence: PvpTopManager.awardCapture calls storage.award(...) directly from capture handling.
+### 10. Auction/Coinflip payout SQL runs on the server thread (status: fixed in this pass)
 
-Failure path: Slow SQL can freeze the main thread during a KOTH/Outpost capture. A database error permits the capture but loses the point award without a durable retry record.
+**In plain terms**
 
-Required fix: Create an idempotent durable award event (type, event ID, faction) with a unique database constraint; process it asynchronously, retry pending awards at startup, and update memory after persistence succeeds.
+This is the same payout-threading issue that has already been fixed above.
 
-### VTX-13 — F Top state is not drained before shutdown/migration
+**Files**
+- `auction/AuctionManager.java`
+- `auction/AuctionJoinListener.java`
+- `coinflip/CoinflipManager.java`
+- `coinflip/CoinflipJoinListener.java`
 
-Evidence: FTopManager.persist serializes its writeChain, but exposes no awaitWrites(). VertexPlugin.onDisable and migration waiting omit it.
+### Technical detail
+`processPendingPayouts` previously loaded/reserved/released SQL rows from join/settlement callbacks on the primary thread, so slow MySQL could stall ticks.
 
-Failure path: A scheduled or forced recalculation immediately followed by a restart/migration can lose scores or the next-update deadline.
+### Required fix
+Already addressed in `R10` with bounded executor handoff and asynchronous persistence.
 
-Required fix: Add a bounded awaitWrites() call to shutdown/migration, surface write failures, and test restart immediately after automatic and forced F Top updates.
+---
 
-### VTX-14 — Coinflip creation leaks wager details in public chat
+### 11. Cross-process behavior has no automated integration harness
 
-Evidence: CoinflipManager passes summarize(created) to coinflip.public-created; summarizeItems includes every item/amount and money, EXP, and GC amounts are also included.
+**In plain terms**
 
-Failure path: Public chat reveals information that should be limited to the coinflip UI and staff logs. The intended message is creator plus coinflip type, not specific items or a value.
+Current tests do not simulate multiple running servers, network failures, or process kills at scale.
 
-Required fix: Use a separate public type label (item, money, XP, GC) for broadcasts. Retain exact details only in the UI, transaction log, and authorized staff tools. Update every locale and test all wager types.
+**Files**
+- `network/*`
+- `teleport/*`
+- `factions/*`
+- `season/*`
 
-## Lower-priority follow-up
+### Technical detail
+Mock and SQLite tests cover local logic and SQL transitions but not MySQL row locks, two Paper JVMs, Velocity forwarding, heartbeat loss, capacity races, process kills, or evacuation/handoff behavior.
 
-### VTX-15 — Non-English language files are far behind English
+### Required fix
+- Add staging harness with Velocity + at least two Paper backends + MySQL + controlled network/process failure injection.
+- Automate Part O scenarios from `addme.md`.
+- Keep logs and DB snapshots as long-lived artifacts.
 
-Evidence: en_us.yml has 1,228 lines; de_de.yml, es_us.yml, and pt_br.yml each have 884 and lack whole newer sections such as GC, dupe, zones, and portals. Runtime fallback prevents a crash but creates mixed-language messages.
+### Simple reason
+Local unit tests do not reproduce real multi-server timing behavior.
 
-Required fix: Treat English as the translation schema. Add a test reporting missing/unknown keys per locale, translate all missing messages, and increment language versions intentionally so bundled changes reach live installations.
+## Staging tests for unresolved work
 
-## Documentation reconciled
+Use copied data only. Do not process-kill or reset production.
 
-- Added/indexed physical-portal documentation.
-- Corrected player trading to item-only.
-- Corrected Mine/Event documentation to describe the implemented event hub.
-- Corrected Sell/TNT Wand activation to left-click.
-- Documented GC as Auction House and Coinflip currency.
-- Updated bundled non-English coinflip/Auction usage text for GC and xp.
+1. Kill a backend while adding/removing a trade offer and compare both player inventories, `trade_escrow`, and `trade_claims` after restart.
+2. Kill a backend at each spawner sell/withdraw/stack step and verify stack age records, physical count, payout/item delivery, and F Top each happen exactly once.
+3. Interrupt Vault during faction bank, upgrade, shop, and wand actions; verify no side is silently committed alone.
+4. Make the Vertex data directory temporarily unwritable and attempt a full-inventory delivery; the source transaction must fail closed.
+5. Run storage migration on staging while every mutating scheduler is active, then compare per-table checksums before and after the required restart.
+6. With two Paper shards, race claim/unclaim against Base/Raid changes and verify every native claim has exactly one correct classification.
+7. Exercise network handoff, destination failure, planned evacuation, season reset, and snapshot restoration with Velocity plus shared MySQL.
 
-## Required staging checks before release
 
-1. Test Vault, FactionsUUID claims/ranks, SQLite, and MySQL integrations.
-2. Force-stop/restart through each VTX-01 through VTX-07 transaction point.
-3. Test zone borders with pistons, explosions, fluids, dispensers, and projectiles.
-4. Test coinflips with both players online, disconnects, full inventories, and every currency type.
-5. Check every bundled language after completing the translation follow-up.
+- This does not work | `/haven portal create <portal-id>` / `/riftlands portal create <portal-id>` | `vertex.portals.admin` | Creates a zone-specific portal directly from the current location. |
+
+
+- This does not work | `/haven create <name>` / `/riftlands create <name>` | `vertex.zones.admin` | Define the active region and metadata for each zone type. |
+
+- This does not work | `/haven list` / `/riftlands list` | `vertex.zones.admin` | Shows the currently defined zones for review/editing. |
+## Latest requested fixes
+
+The requested ticket-give removal, season-reset removal, stacked spawn countdown,
+SandBot bank/persistence behavior, expanded block shop, ally chat, clickable
+faction help pages, and unlimited downward lava source behavior were addressed
+in the current pass. `/f tnt` already reports current/max capacity and faction
+warp creation already uses the configured warp upgrade bonus.
+
+### Haven/Riftlands command-map decision still needed
+
+The obsolete commands are removed, but “full revamp” is broader than a code
+fix. The remaining setup branches (`create`, `list`, `region`, `route`,
+`portal`, `lootpool`, and `admin event/inspect`) need a final desired player vs
+admin command map before they can safely be renamed, merged, or removed.

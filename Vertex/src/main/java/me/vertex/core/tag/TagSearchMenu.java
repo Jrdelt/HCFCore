@@ -29,14 +29,14 @@ public final class TagSearchMenu {
 
     public static void open(Player player, TagManager manager, Messages messages, TagMenuState state) {
         Holder holder = new Holder(manager, messages, state);
-        Inventory inventory = Bukkit.createInventory(holder, InventoryType.ANVIL, messages.get(player, "tags.search-heading"));
+        Inventory inventory = Bukkit.createInventory(holder, InventoryType.ANVIL, messages.getGui(player, "tags.search-heading"));
         holder.inventory = inventory;
 
         ItemStack input = new ItemStack(Material.PAPER);
         ItemMeta meta = input.getItemMeta();
         // The anvil seeds its rename field from the input item's name, so
         // this doubles as the placeholder the player types over.
-        meta.displayName(noItalic(messages.get(player, "tags.search-prompt")));
+        meta.displayName(noItalic(messages.getGui(player, "tags.search-prompt")));
         input.setItemMeta(meta);
         inventory.setItem(SLOT_INPUT, input);
 
@@ -66,10 +66,10 @@ public final class TagSearchMenu {
         boolean hasQuery = query != null && !query.isBlank();
         ItemStack item = new ItemStack(hasQuery ? Material.NAME_TAG : Material.PAPER);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player,
+        meta.displayName(noItalic(messages.getGui(player,
                 hasQuery ? "tags.search-confirm" : "tags.search-confirm-empty",
                 "query", hasQuery ? query : "")));
-        meta.lore(List.of(noItalic(messages.get(player,
+        meta.lore(List.of(noItalic(messages.getGui(player,
                 hasQuery ? "tags.search-confirm-hint" : "tags.search-confirm-empty-hint"))));
         item.setItemMeta(meta);
         return item;

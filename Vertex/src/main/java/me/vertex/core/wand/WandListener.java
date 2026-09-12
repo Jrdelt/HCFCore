@@ -246,6 +246,7 @@ public final class WandListener implements Listener {
         spendUse(player, held, tier);
         player.sendMessage(messages.get(player, "wand.tnt-converted",
                 "amount", Numbers.formatFull(converted)));
+        bank.audit(factionId, "TNT_WAND", player, "amount=" + converted + ";tier=" + tier.id());
         plugin.getLogger().info("TNT Wand: " + player.getName() + " banked " + converted
                 + " TNT for faction " + factionId + " using tier " + tier.id() + ".");
     }

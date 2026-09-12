@@ -20,11 +20,19 @@ reentry-cooldown:
 routes:
   speed: 0.8
 mob-spawning:
-  min-spawn-distance: 20
-  max-spawn-distance: 80
-  base-local-mobs: 18
-  additional-mobs-per-player: 10
-  max-local-mobs: 85
+  # Hostile configured mobs cannot exist in PEACEFUL. Vertex changes the zone
+  # world's live difficulty to NORMAL when required. Disable only if every mob
+  # definition can survive peaceful difficulty.
+  force-normal-difficulty: true
+  min-spawn-distance: 5
+  max-spawn-distance: 30
+  # Four times the previous local budget, with a faster fill rate.
+  base-local-mobs: 72
+  additional-mobs-per-player: 40
+  max-local-mobs: 340
+  max-spawns-per-pass: 12
+  # Values above 1 bias random distances toward the player.
+  distance-bias: 2.5
   cluster-radius: 80
 progression:
   # Riftlands defaults are stronger to reward its PvP risk.

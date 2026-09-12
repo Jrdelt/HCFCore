@@ -81,7 +81,10 @@ lava:
   downward:
     enabled: true
     flow-pattern: downward
-    max-depth: 5
+    # -1 means continue through every block down to the world's minimum Y,
+    # stopping only at the first obstruction. The manager places source blocks
+    # directly, so this never creates a falling-lava entity.
+    max-depth: -1
     base-claim-only: true
     combat-allowed: false
     shop-price: 9000
@@ -93,7 +96,7 @@ lava:
     lore:
       - "<gray>Right-click a block to drop a"
       - "<gray>column of lava sources straight"
-      - "<gray>down, up to 5 blocks deep."
+      - "<gray>down to the world bottom or first obstruction."
       - "<gray>Base Claims only. Reusable."
 
 # These solid-block variants are ordinary reusable Source Buckets too. A

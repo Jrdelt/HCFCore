@@ -45,15 +45,13 @@ import java.util.logging.Level;
  * protected-block filtering, batched block removal, the persisted
  * restart-safe processing lock, and the shop-purchasable custom item.
  *
- * <p><b>Testability.</b> Every live-FactionsUUID/CombatManager lookup this
+ * <p><b>Testability.</b> Every native-faction/CombatManager lookup this
  * class needs is injected as a plain functional interface, exactly the
  * pattern {@code ExplosionProtectionListener} uses for its {@code
- * Predicate<Location> isBaseClaim} -- {@code FactionsHook}'s claim queries
- * reach FactionsUUID's live {@code Board} singleton, which is never
- * initialized in a unit test. Production wiring (see {@code VertexPlugin})
+ * Predicate<Location> isBaseClaim}; production wiring (see {@code VertexPlugin})
  * passes real method references; tests pass lambdas returning canned
  * values, so {@link #validate} can be exercised without MockBukkit's world
- * or a running FactionsUUID at all.
+ * or a running faction service at all.
  *
  * <p><b>The persisted restart-safe lock.</b> See {@link ChunkBusterStorage}'s
  * class doc for why {@code chunk_buster_operations} exists; this class is
@@ -289,10 +287,10 @@ public final class ChunkBusterManager {
         // recognisable and the configured type cannot be spoofed by a lookalike.
         ItemStack item = new ItemStack(Material.MAGMA_BLOCK);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(MessageFormatter.deserialize(config.name()));
+        meta.displayName(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(config.name())));
         List<net.kyori.adventure.text.Component> lore = new ArrayList<>();
         for (String line : config.lore()) {
-            lore.add(MessageFormatter.deserialize(line));
+            lore.add(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(line)));
         }
         meta.lore(lore);
         if (config.customModelData() != null) {

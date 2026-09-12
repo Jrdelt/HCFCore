@@ -18,14 +18,9 @@ import org.bukkit.plugin.Plugin;
 /**
  * On Paper, {@code AsyncChatEvent} has exactly one renderer slot -- the
  * last handler to call {@code event.renderer(...)} wins outright, nobody's
- * output is merged with anybody else's. FactionsUUID ships its own
- * Paper-native chat formatter (enabled by default) that sets its renderer
- * at {@code HIGHEST} too (see {@code ListenPaperChat.onPlayerChatLater} in
- * dev.kitteh:factions), so at equal priority it came down to plugin load
- * order which formatter actually showed up in chat -- sometimes ours,
- * sometimes theirs. Registering at {@code MONITOR} instead guarantees this
- * always runs after HIGHEST, so our renderer always wins regardless of
- * load order.
+ * output is merged with anybody else's. Registering at {@code MONITOR}
+ * makes Vertex's renderer run after normal formatter priorities, so its
+ * configured format is authoritative.
  */
 public final class ChatFormatterListener implements Listener {
 

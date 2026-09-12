@@ -25,7 +25,6 @@ import me.vertex.core.chat.ChatFormatterListener;
 import me.vertex.core.ability.PearlStunnerListener;
 import me.vertex.core.ability.JumpBoostFeatherListener;
 import me.vertex.core.ability.RabbitsFeedListener;
-import me.vertex.core.factions.FactionCommandListener;
 import me.vertex.core.kit.KitCommand;
 import me.vertex.core.kit.KitManager;
 import me.vertex.core.kit.KitMenuListener;
@@ -80,14 +79,16 @@ import me.vertex.core.tag.TagsCommand;
 import me.vertex.core.tag.TagMenuListener;
 import me.vertex.core.util.NumberFormatConfig;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
+import org.bukkit.Difficulty;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerLoginEvent;
+import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -100,6 +101,13 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
 
     private Database database;
     private Storage storage;
+    private me.vertex.core.factions.FactionStorage factionStorage;
+    private me.vertex.core.factions.FactionService factionService;
+    private me.vertex.core.factions.FactionPowerListener factionPowerListener;
+    private me.vertex.core.factions.FPowerBooster factionPowerBooster;
+    private me.vertex.core.factions.FactionSocialStorage factionSocialStorage;
+    private me.vertex.core.factions.FactionSocialManager factionSocialManager;
+    private me.vertex.core.factions.AdminAuditStorage factionAdminAuditStorage;
     private UserManager userManager;
     private Messages messages;
     private me.vertex.core.util.ChatAmountPrompt chatAmountPrompt;
@@ -113,8 +121,11 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.claims.ClaimStorage claimStorage;
     private me.vertex.core.claims.BaseClaimManager baseClaimManager;
     private me.vertex.core.claims.RaidClaimManager raidClaimManager;
+    private me.vertex.core.claims.ClaimEventListener claimEventListener;
     private me.vertex.core.shield.ShieldStorage shieldStorage;
     private me.vertex.core.shield.ShieldManager shieldManager;
+    private me.vertex.core.grace.GraceStorage graceStorage;
+    private me.vertex.core.grace.GraceManager graceManager;
     private me.vertex.core.chunkbuster.ChunkBusterStorage chunkBusterStorage;
     private me.vertex.core.chunkbuster.ChunkBusterManager chunkBusterManager;
     private me.vertex.core.bucket.SourceBucketManager sourceBucketManager;
@@ -145,6 +156,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.faction.FactionBankStorage factionBankStorage;
     private me.vertex.core.faction.FactionBankManager factionBankManager;
     private me.vertex.core.faction.FactionBankMenu factionBankMenu;
+    private me.vertex.core.faction.FactionVaultStorage factionVaultStorage;
+    private me.vertex.core.faction.FactionVaultManager factionVaultManager;
     private final AtomicBoolean storageMigrationRunning = new AtomicBoolean();
     private ArcherTagListener archerTagListener;
     private CombatListener combatListener;
@@ -165,6 +178,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.shop.ShopStorage shopStorage;
     private me.vertex.core.shop.ShopManager shopManager;
     private me.vertex.core.sandbot.SandBotManager sandBotManager;
+    private me.vertex.core.teleport.SpawnCommand spawnCommand;
     private me.vertex.core.placeholderapi.VertexPlaceholderExpansion placeholderExpansion;
     private org.bukkit.scheduler.BukkitTask shopDecayTask;
     private me.vertex.core.auction.AuctionStorage auctionStorage;
@@ -186,37 +200,49 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.performance.PerformanceManager performanceManager;
     private me.vertex.core.zone.ZoneManager zoneManager;
     private me.vertex.core.portal.PortalManager portalManager;
-
-    @Override
-    public void onLoad() {
-        // FactionsUUID closes its third-party command registry during its
-        // onEnable(). Since Vertex depends on it, this onLoad hook runs after
-        // FactionsUUID has initialized the registry but before it closes.
-        RallyCommand.registerFactionsSubcommand(this, () -> rallyCommand);
-        me.vertex.core.faction.FactionBankMenu.registerFactionsSubcommand(this, () -> factionBankMenu);
-    }
+    private me.vertex.core.storage.DeliveryManager deliveryManager;
+    private me.vertex.core.network.NetworkManager networkManager;
+    private me.vertex.core.teleport.TeleportManager teleportManager;
+    private me.vertex.core.teleport.GlobalLocationManager globalLocationManager;
+    private me.vertex.core.teleport.RtpManager rtpManager;
+    private me.vertex.core.stats.PlayerStatsManager playerStatsManager;
+    private me.vertex.core.season.SeasonResetManager seasonResetManager;
+    private Difficulty defaultWorldDifficulty = Difficulty.NORMAL;
 
     @Override
     public void onEnable() {
-        printStartupBanner();
-
         Bukkit.getPluginManager().registerEvents(this, this);
 
         saveDefaultConfig();
+        applyWorldDifficultyConfig();
         NumberFormatConfig.load(this);
 
-        if (!validateRuntimeDependencies()) {
-            Bukkit.getPluginManager().disablePlugin(this);
-            return;
-        }
+        validateRuntimeDependencies();
 
         try {
             database = new Database(getConfig(), getDataFolder());
+            boolean sharedClaims = getConfig().getBoolean("network.enabled", false)
+                    && database.dialect() == Database.Dialect.MYSQL;
+            me.vertex.core.claims.ChunkKey.configureShard(sharedClaims
+                    ? getConfig().getString("network.shard-id", "standalone") : "");
             storage = new SqlStorage(database);
             // One-time schema check at boot; the recurring load/save calls
             // made during gameplay are the ones that must stay off the main
             // thread, and they do (see UserManager/KitManager).
             storage.init();
+            // Native faction disband transactions also purge Base/Raid Claim
+            // ownership, so those tables must exist before faction commands
+            // can ever be enabled.
+            claimStorage = new me.vertex.core.claims.ClaimStorage(database);
+            claimStorage.init();
+            factionStorage = new me.vertex.core.factions.FactionStorage(database);
+            factionService = new me.vertex.core.factions.FactionService(this, factionStorage);
+            factionService.init();
+            factionSocialStorage = new me.vertex.core.factions.FactionSocialStorage(database);
+            factionSocialStorage.init();
+            factionAdminAuditStorage = new me.vertex.core.factions.AdminAuditStorage(database);
+            factionAdminAuditStorage.init();
+            me.vertex.core.factions.FactionsHook.install(factionService);
             spawnerStorage = new me.vertex.core.spawner.SpawnerStorage(database);
             spawnerStorage.init();
             fTopStorage = new me.vertex.core.faction.FTopStorage(database);
@@ -231,6 +257,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             factionUpgradeStorage.init();
             factionBankStorage = new me.vertex.core.faction.FactionBankStorage(database);
             factionBankStorage.init();
+            factionVaultStorage = new me.vertex.core.faction.FactionVaultStorage(database);
+            factionVaultStorage.init();
             coinflipStorage = new me.vertex.core.coinflip.CoinflipStorage(database);
             coinflipStorage.init();
             shopStorage = new me.vertex.core.shop.ShopStorage(database);
@@ -245,12 +273,15 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             gcStorage.init();
             dupeStorage = new me.vertex.core.dupe.DupeStorage(database);
             dupeStorage.init();
-            claimStorage = new me.vertex.core.claims.ClaimStorage(database);
-            claimStorage.init();
             shieldStorage = new me.vertex.core.shield.ShieldStorage(database);
             shieldStorage.init();
+            graceStorage = new me.vertex.core.grace.GraceStorage(database);
+            graceStorage.init();
             chunkBusterStorage = new me.vertex.core.chunkbuster.ChunkBusterStorage(database);
             chunkBusterStorage.init();
+            me.vertex.core.stats.PlayerStatsStorage playerStatsStorage = new me.vertex.core.stats.PlayerStatsStorage(database);
+            playerStatsManager = new me.vertex.core.stats.PlayerStatsManager(this, playerStatsStorage);
+            playerStatsManager.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize the database, disabling.", e);
             Bukkit.getPluginManager().disablePlugin(this);
@@ -258,8 +289,45 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         }
 
         userManager = new UserManager(this, storage);
+        Bukkit.getPluginManager().registerEvents(playerStatsManager, this);
         messages = new Messages(this, userManager);
         messages.load();
+        try {
+            deliveryManager=new me.vertex.core.storage.DeliveryManager(this,database,messages);
+            deliveryManager.init();
+            Bukkit.getPluginManager().registerEvents(deliveryManager,this);
+        } catch (Exception error) {
+            getLogger().log(Level.SEVERE,"Failed to initialize the durable item delivery inbox, disabling.",error);
+            Bukkit.getPluginManager().disablePlugin(this);
+            return;
+        }
+        printStartupBanner();
+        factionService.setMessages(messages);
+        me.vertex.core.factions.FactionCommand factionCommand = new me.vertex.core.factions.FactionCommand(
+                this, factionService, () -> factionBankManager, messages);
+        getCommand("f").setExecutor(factionCommand);
+        getCommand("f").setTabCompleter(factionCommand);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.factions.FactionGameplayListener(this, factionService), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.factions.FactionProtectionListener(this, factionService, messages), this);
+        factionPowerListener = new me.vertex.core.factions.FactionPowerListener(this, factionService);
+        Bukkit.getPluginManager().registerEvents(factionPowerListener, this);
+        factionPowerBooster = new me.vertex.core.factions.FPowerBooster(this, factionService, messages);
+        getCommand("fpowerbooster").setExecutor(factionPowerBooster);
+        getCommand("fpowerbooster").setTabCompleter(factionPowerBooster);
+        Bukkit.getPluginManager().registerEvents(factionPowerBooster, this);
+        try {
+            factionSocialManager = new me.vertex.core.factions.FactionSocialManager(this, factionService,
+                    factionSocialStorage, messages);
+            factionSocialManager.load();
+            factionSocialManager.start();
+            Bukkit.getPluginManager().registerEvents(factionSocialManager, this);
+            Bukkit.getPluginManager().registerEvents(new me.vertex.core.factions.FactionSocialCommand(
+                    this, factionService, factionSocialManager, messages), this);
+        } catch (Exception error) {
+            getLogger().log(Level.SEVERE, "Failed to load native faction social state, disabling.", error);
+            Bukkit.getPluginManager().disablePlugin(this);
+            return;
+        }
 
         // Performance framework: OFF by default, diagnostic-only, never
         // changes gameplay -- see PerformanceManager's class doc. Loaded
@@ -279,7 +347,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 announcementPreferenceManager, messages);
         getCommand("settings").setExecutor(settingsCommand);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.preferences.SettingsMenuListener(), this);
-        chatAmountPrompt = new me.vertex.core.util.ChatAmountPrompt(this);
+        chatAmountPrompt = new me.vertex.core.util.ChatAmountPrompt(this, messages);
         Bukkit.getPluginManager().registerEvents(chatAmountPrompt, this);
         abilityManager = new AbilityManager(this, storage);
         abilityManager.load();
@@ -303,6 +371,64 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 getConfig().getString("pvp.actionbar.vs-player", ""),
                 getConfig().getString("pvp.actionbar.vs-unknown", ""));
 combatManager.start();
+        try {
+            networkManager = new me.vertex.core.network.NetworkManager(this, database, messages, combatManager);
+            networkManager.init();
+            networkManager.start();
+            Bukkit.getPluginManager().registerEvents(networkManager, this);
+            seasonResetManager = new me.vertex.core.season.SeasonResetManager(this, database, networkManager);
+            networkManager.registerInvalidation("season-reset", () -> {
+                getLogger().warning("A network season reset completed; shutting this shard down to reload clean state.");
+                Bukkit.shutdown();
+            });
+            factionService.setMutationPublisher(payload -> networkManager.publishInvalidation("factions", payload));
+            networkManager.registerInvalidation("factions", factionService::refreshFromNetwork);
+            factionSocialManager.setMutationPublisher(() ->
+                    networkManager.publishInvalidation("faction-social", "changed"));
+            networkManager.registerInvalidation("faction-social", factionSocialManager::refreshAsync);
+            teleportManager = new me.vertex.core.teleport.TeleportManager(this, networkManager, combatManager, messages);
+            teleportManager.start();
+            Bukkit.getPluginManager().registerEvents(teleportManager, this);
+            factionCommand.setTeleportManager(teleportManager, networkManager);
+
+            globalLocationManager = new me.vertex.core.teleport.GlobalLocationManager(this, networkManager, messages);
+            globalLocationManager.load();
+            networkManager.registerInvalidation("global-locations", globalLocationManager::refreshAsync);
+            Bukkit.getPluginManager().registerEvents(globalLocationManager, this);
+            spawnCommand = new me.vertex.core.teleport.SpawnCommand(
+                    this, globalLocationManager, teleportManager, messages);
+            getCommand("spawn").setExecutor(spawnCommand);
+            getCommand("spawn").setTabCompleter(spawnCommand);
+            int teleportCountdown = Math.max(0, getConfig().getInt("teleports.countdown-seconds", 5));
+            me.vertex.core.teleport.WarpMenu warpMenu = new me.vertex.core.teleport.WarpMenu(
+                    globalLocationManager, teleportManager, messages, teleportCountdown);
+            Bukkit.getPluginManager().registerEvents(warpMenu, this);
+            me.vertex.core.teleport.WarpCommand warpCommand = new me.vertex.core.teleport.WarpCommand(
+                    globalLocationManager, teleportManager, warpMenu, messages, teleportCountdown);
+            getCommand("warp").setExecutor(warpCommand);
+            getCommand("warp").setTabCompleter(warpCommand);
+            getCommand("warps").setExecutor(warpCommand);
+            getCommand("warps").setTabCompleter(warpCommand);
+            me.vertex.core.teleport.ServerAdminCommand serverAdmin = new me.vertex.core.teleport.ServerAdminCommand(
+                    this, globalLocationManager, messages);
+            getCommand("s").setExecutor(serverAdmin);
+            getCommand("s").setTabCompleter(serverAdmin);
+
+            me.vertex.core.teleport.RtpStorage rtpStorage = new me.vertex.core.teleport.RtpStorage(database);
+            rtpManager = new me.vertex.core.teleport.RtpManager(this, networkManager, teleportManager,
+                    factionService, rtpStorage, messages);
+            rtpManager.load();
+            rtpManager.start();
+            networkManager.registerDestinationValidator("rtp", rtpManager::validate);
+            Bukkit.getPluginManager().registerEvents(rtpManager, this);
+            getCommand("rtp").setExecutor(new me.vertex.core.teleport.RtpCommand(rtpManager, messages));
+        } catch (Exception error) {
+            getLogger().log(Level.SEVERE, "Failed to initialize the shard network layer, disabling.", error);
+            Bukkit.getPluginManager().disablePlugin(this);
+            return;
+        }
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.factions.FactionDisbandMenu(
+                this, factionService, messages, combatManager::isTagged), this);
 
         legacyCombatManager = new LegacyCombatManager(this);
         Bukkit.getPluginManager().registerEvents(legacyCombatManager, this);
@@ -311,6 +437,11 @@ combatManager.start();
         Bukkit.getPluginManager().registerEvents(itemRestrictionListener, this);
 
         rebootManager = new RebootManager(this, messages, announcementPreferenceManager);
+        rebootManager.setPlannedRestartHook(new me.vertex.core.reboot.RebootManager.PlannedRestartHook() {
+            @Override public void onDraining(long restartAtMillis) { networkManager.beginPlannedDrain(restartAtMillis); }
+            @Override public void onRestarting() { networkManager.beginPlannedRestart(); }
+            @Override public void onCancelled() { networkManager.cancelPlannedRestart(); }
+        });
         rebootManager.start();
 
         deathManager = new DeathManager(this, storage);
@@ -327,14 +458,33 @@ combatManager.start();
 
         factionUpgradeManager = new FactionUpgradeManager(this, factionUpgradeStorage);
         factionUpgradeManager.load();
+        factionCommand.setUpgradeManager(() -> factionUpgradeManager);
+        factionUpgradeManager.setMutationPublisher(() ->
+                networkManager.publishInvalidation("faction-upgrades", "changed"));
+        networkManager.registerInvalidation("faction-upgrades", factionUpgradeManager::refreshAsync);
+        factionService.setWarpBonusProvider(factionId -> (int) Math.round(
+                factionUpgradeManager.bonus(factionId, me.vertex.core.faction.FactionUpgrade.WARPS)));
         Bukkit.getPluginManager().registerEvents(factionUpgradeManager, this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.faction.FactionUpgradeMenu(this, factionUpgradeManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.faction.FactionUpgradeEffectsListener(this, factionUpgradeManager), this);
+        try {
+            factionVaultManager = new me.vertex.core.faction.FactionVaultManager(this, factionVaultStorage,
+                    factionUpgradeManager, messages);
+            factionVaultManager.load();
+            Bukkit.getPluginManager().registerEvents(factionVaultManager, this);
+        } catch (Exception error) {
+            getLogger().log(Level.SEVERE, "Failed to load faction vaults, disabling.", error);
+            Bukkit.getPluginManager().disablePlugin(this);
+            return;
+        }
         factionBankManager = new me.vertex.core.faction.FactionBankManager(this, factionBankStorage);
         factionBankManager.load();
-        factionBankManager.migrateNativeTntBanks();
+        factionBankManager.setAuditLogger(factionSocialManager::log);
+        factionBankManager.setMutationPublisher(() ->
+                networkManager.publishInvalidation("faction-bank", "changed"));
+        networkManager.registerInvalidation("faction-bank", factionBankManager::refreshAsync);
         factionBankMenu = new me.vertex.core.faction.FactionBankMenu(this, factionBankManager, factionUpgradeManager,
                 rallyManager, messages, chatAmountPrompt);
         me.vertex.core.faction.TntFillCommand tntFillCommand =
@@ -350,8 +500,7 @@ combatManager.start();
         pvpTopManager.load();
         pvpTopManager.loadState();
         me.vertex.core.faction.PvpTopCommand pvpTopCommand =
-                new me.vertex.core.faction.PvpTopCommand(this, pvpTopManager, messages);
-        Bukkit.getPluginManager().registerEvents(pvpTopCommand, this);
+                new me.vertex.core.faction.PvpTopCommand(pvpTopManager, messages);
         getCommand("pvptop").setExecutor(pvpTopCommand);
         getCommand("pvptop").setTabCompleter(pvpTopCommand);
 
@@ -368,7 +517,7 @@ combatManager.start();
         getCommand("outpost").setExecutor(outpostCommand);
         getCommand("outpost").setTabCompleter(outpostCommand);
         Bukkit.getPluginManager().registerEvents(new VanishListener(staffManager), this);
-        Bukkit.getPluginManager().registerEvents(new StaffChatListener(staffManager), this);
+        Bukkit.getPluginManager().registerEvents(new StaffChatListener(staffManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new StaffBuildListener(staffManager), this);
         Bukkit.getPluginManager().registerEvents(new FreezeListener(staffManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
@@ -388,7 +537,7 @@ combatManager.start();
         getCommand("endersee").setExecutor(endseeCommand);
         getCommand("endersee").setTabCompleter(endseeCommand);
 
-        spawnerManager = new me.vertex.core.spawner.SpawnerManager(this, spawnerStorage);
+        spawnerManager = new me.vertex.core.spawner.SpawnerManager(this, spawnerStorage, messages);
         spawnerManager.setFactionUpgradeManager(factionUpgradeManager);
         spawnerManager.load();
         spawnerManager.loadSpawnersFromDatabase();
@@ -471,45 +620,89 @@ combatManager.start();
         raidClaimManager = new me.vertex.core.claims.RaidClaimManager(this, claimStorage);
         raidClaimManager.load();
         raidClaimManager.loadState();
+        baseClaimManager.setUpgradeSlotProvider(factionId -> (int) Math.round(factionUpgradeManager.bonus(
+                factionId, me.vertex.core.faction.FactionUpgrade.BASE_CLAIM_SLOTS)));
+        baseClaimManager.setRaidConversion(raidClaimManager::freshExpirationMillis,
+                raidClaimManager::adoptConverted);
+        baseClaimManager.setBaseAdmissionListener(raidClaimManager::adoptBase);
+        baseClaimManager.setMutationPublisher(() ->
+                networkManager.publishInvalidation("faction-claim-metadata", "changed"));
+        raidClaimManager.setMutationPublisher(() ->
+                networkManager.publishInvalidation("faction-claim-metadata", "changed"));
+        networkManager.registerInvalidation("faction-claim-metadata", () -> {
+            baseClaimManager.refreshAsync();
+            raidClaimManager.refreshAsync();
+        });
+        // Recover metadata only after both conversion callbacks are wired.
+        // This closes a crash window where a durable native claim could have
+        // existed without its Base/Raid classification row.
+        baseClaimManager.reconcileLiveClaims();
+        raidClaimManager.reconcile(factionService.claimOwners(), baseClaimManager,
+                factionId -> factionService.faction(factionId).map(me.vertex.core.factions.FactionData::system)
+                        .orElse(true));
         raidClaimManager.recoverState();
+        factionService.setClaimMapQueries(baseClaimManager::isBaseClaim, raidClaimManager::expiresAtMillis);
+        factionService.setFreshRaidExpiration(raidClaimManager::freshExpirationMillis);
         me.vertex.core.claims.BaseClaimCommand baseClaimCommand =
                 new me.vertex.core.claims.BaseClaimCommand(this, baseClaimManager, messages, menuRegistry);
         Bukkit.getPluginManager().registerEvents(baseClaimCommand, this);
         Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.claims.BaseClaimMenuListener(baseClaimManager, messages, menuRegistry), this);
-        Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.claims.ClaimEventListener(baseClaimManager, raidClaimManager, messages), this);
+                new me.vertex.core.claims.BaseClaimMenuListener(this, baseClaimManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.claims.BaseDisconnectConfirmMenu(
+                this, factionService, baseClaimManager, messages), this);
+        claimEventListener = new me.vertex.core.claims.ClaimEventListener(this, baseClaimManager, raidClaimManager,
+                messages);
+        Bukkit.getPluginManager().registerEvents(claimEventListener, this);
 
-        // Faction Shield: schedule/override state is loaded fully into
-        // memory (bounded by the number of factions that have ever had a
-        // Shield row), same "durable table, live cache" split as
-        // BaseClaimManager above -- see ShieldManager's class doc for the
-        // "let the current window finish" and override freeze/resume logic.
+        // Faction Shield uses durable active/cooldown deadlines and a live
+        // faction-bounded cache. Restarting cannot extend either timer.
         shieldManager = new me.vertex.core.shield.ShieldManager(this, shieldStorage, baseClaimManager);
         shieldManager.load();
         shieldManager.loadState();
+        claimStorage.enableDurableShieldChecks(shieldManager.scheduleZone());
+        shieldManager.setDurationBonusProvider(factionId -> Math.round(factionUpgradeManager.bonus(
+                factionId, me.vertex.core.faction.FactionUpgrade.SHIELD_DURATION)));
+        shieldManager.setMutationPublisher(() -> networkManager.publishInvalidation("faction-shield", "changed"));
+        networkManager.registerInvalidation("faction-shield", shieldManager::refreshAsync);
         shieldManager.start();
+        factionService.setShieldDisplayProvider(factionId -> new me.vertex.core.factions.FactionService.ShieldDisplay(
+                shieldManager.isShieldActive(factionId), shieldManager.secondsUntilDeactivation(factionId),
+                shieldManager.secondsUntilNextWindow(factionId)));
         baseClaimManager.setShieldActiveQuery(shieldManager::isShieldActive);
+        me.vertex.core.shield.ShieldScheduleMenu shieldScheduleMenu =
+                new me.vertex.core.shield.ShieldScheduleMenu(this, shieldManager, messages);
+        Bukkit.getPluginManager().registerEvents(shieldScheduleMenu, this);
         Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.shield.ShieldCommand(this, shieldManager, messages), this);
+                new me.vertex.core.shield.ShieldCommand(this, shieldManager, messages, shieldScheduleMenu), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.shield.ShieldCombatListener(shieldManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.shield.ShieldFactionLifecycleListener(shieldManager), this);
 
-        // TNT / Explosion / Wither rules (Phase 3): explosion block damage
-        // is stripped out only where it touches a Base Claim, regardless of
-        // Shield state -- Base Claims disable explosion block damage on
-        // their own, Shield only ever gates combat (see ShieldCombatListener
-        // above). Raid Claims and wilderness are left exactly as
-        // FactionsUUID's own territory protection already handles them.
-        // Player/mob damage from any explosion is cancelled everywhere,
-        // unconditionally. Withers are disabled server-wide.
-        Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.claims.ExplosionProtectionListener(baseClaimManager::isBaseClaim), this);
+        graceManager = new me.vertex.core.grace.GraceManager(this, graceStorage);
+        graceManager.load();
+        // /f grace remains the player-facing status branch; /fa owns every
+        // granular command-only administrative action.
+        me.vertex.core.grace.GraceCommand graceStatus =
+                new me.vertex.core.grace.GraceCommand(this, graceManager, messages);
+        Bukkit.getPluginManager().registerEvents(graceStatus, this);
+        me.vertex.core.factions.FactionAdminCommand factionAdmin =
+                new me.vertex.core.factions.FactionAdminCommand(this, factionService, graceManager,
+                        shieldManager, baseClaimManager, factionBankManager, factionSocialManager,
+                        combatManager, factionAdminAuditStorage, messages, networkManager,
+                        seasonResetManager, factionVaultManager);
+        factionAdmin.setUpgradeManager(factionUpgradeManager);
+        getCommand("fa").setExecutor(factionAdmin);
+        getCommand("fa").setTabCompleter(factionAdmin);
+
+        // Grace protects every faction claim from explosions; Shield protects
+        // only claims belonging to the activated faction. Unprotected land
+        // retains normal explosion block/entity damage. Withers stay disabled.
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.claims.ExplosionProtectionListener(
+                graceManager::isClaimProtected, shieldManager::isClaimProtected), this);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.listener.WitherPreventionListener(), this);
 
-        // Chunk Busters (Phase 4): every live-FactionsUUID/combat lookup is
+        // Chunk Busters (Phase 4): every native-faction/combat lookup is
         // injected as a plain functional reference -- see the class doc for
         // why (mirrors ExplosionProtectionListener's Predicate<Location>
         // decoupling above). Wired after CombatManager/SpawnerManager
@@ -565,6 +758,10 @@ combatManager.start();
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.gc.GcLogMenuListener(gcManager, gcMenu, messages), this);
         me.vertex.core.gc.GcCommand gcCommand = new me.vertex.core.gc.GcCommand(this, gcManager, gcMenu,
                 gcInteropHook, messages);
+        me.vertex.core.gc.GcChatProtectionListener gcChatProtection =
+                new me.vertex.core.gc.GcChatProtectionListener(this, gcManager, messages);
+        gcCommand.setChatProtection(gcChatProtection);
+        Bukkit.getPluginManager().registerEvents(gcChatProtection, this);
         getCommand("gc").setExecutor(gcCommand);
         getCommand("gc").setTabCompleter(gcCommand);
 
@@ -610,6 +807,7 @@ combatManager.start();
         me.vertex.core.backpack.BackpackFilterManager backpackFilterManager = new me.vertex.core.backpack.BackpackFilterManager(
                 this);
         backpackFilterManager.load();
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.storage.ClaimDeliveryGuard(this), this);
         me.vertex.core.backpack.BackpackInteractListener backpackInteractListener = new me.vertex.core.backpack.BackpackInteractListener(
                 backpackManager, messages);
         Bukkit.getPluginManager().registerEvents(backpackInteractListener, this);
@@ -715,7 +913,7 @@ combatManager.start();
                 mineManager, mineKothManager, hotZoneManager, boosterService, messages, menuRegistry,
                 mineTeleportManager), this);
         me.vertex.core.event.EventsCommand eventsCommand = new me.vertex.core.event.EventsCommand(
-                mineManager, mineKothManager, hotZoneManager, messages, menuRegistry);
+                mineManager, mineKothManager, hotZoneManager, captureEventManager, messages, menuRegistry);
         getCommand("events").setExecutor(eventsCommand);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.event.EventsMenuListener(), this);
         Bukkit.getScheduler().runTaskTimer(this, new Runnable() {
@@ -726,7 +924,7 @@ combatManager.start();
                 ticks += 20L;
                 for (org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
                     me.vertex.core.event.EventsMenu.refreshOpen(player, mineManager, mineKothManager,
-                            hotZoneManager, messages, menuRegistry, ticks);
+                            hotZoneManager, captureEventManager, messages, menuRegistry, ticks);
                 }
             }
         }, 20L, 20L);
@@ -745,6 +943,11 @@ combatManager.start();
                 new me.vertex.core.shop.ShopCommand(shopManager, spawnerManager, messages);
         getCommand("shop").setExecutor(shopCommand);
         getCommand("shop").setTabCompleter(shopCommand);
+        me.vertex.core.shop.SellCommand sellCommand = new me.vertex.core.shop.SellCommand(shopManager, messages);
+        getCommand("sell").setExecutor(sellCommand);
+        getCommand("sell").setTabCompleter(sellCommand);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.command.VertexCommandPrecedenceListener(backpackFilterCommand, sellCommand), this);
         shopDecayTask = Bukkit.getScheduler().runTaskTimer(this, shopManager::decayTick,
                 shopManager.decayIntervalTicks(), shopManager.decayIntervalTicks());
 
@@ -762,7 +965,7 @@ combatManager.start();
         getCommand("sandbot").setExecutor(sandBotCommand);
         getCommand("sandbot").setTabCompleter(sandBotCommand);
 
-        auctionManager = new me.vertex.core.auction.AuctionManager(this, auctionStorage);
+        auctionManager = new me.vertex.core.auction.AuctionManager(this, auctionStorage,messages);
         auctionManager.load();
         auctionManager.setGcManager(gcManager);
         auctionManager.loadState();
@@ -789,7 +992,6 @@ combatManager.start();
         getCommand("trade").setExecutor(tradeCommand);
         getCommand("trade").setTabCompleter(tradeCommand);
         getCommand("tradetoggle").setExecutor(new me.vertex.core.trade.TradeToggleCommand(tradeManager, messages));
-        getCommand("tradeadmin").setExecutor(new me.vertex.core.trade.TradeAdminCommand(tradeManager, messages));
         me.vertex.core.trade.TradeHistoryCommand tradeHistoryCommand = new me.vertex.core.trade.TradeHistoryCommand(
                 tradeManager, messages);
         getCommand("tradehistory").setExecutor(tradeHistoryCommand);
@@ -822,11 +1024,14 @@ combatManager.start();
             return;
         }
         zoneManager.setBoosterService(boosterService);
+        if (spawnCommand != null) {
+            spawnCommand.setZoneExitDispatch(uuid -> zoneManager.consumeSpawnDispatchBypass(uuid));
+        }
         boosterService.register(new me.vertex.core.zone.ZoneBoosterSource(zoneManager));
-        me.vertex.core.zone.ZoneMenu zoneMenu = new me.vertex.core.zone.ZoneMenu(zoneManager);
+        me.vertex.core.zone.ZoneMenu zoneMenu = new me.vertex.core.zone.ZoneMenu(this, zoneManager, messages);
         Bukkit.getPluginManager().registerEvents(zoneMenu, this);
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.zone.ZoneListener(zoneManager, combatManager,
-                lootProtectionListener), this);
+                lootProtectionListener, messages), this);
         me.vertex.core.zone.ZoneCommand havenCommand = new me.vertex.core.zone.ZoneCommand(zoneManager, zoneMenu,
                 messages, me.vertex.core.zone.ZoneType.HAVEN);
         getCommand("haven").setExecutor(havenCommand);
@@ -850,14 +1055,17 @@ combatManager.start();
             Bukkit.getPluginManager().disablePlugin(this);
             return;
         }
+        havenCommand.setPortalManager(portalManager);
+        riftlandsCommand.setPortalManager(portalManager);
         me.vertex.core.portal.PortalCommand portalCommand = new me.vertex.core.portal.PortalCommand(portalManager,
-                mineManager);
+                mineManager, messages);
         getCommand("portal").setExecutor(portalCommand);
         getCommand("portal").setTabCompleter(portalCommand);
-        Bukkit.getPluginManager().registerEvents(new me.vertex.core.portal.PortalListener(portalManager), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.portal.PortalListener(portalManager, messages), this);
         portalManager.start();
         playerConnectionListener = new PlayerConnectionListener(userManager, combatManager);
         playerConnectionListener.setGhostPlayerManager(ghostPlayerManager);
+        playerConnectionListener.setTrustedTransfer(networkManager::isTrustedDeparture);
         Bukkit.getPluginManager().registerEvents(playerConnectionListener, this);
         Bukkit.getPluginManager().registerEvents(new AbilityMenuListener(this, abilityManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
@@ -904,7 +1112,6 @@ combatManager.start();
                 .registerEvents(new JumpBoostFeatherListener(this, abilityManager, userManager, messages), this);
         Bukkit.getPluginManager().registerEvents(new TagMenuListener(this), this);
         Bukkit.getPluginManager().registerEvents(new ChatFormatterListener(tagManager, this), this);
-        Bukkit.getPluginManager().registerEvents(new FactionCommandListener(this, messages), this);
 
         KitCommand kitCommand = new KitCommand(this, kitManager, messages);
         getCommand("kit").setExecutor(kitCommand);
@@ -958,7 +1165,7 @@ combatManager.start();
             placeholderExpansion = new me.vertex.core.placeholderapi.VertexPlaceholderExpansion(this, userManager,
                     kitManager, abilityManager, combatManager, factionBankManager, staffManager, rebootManager,
                     backpackManager, tagManager, blueprintManager, coinflipManager, auctionManager, tradeManager,
-                    rallyManager, factionUpgradeManager, sandBotManager);
+                    rallyManager, factionUpgradeManager, sandBotManager, playerStatsManager);
             placeholderExpansion.setZoneManager(zoneManager);
             placeholderExpansion.register();
         }
@@ -1001,10 +1208,12 @@ combatManager.start();
     private me.vertex.core.sandbot.SandBotManager loadSandBotManager() {
         return new me.vertex.core.sandbot.SandBotManager(this, factionBankManager, shopManager, messages,
                 getConfig().getBoolean("sandbot.enabled", true),
-                getConfig().getInt("sandbot.radius-blocks", 2),
+                getConfig().getInt("sandbot.radius-blocks", 5),
                 getConfig().getLong("sandbot.tick-interval-ticks", 1L),
                 getConfig().getInt("sandbot.placements-per-column-per-tick", 2),
                 getConfig().getInt("sandbot.max-placements-per-tick", 50),
+                getConfig().getDouble("sandbot.low-bank-warning-threshold", 500000D),
+                getConfig().getLong("sandbot.low-bank-warning-cooldown-seconds", 60L),
                 org.bukkit.entity.EntityType.PLAYER);
     }
 
@@ -1014,15 +1223,35 @@ combatManager.start();
         }
         sandBotManager.reconfigure(
                 getConfig().getBoolean("sandbot.enabled", true),
-                getConfig().getInt("sandbot.radius-blocks", 2),
+                getConfig().getInt("sandbot.radius-blocks", 5),
                 getConfig().getLong("sandbot.tick-interval-ticks", 1L),
                 getConfig().getInt("sandbot.placements-per-column-per-tick", 2),
                 getConfig().getInt("sandbot.max-placements-per-tick", 50),
+                getConfig().getDouble("sandbot.low-bank-warning-threshold", 500000D),
+                getConfig().getLong("sandbot.low-bank-warning-cooldown-seconds", 60L),
                 org.bukkit.entity.EntityType.PLAYER);
     }
 
     @Override
     public void onDisable() {
+        if (networkManager != null) {
+            networkManager.shutdown();
+        }
+        if (rtpManager != null) {
+            rtpManager.shutdown();
+        }
+        if (teleportManager != null) {
+            teleportManager.shutdown();
+        }
+        if (factionService != null) {
+            factionService.shutdown();
+        }
+        if (factionSocialManager != null) {
+            factionSocialManager.shutdown();
+        }
+        if (claimEventListener != null) {
+            claimEventListener.awaitWrites();
+        }
         if (raidClaimManager != null) {
             raidClaimManager.shutdown();
         }
@@ -1046,6 +1275,12 @@ combatManager.start();
         }
         if (mineKothManager != null) {
             mineKothManager.shutdown();
+        }
+        if (fTopManager != null) {
+            fTopManager.shutdown();
+        }
+        if (pvpTopManager != null) {
+            pvpTopManager.awaitWrites();
         }
         if (mineManager != null) {
             mineManager.shutdown();
@@ -1096,14 +1331,17 @@ combatManager.start();
         if (factionBankManager != null) {
             factionBankManager.awaitWrites();
         }
+        if (factionVaultManager != null) {
+            factionVaultManager.shutdown();
+        }
         if (coinflipManager != null) {
-            coinflipManager.awaitWrites();
+            coinflipManager.shutdown();
         }
         if (shopManager != null) {
             shopManager.awaitWrites();
         }
         if (auctionManager != null) {
-            auctionManager.awaitWrites();
+            auctionManager.shutdown();
         }
         if (tradeManager != null) {
             tradeManager.shutdown();
@@ -1117,6 +1355,10 @@ combatManager.start();
         if (dupeManager != null) {
             dupeManager.awaitWrites();
         }
+        if(deliveryManager!=null){deliveryManager.awaitWrites();}
+        if (baseClaimManager != null) {
+            baseClaimManager.awaitWrites();
+        }
         FakePearlListener.clearAll();
         if (storage != null) {
             storage.close();
@@ -1124,37 +1366,21 @@ combatManager.start();
     }
 
     /**
-     * Prints the Vertex logo to the console before anything else runs, so
-     * it's the first thing a server operator sees for this plugin on every
-     * boot -- along with the exact version running and where to find the
-     * source/report issues. Written straight to the console sender (not
+     * Prints the language-backed Vertex logo, exact version, and project link
+     * once localization has loaded. Written straight to the console sender (not
      * {@link #getLogger()}) so the plugin's own log prefix isn't repeated
      * on every line of the art.
      */
     private void printStartupBanner() {
-        String[] logo = {
-                "##      ##  ##########  ########    ##########  ##########  ##      ##",
-                "##      ##  ##          ##      ##      ##      ##          ##      ##",
-                "##      ##  ########    ##      ##      ##      ########      ##  ##  ",
-                "##      ##  ##          ########        ##      ##              ##    ",
-                "  ##  ##    ##          ##  ##          ##      ##            ##  ##  ",
-                "  ##  ##    ##          ##    ##        ##      ##          ##      ##",
-                "    ##      ##########  ##      ##      ##      ##########  ##      ##",
-        };
         String version = getDescription().getVersion();
         String authors = String.join(", ", getDescription().getAuthors());
 
         CommandSender console = Bukkit.getConsoleSender();
         console.sendMessage(Component.empty());
-        for (String line : logo) {
-            console.sendMessage(Component.text(line, NamedTextColor.AQUA));
-        }
+        messages.getList(console, "startup.logo").forEach(console::sendMessage);
         console.sendMessage(Component.empty());
-        console.sendMessage(Component.text("  Version ", NamedTextColor.GRAY)
-                .append(Component.text(version, NamedTextColor.WHITE))
-                .append(Component.text("   Developed by ", NamedTextColor.GRAY))
-                .append(Component.text(authors, NamedTextColor.WHITE)));
-        console.sendMessage(Component.text("  https://github.com/Jrdelt/HCFCore", NamedTextColor.DARK_AQUA));
+        console.sendMessage(messages.get(console, "startup.version", "version", version, "authors", authors));
+        console.sendMessage(messages.get(console, "startup.repository"));
         console.sendMessage(Component.empty());
     }
 
@@ -1207,16 +1433,13 @@ combatManager.start();
     }
 
     public static boolean hasRequiredDependency(PluginManager pluginManager) {
-        Plugin factions = pluginManager.getPlugin("FactionsUUID");
-        return factions != null && factions.isEnabled();
+        // Vertex owns factions, claims, relations, and permissions itself.
+        // Keep this compatibility method for older callers without requiring
+        // any external faction plugin at startup.
+        return true;
     }
 
     public boolean validateRuntimeDependencies() {
-        if (!hasRequiredDependency(Bukkit.getPluginManager())) {
-            getLogger().severe("Missing required dependency: FactionsUUID. Disabling Vertex.");
-            return false;
-        }
-
         List<String> optionalDependencies = List.of("Vault", "WorldGuard", "LuckPerms",
                 "FastAsyncWorldEdit", "DecentHolograms", "FancyNpcs");
         for (String dependency : optionalDependencies) {
@@ -1240,8 +1463,11 @@ combatManager.start();
         return performanceManager;
     }
 
+    public me.vertex.core.storage.DeliveryManager deliveryManager(){return deliveryManager;}
+
     public void reload() {
         reloadConfig();
+        applyWorldDifficultyConfig();
         NumberFormatConfig.load(this);
         validateRuntimeDependencies();
 
@@ -1254,6 +1480,18 @@ combatManager.start();
         }
         if (messages != null) {
             messages.load();
+        }
+        if (factionService != null) {
+            factionService.reloadConfig();
+        }
+        if (factionPowerListener != null) {
+            factionPowerListener.reloadConfig();
+        }
+        if (factionPowerBooster != null) {
+            factionPowerBooster.reload();
+        }
+        if (factionSocialManager != null) {
+            factionSocialManager.reloadConfig();
         }
         if (rallyManager != null) {
             rallyManager.reloadConfig();
@@ -1283,6 +1521,9 @@ combatManager.start();
         if (shieldManager != null) {
             shieldManager.load();
         }
+        if (graceManager != null) {
+            graceManager.load();
+        }
         if (chunkBusterManager != null) {
             chunkBusterManager.load();
         }
@@ -1294,6 +1535,9 @@ combatManager.start();
             if (spawnerManager != null) {
                 spawnerManager.retuneAll();
             }
+        }
+        if (factionVaultManager != null) {
+            factionVaultManager.reloadConfig();
         }
         if (chunkCollectorManager != null) {
             chunkCollectorManager.load();
@@ -1438,7 +1682,12 @@ combatManager.start();
      */
     public boolean beginStorageMigration() {
         if (!Bukkit.getOnlinePlayers().isEmpty()
-                || blueprintManager != null && !blueprintManager.activeBuilds().isEmpty()) {
+                || blueprintManager != null && !blueprintManager.activeBuilds().isEmpty()
+                // A local JVM lock cannot stop another Paper process from
+                // writing the shared MySQL source. Refuse the live command in
+                // network mode; operators must stop the other shards and boot
+                // this node with network.enabled=false for the cutover.
+                || networkManager != null && networkManager.enabled()) {
             return false;
         }
         return storageMigrationRunning.compareAndSet(false, true);
@@ -1449,6 +1698,14 @@ combatManager.start();
      * writes.
      */
     public void awaitStorageWritesForMigration() {
+        if (factionService != null)
+            factionService.awaitMutations();
+        if (claimEventListener != null)
+            claimEventListener.awaitWrites();
+        if (raidClaimManager != null)
+            raidClaimManager.awaitWrites();
+        if (baseClaimManager != null)
+            baseClaimManager.awaitWrites();
         if (kitManager != null)
             kitManager.awaitWrites();
         if (abilityManager != null)
@@ -1459,6 +1716,16 @@ combatManager.start();
             deathManager.awaitWrites();
         if (tagManager != null)
             tagManager.awaitWrites();
+        if (zoneManager != null)
+            zoneManager.awaitWrites();
+        if (hotZoneManager != null)
+            hotZoneManager.awaitWrites();
+        if (mineKothManager != null)
+            mineKothManager.awaitWrites();
+        if (fTopManager != null)
+            fTopManager.awaitWrites();
+        if (pvpTopManager != null)
+            pvpTopManager.awaitWrites();
         if (spawnerManager != null)
             spawnerManager.awaitWrites();
         if (chunkCollectorManager != null)
@@ -1469,6 +1736,8 @@ combatManager.start();
             factionUpgradeManager.awaitWrites();
         if (factionBankManager != null)
             factionBankManager.awaitWrites();
+        if (factionVaultManager != null)
+            factionVaultManager.awaitWrites();
         if (coinflipManager != null)
             coinflipManager.awaitWrites();
         if (shopManager != null)
@@ -1477,14 +1746,46 @@ combatManager.start();
             auctionManager.awaitWrites();
         if (tradeManager != null)
             tradeManager.awaitWrites();
+        if (announcementPreferenceManager != null)
+            announcementPreferenceManager.awaitWrites();
         if (gcManager != null)
             gcManager.awaitWrites();
         if (dupeManager != null)
             dupeManager.awaitWrites();
+        if (deliveryManager != null)
+            deliveryManager.drainWrites();
     }
 
     public void finishStorageMigration() {
         storageMigrationRunning.set(false);
+    }
+
+    /** Re-applies the configured server-wide default when plugins load worlds later. */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onWorldLoad(WorldLoadEvent event) {
+        applyDefaultDifficulty(event.getWorld());
+    }
+
+    private void applyWorldDifficultyConfig() {
+        String configured = getConfig().getString("world-defaults.difficulty", "NORMAL");
+        if (configured != null && configured.equalsIgnoreCase("DISABLED")) {
+            defaultWorldDifficulty = null;
+            return;
+        }
+        try {
+            defaultWorldDifficulty = Difficulty.valueOf(configured == null
+                    ? "NORMAL" : configured.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException error) {
+            defaultWorldDifficulty = Difficulty.NORMAL;
+            getLogger().warning("Invalid world-defaults.difficulty '" + configured
+                    + "'; using NORMAL.");
+        }
+        for (World world : Bukkit.getWorlds()) applyDefaultDifficulty(world);
+    }
+
+    private void applyDefaultDifficulty(World world) {
+        Difficulty target = defaultWorldDifficulty;
+        if (target != null && world.getDifficulty() != target) world.setDifficulty(target);
     }
 
     /** Keeps an accepted migration a true point-in-time copy. */

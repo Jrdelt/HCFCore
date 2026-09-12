@@ -57,8 +57,11 @@ public final class WandCommand implements CommandExecutor, TabCompleter {
         }
 
         ItemStack wand = wands.createWand(tier, uses);
-        target.getInventory().addItem(wand).values()
-                .forEach(leftover -> target.getWorld().dropItemNaturally(target.getLocation(), leftover));
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
+                wands.plugin(), target, List.of(wand), "wand-admin-give")) {
+            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
+            return true;
+        }
         sender.sendMessage(messages.get(sender, "wand.given",
                 "tier", tier.id(), "player", target.getName(), "uses", String.valueOf(uses)));
         return true;

@@ -173,6 +173,12 @@ public final class Messages {
         return MessageFormatter.deserialize(getRaw(sender, key, placeholders));
     }
 
+    /** Language-backed GUI text: static template words become small caps before values are inserted. */
+    public Component getGui(CommandSender sender, String key, String... placeholders) {
+        return MessageFormatter.deserialize(applyPlaceholders(
+                SmallCaps.template(resolveTemplate(sender, key)), placeholders));
+    }
+
     /**
      * Resolves a YAML list using the same per-player locale and fallback
      * rules as {@link #get(CommandSender, String, String...)}, making an
@@ -182,6 +188,12 @@ public final class Messages {
     public List<Component> getList(CommandSender sender, String key, String... placeholders) {
         return resolveList(sender, key).stream()
                 .map(line -> MessageFormatter.deserialize(applyPlaceholders(line, placeholders)))
+                .toList();
+    }
+
+    public List<Component> getGuiList(CommandSender sender, String key, String... placeholders) {
+        return resolveList(sender, key).stream()
+                .map(line -> MessageFormatter.deserialize(applyPlaceholders(SmallCaps.template(line), placeholders)))
                 .toList();
     }
 

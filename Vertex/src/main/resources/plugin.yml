@@ -3,10 +3,7 @@ main: me.vertex.core.VertexPlugin
 version: ${project.version}
 api-version: '1.21.10'
 author: cesardeltorojr
-description: Kits and PvP combat-tag timers, integrated with FactionsUUID.
-
-depend:
-  - FactionsUUID
+description: Vertex's native factions, kits, PvP, economy, events, and progression suite.
 
 softdepend:
   - Vault
@@ -19,6 +16,33 @@ softdepend:
   - FancyNpcs
 
 commands:
+  f:
+    description: Create and manage your native Vertex faction.
+    usage: /<command> [create|claim|home|perms|bank|tnt|upgrades|who]
+    aliases: [factions, faction, t]
+  fa:
+    description: Native Vertex faction administration commands.
+    usage: /<command> help [page]
+    aliases: [fadmin]
+  spawn:
+    description: Teleport to the shared network Spawn after a safe countdown.
+    usage: /<command> [set]
+  warp:
+    description: Teleport to a public network warp.
+    usage: /<command> <name>
+  warps:
+    description: Browse all public network warps.
+    usage: /<command>
+  s:
+    description: Configure shared server locations.
+    usage: /<command> warp set|delete <name> [description]
+  rtp:
+    description: Browse safe random-teleport destinations.
+    usage: /<command>
+    aliases: [wild]
+  fpowerbooster:
+    description: Give persistent personal faction-power booster vouchers.
+    usage: /<command> give <player> <10|25|50|75|100> [amount]
   kit:
     description: Claim, preview, or manage kits.
     usage: /<command> <name>|preview <name>
@@ -104,7 +128,10 @@ commands:
     usage: /<command> give <player> <tier> [level 1-10]
   filter:
     description: Configure which auto-collected Backpack items are discarded.
-    usage: /<command> <material|clear>
+    usage: /<command> add|remove <material>|list|clear
+  sell:
+    description: Sell eligible vanilla items through the Vertex dynamic shop.
+    usage: /<command> hand|all
   koth:
     description: Focus an active KOTH or manage KOTH regions as staff.
     usage: /<command> focus [name|off]|create|wand|cancel|start|stop|delete|list|validate
@@ -131,9 +158,6 @@ commands:
   tradetoggle:
     description: Toggle whether you accept incoming trade requests.
     usage: /<command>
-  tradeadmin:
-    description: Reload and validate the player-trade configuration.
-    usage: /<command> reload
   tradehistory:
     description: View player trade history as staff.
     usage: /<command> [player]
@@ -173,10 +197,10 @@ commands:
     aliases: [ce, customenchants, runes]
   haven:
     description: Enter Haven or manage Haven zones as staff.
-    usage: /<command> [lootpool|region|route|admin]
+    usage: /<command> [create|wand|list|lootpool|portal create]
   riftlands:
     description: Enter Riftlands or manage Riftlands zones as staff.
-    usage: /<command> [lootpool|ticket|region|route|admin]
+    usage: /<command> [create|wand|list|lootpool|portal create]
     aliases: [rift]
   zones:
     description: View Haven, Riftlands, and Mob Kill Event progression.
@@ -187,6 +211,79 @@ commands:
     aliases: [portals]
 
 permissions:
+  vertex.fa.*:
+    description: Access every Vertex faction administration command.
+    default: op
+    children:
+      vertex.fa.help: true
+      vertex.fa.info: true
+      vertex.fa.grace: true
+      vertex.fa.power: true
+      vertex.fa.claim: true
+      vertex.fa.unclaim: true
+      vertex.fa.disband: true
+      vertex.fa.relation: true
+      vertex.fa.shield: true
+      vertex.fa.bank: true
+      vertex.fa.vault: true
+      vertex.fa.upgrades: true
+      vertex.fa.members: true
+      vertex.fa.combat: true
+      vertex.fa.logs: true
+      vertex.fa.network: true
+      vertex.fa.season: true
+  vertex.fa.help: {default: op}
+  vertex.fa.info: {default: op}
+  vertex.fa.grace: {default: op}
+  vertex.fa.power: {default: op}
+  vertex.fa.claim: {default: op}
+  vertex.fa.unclaim: {default: op}
+  vertex.fa.disband: {default: op}
+  vertex.fa.relation: {default: op}
+  vertex.fa.shield: {default: op}
+  vertex.fa.bank: {default: op}
+  vertex.fa.vault:
+    description: Inspect a faction vault while retaining the network-wide edit lock.
+    default: op
+  vertex.fa.upgrades:
+    description: Set faction upgrade levels without charging normal costs.
+    default: op
+  vertex.fa.members: {default: op}
+  vertex.fa.combat: {default: op}
+  vertex.fa.logs: {default: op}
+  vertex.fa.network:
+    description: Inspect and recover network shards and transfers.
+    default: op
+  vertex.fa.season:
+    description: Perform the destructive, network-wide seasonal data reset.
+    default: op
+  vertex.network.recovery:
+    description: Approve crash recovery and return a shard to public service.
+    default: op
+  vertex.network.transfer.alerts:
+    description: Receive alerts for unresolved cross-shard handoffs.
+    default: op
+  vertex.teleport.bypass:
+    description: Bypass persistent Vertex teleport cooldowns.
+    default: op
+  vertex.teleport.combat-bypass:
+    description: Use Vertex teleports while combat tagged.
+    default: op
+  vertex.spawn.set:
+    description: Set the persistent network Spawn location.
+    default: op
+  vertex.server.warp:
+    description: Create and delete public network warps with /s.
+    default: op
+  vertex.factions.admin:
+    description: Create or remove native SafeZone/WarZone system claims.
+    default: op
+  vertex.factions.bypass:
+    description: Bypass native Vertex faction build and container protection.
+    default: op
+  vertex.fpowerbooster.give:
+    description: Give persistent F Power Booster vouchers.
+    default: op
   vertex.admin:
     description: Reload Vertex's config, clear stacked mobs, or switch the storage backend.
     default: op
@@ -205,15 +302,9 @@ permissions:
   vertex.chunkbuster.give:
     description: Give configured Chunk Buster items with /chunkbusters give.
     default: op
-  vertex.baseclaim.purchaseslot:
-    description: Purchase an additional Base Claim slot.
+  vertex.shield.activate:
+    description: Activate a faction Shield as its Leader or Co-Leader.
     default: true
-  vertex.shield.set:
-    description: Submit your faction's Shield schedule via /f shield set.
-    default: true
-  vertex.admin.claims:
-    description: Force a faction's Faction Shield ACTIVE/INACTIVE via /f shield admin, and bypass Shield-locked Base Claim removal.
-    default: op
   vertex.collector.give:
     description: Give a player a Chunk Collector.
     default: op
@@ -238,11 +329,23 @@ permissions:
   vertex.coinflip.logs:
     description: View the Coinflip staff audit log.
     default: op
+  vertex.coinflip.payouts:
+    description: Inspect and reconcile uncertain Coinflip currency payouts.
+    default: op
+  vertex.coinflip.intents:
+    description: Inspect and reconcile interrupted Coinflip wager debits.
+    default: op
   vertex.auction.remove:
     description: Cancel any player's active Auction House listing and refund it.
     default: op
   vertex.auction.logs:
     description: View the Auction House staff audit log.
+    default: op
+  vertex.auction.payouts:
+    description: Inspect and reconcile uncertain Auction House currency payouts.
+    default: op
+  vertex.auction.intents:
+    description: Inspect and reconcile interrupted Auction House listing debits.
     default: op
   vertex.trade.use:
     description: Request and accept player trades.
@@ -253,11 +356,11 @@ permissions:
   vertex.trade.staff.bypassblacklist:
     description: Bypass player-trade item, world, and gamemode restrictions.
     default: op
-  vertex.trade.staff.reload:
-    description: Reload and validate traders.yml.
-    default: op
   vertex.trade.staff.history:
     description: View the player-trade audit log.
+    default: op
+  vertex.trade.payouts:
+    description: Inspect and reconcile uncertain legacy Trade money/EXP payouts.
     default: op
   vertex.trade.staff.alerts:
     description: Receive suspicious player-trade alerts.
@@ -380,7 +483,7 @@ permissions:
     description: Enter Haven and Riftlands, view their loot pools, and use Riftlands Tickets.
     default: true
   vertex.zones.admin:
-    description: Create/delete Haven and Riftlands regions/routes, edit loot, give tickets, and use zone debug commands.
+    description: Create/delete Haven and Riftlands regions/routes, edit loot, and use zone debug commands.
     default: op
   vertex.zones.admin.build:
     description: Bypass the no-build terrain rule inside Haven and Riftlands.

@@ -31,14 +31,14 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Covers {@link SourceBucketManager} without touching FactionsUUID's live
+ * Covers {@link SourceBucketManager} without booting the native faction
  * {@code Board} singleton or a real {@code CombatManager}/{@code
  * BaseClaimManager} -- every such lookup is a plain per-test lambda here,
  * standing in for what {@code FactionsHook}/{@code CombatManager}/{@code
  * BaseClaimManager} report in production (mirrors {@code
  * ChunkBusterManagerTest}'s approach exactly). Every test flow runs down a
  * single fixed {@code x, z} column, so the injected lookups are keyed by Y
- * alone -- exactly how a real DOWNWARD flow behaves too, since FactionsUUID
+ * alone -- exactly how a real DOWNWARD flow behaves too, since native claims
  * claims apply to a whole chunk regardless of height.
  */
 class SourceBucketManagerTest {

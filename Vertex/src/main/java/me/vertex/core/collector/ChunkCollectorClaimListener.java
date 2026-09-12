@@ -1,11 +1,9 @@
 package me.vertex.core.collector;
 
-import dev.kitteh.factions.Faction;
-import dev.kitteh.factions.event.FactionAutoDisbandEvent;
-import dev.kitteh.factions.event.FactionDisbandEvent;
-import dev.kitteh.factions.event.LandClaimEvent;
-import dev.kitteh.factions.event.LandUnclaimAllEvent;
-import dev.kitteh.factions.event.LandUnclaimEvent;
+import me.vertex.core.factions.FactionData;
+import me.vertex.core.factions.event.FactionClaimEvent;
+import me.vertex.core.factions.event.FactionLifecycleEvent;
+import me.vertex.core.factions.event.FactionUnclaimAllEvent;
 import me.vertex.core.lang.Messages;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -36,30 +34,40 @@ public final class ChunkCollectorClaimListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onClaim(LandClaimEvent event) {
-        if (event.isCancelled() || event.getFaction() == null) {
-            return;
-        }
-        String claimingTag = event.getFaction().tag();
-        for (Map.Entry<Location, ChunkCollectorData> entry : manager.getCollectorsInChunk(event.getLocation().asChunk())) {
+    public void onClaim(FactionClaimEvent event) {
+        if (event.action() != FactionClaimEvent.Action.CLAIM || event.faction().system()) return;
+        String claimingTag = event.faction().tag();
+        org.bukkit.World world = event.chunk().isLocalShard() ? Bukkit.getWorld(event.chunk().localWorld()) : null;
+        if (world == null) return;
+        for (Map.Entry<Location, ChunkCollectorData> entry : manager.getCollectorsInChunk(world,event.chunk().x(),event.chunk().z())) {
             manager.transferFactionOwnership(entry.getKey(), claimingTag);
         }
     }
 
     /** Blocks unclaiming a single chunk outright while it has an active Collector. */
     @EventHandler(priority = EventPriority.HIGH)
-    public void onUnclaim(LandUnclaimEvent event) {
-        if (event.isCancelled()) {
-            return;
-        }
-        Chunk chunk = event.getLocation().asChunk();
-        if (manager.getCollectorsInChunk(chunk).isEmpty()) {
+    public void onUnclaim(FactionClaimEvent event) {
+        if (event.action() != FactionClaimEvent.Action.UNCLAIM) return;
+        org.bukkit.World world = event.chunk().isLocalShard() ? Bukkit.getWorld(event.chunk().localWorld()) : null;
+        if (world == null) return;
+        if (!manager.hasCollectorInChunk(world,event.chunk().x(),event.chunk().z())) {
             return;
         }
         event.setCancelled(true);
-        Player player = event.getFPlayer().asPlayer();
+        Player player = event.actor();
         if (player != null) {
             player.sendMessage(messages.get(player, "collector.unclaim-blocked"));
+        }
+    }
+
+    /** Timed raid land must expire even when it contains a collector. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onExpire(FactionClaimEvent event) {
+        if (event.action() != FactionClaimEvent.Action.EXPIRE) return;
+        org.bukkit.World world = event.chunk().isLocalShard() ? Bukkit.getWorld(event.chunk().localWorld()) : null;
+        if (world == null) return;
+        for (Map.Entry<Location, ChunkCollectorData> entry : manager.getCollectorsInChunk(world,event.chunk().x(),event.chunk().z())) {
+            dropCollector(entry.getKey(), entry.getValue());
         }
     }
 
@@ -70,42 +78,31 @@ public final class ChunkCollectorClaimListener implements Listener {
      * of left behind in an unclaimed chunk.
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onUnclaimAll(LandUnclaimAllEvent event) {
-        if (event.isCancelled()) {
-            return;
-        }
-        Faction faction = event.getFPlayer().faction();
-        int dropped = dropAllInFactionClaims(faction);
+    public void onUnclaimAll(FactionUnclaimAllEvent event) {
+        int dropped = dropAllInFactionClaims(event.faction());
         if (dropped <= 0) {
             return;
         }
-        Player player = event.getFPlayer().asPlayer();
+        Player player = event.actor();
         if (player != null) {
             player.sendMessage(messages.get(player, "collector.unclaimall-warning", "amount", String.valueOf(dropped)));
         }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onDisband(FactionDisbandEvent event) {
-        if (event.isCancelled()) {
-            return;
-        }
-        int dropped = dropAllInFactionClaims(event.getFaction());
+    public void onDisband(FactionLifecycleEvent event) {
+        if (event.action() != FactionLifecycleEvent.Action.DISBAND) return;
+        int dropped = dropAllInFactionClaims(event.faction());
         if (dropped <= 0) {
             return;
         }
-        Player player = event.getFPlayer().asPlayer();
+        Player player = event.actor();
         if (player != null) {
             player.sendMessage(messages.get(player, "collector.disband-warning", "amount", String.valueOf(dropped)));
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onAutoDisband(FactionAutoDisbandEvent event) {
-        dropAllInFactionClaims(event.getFaction());
-    }
-
-    private int dropAllInFactionClaims(Faction faction) {
+    private int dropAllInFactionClaims(FactionData faction) {
         if (faction == null) {
             return 0;
         }

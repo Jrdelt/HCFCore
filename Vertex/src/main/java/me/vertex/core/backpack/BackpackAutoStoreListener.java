@@ -43,10 +43,16 @@ public final class BackpackAutoStoreListener implements Listener {
         if (equipped == null) {
             return;
         }
+        ItemStack backpackBefore = equipped.item().clone();
         List<ItemStack> drops = new ArrayList<>(event.getBlock().getDrops(player.getInventory().getItemInMainHand(), player));
         event.setDropItems(false);
-        for (ItemStack leftover : route(player, equipped, drops)) {
-            player.getWorld().dropItemNaturally(event.getBlock().getLocation(), leftover);
+        List<ItemStack> overflow = route(player, equipped, drops);
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
+                manager.plugin(), player, overflow, "backpack-mining-overflow")) {
+            player.getInventory().setItemInOffHand(backpackBefore);
+            player.updateInventory();
+            event.setCancelled(true);
+            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
         }
     }
 

@@ -19,7 +19,7 @@ public final class ActiveBuild {
     private final Location anchor;
     private final BlueprintTemplate template;
     private final UUID ownerUuid;
-    /** Immutable FactionsUUID id, so renaming a faction cannot change ownership. */
+    /** Immutable Vertex faction id, so renaming a faction cannot change ownership. */
     private final int ownerFactionId;
     private final long startedAtMillis;
     private final String hologramName;

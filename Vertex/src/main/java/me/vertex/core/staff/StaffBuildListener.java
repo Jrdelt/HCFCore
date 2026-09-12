@@ -14,11 +14,11 @@ import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 
 /**
- * Bypasses FactionsUUID's claim protection for players with staff-build
+ * Bypasses Vertex's claim protection for players with staff-build
  * on. Runs at MONITOR so claim protection (which listens at a normal
  * priority) has already run and cancelled the event -- this just
  * un-cancels it afterward, rather than trying to duplicate or pre-empt
- * whatever claim logic FactionsUUID applies. Covers block break/place,
+ * whatever claim logic Vertex applies. Covers block break/place,
  * container/door access, buckets, item frames/paintings, and entity
  * interaction (armor stands etc.) -- the full set of things a claim
  * typically protects.

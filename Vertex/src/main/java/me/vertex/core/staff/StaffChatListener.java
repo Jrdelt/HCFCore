@@ -2,6 +2,7 @@ package me.vertex.core.staff;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
 import me.vertex.core.lang.MessageFormatter;
+import me.vertex.core.lang.Messages;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -22,9 +23,11 @@ import org.bukkit.event.Listener;
 public final class StaffChatListener implements Listener {
 
     private final StaffManager staffManager;
+    private final Messages messages;
 
-    public StaffChatListener(StaffManager staffManager) {
+    public StaffChatListener(StaffManager staffManager, Messages messages) {
         this.staffManager = staffManager;
+        this.messages = messages;
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -38,7 +41,7 @@ public final class StaffChatListener implements Listener {
         // The player's own message is appended as a Component rather than
         // interpolated into the MiniMessage string below, so nothing in it
         // (e.g. "<red>") is parsed as markup.
-        Component formatted = MessageFormatter.deserialize("&c&lSTAFF&r &7> &e" + player.getName() + "&7: &f")
+        Component formatted = messages.get(player, "staff.chat-format", "player", player.getName())
                 .append(event.message());
 
         for (Player viewer : Bukkit.getOnlinePlayers()) {

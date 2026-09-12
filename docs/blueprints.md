@@ -23,7 +23,9 @@ required progress display above the build. See
 2. Placing the item puts down its marked Beacon preview and immediately
    opens an **Enable Blueprint** confirmation GUI. **Cancel** (or breaking
    the unactivated preview Beacon) removes the preview and returns the
-   Blueprint item. Right-clicking the preview reopens the confirmation.
+   Blueprint item. Right-clicking the preview reopens the confirmation. The
+   vanilla Beacon container is cancelled at both interaction and inventory-
+   open time, so only the Vertex control GUI can appear.
    While the confirmation is open, a particle box outlines exactly where
    the structure will be built — visible only to the placing player, so it
    never clutters anyone else's screen. It disappears the moment the build

@@ -1,7 +1,9 @@
 # Commands & Permissions
 
 Every command Vertex registers, grouped by area. "Open to all" means no
-permission is checked — anyone can run it.
+permission is checked — anyone can run it. A row with `—` in the permission
+column also means no separate permission node exists. Permission-guarded faction
+features are usually role-gated under `/f permissions`.
 
 ## Kits
 
@@ -59,7 +61,7 @@ shop's category picker instead of its own top-level command.
 |---|---|---|
 | `/backpack give <player> <tier> [level]` | `vertex.backpack.give` | Gives a Backpack of that tier, optionally starting at any positive level (default 1) — no in-game shop for these. Its material and custom model data come from `backpacks.yml`. |
 | `/backpack debug` | `vertex.backpack.debug` | Toggles personal Backpack interaction diagnostics. It prints the received action, hand, cancellation state, and reject/open reason to chat and console; run it again to turn tracing off. |
-| `/filter <material>` / `/filter clear` | — | Toggles or clears persistent Backpack auto-collection filters. Filters discard matching routed drops only while a Backpack is equipped. |
+| `/filter add\|remove <material>` / `/filter list\|clear` | — | Manages persistent Backpack auto-collection filters. The one-argument toggle remains compatible. Vertex intercepts this command before Essentials. |
 
 ## Player trading
 
@@ -67,7 +69,8 @@ shop's category picker instead of its own top-level command.
 |---|---|---|
 | `/trade <player>` / `/trade accept <player>` / `/trade cancel` | `vertex.trade.use` | Creates, accepts, or cancels a secured direct trade. |
 | `/tradetoggle` | `vertex.trade.use` | Persists an incoming-request opt-out. |
-| `/tradeadmin reload` | `vertex.trade.staff.reload` | Reloads and validates `traders.yml`. |
+| `/trade payouts [key] [paid\|retry]` | `vertex.trade.payouts` | Lists or reconciles uncertain legacy Trade money/EXP payouts. |
+| `/vertex reload` | `vertex.admin` | Reloads Vertex configuration, including `traders.yml`. |
 | `/tradehistory [player]` / `/tradelogs [all\|player]` | `vertex.trade.staff.history` | Opens the read-only, paginated trade audit history. |
 
 `vertex.trade.staff.bypassdistance` and `vertex.trade.staff.bypassblacklist`
@@ -87,6 +90,8 @@ are available for staff testing. See [Player Trading](trading.md).
 | `/cf ban` / `/cf ban confirm` / `/cf unban` | — | Self-exclusion — see [Coinflips](coinflips.md#self-ban). Confirmation is required within 30 seconds; the ban itself cannot be lifted early. |
 | `/cf cancel <id>` | `vertex.coinflip.remove` for someone else's; open to the host for their own | Cancels an unplayed coinflip and refunds its wager. |
 | `/cf logs [player] [page]` | `vertex.coinflip.logs` | Reads the permanent staff audit log. |
+| `/cf payouts [key] [paid\|retry]` | `vertex.coinflip.payouts` | Lists or reconciles Vault/EXP payouts left uncertain by an interrupted acknowledgement. |
+| `/cf intents [key] [debited\|not-debited]` | `vertex.coinflip.intents` | Inspects and resolves an interrupted wager creation after staff verify whether its debit happened. |
 
 ## GC (Gift Card / Credit)
 
@@ -127,6 +132,21 @@ join-time summary of any still-open cases. See
 |---|---|---|
 | `/settings` (alias `/preferences`) | — | Opens personal toggles for optional Coinflip, KOTH, Outpost, Mining Event, and Server announcements. |
 
+## Network travel
+
+| Command | Permission | Notes |
+|---|---|---|
+| `/spawn` | Open to all | Starts the shared Spawn countdown. Movement, damage, combat, or a destination revision/health change cancels it. |
+| `/spawn set` | `vertex.spawn.set` | Stores the current shard, world, coordinates, yaw, and pitch as the shared Spawn and first-join destination. |
+| `/warp <name>` | Open to all | Starts the shared countdown to a public warp, including cross-shard destinations. |
+| `/warps` | Open to all | Opens the public network-warp GUI. |
+| `/s warp set <name> [description]` / `/s warp delete <name>` | `vertex.server.warp` | Creates, updates, or deletes a shared public warp. |
+| `/rtp` (alias `/wild`) | Open to all | Opens the configured shard/world random-teleport GUI. Safe land and the claim buffer are revalidated before completion. |
+
+`vertex.teleport.bypass` bypasses persisted teleport cooldowns and
+`vertex.teleport.combat-bypass` bypasses combat restrictions. Network mode and
+its operational requirements are covered in [Velocity Shards](network-shards.md).
+
 ## Spawner diagnostics
 
 | Command | Permission | What it does |
@@ -139,9 +159,12 @@ join-time summary of any still-open cases. See
 | Command | Permission | Notes |
 |---|---|---|
 | `/mines` | Open to all | Overview of the placed mining worlds — see [Mining Worlds](mines.md). |
+| `/events` | Open to all | Opens live server KOTH, Mine KOTH, and Hot Zone state, including owner and the next configured KOTH start. |
 | `/mines wand <mine>` | `vertex.mines.admin` | Blaze-rod corner selection; saving writes the world and bounds into `mines.yml`. |
-| `/haven`, `/riftlands`, `/zones` | `vertex.zones.use` | Enter/configure the zone flow or view player progression. |
-| `/haven\|riftlands region\|route\|lootpool\|admin`, `/riftlands ticket give` | `vertex.zones.admin` | Zone geometry, route, loot, event, and Ticket administration. |
+| `/haven`, `/riftlands` | `vertex.zones.use` | Opens that zone's hub with live player/mob counts, entry, and a read-only loot pool with drop percentages. |
+| `/zones` | `vertex.zones.use` | View Haven/Riftlands progression and Mob Kill Event standings. |
+| `/haven\|riftlands create\|wand\|list\|lootpool` | `vertex.zones.admin` | Zone setup and loot-pool commands. Staff can use the documented `region`, `route`, and `admin event/inspect` branches for management. |
+| `/haven\|riftlands portal create <name>` | `vertex.portals.admin` | Starts a portal-volume selection already locked to that zone type and gives the correct Portal Selector. |
 | — | `vertex.zones.admin.build` | Bypass the no-build rule inside a zone for controlled maintenance. |
 | `/portal` (alias `/portals`) | `vertex.portals.admin` | Creates source portal volumes, verified destination routes, and staff previews. See [Physical Entry Portals](portals.md). |
 | — | `vertex.portals.use` | Allows a player to enter a configured physical portal. Defaults to everyone. |
@@ -168,6 +191,7 @@ join-time summary of any still-open cases. See
 | `/shop` | — | Opens the category picker — see [Shop](shop.md#categories-shopyml). |
 | `/shop buy <item> [amount]` | — | Buys at the current dynamic price, regardless of category. |
 | `/shop sell <item> [amount]` | — | Sells at the current dynamic price, regardless of category. |
+| `/sell hand` / `/sell all` | — | Vertex-owned quick selling. Custom/PDC items stay untouched and sales use the dynamic Shop economy. |
 
 Buyable Spawners are ordinary paginated product tiles in **Spawners & Mob
 Drops**. Chunk Busters and enabled Source Bucket variants are ordinary
@@ -183,27 +207,32 @@ dynamic prices. Runes are deliberately separate from `/shop`; use `/runes`,
 | `/ah` (alias `/auctionhouse`) | — | Opens the browse GUI. |
 | `/ah sell <price> [money\|exp\|gc]` | — | Lists the item in your main hand at a fixed buy-it-now price, in money (default), experience levels, or GC. |
 | `/ah cancel <id>` | `vertex.auction.remove` for someone else's; open to the seller for their own | Cancels an unsold listing and puts its item in the Collection Box. |
-| `/ah collect` | — | Opens the claim GUI for returned, expired, or cancelled listing items. |
+| `/ah collect` | — | Opens the claim GUI for purchased, returned, expired, or cancelled listing items. |
 | `/ah logs [player] [page]` | `vertex.auction.logs` | Reads the permanent staff audit log. |
+| `/ah payouts [key] [paid\|retry]` | `vertex.auction.payouts` | Lists or reconciles Vault/EXP payouts left uncertain by an interrupted acknowledgement. |
+| `/ah intents [key] [debited\|not-debited\|item-not-removed]` | `vertex.auction.intents` | Resolves an interrupted listing after staff verify both item removal and the external fee. `item-not-removed` discards the saved copy without returning another item. |
 
 ## Factions & Rally
 
 | Command | Permission | Notes |
 |---|---|---|
 | `/f rally [set\|clear]` (alias `/frally`) | The role's **Set Rally** / **Clear Rally** permission | Sets/clears a 4-minute faction rally point. Defaults allow every editable role; leaders change it in `/f permissions`. |
-| `/f permissions` / `/f perms` | Faction leader only (checked in-code, not a permission node) | Opens the faction permission matrix GUI. |
-| `/f upgrades` / `/f upgrade` | Faction role needs FactionsUUID's native `UPGRADE` action allowed | Opens Vertex's persistent faction-upgrades GUI. Set `faction-upgrades.leader-only: true` to restrict purchases further. FactionsUUID's native upgrade administration remains separate. |
+| `/f create`, `/f invite`, `/f join`, `/f claim`, `/f home`, `/f warp`, `/f who`, `/f map`, `/f chat`, `/f c a` | Open to players; faction role actions apply where relevant | Native Vertex faction commands, including persistent ally chat and clickable paged help. See [Native Factions](factions-integration.md). |
+| `/f permissions` / `/f perms` | Leader, Co-Leader, or Admin, with rank-scoped editing | Opens the faction permission matrix GUI. Admin can edit Member/Recruit; Co-Leader can edit Admin and below; Leader can edit Co-Leader and below. |
+| `/f upgrades` / `/f upgrade` | Leader or Co-Leader | Opens Vertex's persistent faction-upgrades GUI. Upgrade levels use exact configured prices and values. |
 | `/f bank` | Faction member; role permissions apply to deposits/withdrawals | Opens the six-row faction bank for money, experience, and TNT. |
+| `/f tnt` | Faction member | Shows the faction's current TNT and its upgrade-derived capacity. |
 | `/tntfill <radius> <amount> bank\|inventory` | `vertex.tntfill.use` (default: everyone) | Fills every dispenser within `radius` blocks (max 100) of you, inside your own faction's claim, with up to `amount` TNT — drawn from the faction's Vertex TNT bank (the same one `/f bank` manages) or your own inventory. The bank is debited before any dispenser is filled, and anything the dispensers cannot take is returned immediately. |
-| `/f top` (or any `factions.command-aliases` alias) | Open to all | Vertex's claimed, individually-aged spawner-value leaderboard — replaces FactionsUUID's power-based `/f top`. See [Faction Leaderboards](faction-leaderboards.md#f-top-claimed-spawner-value). |
+| `/f top` | Open to all | Vertex's claimed, individually-aged spawner-value leaderboard, separate from native faction power. See [Faction Leaderboards](faction-leaderboards.md#f-top-claimed-spawner-value). |
 | `/ftopforcecheck` | `vertex.ftop.forcecheck` | Immediately recalculates F Top for every faction without moving the regular scheduled deadline. |
 | `/f baseclaim` (or any `factions.command-aliases` alias) | `vertex.baseclaim.view` | Opens the Base Claim info/removal GUI if standing on one; otherwise attempts to create one (Leader/Co-Leader + `vertex.baseclaim.create` only). Confirming removal in that GUI additionally requires `vertex.baseclaim.remove` (default: true). See [Base and Raid Claims](base-and-raid-claims.md). |
-| `/f baseclaim buy` | `vertex.baseclaim.purchaseslot` | Any member purchases their faction's next Base Claim slot (#2/#3), paid from their own balance. |
-| `/pvptop` | Open to all | Faction leaderboard ranked by persisted KOTH/Outpost capture points, independent of F Top. `/f pvptop` remains a compatibility alias. See [Faction Leaderboards](faction-leaderboards.md#pvp-top-objective-points). |
-| `/f shield` (or any `factions.command-aliases` alias) | Open to all | Shows the caller's faction's Faction Shield status: active/inactive, countdown, current/pending schedule, admin override. See [Faction Shield](faction-shield.md). |
-| `/f shield set <HH:mm> <minutes>` | `vertex.shield.set` | Leader/Co-Leader only; submits a new Shield schedule (takes effect after the configured activation delay). Rejected until the New-Faction Shield Delay has passed. |
-| `/f shield admin <faction> active\|inactive\|clear` | `vertex.admin.claims` | Staff force a faction's Shield state, or clear an existing override. Every attempt is console-logged; silent to the affected faction. |
-| `/f who <faction-or-player>` | *(native FactionsUUID permission)* | Native command untouched; Vertex appends a one-tick-delayed Shield status follow-up message. |
+| `/pvptop` | Open to all | Dedicated faction leaderboard ranked by persisted KOTH/Outpost capture points, independent of F Top. See [Faction Leaderboards](faction-leaderboards.md#pvp-top-objective-points). |
+| `/f grace` | Open to all | Shows whether global faction Grace is active and its remaining time. |
+| `/fa grace on <duration>` / `/fa grace off` | `vertex.fa.grace` | Enables or disables persistent global explosion protection with an audit record. Example duration: `2d12h`. |
+| `/f shield` | All faction members can view; Leader/Co-Leader configure | Opens the persistent weekly Base Claim Shield schedule and PvP option. |
+| `/f shield activate` | Leader or Co-Leader + `vertex.shield.activate` | Optional manual Shield activation. Rejects duplicate/cooldown activation. |
+| `/fa shield <faction> active\|inactive\|clear --force` | `vertex.fa.shield` | Persistent, audited staff override. Clearing it resumes the real schedule/manual deadline. |
+| `/fpowerbooster give <player> <10\|25\|50\|75\|100> [amount]` | `vertex.fpowerbooster.give` | Gives persistent personal maximum-power vouchers. Redeeming raises max power only, up to the configured absolute cap. |
 
 ## Chunk Busters
 
@@ -305,6 +334,36 @@ rewards, and the `capture-events.yml` reference.
 | `/vertex storage` | `vertex.admin` | Shows which storage backend is currently in use. |
 | `/vertex storage <local\|mysql> [confirm]` | `vertex.admin` | Copies all data into the other backend and switches `storage.type` to it. Takes effect on the next restart. `confirm` is required if the target database already has data in it, since it gets overwritten. See [Installation](installation.md#switching-backends-in-game). |
 | `/vertex performance` | `vertex.admin` | Reports the performance framework's current OFF/BASIC/DETAILED monitoring state — see [Performance](performance.md). |
+| `/f safezone`, `/f warzone`, `/f admin unclaim` | `vertex.factions.admin` | Creates/removes native system-faction claims at the current chunk. |
+
+### Native faction administration
+
+`/fa` is command-only and paginates its own help. Suggestions and help entries
+are filtered by the sender's permissions. `vertex.fa.*` grants every normal
+area below; crash recovery remains separate as `vertex.network.recovery`.
+
+| Permission | `/fa` area |
+|---|---|
+| `vertex.fa.help` | Paginated help |
+| `vertex.fa.info` | Faction/player inspection |
+| `vertex.fa.grace` | Global Grace controls |
+| `vertex.fa.power` | Current/max player-power controls |
+| `vertex.fa.claim` | Forced claim operations |
+| `vertex.fa.unclaim` | Forced unclaim operations |
+| `vertex.fa.disband` | Audited forced disband |
+| `vertex.fa.relation` | Relation overrides |
+| `vertex.fa.shield` | Shield overrides |
+| `vertex.fa.bank` | Money/XP/TNT bank controls |
+| `vertex.fa.vault` | Vault inspection/unlock |
+| `vertex.fa.upgrades` | Upgrade overrides |
+| `vertex.fa.members` | Membership and role controls |
+| `vertex.fa.combat` | Audited combat-tag clearing |
+| `vertex.fa.logs` | Active/disbanded faction logs |
+| `vertex.fa.network` | Shard and transfer inspection |
+| `vertex.fa.season` | Destructive season reset |
+
+Dangerous irreversible operations require `--force` and are audited. See
+[Native Factions](factions-integration.md) and [Velocity Shards](network-shards.md).
 
 ## Permission node reference
 
@@ -318,8 +377,13 @@ nodes:
 | `vertex.tag.<name>` | `vertex.tag.berserker` | Set per-tag in `tags.yml`; blank unlocks it for everyone |
 
 Plus two bypass nodes for staff testing kits: `vertex.kit.bypasscooldown`
-and `vertex.kit.bypasscost`. `vertex.admin` also covers reload/
+and `vertex.kit.bypasscost`. `vertex.factions.bypass` bypasses native faction
+build/container protection. `vertex.admin` also covers reload/
 clearmobstacks as shown above.
+
+`vertex.collector.bypass` is a high-risk, staff-build-only bypass for Chunk
+Collector ownership and role checks. It is intentionally separate from
+`vertex.staff.staffbuild`.
 
 ### Notification-only nodes
 

@@ -91,7 +91,7 @@ public final class AuctionMenu {
             case MINE -> "auction.gui-title-mine";
             case WATCHLIST -> "auction.gui-title-watchlist";
         };
-        Inventory inventory = Bukkit.createInventory(holder, 54, messages.get(player, titleKey));
+        Inventory inventory = Bukkit.createInventory(holder, 54, messages.getGui(player, titleKey));
         holder.inventory = inventory;
         holder.page = clampPage(player, manager, holder, requestedPage);
         renderBrowse(inventory, holder, player, manager, messages);
@@ -187,7 +187,7 @@ public final class AuctionMenu {
     private static void openClaimLoaded(Player player, Messages messages, List<ItemStack> items) {
         Holder holder = new Holder(Mode.CLAIM, 0, ViewFilter.ALL, SortMode.DATE_POSTED, SortDirection.ASCENDING, null);
         holder.setClaimItems(items);
-        Inventory inventory = Bukkit.createInventory(holder, 54, messages.get(player, "auction.claim-title"));
+        Inventory inventory = Bukkit.createInventory(holder, 54, messages.getGui(player, "auction.claim-title"));
         holder.inventory = inventory;
 
         for (int slot = 45; slot < 54; slot++) {
@@ -218,23 +218,23 @@ public final class AuctionMenu {
             lore.addAll(meta.lore());
             lore.add(Component.empty());
         }
-        lore.add(noItalic(messages.get(viewer, "auction.listing-seller", "player", sellerName)));
+        lore.add(noItalic(messages.getGui(viewer, "auction.listing-seller", "player", sellerName)));
         String priceText = switch (listing.currency()) {
             case MONEY -> EconomyHook.format(listing.price());
             case EXP -> (int) Math.ceil(listing.price()) + " levels";
             case GC -> Numbers.formatFull((long) Math.ceil(listing.price())) + " GC";
         };
-        lore.add(noItalic(messages.get(viewer, "auction.listing-price", "price", priceText)));
-        lore.add(noItalic(messages.get(viewer, "auction.listing-expires", "time", relativeTime(listing.expiresAtMillis()))));
+        lore.add(noItalic(messages.getGui(viewer, "auction.listing-price", "price", priceText)));
+        lore.add(noItalic(messages.getGui(viewer, "auction.listing-expires", "time", relativeTime(listing.expiresAtMillis()))));
         boolean isSeller = listing.sellerUuid().equals(viewer.getUniqueId());
         if (!isSeller) {
-            lore.add(noItalic(messages.get(viewer, "auction.listing-click-buy")));
+            lore.add(noItalic(messages.getGui(viewer, "auction.listing-click-buy")));
         }
         if (isSeller || viewer.hasPermission("vertex.auction.remove")) {
-            lore.add(noItalic(messages.get(viewer, "auction.listing-shift-click-cancel")));
+            lore.add(noItalic(messages.getGui(viewer, "auction.listing-shift-click-cancel")));
         }
         boolean watching = manager.isWatching(viewer.getUniqueId(), listing.id());
-        lore.add(noItalic(messages.get(viewer, watching ? "auction.listing-right-click-unwatch" : "auction.listing-right-click-watch")));
+        lore.add(noItalic(messages.getGui(viewer, watching ? "auction.listing-right-click-unwatch" : "auction.listing-right-click-watch")));
         meta.lore(lore);
         icon.setItemMeta(meta);
         return icon;
@@ -255,14 +255,14 @@ public final class AuctionMenu {
             case PRICE -> "auction.sort-price";
         };
         String directionKey = holder.sortDirection == SortDirection.ASCENDING ? "auction.sort-ascending" : "auction.sort-descending";
-        meta.displayName(noItalic(messages.get(player, "auction.sort-title",
+        meta.displayName(noItalic(messages.getGui(player, "auction.sort-title",
                 "mode", messages.getRaw(player, modeKey), "direction", messages.getRaw(player, directionKey))));
         meta.lore(List.of(
                 option(player, messages, "auction.sort-date-posted", holder.sortMode == SortMode.DATE_POSTED),
                 option(player, messages, "auction.sort-price", holder.sortMode == SortMode.PRICE),
                 Component.empty(),
-                noItalic(messages.get(player, "auction.sort-click-hint")),
-                noItalic(messages.get(player, "auction.sort-shift-click-hint"))));
+                noItalic(messages.getGui(player, "auction.sort-click-hint")),
+                noItalic(messages.getGui(player, "auction.sort-shift-click-hint"))));
         item.setItemMeta(meta);
         return item;
     }
@@ -276,14 +276,14 @@ public final class AuctionMenu {
             case EXP -> "auction.currency-exp";
             case GC -> "auction.currency-gc-coming-soon";
         };
-        meta.displayName(noItalic(messages.get(player, "auction.currency-title", "currency", messages.getRaw(player, currentKey))));
+        meta.displayName(noItalic(messages.getGui(player, "auction.currency-title", "currency", messages.getRaw(player, currentKey))));
         meta.lore(List.of(
                 option(player, messages, "auction.currency-all", holder.currencyFilter == null),
                 option(player, messages, "auction.currency-money", holder.currencyFilter == AuctionCurrency.MONEY),
                 option(player, messages, "auction.currency-exp", holder.currencyFilter == AuctionCurrency.EXP),
                 option(player, messages, "auction.currency-gc-coming-soon", holder.currencyFilter == AuctionCurrency.GC),
                 Component.empty(),
-                noItalic(messages.get(player, "auction.currency-click-hint"))));
+                noItalic(messages.getGui(player, "auction.currency-click-hint"))));
         item.setItemMeta(meta);
         return item;
     }
@@ -292,15 +292,15 @@ public final class AuctionMenu {
         ItemStack head = new ItemStack(Material.PLAYER_HEAD);
         org.bukkit.inventory.meta.SkullMeta meta = (org.bukkit.inventory.meta.SkullMeta) head.getItemMeta();
         meta.setOwningPlayer(player);
-        meta.displayName(noItalic(messages.get(player, "auction.hub-title")));
+        meta.displayName(noItalic(messages.getGui(player, "auction.hub-title")));
         meta.lore(List.of(
-                noItalic(messages.get(player, "auction.hub-lore-1")),
-                noItalic(messages.get(player, "auction.hub-lore-2")),
-                noItalic(messages.get(player, "auction.hub-lore-3")),
-                noItalic(messages.get(player, "auction.hub-lore-4")),
-                noItalic(messages.get(player, "auction.hub-lore-5")),
+                noItalic(messages.getGui(player, "auction.hub-lore-1")),
+                noItalic(messages.getGui(player, "auction.hub-lore-2")),
+                noItalic(messages.getGui(player, "auction.hub-lore-3")),
+                noItalic(messages.getGui(player, "auction.hub-lore-4")),
+                noItalic(messages.getGui(player, "auction.hub-lore-5")),
                 Component.empty(),
-                noItalic(messages.get(player, "auction.hub-click-hint"))));
+                noItalic(messages.getGui(player, "auction.hub-click-hint"))));
         head.setItemMeta(meta);
         return head;
     }
@@ -308,8 +308,8 @@ public final class AuctionMenu {
     private static ItemStack claimAllButton(Player player, Messages messages, boolean hasItems) {
         ItemStack item = new ItemStack(hasItems ? Material.CHEST : Material.BARRIER);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "auction.claim-all-button")));
-        meta.lore(List.of(noItalic(messages.get(player, hasItems ? "auction.claim-all-lore" : "auction.claim-all-empty-lore"))));
+        meta.displayName(noItalic(messages.getGui(player, "auction.claim-all-button")));
+        meta.lore(List.of(noItalic(messages.getGui(player, hasItems ? "auction.claim-all-lore" : "auction.claim-all-empty-lore"))));
         item.setItemMeta(meta);
         return item;
     }
@@ -317,7 +317,7 @@ public final class AuctionMenu {
     private static ItemStack pageButton(Messages messages, Player player, String key, Material material, boolean enabled) {
         ItemStack item = new ItemStack(enabled ? material : Material.GRAY_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, key)));
+        meta.displayName(noItalic(messages.getGui(player, key)));
         item.setItemMeta(meta);
         return item;
     }
@@ -336,7 +336,7 @@ public final class AuctionMenu {
 
     /** Option labels deliberately override locale colours: green means active; gray means inactive. */
     private static Component option(Player player, Messages messages, String key, boolean selected) {
-        return Component.text(MessageFormatter.plain(messages.getRaw(player, key)),
+        return Component.text(MessageFormatter.plain(me.vertex.core.lang.SmallCaps.template(messages.getRaw(player, key))),
                 selected ? NamedTextColor.GREEN : NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false);
     }

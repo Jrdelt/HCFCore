@@ -35,6 +35,7 @@ public final class ShopManager {
     private final Plugin plugin;
     private final ShopStorage storage;
     private final BoosterService boosters;
+    private final DeliveryAdmission deliveryAdmission;
     private final File file;
 
     private volatile boolean enabled;
@@ -55,10 +56,22 @@ public final class ShopManager {
     private final java.util.Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
 
     public ShopManager(Plugin plugin, ShopStorage storage, BoosterService boosters) {
+        this(plugin, storage, boosters, (player, items, source) ->
+                me.vertex.core.storage.DeliveryManager.queueOverflow(plugin, player, items, source));
+    }
+
+    ShopManager(Plugin plugin, ShopStorage storage, BoosterService boosters,
+            DeliveryAdmission deliveryAdmission) {
         this.plugin = plugin;
         this.storage = storage;
         this.boosters = boosters;
+        this.deliveryAdmission = java.util.Objects.requireNonNull(deliveryAdmission, "deliveryAdmission");
         this.file = new File(plugin.getDataFolder(), "shop.yml");
+    }
+
+    @FunctionalInterface
+    interface DeliveryAdmission {
+        boolean admit(Player player, java.util.Collection<ItemStack> items, String source);
     }
 
     /**
@@ -297,7 +310,7 @@ public final class ShopManager {
     }
 
     public enum TradeResult {
-        OK, DISABLED, UNKNOWN_BLOCK, NO_ECONOMY, CANNOT_AFFORD, NOT_ENOUGH_ITEMS
+        OK, DISABLED, UNKNOWN_BLOCK, NO_ECONOMY, CANNOT_AFFORD, NOT_ENOUGH_ITEMS, STORAGE_UNAVAILABLE
     }
 
     public record TradeOutcome(TradeResult result, double total) {
@@ -323,8 +336,13 @@ public final class ShopManager {
             return TradeOutcome.failure(TradeResult.CANNOT_AFFORD);
         }
 
-        for (ItemStack leftover : player.getInventory().addItem(new ItemStack(material, amount)).values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        if (!queueOverflow(player, List.of(new ItemStack(material, amount)), "shop-purchase")) {
+            EconomyResponse refund = economy.depositPlayer(player, cost);
+            if (refund == null || !refund.transactionSuccess()) {
+                plugin.getLogger().severe("Shop purchase delivery and Vault refund both failed for "
+                        + player.getUniqueId() + ": " + cost + " for " + amount + "x " + material);
+            }
+            return TradeOutcome.failure(TradeResult.STORAGE_UNAVAILABLE);
         }
         adjustVolume(material, ShopPricing.afterBuy(volumeOf(material), amount));
         return new TradeOutcome(TradeResult.OK, cost);
@@ -345,27 +363,52 @@ public final class ShopManager {
         }
 
         double payout = totalSellPayout(material, amount);
+        ItemStack[] inventoryBefore = cloneContents(player.getInventory().getStorageContents());
         Map<Integer, ItemStack> leftover = player.getInventory().removeItem(new ItemStack(material, amount));
         if (!leftover.isEmpty()) {
-            // Should be unreachable given the count check above, but never
-            // pay out for items that didn't actually leave the inventory.
-            for (ItemStack notRemoved : leftover.values()) {
-                player.getInventory().addItem(notRemoved);
-            }
+            // Should be unreachable given the matching-stack count below.
+            // Inventory#removeItem returns the requested quantity that it
+            // could not remove; those items were never taken and must not be
+            // added back or this failure path would create new items.
             return TradeOutcome.failure(TradeResult.NOT_ENOUGH_ITEMS);
         }
 
         payout = applySellBonus(player, payout);
         EconomyResponse deposit = EconomyHook.getEconomy().depositPlayer(player, payout);
         if (deposit == null || !deposit.transactionSuccess()) {
-            // The response was previously ignored, which deleted the items
-            // and moved the market for money that never arrived. Hand the
-            // items straight back instead; the player just had room for them.
-            for (ItemStack notPaid : player.getInventory().addItem(new ItemStack(material, amount)).values()) {
-                player.getWorld().dropItemNaturally(player.getLocation(), notPaid);
-            }
+            // Restore the exact slots synchronously. The sale removed items
+            // from this same inventory on this same tick, so no overflow
+            // delivery is needed and custom neighboring stacks are untouched.
+            player.getInventory().setStorageContents(inventoryBefore);
             plugin.getLogger().warning("Shop sale for " + player.getName() + " was reverted: the "
                     + payout + " payout failed, so " + amount + "x " + material + " was returned.");
+            return TradeOutcome.failure(TradeResult.NO_ECONOMY);
+        }
+        adjustVolume(material, ShopPricing.afterSell(volumeOf(material), amount));
+        return new TradeOutcome(TradeResult.OK, payout);
+    }
+
+    /** Sells exactly the live stack in one inventory slot (used by /sell hand). */
+    public TradeOutcome sellSlot(Player player, int slot) {
+        if (!enabled) return TradeOutcome.failure(TradeResult.DISABLED);
+        if (slot < 0 || slot >= player.getInventory().getStorageContents().length) {
+            return TradeOutcome.failure(TradeResult.NOT_ENOUGH_ITEMS);
+        }
+        ItemStack original = player.getInventory().getItem(slot);
+        if (original == null || original.isEmpty() || !isPlainStack(original)
+                || !entries.containsKey(original.getType())) {
+            return TradeOutcome.failure(TradeResult.UNKNOWN_BLOCK);
+        }
+        if (!EconomyHook.isAvailable()) return TradeOutcome.failure(TradeResult.NO_ECONOMY);
+
+        Material material = original.getType();
+        int amount = original.getAmount();
+        double payout = applySellBonus(player, totalSellPayout(material, amount));
+        ItemStack removed = original.clone();
+        player.getInventory().setItem(slot, null);
+        EconomyResponse deposit = EconomyHook.getEconomy().depositPlayer(player, payout);
+        if (deposit == null || !deposit.transactionSuccess()) {
+            player.getInventory().setItem(slot, removed);
             return TradeOutcome.failure(TradeResult.NO_ECONOMY);
         }
         adjustVolume(material, ShopPricing.afterSell(volumeOf(material), amount));
@@ -375,11 +418,32 @@ public final class ShopManager {
     private static int countInInventory(Player player, Material material) {
         int count = 0;
         for (ItemStack item : player.getInventory().getStorageContents()) {
-            if (item != null && item.getType() == material) {
+            if (item != null && item.getType() == material && isPlainStack(item)) {
                 count += item.getAmount();
             }
         }
         return count;
+    }
+
+    private static ItemStack[] cloneContents(ItemStack[] source) {
+        ItemStack[] copy = new ItemStack[source.length];
+        for (int i = 0; i < source.length; i++) {
+            copy[i] = source[i] == null ? null : source[i].clone();
+        }
+        return copy;
+    }
+
+    /** Uses Bukkit's similarity contract so default implementation metadata is not mistaken for custom item data. */
+    public static boolean isPlainStack(ItemStack item) {
+        return item != null && !item.isEmpty() && item.isSimilar(new ItemStack(item.getType()));
+    }
+
+    public boolean queueOverflow(Player player, java.util.Collection<ItemStack> items, String source) {
+        return deliveryAdmission.admit(player, items, source);
+    }
+
+    Plugin plugin() {
+        return plugin;
     }
 
     private void adjustVolume(Material material, double newVolume) {
@@ -396,20 +460,7 @@ public final class ShopManager {
         // finished last won -- so an older volume could overwrite a newer
         // one. The live price still looked right until a restart read the
         // stale row back.
-        synchronized (writeChains) {
-            CompletableFuture<Void> previous =
-                    writeChains.getOrDefault(material, CompletableFuture.completedFuture(null));
-            CompletableFuture<Void> next = previous.handle((ignored, error) -> null).thenRunAsync(() -> {
-                try {
-                    storage.save(name, newVolume);
-                } catch (Exception e) {
-                    plugin.getLogger().log(Level.WARNING, "Failed to persist Shop market state for " + name, e);
-                }
-            });
-            writeChains.put(material, next);
-            next.whenComplete((ignored, error) -> writeChains.remove(material, next));
-            track(next);
-        }
+        queueVolumeWrite(material, () -> storage.save(name, newVolume), "save");
     }
 
     /** Called on a repeating task every {@link #decayIntervalTicks()}; drifts every traded block back toward its base price. */
@@ -420,18 +471,38 @@ public final class ShopManager {
             if (ShopPricing.isEffectivelyZero(decayed)) {
                 netVolume.remove(material);
                 String name = material.name();
-                track(CompletableFuture.runAsync(() -> {
-                    try {
-                        storage.delete(name);
-                    } catch (Exception e) {
-                        plugin.getLogger().log(Level.WARNING, "Failed to clear Shop market state for " + name, e);
-                    }
-                }));
+                // Deletion must share the same per-material chain as saves.
+                // Otherwise an older save can finish after this delete and
+                // recreate a price offset that the live cache already cleared.
+                queueVolumeWrite(material, () -> storage.delete(name), "clear");
             } else {
                 adjustVolume(material, decayed);
             }
         }
     }
+
+    private void queueVolumeWrite(Material material, SqlOperation operation, String action) {
+        synchronized (writeChains) {
+            CompletableFuture<Void> previous =
+                    writeChains.getOrDefault(material, CompletableFuture.completedFuture(null));
+            CompletableFuture<Void> next = previous.handle((ignored, error) -> null).thenRunAsync(() -> {
+                try {
+                    me.vertex.core.storage.SqlRetry.run(plugin,
+                            "Shop market " + action + " for " + material.name(), operation::run);
+                } catch (Exception error) {
+                    plugin.getLogger().log(Level.SEVERE,
+                            "Failed to " + action + " Shop market state for " + material.name()
+                                    + " after retries.", error);
+                }
+            });
+            writeChains.put(material, next);
+            next.whenComplete((ignored, error) -> writeChains.remove(material, next));
+            track(next);
+        }
+    }
+
+    @FunctionalInterface
+    private interface SqlOperation { void run() throws Exception; }
 
     private void track(CompletableFuture<?> write) {
         pendingWrites.add(write);
@@ -439,10 +510,30 @@ public final class ShopManager {
     }
 
     public void awaitWrites() {
-        try {
-            CompletableFuture.allOf(pendingWrites.toArray(new CompletableFuture[0])).get(10, TimeUnit.SECONDS);
-        } catch (Exception e) {
-            plugin.getLogger().log(Level.WARNING, "Timed out waiting for pending Shop writes.", e);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        int stableEmptyRounds = 0;
+        while (System.nanoTime() < deadline && stableEmptyRounds < 3) {
+            CompletableFuture<?>[] snapshot = pendingWrites.toArray(new CompletableFuture[0]);
+            if (snapshot.length == 0) {
+                stableEmptyRounds++;
+                Thread.onSpinWait();
+                continue;
+            }
+            stableEmptyRounds = 0;
+            try {
+                CompletableFuture.allOf(snapshot).get(
+                        Math.max(1L, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (java.util.concurrent.TimeoutException error) {
+                break;
+            } catch (Exception error) {
+                plugin.getLogger().log(Level.WARNING, "Failed while waiting for pending Shop writes.", error);
+            }
+        }
+        if (!pendingWrites.isEmpty()) {
+            plugin.getLogger().warning("Timed out waiting for pending Shop writes.");
         }
     }
 }

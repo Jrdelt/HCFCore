@@ -27,27 +27,27 @@ public final class BlueprintActivationMenu {
 
     public static void open(Player player, Messages messages, Location anchor, BlueprintTemplate template) {
         Holder holder = new Holder(anchor, template.name());
-        Inventory inventory = Bukkit.createInventory(holder, 9, messages.get(player, "blueprint.activate-title"));
+        Inventory inventory = Bukkit.createInventory(holder, 9, messages.getGui(player, "blueprint.activate-title"));
         holder.inventory = inventory;
 
         ItemStack info = new ItemStack(Material.BEACON);
         ItemMeta infoMeta = info.getItemMeta();
         infoMeta.displayName(noItalic(MessageFormatter.deserialize(template.displayName())));
-        infoMeta.lore(List.of(noItalic(messages.get(player, "blueprint.activate-info-lore"))));
+        infoMeta.lore(List.of(noItalic(messages.getGui(player, "blueprint.activate-info-lore"))));
         info.setItemMeta(infoMeta);
         inventory.setItem(INFO_SLOT, info);
 
         ItemStack enable = new ItemStack(Material.LIME_DYE);
         ItemMeta enableMeta = enable.getItemMeta();
-        enableMeta.displayName(noItalic(messages.get(player, "blueprint.activate-enable-title")));
-        enableMeta.lore(List.of(noItalic(messages.get(player, "blueprint.activate-enable-lore"))));
+        enableMeta.displayName(noItalic(messages.getGui(player, "blueprint.activate-enable-title")));
+        enableMeta.lore(List.of(noItalic(messages.getGui(player, "blueprint.activate-enable-lore"))));
         enable.setItemMeta(enableMeta);
         inventory.setItem(ENABLE_SLOT, enable);
 
         ItemStack cancel = new ItemStack(Material.BARRIER);
         ItemMeta cancelMeta = cancel.getItemMeta();
-        cancelMeta.displayName(noItalic(messages.get(player, "blueprint.activate-cancel-title")));
-        cancelMeta.lore(List.of(noItalic(messages.get(player, "blueprint.activate-cancel-lore"))));
+        cancelMeta.displayName(noItalic(messages.getGui(player, "blueprint.activate-cancel-title")));
+        cancelMeta.lore(List.of(noItalic(messages.getGui(player, "blueprint.activate-cancel-lore"))));
         cancel.setItemMeta(cancelMeta);
         inventory.setItem(CANCEL_SLOT, cancel);
 

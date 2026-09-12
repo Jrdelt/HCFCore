@@ -1,14 +1,14 @@
 # Vertex Documentation
 
 Vertex is a Paper plugin that adds a full HCF
-gameplay layer on top of **FactionsUUID**: armor-based kit classes, PvP
+gameplay layer with **native Vertex factions**: armor-based kit classes, PvP
 ability items, 1.8-style legacy combat, a combat-tag system,
 faction-aware chat, rallies, a faction permission matrix,
 faction upgrades, a shared faction bank, cosmetic tags, stackable
 spawners, Chunk Collectors, a progressive schematic base-builder,
 KOTH/Outpost captures, a staff toolkit, a self-hosted GC currency,
 automatic duplicate-item detection, Base and Raid Claims with a
-schedule-based Faction Shield, Chunk Busters, claim-aware Source
+global Grace, weekly scheduled Faction Shields, Chunk Busters, claim-aware Source
 Buckets, a full Rune-based Custom Enchantment system, and an opt-in
 performance-monitoring framework.
 
@@ -27,7 +27,8 @@ integration behavior.
 | [Configuration](configuration.md) | Full walkthrough of `config.yml`: database, chat, factions/upgrades, reboot, and reload semantics |
 | [PvP & Combat](pvp-and-combat.md) | Combat tag, action bar, item cooldowns, no-pearl zones, Legacy Combat (1.8 PvP), Archer Tag |
 | [Kits & Abilities](kits-and-abilities.md) | Kit classes, class effects, kit costs, the full ability item catalog and their mechanics |
-| [Factions Integration](factions-integration.md) | FactionsUUID compatibility, chat placeholders, rallies, permissions, upgrades, bank, leader-leave protection |
+| [Native Factions](factions-integration.md) | Native claims, roles, chat, permissions, rallies, upgrades, banks, and leader-leave protection |
+| [Velocity Shards](network-shards.md) | Shared-state topology, shard health, cross-server handoffs, queues, crash recovery, and operator procedures |
 | [Faction Leaderboards](faction-leaderboards.md) | `/f top`'s claimed, individually-aged spawner-value F Top, and `/pvptop`'s KOTH/Outpost objective points |
 | [Spawners & Collectors](spawners-and-collectors.md) | Spawner shop/economy, daylight and lava behavior, stacking, mob stacks, and Chunk Collectors |
 | [Blueprint Base Builder](blueprints.md) | Automated `.schem` base building with FastAsyncWorldEdit + DecentHolograms |
@@ -38,7 +39,7 @@ integration behavior.
 | [GC (Gift Card / Credit)](gc-currency.md) | Vertex's self-hosted third currency: the wallet GUI, one-time withdrawal codes, redeem codes, and staff tools |
 | [Dupe investigation](dupe-investigation.md) | The staff-only suspected-duplicate item scanner, case lifecycle, `/dupe` commands, and the shared item-identity utility |
 | [Base and Raid Claims](base-and-raid-claims.md) | `/f baseclaim`'s permanent, connectable safe regions vs. Raid Claims' real-time-expiring faction land |
-| [Faction Shield](faction-shield.md) | Schedule-based Base Claim PvP protection, activation delay, New-Faction Shield Delay, and staff overrides |
+| [Grace and Faction Shield](faction-shield.md) | Global Grace plus weekly Base-only Shield schedules and audited overrides |
 | [Chunk Busters](chunk-busters.md) | The 4 destructive area-clear items: batched removal, persisted operation locking, faction role permissions, and the confirmation GUI |
 | [Source Buckets](source-buckets.md) | Reusable configured-block items: flow patterns, the claim-boundary rule, per-variant combat/base-claim gates, and charge-after-success economics |
 | [Custom Enchantments](custom-enchantments.md) | Rune tiers and rolling, physical enchant items, the Enchant Application GUI, level-replacement rules, Lucky Gems, world restrictions, and persistence through anvils/smithing |
@@ -49,6 +50,9 @@ integration behavior.
 | [Mining Worlds](mines.md) | Stonewake and Bloodvein: region selection, ore generation, and regeneration |
 | [Haven & Riftlands](haven-riftlands.md) | PvE/PvPvE zones, guided routes, loot sessions, tickets, and the Mob Kill Event |
 | [Physical Entry Portals](portals.md) | Build a portal and connect it to verified flight routes into mines, Haven, or Riftlands |
+| [**Haven Setup Checklist**](setup-haven.md) | Owner step-by-step setup for the Haven region, route, loot pool, mobs, and portal |
+| [**Riftlands Setup Checklist**](setup-riftlands.md) | Owner step-by-step setup for the Riftlands region, route, loot pool, mobs, and portal |
+| [**Mine Setup Checklist**](setup-mines.md) | Owner step-by-step setup for Stonewake, Bloodvein, mine KOTHs, ore fills, and portals |
 | [GUI framework](gui-framework.md) | Configuring new menus: sizes, slots, materials, lore, sounds |
 | [Auction House](auctionhouse.md) | Buy-it-now listings for any item (money, experience, or GC), claim stashes, expiry, fees, and the staff audit log |
 | [KOTH & Outposts](koth-and-outposts.md) | Faction capture rules, directions/focus, schedules, staff selection, holograms, rewards, and Outpost XP boosters |

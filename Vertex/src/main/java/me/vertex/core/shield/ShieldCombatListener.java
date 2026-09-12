@@ -8,11 +8,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 
 /**
- * Disables player-vs-player damage inside a faction's Base Claims while
- * that faction's Shield is active. Raid Claims are never checked here --
- * {@link ShieldManager#isBaseClaimProtected} only ever returns true for a
- * location inside a Base Claim region, so Raid Claims stay raidable
- * regardless of Shield state, per spec.
+ * Optionally disables PvP in any claim owned by a Shielded faction.
  */
 public final class ShieldCombatListener implements Listener {
 
@@ -26,9 +22,6 @@ public final class ShieldCombatListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent event) {
-        if (!shield.combatProtectionEnabled()) {
-            return;
-        }
         if (!(event.getEntity() instanceof Player victim)) {
             return;
         }
@@ -36,7 +29,7 @@ public final class ShieldCombatListener implements Listener {
         if (attacker == null) {
             return;
         }
-        if (!shield.isBaseClaimProtected(victim.getLocation())) {
+        if (!shield.isPvpProtected(victim.getLocation())) {
             return;
         }
         event.setCancelled(true);

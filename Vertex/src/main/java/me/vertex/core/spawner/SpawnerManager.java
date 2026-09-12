@@ -1,6 +1,7 @@
 package me.vertex.core.spawner;
 
 import me.vertex.core.faction.FactionUpgradeManager;
+import me.vertex.core.lang.Messages;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -48,6 +49,7 @@ public final class SpawnerManager {
 
     private final Plugin plugin;
     private final SpawnerStorage storage;
+    private final Messages messages;
     private final File file;
     private final NamespacedKey markerKey;
     private final NamespacedKey mobTypeKey;
@@ -95,8 +97,13 @@ public final class SpawnerManager {
     private volatile me.vertex.core.faction.FTopManager fTopManager;
 
     public SpawnerManager(Plugin plugin, SpawnerStorage storage) {
+        this(plugin, storage, null);
+    }
+
+    public SpawnerManager(Plugin plugin, SpawnerStorage storage, Messages messages) {
         this.plugin = plugin;
         this.storage = storage;
+        this.messages = messages;
         this.file = new File(plugin.getDataFolder(), "spawners.yml");
         this.markerKey = new NamespacedKey(plugin, "tracked_spawner");
         this.mobTypeKey = new NamespacedKey(plugin, "spawner_mob_type");
@@ -104,6 +111,8 @@ public final class SpawnerManager {
         this.ownerFactionKey = new NamespacedKey(plugin, "spawner_owner_faction");
         this.placedAtDataKey = new NamespacedKey(plugin, "spawner_placed_at_data");
     }
+
+    Plugin plugin(){return plugin;}
 
     public void load() {
         if (!file.exists()) {
@@ -538,9 +547,10 @@ public final class SpawnerManager {
         nextManualSpawnTicks.remove(locationKey);
         queue(location, () -> {
             try {
-                storage.delete(location);
+                me.vertex.core.storage.SqlRetry.run(plugin, "Spawner delete at " + key(location),
+                        () -> storage.delete(location));
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to delete spawner from the database.", e);
+                plugin.getLogger().log(Level.SEVERE, "Failed to delete spawner from the database after retries.", e);
             }
         });
     }
@@ -614,9 +624,10 @@ public final class SpawnerManager {
         SpawnerData snapshot = new SpawnerData(data.mobType(), data.placedAtMillis(), data.ownerFactionTag());
         queue(location, () -> {
             try {
-                storage.save(location, snapshot);
+                me.vertex.core.storage.SqlRetry.run(plugin, "Spawner save at " + key(location),
+                        () -> storage.save(location, snapshot));
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to save spawner to the database.", e);
+                plugin.getLogger().log(Level.SEVERE, "Failed to save spawner to the database after retries.", e);
             }
         });
     }
@@ -644,15 +655,30 @@ public final class SpawnerManager {
      * physical block change) already reflected it.
      */
     public void awaitWrites() {
-        try {
-            CompletableFuture.allOf(pendingWrites.toArray(new CompletableFuture[0]))
-                    .get(5, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (TimeoutException e) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        int stableEmptyRounds = 0;
+        while (System.nanoTime() < deadline && stableEmptyRounds < 3) {
+            CompletableFuture<?>[] snapshot = pendingWrites.toArray(new CompletableFuture[0]);
+            if (snapshot.length == 0) {
+                stableEmptyRounds++;
+                Thread.onSpinWait();
+                continue;
+            }
+            stableEmptyRounds = 0;
+            try {
+                CompletableFuture.allOf(snapshot).get(
+                        Math.max(1L, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (TimeoutException e) {
+                break;
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "Failed while waiting for spawner writes.", e);
+            }
+        }
+        if (!pendingWrites.isEmpty()) {
             plugin.getLogger().warning("Timed out waiting for spawner writes during shutdown.");
-        } catch (Exception e) {
-            plugin.getLogger().log(Level.WARNING, "Failed while waiting for spawner writes.", e);
         }
     }
 
@@ -937,8 +963,9 @@ public final class SpawnerManager {
                     || player.getLocation().distanceSquared(location) > DEBUG_RANGE_BLOCKS * DEBUG_RANGE_BLOCKS) {
                 continue;
             }
-            player.sendMessage(net.kyori.adventure.text.Component.text("[Spawner Debug] " + detail,
-                    net.kyori.adventure.text.format.NamedTextColor.GRAY));
+            if (messages != null) {
+                player.sendMessage(messages.get(player, "spawner.debug-line", "detail", detail));
+            }
         }
     }
 
@@ -1000,8 +1027,13 @@ public final class SpawnerManager {
 
     /** Every tracked spawner whose block sits in this chunk. */
     public List<Map.Entry<Location, SpawnerData>> getSpawnersInChunk(Chunk chunk) {
+        return getSpawnersInChunk(chunk.getWorld(),chunk.getX(),chunk.getZ());
+    }
+
+    /** Indexed lookup by coordinates; does not synchronously load the chunk. */
+    public List<Map.Entry<Location, SpawnerData>> getSpawnersInChunk(World world,int chunkX,int chunkZ) {
         List<Map.Entry<Location, SpawnerData>> found = new ArrayList<>();
-        String worldName = chunk.getWorld().getName();
+        String worldName = world.getName();
         for (Map.Entry<String, SpawnerData> entry : spawners.entrySet()) {
             String[] parts = entry.getKey().split(":", 4);
             if (!parts[0].equals(worldName)) {
@@ -1009,13 +1041,34 @@ public final class SpawnerManager {
             }
             int blockX = Integer.parseInt(parts[1]);
             int blockZ = Integer.parseInt(parts[3]);
-            if ((blockX >> 4) == chunk.getX() && (blockZ >> 4) == chunk.getZ()) {
-                World world = chunk.getWorld();
+            if ((blockX >> 4) == chunkX && (blockZ >> 4) == chunkZ) {
                 int blockY = Integer.parseInt(parts[2]);
                 found.add(Map.entry(new Location(world, blockX, blockY, blockZ), entry.getValue()));
             }
         }
         return found;
+    }
+
+    /** Checks the persistent in-memory index without loading the Bukkit chunk. */
+    public boolean hasSpawnerInChunk(String worldName, int chunkX, int chunkZ) {
+        if (worldName == null) {
+            return false;
+        }
+        for (String locationKey : spawners.keySet()) {
+            String[] parts = locationKey.split(":", 4);
+            if (parts.length != 4 || !parts[0].equals(worldName)) {
+                continue;
+            }
+            try {
+                if ((Integer.parseInt(parts[1]) >> 4) == chunkX
+                        && (Integer.parseInt(parts[3]) >> 4) == chunkZ) {
+                    return true;
+                }
+            } catch (NumberFormatException ignored) {
+                // A malformed legacy key cannot identify a valid tracked block.
+            }
+        }
+        return false;
     }
 
     /**

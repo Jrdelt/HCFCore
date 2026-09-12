@@ -1,174 +1,85 @@
-# Factions Integration
+# Native Factions
 
-Vertex is built directly on top of **FactionsUUID** — it's a hard
-dependency, not an optional one. Vertex is compiled against FactionsUUID
-4.4.0, and its direct API use has also been checked against 4.7.0. This page
-covers everything that plugs into faction identity and relationships:
-rallies, permissions, upgrades, and the bank. Chat formatting
-is covered in [Configuration](configuration.md#chat-formatting) since
-it's primarily config-driven.
+Vertex owns factions directly. It does not require, load, or call
+FactionsUUID. Factions, members, roles, land, relations, permissions, homes,
+warps, money, player map/chat preferences, and system-faction claims are kept
+in the configured Vertex database.
 
-## Rally
+## Core commands
 
-`/f rally [set|clear]` (alias `/frally`) sets a rally point at the
-sender's current location; with no argument it acts as `set`. The point is
-visible to the whole faction for four minutes; `clear` removes it early.
-The **Set Rally** and **Clear Rally** role permissions control the two
-actions independently. They default to allowed for Moderator, Member, and
-Recruit, but the faction leader can change them in `/f permissions`.
+The core `/f` command list is role-aware. Most actions are allowed or blocked
+through `/f permissions`; only command-level visibility is shown below.
 
-Faction members in the rally's world see a green bossbar with live distance
-and a compass arrow pointing toward it, refreshing every 10 ticks
-(twice per second).
-The arrow points to a true compass bearing (north stays north) rather
-than one relative to the viewer's own facing. Rally indicators only
-display in the same world the rally was set in, preserve each player's
-prior compass target on expiry, and clean up their bossbars on shutdown.
+| Command | Permission / Audience | Purpose |
+|---|---|---|
+| `/f create <tag>` | Follows faction-state rules; open command surface is always available | Create a faction. Tags follow `factions.tag-pattern`. |
+| `/f invite <player>` / `/f join <faction>` | Role-/state-gated (see `/f permissions` and invite flow) | Invite and join factions. Invites expire after the configured time. |
+| `/f leave`, `/f kick <player>`, `/f promote <player>`, `/f demote <player>`, `/f leader <player>` | Role-gated (`Leader` and `Admin` controls most role changes) | Manage membership and roles. Leaders must transfer leadership before leaving when `prevent-leader-leave` is enabled. |
+| `/f claim [radius]`, `/f unclaim`, `/f unclaimall`, `/f autoclaim` | Open to members by claim-role checks in `/f permissions` | Manage chunk claims. Radius is bounded by configuration. |
+| `/f who [faction or player]`, `/f list` | Open to all players | Inspect factions and members. |
+| `/f ally`, `/f neutral`, `/f enemy <faction>` | Relation actions follow faction role permission model | Manage the three supported relations. Ally and Enemy-to-Neutral require request/acceptance; Enemy is unilateral and either faction can unally to Neutral. |
+| `/f open`, `/f close`, `/f description <text>`, `/f rename <tag>` | Role-gated (`Member`-level settings depend on your faction role) | Manage faction settings. |
+| `/f home`, `/f sethome`, `/f warp [name]`, `/f setwarp <name>`, `/f delwarp <name>` | Open to faction members, role checks still apply | Native faction homes and warps. |
+| `/f money [deposit\|withdraw <amount>]` | Role-gated by `/f permissions` and same bank rules as `/f bank` | View or use the same durable Vertex faction-bank money balance as `/f bank`, through Vault. |
+| `/f chat [faction\|ally\|public]` or `/f c [f\|a\|p]`, `/f map [on\|off]` | Open to all players with faction settings | Toggle faction chat, ally chat, and map display. Both preferences persist per player; ally chat includes your faction and mutually allied factions. Map width/height are configured independently, and a green crosshair marks the player's current chunk. Hover a claimed chunk to see its faction and whether it is a Base Claim or Raid Claim; Raid Claims also show their remaining lifetime. |
 
-## Rally / Faction Permission GUI
+`/f` and `/f help` show a paginated clickable help menu. The previous and
+next controls run `/f help <page>` and the command list is localized through
+`en_us.yml`.
 
-A faction leader opens the complete FactionsUUID permission matrix with
-`/f permissions` (or `/f perms`, or any alias configured under
-`factions.command-aliases`):
+`/f` also hosts the Vertex feature branches: `bank`, `upgrades`, `perms`,
+`rally`, `shield`, `top`, and `baseclaim`. Their existing commands and GUIs
+remain available under the native root.
 
-- The top row selects which role's permissions you're editing:
-  **Moderator** (applies to both FactionsUUID's Co-Leader and Moderator
-  roles), **Member**, or **Recruit**.
-- The grid lists every FactionsUUID native permission plus Vertex's **Set
-  Rally**, **Clear Rally**, **Add Spawners**, **Remove Spawners**, **Open
-  Collectors**, **Break Collectors**, **Deposit Bank Resources**,
-  **Withdraw Bank Resources**, and **Use Chunk Busters** actions. Every permission is a
-  green stained-glass pane when allowed for that role and a red pane when
-  denied. The native **Upgrade** permission controls access to Vertex's
-  `/f upgrades` menu as well. The state material is deliberately not
-  configurable.
-- All visible GUI text (title, roles, action names, status, and click
-  instructions) renders in small caps. Color tags in `config.yml` still
-  work normally.
-- **Left-click allows**, **right-click denies**. Changes save immediately
-  to FactionsUUID's own permission system for native actions, and to
-  Vertex's per-faction configuration for its custom actions.
-- **Admin is intentionally not selectable.** FactionsUUID always permits
-  its own Admin role to perform every native action regardless of any
-  configured permission, so there is nothing for this GUI to toggle for
-  Admin.
+## Claims and protection
 
-The title, each role's slot/icon/name, and any action's label override
-live under `rally.permission-gui` in `config.yml` (see
-[Configuration](configuration.md#rally-permission-gui)). Per-faction rally
-permission choices are saved under `rally.faction-permissions` and are
-removed automatically when a faction disbands.
+Vertex validates build/break, container access, doors/switches, bucket fill and
+empty, and direct/projectile player PvP on the server. Factionless players
+cannot build or use protected blocks in claims. Members need the relevant rank
+action; allies can build only when
+`factions.protection.allies-can-build` is enabled. Friendly-fire and ally-PvP
+are controlled by `factions.pvp`.
 
-## Faction upgrades
+Claims are stored by world and chunk. Base Claims, Raid Claims, Chunk
+Collectors, Spawners, Sand Bots, Chunk Busters, Source Buckets, faction
+upgrades, shields, and leaderboards all read the same native claim ownership.
+`factions.claims` can require connected land, price each claimed chunk in
+power, and enable power-ratio overclaims. All are off by default except the
+configured ratio, which is used only if overclaims are enabled.
 
-`/f upgrades` (or `/f upgrade`, including configured faction-command
-aliases) opens Vertex's persistent per-faction upgrade GUI. The role needs
-FactionsUUID's native **UPGRADE** action allowed to open or buy from it.
-`leader-only: true` adds a leader-only purchase rule; with the shipped
-`false` setting, any role allowed to use **UPGRADE** can buy a level using
-their own Vault balance.
+## Roles and permissions
 
-Vertex owns the price, level, and bonus for the following entries. Every
-level is stored by stable faction id, so it survives restarts and faction
-renames; faction disband deletes Vertex-owned levels and bank balances.
+The six roles are Recruit, Member, Mod, Admin, Co-Leader, and Leader. Leaders
+always have access. `/f perms` opens the persistent permission editor for the
+other role buckets and the dedicated Allies page. Leaders, Co-Leaders, and
+Admins can edit only the role scopes allowed by the rank hierarchy. It controls
+core actions such as building, containers, doors/switches,
+territory, invitations, relationships, homes/warps, upgrades, rallies,
+spawners, collectors, faction banks, and Chunk Busters. Defaults are in
+`factions.permissions.defaults`; a leader’s changes are stored in SQL and
+survive config reloads/restarts.
 
-| Upgrade | Where it applies | Exact effect |
-| --- | --- | --- |
-| Claim Damage | Attacker standing in their own claim | Increases damage from the player or their projectile. |
-| Claim Protection | Member standing in their own claim | Reduces all incoming damage. |
-| Armor Wear | Member standing in their own claim | Reduces durability damage, preserving fractional reductions fairly over repeated hits. |
-| Fall Protection | Member standing in their own claim | Adds a second fall-damage reduction. It combines with Claim Protection if both exist. |
-| Fly Boost | Already-flying member in their own claim | Multiplies flight speed; does not grant flight. Vertex reapplies the multiplier after another plugin changes the base speed. |
-| Spawner Rate | Vertex spawner physically in that faction's claim | Retunes its spawn count and nearby-mob cap, including the daylight/Iron Golem fallback. |
-| Crop Growth | Crop physically in that faction's claim | Gives a configured chance for one extra growth stage. No player needs to be present. |
-| Mob Experience | Mob killed by a member in that faction's claim | Increases the XP dropped by that kill. |
+## Power and system factions
 
-**Warps is the one native bridge.** Buying a Vertex **Warps** level calls
-FactionsUUID's `WARPS` upgrade directly. FactionsUUID remains responsible
-for `/f warp`, warp creation, and the number of permitted warps. Vertex
-adopts an existing native Warp level when the GUI opens and never lowers it.
-Set the same maximum level and a complete level-to-warp-count mapping in
-FactionsUUID's own upgrades configuration; Vertex's price/`bonus` field is
-only GUI text for this entry.
+Faction power starts and caps per member. Death loss and online regeneration
+are configurable in `factions.power`. Power is native Vertex state and is
+shown by the normal faction placeholders/`/f who`; it is separate from F Top.
 
-FactionsUUID also offers native upgrades with overlapping effects (territory
-damage, armor durability, fall reduction, growth, mob XP, and spawner rate).
-Keep those native duplicates disabled when using Vertex's matching entries
-or their effects can stack. Native **Flight** can remain enabled when it is
-used to grant flight: Vertex's Fly Boost only changes the speed of players
-already flying. Vertex intentionally routes `/f upgrades` to its GUI, so
-manage any remaining native FactionsUUID upgrades through FactionsUUID's
-administration/configuration rather than expecting that player command to
-open both menus.
+Staff with `vertex.factions.admin` can claim the current chunk for the
+configured SafeZone or WarZone with `/f safezone`, `/f warzone`, or
+`/f admin <safezone|warzone>`. `/f admin unclaim` removes the current claim.
+System-faction tags and no-PvP tags are configurable under
+`factions.system-claims`.
 
-Set an individual `enabled: false` or set `faction-upgrades.enabled: false`
-to stop new purchases and its Vertex effect without deleting the saved
-level. See [Configuration](configuration.md#faction-upgrades) for explicit
-per-level prices and bonuses. GUI title, names, effects, lore, and messages
-are localized under `faction-upgrades` in `lang/en_us.yml`.
+## Storage and migration
 
-## Faction bank
-
-`/f bank` opens a six-row bank GUI. Its upper rows show the faction's
-stored **money** (Gold Block), **experience** (Experience Bottle), and
-**TNT**, followed by deposit and withdraw controls that open an amount
-prompt.
-
-Money, experience, **and TNT** are all stored by Vertex in the selected
-database and survive a restart; money moves through Vault. Deposit/withdraw
-closes the bank GUI and prompts you to type a positive whole number in chat
-(`ChatAmountPrompt`), or `cancel` to back out; the GUI reopens once an
-amount is accepted. Amounts accept shorthand — `10k`, `1.5m`, `2b` —
-through the shared parser described in
-[Configuration](configuration.md#number-formatting).
-
-Vertex owns the TNT balance rather than delegating to FactionsUUID's native
-TNT bank. The native bank is an unsaved in-memory field whose ceiling comes
-from FactionsUUID's own config, which meant deposits could be lost on
-restart and no Vertex upgrade could raise the cap. On the first start after
-upgrading, any balance still sitting in the native bank is moved into
-Vertex's storage.
-
-Each faction's TNT is **committed to Vertex before its native value is
-cleared**, so the two banks can never both claim the same TNT and a failed
-write can never leave neither holding it. If any faction cannot be migrated,
-its native balance is left untouched and the migration is not marked
-complete — the next start retries it. Factions already moved have a zero
-native balance and are skipped, so a repeat run is harmless.
-
-A faction's TNT ceiling starts at `faction-upgrades.tnt-base-capacity`
-(default 1,000,000) and is raised by the **TNT Bank** faction upgrade. That
-upgrade is unusual: each level's `bonus` is the absolute capacity at that
-level rather than a percentage, so capacities are read straight off
-`config.yml` instead of being derived from a multiplier. The shipped levels
-run 2M → 10M.
-
-`/tntfill <radius> <amount> bank|inventory` (see
-[Commands & Permissions](commands-and-permissions.md#factions--rally))
-draws from this same TNT bank (or the player's own inventory instead) to top
-up every dispenser within range inside the player's own claim, without
-manually depositing/withdrawing and hand-filling each one.
-
-Vertex serializes each faction's money/XP write before it changes the cached
-balance. If a money/XP deposit cannot be saved, it returns the resources;
-failed money payouts are compensated back into the bank. `bank-deposit` and
-`bank-withdraw` appear in `/f permissions` and default to allowed for
-Moderator, Member, and Recruit. All names, lore, prompts, and messages are
-under `faction-bank` in the language files.
-
-## Leader-leave protection
-
-`factions.prevent-leader-leave` (default `true`) blocks a faction
-leader's `/f leave` — and any alias listed in `factions.command-aliases`
-— with an explanatory message instead of letting it through. This
-prevents a leader from leaving their own faction (accidentally or as an
-exploit) without transferring leadership to someone else first.
-
-## Faction compatibility
-
-Every hostile ability, and Archer Tag, refuses to target faction members
-or allies; Portable Bard's buffs are the deliberate exception, designed
-to be shared with your own faction. See
-[PvP & Combat](pvp-and-combat.md#faction-compatibility) for the full
-list. Vertex is built against FactionsUUID 4.4.0; the currently used 4.7.0
-API has been checked for compatibility with Vertex's direct integrations.
+All native faction tables use the configured Vertex database backend. Core
+membership, leadership transfer, claim changes, and faction deletion are
+committed before cache changes or claim-bound item listeners run. `/f money`
+uses the existing durable `faction_banks` balance; the faction identity table
+does not keep a second money balance.
+Existing FactionsUUID data is intentionally not auto-imported: its storage
+layout and server-specific custom fields vary, and an unsafe import could
+misassign land or balances. Back up its data before removing that plugin. A
+one-time importer should only be run after its exact database/files and the
+desired mapping are reviewed.

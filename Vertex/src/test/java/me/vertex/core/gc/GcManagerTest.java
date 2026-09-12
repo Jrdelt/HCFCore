@@ -178,6 +178,15 @@ class GcManagerTest {
         assertTrue(compensated.get(), "the caller must be told to undo its own external side effect");
     }
 
+    @Test
+    void aDurablePayoutOperationKeyCannotCreditTwice() throws Exception {
+        assertTrue(manager.creditDurably(player, null, GcAction.COINFLIP_PAYOUT, 125L,
+                "coinflip:test:payout").get(5, TimeUnit.SECONDS));
+        assertTrue(manager.creditDurably(player, null, GcAction.COINFLIP_PAYOUT, 125L,
+                "coinflip:test:payout").get(5, TimeUnit.SECONDS));
+        assertEquals(125L, manager.balance(player));
+    }
+
     // ---- Redeem codes ----
 
     @Test

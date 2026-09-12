@@ -48,7 +48,7 @@ public final class TagMenu {
         TagMenuState state = requestedState.withPage(page);
 
         Holder holder = new Holder(manager, messages, state);
-        Component title = messages.get(player, titleKey(state.filter()), "count", String.valueOf(visible.size()));
+        Component title = messages.getGui(player, titleKey(state.filter()), "count", String.valueOf(visible.size()));
         Inventory inventory = Bukkit.createInventory(holder, 54, title);
         holder.inventory = inventory;
 
@@ -131,19 +131,19 @@ public final class TagMenu {
 
         boolean equipped = tag.id().equalsIgnoreCase(manager.getPlayerTag(player.getUniqueId()));
         List<Component> lore = new ArrayList<>();
-        lore.add(messages.get(player, equipped ? "tags.equipped" : "tags.unequipped"));
+        lore.add(messages.getGui(player, equipped ? "tags.equipped" : "tags.unequipped"));
         if (tag.lore() != null && !tag.lore().isEmpty()) {
             lore.add(Component.empty());
             for (String line : tag.lore()) {
-                lore.add(MessageFormatter.deserialize(line));
+                lore.add(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(line)));
             }
         }
         lore.add(Component.empty());
-        lore.add(messages.get(player, "tags.info-created", "date", TagManager.formatCreated(tag.createdAt())));
-        lore.add(messages.get(player, "tags.info-owners", "count", String.valueOf(manager.owners(tag.id()))));
+        lore.add(messages.getGui(player, "tags.info-created", "date", TagManager.formatCreated(tag.createdAt())));
+        lore.add(messages.getGui(player, "tags.info-owners", "count", String.valueOf(manager.owners(tag.id()))));
         lore.add(Component.empty());
         String hintKey = !unlocked ? "tags.locked" : (equipped ? "tags.click-unselect" : "tags.click-select");
-        lore.add(messages.get(player, hintKey));
+        lore.add(messages.getGui(player, hintKey));
         meta.lore(lore.stream().map(TagMenu::noItalic).toList());
         meta.getPersistentDataContainer().set(new NamespacedKey(manager.plugin(), "tag_id"),
                 PersistentDataType.STRING, tag.id());
@@ -166,19 +166,19 @@ public final class TagMenu {
 
     private static ItemStack filterButton(Player player, TagManager manager, Messages messages, TagMenuState state) {
         List<Component> lore = new ArrayList<>();
-        lore.add(messages.get(player, "tags.filter-heading", "filter",
+        lore.add(messages.getGui(player, "tags.filter-heading", "filter",
                 messages.getRaw(player, filterLabelKey(state.filter()))));
         lore.add(Component.empty());
         for (TagManager.Filter option : TagManager.Filter.values()) {
             long count = countFor(player, manager, option);
-            Component label = messages.get(player, filterLabelKey(option))
+            Component label = messages.getGui(player, filterLabelKey(option))
                     .append(Component.text(" (" + count + ")"));
             NamedTextColor color = option == state.filter() ? NamedTextColor.GREEN : NamedTextColor.GRAY;
             lore.add(Component.text(option == state.filter() ? "→ " : "  ", color).append(label.color(color)));
         }
         lore.add(Component.empty());
-        lore.add(messages.get(player, "tags.filter-hint"));
-        return button(Material.HOPPER, Component.text("Filter", NamedTextColor.AQUA), lore);
+        lore.add(messages.getGui(player, "tags.filter-hint"));
+        return button(Material.HOPPER, messages.getGui(player, "tags.filter-button"), lore);
     }
 
     private static String filterLabelKey(TagManager.Filter filter) {
@@ -197,16 +197,16 @@ public final class TagMenu {
 
     private static ItemStack sortButton(Player player, Messages messages, TagMenuState state) {
         List<Component> lore = new ArrayList<>();
-        lore.add(messages.get(player, "tags.sort-heading", "sort", messages.getRaw(player, sortLabelKey(state.sort()))));
+        lore.add(messages.getGui(player, "tags.sort-heading", "sort", messages.getRaw(player, sortLabelKey(state.sort()))));
         lore.add(Component.empty());
         for (TagManager.Sort option : TagManager.Sort.values()) {
             NamedTextColor color = option == state.sort() ? NamedTextColor.GREEN : NamedTextColor.GRAY;
-            lore.add(Component.text("→ ", color).append(messages.get(player, sortLabelKey(option)).color(color)));
+            lore.add(Component.text("→ ", color).append(messages.getGui(player, sortLabelKey(option)).color(color)));
         }
         lore.add(Component.empty());
-        lore.add(messages.get(player, "tags.sort-hint-cycle"));
-        lore.add(messages.get(player, "tags.sort-hint-direction"));
-        return button(Material.CLOCK, Component.text("Sort", NamedTextColor.AQUA), lore);
+        lore.add(messages.getGui(player, "tags.sort-hint-cycle"));
+        lore.add(messages.getGui(player, "tags.sort-hint-direction"));
+        return button(Material.CLOCK, messages.getGui(player, "tags.sort-button"), lore);
     }
 
     private static String sortLabelKey(TagManager.Sort sort) {
@@ -219,28 +219,28 @@ public final class TagMenu {
 
     private static ItemStack searchButton(Player player, Messages messages, TagMenuState state) {
         List<Component> lore = new ArrayList<>();
-        lore.add(messages.get(player, "tags.search-heading"));
+        lore.add(messages.getGui(player, "tags.search-heading"));
         lore.add(Component.empty());
         if (state.searchQuery() != null && !state.searchQuery().isBlank()) {
             lore.add(Component.text("\"" + state.searchQuery() + "\"", NamedTextColor.WHITE));
             lore.add(Component.empty());
         }
-        lore.add(messages.get(player, "tags.search-hint-left"));
-        lore.add(messages.get(player, "tags.search-hint-right"));
-        return button(Material.COMPASS, Component.text("Search", NamedTextColor.GOLD), lore);
+        lore.add(messages.getGui(player, "tags.search-hint-left"));
+        lore.add(messages.getGui(player, "tags.search-hint-right"));
+        return button(Material.COMPASS, messages.getGui(player, "tags.search-button"), lore);
     }
 
     private static ItemStack pageButton(Messages messages, Player player, String key, Material material, boolean enabled) {
         ItemStack item = new ItemStack(enabled ? material : Material.GRAY_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, key)));
+        meta.displayName(noItalic(messages.getGui(player, key)));
         item.setItemMeta(meta);
         return item;
     }
 
     private static ItemStack nicknameButton(Player player, TagManager manager, Messages messages) {
         List<Component> lore = new ArrayList<>();
-        lore.add(messages.get(player, "tags.nickname-heading"));
+        lore.add(messages.getGui(player, "tags.nickname-heading"));
         lore.add(Component.empty());
 
         // Shown regardless of whether nickname-match is currently on/off,
@@ -253,23 +253,23 @@ public final class TagMenu {
         Component chatPrefix = chatPreviewPrefix(player, manager, equippedTag);
         String sample = messages.getRaw(player, "tags.nickname-sample-message");
         String displayName = EssentialsHook.resolveName(player);
-        lore.add(messages.get(player, "tags.nickname-preview-heading"));
+        lore.add(messages.getGui(player, "tags.nickname-preview-heading"));
         lore.add(chatPrefix.append(MessageFormatter.deserialize(previewColor + displayName
                 + "<gray>: " + sample)));
         if (color != null && color.contains("gradient")) {
             lore.add(chatPrefix.append(MessageFormatter.deserialize(GradientColor.reverse(color) + displayName
                     + "<gray>: " + sample))
-                    .append(messages.get(player, "tags.nickname-reversed-suffix")));
+                    .append(messages.getGui(player, "tags.nickname-reversed-suffix")));
         }
         lore.add(Component.empty());
 
         boolean enabled = manager.isNicknameMatchEnabled(player.getUniqueId());
-        lore.add(messages.get(player, enabled ? "tags.nickname-status-on" : "tags.nickname-status-off"));
-        lore.add(messages.get(player, "tags.nickname-hint-toggle"));
+        lore.add(messages.getGui(player, enabled ? "tags.nickname-status-on" : "tags.nickname-status-off"));
+        lore.add(messages.getGui(player, "tags.nickname-hint-toggle"));
         if (color != null && color.contains("gradient")) {
-            lore.add(messages.get(player, "tags.nickname-hint-reverse"));
+            lore.add(messages.getGui(player, "tags.nickname-hint-reverse"));
         }
-        return skullButton(player, Component.text("Nickname Match", NamedTextColor.YELLOW), lore);
+        return skullButton(player, messages.getGui(player, "tags.nickname-button"), lore);
     }
 
     /**
@@ -311,7 +311,7 @@ public final class TagMenu {
     /**
      * This preview now renders unconditionally (see nicknameButton), so it
      * runs for every player who opens the tag menu instead of only those
-     * with a colored tag equipped -- FactionsUUID's own static state isn't
+     * with a colored tag equipped -- native faction state isn't
      * guaranteed initialized in every environment this runs in, so a lookup
      * failure here degrades to "no faction" for this cosmetic preview
      * rather than breaking the whole menu.

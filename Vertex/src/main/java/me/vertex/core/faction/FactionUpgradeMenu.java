@@ -1,8 +1,7 @@
 package me.vertex.core.faction;
 
-import dev.kitteh.factions.Faction;
-import dev.kitteh.factions.permissible.PermissibleActions;
 import me.vertex.core.economy.EconomyHook;
+import me.vertex.core.factions.FactionData;
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.Messages;
 import org.bukkit.Bukkit;
@@ -50,24 +49,23 @@ public final class FactionUpgradeMenu implements Listener {
     }
 
     public void open(Player player) {
-        Faction faction = FactionsHook.getFaction(player);
+        FactionData faction = FactionsHook.getFaction(player).orElse(null);
         if (faction == null) {
-            player.sendMessage(messages.get(player, "faction-upgrades.no-faction"));
+            player.sendMessage(messages.getGui(player, "faction-upgrades.no-faction"));
             return;
         }
         if (!canUseUpgrades(player, faction)) {
-            player.sendMessage(messages.get(player, "faction-upgrades.role-permission-denied"));
+            player.sendMessage(messages.getGui(player, "faction-upgrades.role-permission-denied"));
             return;
         }
-        manager.adoptNativeWarpLevel(faction);
         if (!manager.isEnabled()) {
-            player.sendMessage(messages.get(player, "faction-upgrades.disabled"));
+            player.sendMessage(messages.getGui(player, "faction-upgrades.disabled"));
             return;
         }
 
         Holder holder = new Holder(faction.id());
         Inventory inventory = Bukkit.createInventory(holder, INVENTORY_SIZE,
-                messages.get(player, "faction-upgrades.gui-title"));
+                messages.getGui(player, "faction-upgrades.gui-title"));
         holder.inventory = inventory;
         ItemStack border = border();
         for (int slot = 0; slot < inventory.getSize(); slot++) {
@@ -82,10 +80,7 @@ public final class FactionUpgradeMenu implements Listener {
         player.openInventory(inventory);
     }
 
-    /** FactionsUUID owns /f, so Vertex routes only the dedicated upgrades aliases. */
-    // Run before FactionsUUID's own command bridge. Vertex owns this GUI;
-    // FactionsUUID remains the source of truth only for its native Warps
-    // upgrade, which FactionUpgradeManager synchronizes on every view/buy.
+    /** Routes the native /f upgrades aliases to Vertex's persisted GUI. */
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onFactionUpgradeCommand(PlayerCommandPreprocessEvent event) {
         String[] parts = event.getMessage().trim().toLowerCase(Locale.ROOT).split("\\s+");
@@ -133,13 +128,13 @@ public final class FactionUpgradeMenu implements Listener {
                 || !(event.getWhoClicked() instanceof Player player)) {
             return;
         }
-        Faction faction = FactionsHook.getFaction(player);
+        FactionData faction = FactionsHook.getFaction(player).orElse(null);
         if (faction == null || faction.id() != holder.factionId) {
             player.closeInventory();
             return;
         }
         if (!canUseUpgrades(player, faction)) {
-            player.sendMessage(messages.get(player, "faction-upgrades.role-permission-denied"));
+            player.sendMessage(messages.getGui(player, "faction-upgrades.role-permission-denied"));
             player.closeInventory();
             return;
         }
@@ -154,34 +149,34 @@ public final class FactionUpgradeMenu implements Listener {
         }
         FactionUpgradeManager.PurchaseResult result = manager.purchase(player, faction, upgrade);
         switch (result) {
-            case SUCCESS -> player.sendMessage(messages.get(player, "faction-upgrades.purchased",
+            case SUCCESS -> player.sendMessage(messages.getGui(player, "faction-upgrades.purchased",
                     "upgrade", upgradeName(player, upgrade), "level", String.valueOf(manager.level(faction.id(), upgrade))));
-            case PENDING -> player.sendMessage(messages.get(player, "faction-upgrades.purchase-pending"));
-            case LEADER_ONLY -> player.sendMessage(messages.get(player, "faction-upgrades.leader-only"));
-            case MAXED -> player.sendMessage(messages.get(player, "faction-upgrades.maxed"));
-            case NO_ECONOMY -> player.sendMessage(messages.get(player, "faction-upgrades.no-economy"));
-            case CANNOT_AFFORD -> player.sendMessage(messages.get(player, "faction-upgrades.cannot-afford",
+            case PENDING -> player.sendMessage(messages.getGui(player, "faction-upgrades.purchase-pending"));
+            case LEADER_ONLY -> player.sendMessage(messages.getGui(player, "faction-upgrades.leader-only"));
+            case MAXED -> player.sendMessage(messages.getGui(player, "faction-upgrades.maxed"));
+            case NO_ECONOMY -> player.sendMessage(messages.getGui(player, "faction-upgrades.no-economy"));
+            case CANNOT_AFFORD -> player.sendMessage(messages.getGui(player, "faction-upgrades.cannot-afford",
                     "amount", EconomyHook.format(manager.nextCost(faction.id(), upgrade))));
-            case DISABLED -> player.sendMessage(messages.get(player, "faction-upgrades.disabled"));
+            case DISABLED -> player.sendMessage(messages.getGui(player, "faction-upgrades.disabled"));
         }
         // Reopen rather than closing the menu: a leader can purchase several
         // levels in succession, and the lore always reflects the live state.
         open(player);
     }
 
-    private ItemStack icon(Player player, Faction faction, FactionUpgrade upgrade) {
+    private ItemStack icon(Player player, FactionData faction, FactionUpgrade upgrade) {
         FactionUpgradeManager.Definition definition = manager.definition(upgrade);
         int level = manager.level(faction.id(), upgrade);
         ItemStack item = new ItemStack(definition.enabled() ? upgrade.icon() : Material.BARRIER);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(messages.get(player, "faction-upgrades.gui.name." + upgrade.configKey()));
+        meta.displayName(messages.getGui(player, "faction-upgrades.gui.name." + upgrade.configKey()));
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         String state = !definition.enabled() ? "disabled"
                 : level >= definition.maxLevel() ? "maxed"
-                : manager.leaderOnly() && !FactionsHook.isLeader(player) ? "leader-only" : "available";
+                : !manager.canPurchase(player) ? "leader-only" : "available";
         double nextCost = definition.enabled() && level < definition.maxLevel()
                 ? manager.nextCost(faction.id(), upgrade) : 0D;
-        List<net.kyori.adventure.text.Component> lore = messages.getList(player,
+        List<net.kyori.adventure.text.Component> lore = messages.getGuiList(player,
                 "faction-upgrades.gui.lore." + state,
                 "level", String.valueOf(level),
                 "max", String.valueOf(definition.maxLevel()),
@@ -194,10 +189,9 @@ public final class FactionUpgradeMenu implements Listener {
         return item;
     }
 
-    /** The native UPGRADE switch in /f permissions also controls this GUI. */
-    private static boolean canUseUpgrades(Player player, Faction faction) {
-        return RallyPermissionMenu.isNativeActionAllowed(
-                faction, RallyManager.roleId(player), PermissibleActions.UPGRADE);
+    /** The native Vertex upgrade permission is stored per faction role. */
+    private static boolean canUseUpgrades(Player player, FactionData faction) {
+        return FactionsHook.service().actionAllowed(faction.id(), RallyManager.roleId(player), "upgrade");
     }
 
     private String upgradeName(Player player, FactionUpgrade upgrade) {

@@ -58,7 +58,7 @@ public final class CoinflipMenu {
             boolean hasClaims) {
         Holder holder = new Holder(Mode.BROWSE, clampPage(player, manager, requestedPage), null);
         holder.hasClaims = hasClaims;
-        Inventory inventory = Bukkit.createInventory(holder, 54, messages.get(player, "coinflip.gui-title"));
+        Inventory inventory = Bukkit.createInventory(holder, 54, messages.getGui(player, "coinflip.gui-title"));
         holder.inventory = inventory;
         for (int slot = 0; slot < 9; slot++) {
             inventory.setItem(slot, border());
@@ -140,7 +140,7 @@ public final class CoinflipMenu {
     private static void openClaimLoaded(Player player, Messages messages, List<ItemStack> items) {
         Holder holder = new Holder(Mode.CLAIM, 0, null);
         holder.claimItems = List.copyOf(items);
-        Inventory inventory = Bukkit.createInventory(holder, 54, messages.get(player, "coinflip.claim-title"));
+        Inventory inventory = Bukkit.createInventory(holder, 54, messages.getGui(player, "coinflip.claim-title"));
         holder.inventory = inventory;
 
         for (int slot = 45; slot < 54; slot++) {
@@ -156,7 +156,7 @@ public final class CoinflipMenu {
 
     public static void openViewItems(Player player, Messages messages, Coinflip coinflip) {
         Holder holder = new Holder(Mode.VIEW_ITEMS, 0, coinflip.id());
-        Inventory inventory = Bukkit.createInventory(holder, 27, messages.get(player, "coinflip.view-items-title"));
+        Inventory inventory = Bukkit.createInventory(holder, 27, messages.getGui(player, "coinflip.view-items-title"));
         holder.inventory = inventory;
         ItemStack[] items = coinflip.items();
         for (int i = 0; i < items.length && i < 27; i++) {
@@ -179,31 +179,31 @@ public final class CoinflipMenu {
         };
         ItemMeta meta = icon.getItemMeta();
         String hostName = host.getName() == null ? "?" : host.getName();
-        meta.displayName(noItalic(messages.get(viewer, "coinflip.listing-title", "player", hostName)));
+        meta.displayName(noItalic(messages.getGui(viewer, "coinflip.listing-title", "player", hostName)));
 
         List<Component> lore = new ArrayList<>();
-        lore.add(noItalic(messages.get(viewer, "coinflip.listing-wager", "wager", wagerText(coinflip))));
+        lore.add(noItalic(messages.getGui(viewer, "coinflip.listing-wager", "wager", wagerText(coinflip))));
         if (coinflip.type() == CoinflipType.MONEY) {
-            lore.add(noItalic(messages.get(viewer, "coinflip.listing-your-balance",
+            lore.add(noItalic(messages.getGui(viewer, "coinflip.listing-your-balance",
                     "balance", EconomyHook.getBalance(viewer))));
         } else if (coinflip.type() == CoinflipType.EXP) {
-            lore.add(noItalic(messages.get(viewer, "coinflip.listing-your-levels", "levels", String.valueOf(viewer.getLevel()))));
+            lore.add(noItalic(messages.getGui(viewer, "coinflip.listing-your-levels", "levels", String.valueOf(viewer.getLevel()))));
         }
-        lore.add(noItalic(messages.get(viewer, "coinflip.listing-created", "time", relativeTime(coinflip.createdAtMillis()))));
+        lore.add(noItalic(messages.getGui(viewer, "coinflip.listing-created", "time", relativeTime(coinflip.createdAtMillis()))));
         boolean isHost = coinflip.hostUuid().equals(viewer.getUniqueId());
         boolean pendingMatch = coinflip.type() == CoinflipType.ITEMS && manager.hasPendingItemMatch(coinflip.id());
         if (isHost && pendingMatch) {
-            lore.add(noItalic(messages.get(viewer, "coinflip.listing-pending-match-host", "id", String.valueOf(coinflip.id()))));
+            lore.add(noItalic(messages.getGui(viewer, "coinflip.listing-pending-match-host", "id", String.valueOf(coinflip.id()))));
         } else if (!isHost && pendingMatch) {
-            lore.add(noItalic(messages.get(viewer, "coinflip.listing-pending-match-other")));
+            lore.add(noItalic(messages.getGui(viewer, "coinflip.listing-pending-match-other")));
         } else if (!isHost) {
-            lore.add(noItalic(messages.get(viewer, "coinflip.listing-click-play")));
+            lore.add(noItalic(messages.getGui(viewer, "coinflip.listing-click-play")));
         }
         if (coinflip.type() == CoinflipType.ITEMS && coinflip.items().length > 1) {
-            lore.add(noItalic(messages.get(viewer, "coinflip.listing-right-click-view")));
+            lore.add(noItalic(messages.getGui(viewer, "coinflip.listing-right-click-view")));
         }
         if (isHost || viewer.hasPermission("vertex.coinflip.remove")) {
-            lore.add(noItalic(messages.get(viewer, "coinflip.listing-shift-click-cancel")));
+            lore.add(noItalic(messages.getGui(viewer, "coinflip.listing-shift-click-cancel")));
         }
         meta.lore(lore);
         icon.setItemMeta(meta);
@@ -251,8 +251,8 @@ public final class CoinflipMenu {
     private static ItemStack claimButton(Player player, Messages messages, boolean hasClaims) {
         ItemStack item = new ItemStack(hasClaims ? Material.LIME_DYE : Material.GRAY_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, hasClaims ? "coinflip.claim-button-has-items" : "coinflip.claim-button-empty")));
-        meta.lore(List.of(noItalic(messages.get(player, hasClaims ? "coinflip.claim-button-has-items-lore" : "coinflip.claim-button-empty-lore"))));
+        meta.displayName(noItalic(messages.getGui(player, hasClaims ? "coinflip.claim-button-has-items" : "coinflip.claim-button-empty")));
+        meta.lore(List.of(noItalic(messages.getGui(player, hasClaims ? "coinflip.claim-button-has-items-lore" : "coinflip.claim-button-empty-lore"))));
         item.setItemMeta(meta);
         return item;
     }
@@ -261,13 +261,13 @@ public final class CoinflipMenu {
         boolean banned = manager.isBanned(player.getUniqueId());
         ItemStack item = new ItemStack(Material.PAPER);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, banned ? "coinflip.self-ban-title-active" : "coinflip.self-ban-title")));
+        meta.displayName(noItalic(messages.getGui(player, banned ? "coinflip.self-ban-title-active" : "coinflip.self-ban-title")));
         List<Component> lore = new ArrayList<>();
         if (banned) {
-            lore.add(noItalic(messages.get(player, "coinflip.self-ban-active")));
-            lore.add(noItalic(messages.get(player, "coinflip.self-ban-remaining", "time", formatDuration(manager.banRemainingMillis(player.getUniqueId())))));
+            lore.add(noItalic(messages.getGui(player, "coinflip.self-ban-active")));
+            lore.add(noItalic(messages.getGui(player, "coinflip.self-ban-remaining", "time", formatDuration(manager.banRemainingMillis(player.getUniqueId())))));
         } else {
-            lore.add(noItalic(messages.get(player, "coinflip.self-ban-lore")));
+            lore.add(noItalic(messages.getGui(player, "coinflip.self-ban-lore")));
         }
         meta.lore(lore);
         item.setItemMeta(meta);
@@ -283,8 +283,8 @@ public final class CoinflipMenu {
     private static ItemStack helpButton(Player player, Messages messages) {
         ItemStack item = new ItemStack(Material.EMERALD);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "coinflip.help-title")));
-        meta.lore(messages.getList(player, "coinflip.help-lore").stream().map(CoinflipMenu::noItalic).toList());
+        meta.displayName(noItalic(messages.getGui(player, "coinflip.help-title")));
+        meta.lore(messages.getGuiList(player, "coinflip.help-lore").stream().map(CoinflipMenu::noItalic).toList());
         item.setItemMeta(meta);
         return item;
     }
@@ -292,8 +292,8 @@ public final class CoinflipMenu {
     private static ItemStack claimAllButton(Player player, Messages messages, boolean hasItems) {
         ItemStack item = new ItemStack(hasItems ? Material.CHEST : Material.BARRIER);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "coinflip.claim-all-button")));
-        meta.lore(List.of(noItalic(messages.get(player, hasItems ? "coinflip.claim-all-lore" : "coinflip.claim-all-empty-lore"))));
+        meta.displayName(noItalic(messages.getGui(player, "coinflip.claim-all-button")));
+        meta.lore(List.of(noItalic(messages.getGui(player, hasItems ? "coinflip.claim-all-lore" : "coinflip.claim-all-empty-lore"))));
         item.setItemMeta(meta);
         return item;
     }
@@ -301,7 +301,7 @@ public final class CoinflipMenu {
     private static ItemStack pageButton(Messages messages, Player player, String key, Material material, boolean enabled) {
         ItemStack item = new ItemStack(enabled ? material : Material.GRAY_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, key)));
+        meta.displayName(noItalic(messages.getGui(player, key)));
         item.setItemMeta(meta);
         return item;
     }

@@ -43,6 +43,7 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
     private final GcInteropHook interopHook;
     private final Messages messages;
     private final Logger logger;
+    private volatile GcChatProtectionListener chatProtection;
 
     public GcCommand(Plugin plugin, GcManager manager, GcMenu menu,
             GcInteropHook interopHook, Messages messages) {
@@ -52,6 +53,10 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
         this.interopHook = interopHook;
         this.messages = messages;
         this.logger = plugin.getLogger();
+    }
+
+    public void setChatProtection(GcChatProtectionListener chatProtection) {
+        this.chatProtection = chatProtection;
     }
 
     @Override
@@ -74,6 +79,10 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
             case "redeem" -> handleRedeem(sender, args);
             case "withdraw" -> handleWithdrawCode(sender, args);
             case "admin" -> handleAdmin(sender, args);
+            case "chatapprove" -> {
+                if (sender instanceof Player player && chatProtection != null) chatProtection.approve(player);
+                else sender.sendMessage(messages.get(sender, "general.players-only"));
+            }
             default -> sendUsage(sender);
         }
         return true;
@@ -275,7 +284,10 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
                         "player", displayName(target), "balance", Numbers.formatFull(manager.balance(targetUuid))));
             }
             case STAFF_SET -> {
-                manager.setBalance(targetUuid, actorUuid, action, amount, "/gc admin set");
+                if (!manager.setBalance(targetUuid, actorUuid, action, amount, "/gc admin set")) {
+                    sender.sendMessage(messages.get(sender, "gc.admin-mutate-failed"));
+                    return;
+                }
                 sender.sendMessage(messages.get(sender, "gc.admin-mutate-success",
                         "player", displayName(target), "balance", Numbers.formatFull(amount)));
             }
@@ -296,7 +308,10 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
             return;
         }
         UUID actorUuid = sender instanceof Player player ? player.getUniqueId() : null;
-        manager.setBalance(target.getUniqueId(), actorUuid, GcAction.STAFF_ZERO, 0L, "/gc admin zero");
+        if (!manager.setBalance(target.getUniqueId(), actorUuid, GcAction.STAFF_ZERO, 0L, "/gc admin zero")) {
+            sender.sendMessage(messages.get(sender, "gc.admin-mutate-failed"));
+            return;
+        }
         sender.sendMessage(messages.get(sender, "gc.admin-mutate-success", "player", displayName(target), "balance", "0"));
     }
 

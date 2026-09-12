@@ -123,14 +123,17 @@ public final class PortableBardListener implements Listener {
             return;
         }
 
-        if (!consumeOnePortableBard(player)) {
-            player.closeInventory();
+        ItemStack buffItem = abilityManager.createItem(buffAbility);
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
+                plugin, player, List.of(buffItem), "portable-bard-exchange")) {
+            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
             return;
         }
-
-        PlayerInventory inventory = player.getInventory();
-        for (ItemStack dropped : inventory.addItem(abilityManager.createItem(buffAbility)).values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), dropped);
+        if (!consumeOnePortableBard(player)) {
+            plugin.getLogger().severe("Portable Bard source disappeared after output admission for "
+                    + player.getName());
+            player.closeInventory();
+            return;
         }
 
         // Only close once they're out of Portable Bards -- a player holding

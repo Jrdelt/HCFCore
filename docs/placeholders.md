@@ -54,11 +54,11 @@ Blank (not an error) for any of these if LuckPerms/Vault isn't installed.
 | Placeholder | Value |
 |---|---|
 | `%vertex_faction%` / `%vertex_faction_tag%` | The player's faction tag, or `None` if factionless |
-| `%vertex_faction_role%` | Their FactionsUUID role (`Recruit`, `Admin`, ...), or `None` |
+| `%vertex_faction_role%` | Their native Vertex role (`Recruit`, `Member`, `Moderator`, `Co-Leader`, or `Leader`), or `None` |
 | `%vertex_faction_power%` | Faction power, `current/max` |
 | `%vertex_faction_ftop%` | The faction's rank on the power leaderboard |
 | `%vertex_faction_online%` | Online members of the player's faction |
-| `%vertex_faction_money%` | FactionsUUID's own native `/f money` balance — blank if that economy isn't enabled on this server |
+| `%vertex_faction_money%` | Native Vertex `/f money` balance, or `0` when factionless |
 | `%vertex_faction_bank_money%` | Vertex's own `/fbank` money balance (a separate ledger from `/f money` — see [Factions Integration](factions-integration.md)) |
 | `%vertex_faction_bank_xp%` | Vertex's own `/fbank` experience balance |
 

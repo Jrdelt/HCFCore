@@ -21,6 +21,7 @@ public final class PlayerConnectionListener implements Listener {
     private final UserManager userManager;
     private final CombatManager combatManager;
     private volatile GhostPlayerManager ghostPlayerManager;
+    private volatile java.util.function.Predicate<UUID> trustedTransfer = ignored -> false;
 
     public PlayerConnectionListener(UserManager userManager, CombatManager combatManager) {
         this.userManager = userManager;
@@ -29,6 +30,11 @@ public final class PlayerConnectionListener implements Listener {
 
     public void setGhostPlayerManager(GhostPlayerManager ghostPlayerManager) {
         this.ghostPlayerManager = ghostPlayerManager;
+    }
+
+    /** Verified network/restart departures must never be treated as combat logging. */
+    public void setTrustedTransfer(java.util.function.Predicate<UUID> trustedTransfer) {
+        this.trustedTransfer = trustedTransfer == null ? ignored -> false : trustedTransfer;
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -69,7 +75,8 @@ public final class PlayerConnectionListener implements Listener {
         UUID uuid = player.getUniqueId();
 
         GhostPlayerManager ghosts = ghostPlayerManager;
-        boolean ghostSpawned = ghosts != null && isForcedDisconnect(event)
+        boolean protectedDeparture = trustedTransfer.test(uuid);
+        boolean ghostSpawned = !protectedDeparture && ghosts != null && isForcedDisconnect(event)
                 && ghosts.handleForcedDisconnect(player);
         if (ghostSpawned && combatManager != null && combatManager.isTagged(uuid)) {
             UUID opponentId = combatManager.getOpponentId(uuid);
@@ -78,7 +85,7 @@ public final class PlayerConnectionListener implements Listener {
             // opponent tied to a player who is no longer online.
             combatManager.clearOwnTag(uuid);
             combatManager.releaseOpponent(opponentId);
-        } else if (combatManager != null && combatManager.logoutPenaltyEnabled() && combatManager.isTagged(uuid)) {
+        } else if (!protectedDeparture && combatManager != null && combatManager.logoutPenaltyEnabled() && combatManager.isTagged(uuid)) {
             UUID opponentId = combatManager.getOpponentId(uuid);
             // setHealth(0) triggers a synchronous PlayerDeathEvent, which
             // CombatListener.onDeath handles by applying the killer's

@@ -2,6 +2,7 @@ package me.vertex.core.event;
 
 import me.vertex.core.lang.Messages;
 import me.vertex.core.menu.MenuRegistry;
+import me.vertex.core.capture.CaptureEventManager;
 import me.vertex.core.mine.HotZoneManager;
 import me.vertex.core.mine.MineKothManager;
 import me.vertex.core.mine.MineManager;
@@ -16,14 +17,17 @@ public final class EventsCommand implements CommandExecutor {
     private final MineManager mines;
     private final MineKothManager koths;
     private final HotZoneManager hotZones;
+    private final CaptureEventManager captureEvents;
     private final Messages messages;
     private final MenuRegistry menus;
 
     public EventsCommand(MineManager mines, MineKothManager koths, HotZoneManager hotZones,
+            CaptureEventManager captureEvents,
             Messages messages, MenuRegistry menus) {
         this.mines = mines;
         this.koths = koths;
         this.hotZones = hotZones;
+        this.captureEvents = captureEvents;
         this.messages = messages;
         this.menus = menus;
     }
@@ -34,7 +38,7 @@ public final class EventsCommand implements CommandExecutor {
             sender.sendMessage(messages.get(sender, "general.players-only"));
             return true;
         }
-        EventsMenu.open(player, mines, koths, hotZones, messages, menus);
+        EventsMenu.open(player, mines, koths, hotZones, captureEvents, messages, menus);
         return true;
     }
 }

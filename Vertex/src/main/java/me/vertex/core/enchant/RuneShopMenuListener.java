@@ -55,8 +55,15 @@ public final class RuneShopMenuListener implements Listener {
             return;
         }
         ItemStack item = manager.createRune(tier);
-        for (ItemStack dropped : player.getInventory().addItem(item).values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), dropped);
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
+                manager.plugin(), player, java.util.List.of(item), "rune-shop-purchase")) {
+            EconomyResponse refund = economy.depositPlayer(player, price);
+            if (refund == null || !refund.transactionSuccess()) {
+                manager.plugin().getLogger().severe("Rune delivery and Vault refund both failed for "
+                        + player.getUniqueId() + ": " + price);
+            }
+            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+            return;
         }
         player.sendMessage(messages.get(player, "rune.purchased", "tier", displayTier(tier),
                 "amount", EconomyHook.format(price)));

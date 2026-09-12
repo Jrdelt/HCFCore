@@ -73,17 +73,29 @@ public final class NoPearlSpawnListener implements Listener {
             return;
         }
         if (isProtected(plugin, event.getTo())) {
+            if (!refund(plugin,event.getPlayer())) {
+                // The pearl was already consumed. If neither durable storage
+                // nor the live inventory can accept its refund, allowing the
+                // original teleport is the only outcome that does not silently
+                // destroy a player's item.
+                plugin.getLogger().severe("Could not return a blocked Ender Pearl to "
+                        + event.getPlayer().getName() + "; allowing its original teleport.");
+                event.getPlayer().sendMessage(messages.get(event.getPlayer(),
+                        "delivery.storage-unavailable"));
+                return;
+            }
             event.setCancelled(true);
-            refund(event.getPlayer());
             event.getPlayer().sendMessage(messages.get(event.getPlayer(), "combat.no-pearl-spawn"));
         }
     }
 
-    private static void refund(Player player) {
+    private static boolean refund(Plugin plugin,Player player) {
         ItemStack refund = new ItemStack(Material.ENDER_PEARL, 1);
-        for (ItemStack dropped : player.getInventory().addItem(refund).values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), dropped);
+        if (me.vertex.core.storage.DeliveryManager.queueOverflow(
+                plugin, player, java.util.List.of(refund), "blocked-pearl-refund")) {
+            return true;
         }
+        return player.getInventory().addItem(refund).isEmpty();
     }
 
     /**

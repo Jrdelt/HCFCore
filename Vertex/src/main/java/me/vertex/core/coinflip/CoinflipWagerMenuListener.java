@@ -65,13 +65,23 @@ public final class CoinflipWagerMenuListener implements Listener {
                 || !(event.getPlayer() instanceof Player player) || holder.isResolved()) {
             return;
         }
-        for (int slot = CoinflipWagerMenu.GRID_START; slot < CoinflipWagerMenu.GRID_START + CoinflipWagerMenu.GRID_SLOTS; slot++) {
+        List<ItemStack> returns = new ArrayList<>();
+        for (int slot = CoinflipWagerMenu.GRID_START;
+                slot < CoinflipWagerMenu.GRID_START + CoinflipWagerMenu.GRID_SLOTS; slot++) {
             ItemStack item = event.getInventory().getItem(slot);
-            if (item == null || item.isEmpty()) {
-                continue;
-            }
-            player.getInventory().addItem(item).values()
-                    .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+            if (item != null && !item.isEmpty()) returns.add(item.clone());
+        }
+        if (returns.isEmpty()) return;
+        if (!manager.queueOverflow(player, returns, "coinflip-wager-return")) {
+            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+            org.bukkit.Bukkit.getScheduler().runTask(manager.plugin(), () -> {
+                if (player.isOnline()) player.openInventory(event.getInventory());
+            });
+            return;
+        }
+        for (int slot = CoinflipWagerMenu.GRID_START;
+                slot < CoinflipWagerMenu.GRID_START + CoinflipWagerMenu.GRID_SLOTS; slot++) {
+            event.getInventory().setItem(slot, null);
         }
     }
 
@@ -157,6 +167,8 @@ public final class CoinflipWagerMenuListener implements Listener {
             case EMPTY_WAGER -> "coinflip.wager-empty";
             case TOO_MANY_ITEMS -> "coinflip.wager-too-many-items-generic";
             case ALREADY_HOSTING -> "coinflip.already-hosting";
+            case PERSIST_FAILED -> "coinflip.create-persist-failed";
+            case RECOVERY_REQUIRED -> "coinflip.create-recovery-required";
             default -> "coinflip.create-failed";
         };
     }

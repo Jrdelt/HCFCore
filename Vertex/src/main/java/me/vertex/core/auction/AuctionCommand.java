@@ -48,6 +48,8 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
             case "cancel" -> handleCancel(player, args);
             case "collect" -> AuctionMenu.openClaim(player, manager, messages);
             case "logs" -> handleLogs(player, args);
+            case "payouts" -> handlePayouts(player, args);
+            case "intents" -> handleIntents(player, args);
             default -> sendUsage(player);
         }
         return true;
@@ -79,14 +81,8 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(messages.get(player, "auction.empty-hand"));
             return;
         }
-        ItemStack toList = held.clone();
-        player.getInventory().setItemInMainHand(null);
-
-        AuctionManager.ListOutcome outcome = manager.list(player, toList, price, currency);
+        AuctionManager.ListOutcome outcome = manager.listHeld(player, price, currency);
         if (outcome.result() != AuctionManager.ListResult.OK) {
-            // Hand it back -- nothing was actually listed.
-            player.getInventory().addItem(toList).values()
-                    .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
             player.sendMessage(messages.get(player, listFailureKey(outcome.result())));
             return;
         }
@@ -160,6 +156,90 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void handlePayouts(Player player, String[] args) {
+        if (!player.hasPermission("vertex.auction.payouts")) {
+            player.sendMessage(messages.get(player, "general.no-permission"));
+            return;
+        }
+        if (args.length == 1) {
+            List<AuctionStorage.PendingPayout> payouts = manager.uncertainPayouts();
+            if (payouts.isEmpty()) {
+                player.sendMessage(messages.get(player, "auction.payouts-empty"));
+                return;
+            }
+            player.sendMessage(messages.get(player, "auction.payouts-header", "count", String.valueOf(payouts.size())));
+            for (AuctionStorage.PendingPayout payout : payouts) player.sendMessage(messages.get(player,
+                    "auction.payouts-line", "key", payout.key(), "player", nameOf(payout.ownerUuid()),
+                    "currency", payout.currency().name(), "amount", String.valueOf(payout.amount())));
+            return;
+        }
+        if (args.length != 3 || !(args[2].equalsIgnoreCase("paid") || args[2].equalsIgnoreCase("retry"))) {
+            player.sendMessage(messages.get(player, "auction.payouts-usage"));
+            return;
+        }
+        boolean paid = args[2].equalsIgnoreCase("paid");
+        boolean success = manager.resolveUncertainPayout(args[1], paid);
+        player.sendMessage(messages.get(player, success ? "auction.payouts-resolved" : "auction.payouts-missing",
+                "key", args[1], "action", paid ? "PAID" : "RETRY"));
+    }
+
+    private void handleIntents(Player player, String[] args) {
+        if (!player.hasPermission("vertex.auction.intents")) {
+            player.sendMessage(messages.get(player, "general.no-permission"));
+            return;
+        }
+        if (args.length == 1) {
+            List<AuctionStorage.CreationIntent> intents = manager.unresolvedCreationIntents();
+            if (intents.isEmpty()) {
+                player.sendMessage(messages.get(player, "auction.intents-empty"));
+                return;
+            }
+            player.sendMessage(messages.get(player, "auction.intents-header", "count", String.valueOf(intents.size())));
+            for (AuctionStorage.CreationIntent intent : intents) {
+                player.sendMessage(messages.get(player, "auction.intents-line", "key", intent.key(),
+                        "player", nameOf(intent.sellerUuid()), "item", intent.item().getType().name(),
+                        "amount", String.valueOf(intent.item().getAmount()), "price", String.valueOf(intent.price()),
+                        "currency", intent.currency().name()));
+            }
+            return;
+        }
+        if (args.length == 2) {
+            manager.creationIntent(args[1]).ifPresentOrElse(intent -> player.sendMessage(messages.get(player,
+                    "auction.intents-detail", "key", intent.key(), "player", nameOf(intent.sellerUuid()),
+                    "item", intent.item().getType().name(), "amount", String.valueOf(intent.item().getAmount()),
+                    "price", String.valueOf(intent.price()), "currency", intent.currency().name())),
+                    () -> player.sendMessage(messages.get(player, "auction.intents-missing", "key", args[1])));
+            return;
+        }
+        if (args.length != 3 || !(args[2].equalsIgnoreCase("debited")
+                || args[2].equalsIgnoreCase("not-debited")
+                || args[2].equalsIgnoreCase("item-not-removed"))) {
+            player.sendMessage(messages.get(player, "auction.intents-usage"));
+            return;
+        }
+        AuctionStorage.IntentResolutionDecision decision = args[2].equalsIgnoreCase("debited")
+                ? AuctionStorage.IntentResolutionDecision.DEBITED
+                : args[2].equalsIgnoreCase("not-debited")
+                        ? AuctionStorage.IntentResolutionDecision.NOT_DEBITED
+                        : AuctionStorage.IntentResolutionDecision.ITEM_NOT_REMOVED;
+        AuctionStorage.IntentResolution result = manager.resolveCreationIntent(args[1], decision, player);
+        player.sendMessage(messages.get(player, intentResultKey(result.status()), "key", args[1],
+                "prior", result.priorDecision() == null ? "-" : result.priorDecision()));
+    }
+
+    private static String intentResultKey(AuctionStorage.IntentResolutionStatus status) {
+        return switch (status) {
+            case ACTIVATED -> "auction.intents-activated";
+            case REFUNDED -> "auction.intents-refunded";
+            case DISCARDED -> "auction.intents-discarded";
+            case ALREADY_RESOLVED -> "auction.intents-already-resolved";
+            case CONFLICT -> "auction.intents-conflict";
+            case INVALID_STATE -> "auction.intents-invalid";
+            case MISSING -> "auction.intents-missing";
+            case STORAGE_ERROR -> "auction.intents-storage-error";
+        };
+    }
+
     private static String listFailureKey(AuctionManager.ListResult result) {
         return switch (result) {
             case DISABLED -> "auction.disabled";
@@ -168,6 +248,8 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
             case NO_ECONOMY -> "spawner.no-economy";
             case NO_GC -> "gc.no-economy";
             case CANNOT_AFFORD_FEE -> "auction.cannot-afford-fee";
+            case PERSIST_FAILED -> "auction.create-persist-failed";
+            case RECOVERY_REQUIRED -> "auction.create-recovery-required";
             case OK -> "auction.listed";
         };
     }
@@ -175,7 +257,8 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
     /** The staff-only /ah logs syntax only gets appended for someone who could actually run it. */
     private void sendUsage(Player player) {
         player.sendMessage(messages.get(player, "auction.command-usage"));
-        if (player.hasPermission("vertex.auction.logs")) {
+        if (player.hasPermission("vertex.auction.logs") || player.hasPermission("vertex.auction.payouts")
+                || player.hasPermission("vertex.auction.intents")) {
             player.sendMessage(messages.get(player, "auction.command-usage-admin"));
         }
     }
@@ -193,6 +276,8 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
             if (sender.hasPermission("vertex.auction.logs")) {
                 options.add("logs");
             }
+            if (sender.hasPermission("vertex.auction.payouts")) options.add("payouts");
+            if (sender.hasPermission("vertex.auction.intents")) options.add("intents");
             String partial = args[0].toLowerCase(Locale.ROOT);
             List<String> matches = new ArrayList<>();
             for (String option : options) {
@@ -201,6 +286,29 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
                 }
             }
             return matches;
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("payouts")
+                && sender.hasPermission("vertex.auction.payouts")) {
+            String partial = args[1].toLowerCase(Locale.ROOT);
+            return manager.uncertainPayouts().stream().map(AuctionStorage.PendingPayout::key)
+                    .filter(key -> key.toLowerCase(Locale.ROOT).startsWith(partial)).toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("payouts")
+                && sender.hasPermission("vertex.auction.payouts")) {
+            String partial = args[2].toLowerCase(Locale.ROOT);
+            return List.of("paid", "retry").stream().filter(value -> value.startsWith(partial)).toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("intents")
+                && sender.hasPermission("vertex.auction.intents")) {
+            String partial = args[1].toLowerCase(Locale.ROOT);
+            return manager.unresolvedCreationIntents().stream().map(AuctionStorage.CreationIntent::key)
+                    .filter(key -> key.toLowerCase(Locale.ROOT).startsWith(partial)).toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("intents")
+                && sender.hasPermission("vertex.auction.intents")) {
+            String partial = args[2].toLowerCase(Locale.ROOT);
+            return List.of("debited", "not-debited", "item-not-removed").stream()
+                    .filter(value -> value.startsWith(partial)).toList();
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("sell")) {
             String partial = args[2].toLowerCase(Locale.ROOT);

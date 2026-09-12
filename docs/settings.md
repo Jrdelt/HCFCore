@@ -4,6 +4,12 @@
 preferences. Every category starts enabled, and a toggle is stored per player
 across reconnects and restarts.
 
+## Command and permission
+
+| Command | Permission | What it does |
+|---|---|---|
+| `/settings` / `/preferences` | Open to all | Opens personal notification preference toggles. |
+
 | Toggle | Messages controlled |
 |---|---|
 | Coinflip Announcements | Newly created public coinflips |

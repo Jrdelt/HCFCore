@@ -82,13 +82,16 @@ public final class BlueprintActivationMenuListener implements Listener {
                         }
                     }
 
-                    // Remove beacon without dropping vanilla items
-                    block.setType(Material.AIR, false);
-
-                    // Refund custom blueprint beacon to player or drop at player's location
+                    // Admit the refund before removing the source block. A
+                    // failed WAL and SQL inbox therefore leave the preview
+                    // beacon in place for a later retry.
                     ItemStack blueprintItem = listener.createBlueprintItem(template);
-                    player.getInventory().addItem(blueprintItem).values()
-                            .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+                    if (!listener.queueOverflow(
+                            player, java.util.List.of(blueprintItem), "blueprint-preview-refund")) {
+                        player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+                        return;
+                    }
+                    block.setType(Material.AIR, false);
 
                     player.sendMessage(messages.get(player, "blueprint.cancelled"));
                 }

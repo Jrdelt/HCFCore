@@ -41,7 +41,11 @@ public final class ChunkBusterMenu {
         Holder holder = new Holder(type, target.clone(), hasSpawners);
 
         MenuPlaceholders placeholders = MenuPlaceholders.of()
-                .put("type", manager.displayName(type))
+                // Type names come from admin-controlled chunkbuster.yml and
+                // may intentionally contain MiniMessage tags such as <red>.
+                // A normal placeholder escapes those tags and showed them as
+                // raw lore text, so this one must be rendered as trusted text.
+                .putTrusted("type", manager.displayName(type))
                 .put("world", target.getWorld().getName())
                 .put("x", target.getBlockX())
                 .put("y", target.getBlockY())

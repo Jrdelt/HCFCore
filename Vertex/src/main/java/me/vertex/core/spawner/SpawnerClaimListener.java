@@ -1,11 +1,9 @@
 package me.vertex.core.spawner;
 
-import dev.kitteh.factions.Faction;
-import dev.kitteh.factions.event.FactionAutoDisbandEvent;
-import dev.kitteh.factions.event.FactionDisbandEvent;
-import dev.kitteh.factions.event.LandUnclaimAllEvent;
-import dev.kitteh.factions.event.LandUnclaimEvent;
-import dev.kitteh.factions.event.LandClaimEvent;
+import me.vertex.core.factions.FactionData;
+import me.vertex.core.factions.event.FactionClaimEvent;
+import me.vertex.core.factions.event.FactionLifecycleEvent;
+import me.vertex.core.factions.event.FactionUnclaimAllEvent;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import net.kyori.adventure.text.Component;
@@ -41,30 +39,40 @@ public final class SpawnerClaimListener implements Listener {
      * and ensuring the old faction cannot later remove it on disband.
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onClaim(LandClaimEvent event) {
-        if (event.isCancelled() || event.getFaction() == null) {
-            return;
-        }
-        String claimingTag = event.getFaction().tag();
-        for (Map.Entry<Location, SpawnerData> entry : spawnerManager.getSpawnersInChunk(event.getLocation().asChunk())) {
+    public void onClaim(FactionClaimEvent event) {
+        if (event.action() != FactionClaimEvent.Action.CLAIM || event.faction().system()) return;
+        String claimingTag = event.faction().tag();
+        org.bukkit.World world = event.chunk().isLocalShard() ? org.bukkit.Bukkit.getWorld(event.chunk().localWorld()) : null;
+        if (world == null) return;
+        for (Map.Entry<Location, SpawnerData> entry : spawnerManager.getSpawnersInChunk(world,event.chunk().x(),event.chunk().z())) {
             spawnerManager.transferOwnership(entry.getKey(), claimingTag);
         }
     }
 
     /** Blocks unclaiming a single chunk outright while it has active spawners. */
     @EventHandler(priority = EventPriority.HIGH)
-    public void onUnclaim(LandUnclaimEvent event) {
-        if (event.isCancelled()) {
-            return;
-        }
-        Chunk chunk = event.getLocation().asChunk();
-        if (spawnerManager.getSpawnersInChunk(chunk).isEmpty()) {
+    public void onUnclaim(FactionClaimEvent event) {
+        if (event.action() != FactionClaimEvent.Action.UNCLAIM) return;
+        org.bukkit.World world = event.chunk().isLocalShard() ? org.bukkit.Bukkit.getWorld(event.chunk().localWorld()) : null;
+        if (world == null) return;
+        if (!spawnerManager.hasSpawnerInChunk(world.getName(),event.chunk().x(),event.chunk().z())) {
             return;
         }
         event.setCancelled(true);
-        Player player = event.getFPlayer().asPlayer();
+        Player player = event.actor();
         if (player != null) {
             player.sendMessage(messages.get(player, "spawner.unclaim-blocked"));
+        }
+    }
+
+    /** Timed raid land must expire even when it contains spawners. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onExpire(FactionClaimEvent event) {
+        if (event.action() != FactionClaimEvent.Action.EXPIRE) return;
+        org.bukkit.World world = event.chunk().isLocalShard() ? org.bukkit.Bukkit.getWorld(event.chunk().localWorld()) : null;
+        if (world == null) return;
+        for (Map.Entry<Location, SpawnerData> entry : spawnerManager.getSpawnersInChunk(world,event.chunk().x(),event.chunk().z())) {
+            dropSpawner(entry.getKey(), entry.getValue());
         }
     }
 
@@ -75,42 +83,31 @@ public final class SpawnerClaimListener implements Listener {
      * instead of left behind floating in an unclaimed chunk.
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onUnclaimAll(LandUnclaimAllEvent event) {
-        if (event.isCancelled()) {
-            return;
-        }
-        Faction faction = event.getFPlayer().faction();
-        int dropped = dropAllInFactionClaims(faction);
+    public void onUnclaimAll(FactionUnclaimAllEvent event) {
+        int dropped = dropAllInFactionClaims(event.faction());
         if (dropped <= 0) {
             return;
         }
-        Player player = event.getFPlayer().asPlayer();
+        Player player = event.actor();
         if (player != null) {
             player.sendMessage(messages.get(player, "spawner.unclaimall-warning", "amount", String.valueOf(dropped)));
         }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onDisband(FactionDisbandEvent event) {
-        if (event.isCancelled()) {
-            return;
-        }
-        int dropped = dropAllInFactionClaims(event.getFaction());
+    public void onDisband(FactionLifecycleEvent event) {
+        if (event.action() != FactionLifecycleEvent.Action.DISBAND) return;
+        int dropped = dropAllInFactionClaims(event.faction());
         if (dropped <= 0) {
             return;
         }
-        Player player = event.getFPlayer().asPlayer();
+        Player player = event.actor();
         if (player != null) {
             player.sendMessage(messages.get(player, "spawner.disband-warning", "amount", String.valueOf(dropped)));
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onAutoDisband(FactionAutoDisbandEvent event) {
-        dropAllInFactionClaims(event.getFaction());
-    }
-
-    private int dropAllInFactionClaims(Faction faction) {
+    private int dropAllInFactionClaims(FactionData faction) {
         if (faction == null) {
             return 0;
         }

@@ -518,7 +518,7 @@ public final class BackpackManager {
             meta.setCustomModelData(null);
         }
 
-        meta.displayName(MessageFormatter.deserialize(tier.displayName()));
+        meta.displayName(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(tier.displayName())));
         meta.lore(buildLore(tier, data));
         item.setItemMeta(meta);
     }
@@ -562,7 +562,7 @@ public final class BackpackManager {
         double bonus = dropBonusPercent(tier, data.level());
         long stored = storedItemCount(data.contents());
 
-        return messages.getList(Bukkit.getConsoleSender(), "backpack.lore",
+        return messages.getGuiList(Bukkit.getConsoleSender(), "backpack.lore",
                 "level", String.valueOf(data.level()),
                 "bonus", String.format("%.2f", bonus),
                 "stored", String.format("%,d", stored),

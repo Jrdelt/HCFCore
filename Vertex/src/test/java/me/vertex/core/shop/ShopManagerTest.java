@@ -49,7 +49,12 @@ class ShopManagerTest {
         ShopStorage storage = new ShopStorage(database);
         storage.init();
 
-        manager = new ShopManager(plugin, storage, null);
+        manager = new ShopManager(plugin, storage, null, (target, items, source) -> {
+            for (org.bukkit.inventory.ItemStack item : items) {
+                if (!target.getInventory().addItem(item.clone()).isEmpty()) return false;
+            }
+            return true;
+        });
         manager.load();
         manager.loadState();
 
@@ -195,6 +200,25 @@ class ShopManagerTest {
 
         assertEquals(ShopManager.TradeResult.NOT_ENOUGH_ITEMS, outcome.result());
         assertEquals(startBalance, economy.get(player.getUniqueId()), 0.0001);
+    }
+
+    @Test
+    void customItemsAreNotCountedOrDuplicatedByAPlainMaterialSale() {
+        org.bukkit.inventory.ItemStack custom = new org.bukkit.inventory.ItemStack(Material.STONE, 20);
+        org.bukkit.inventory.meta.ItemMeta meta = custom.getItemMeta();
+        meta.displayName(net.kyori.adventure.text.Component.text("Tracked stone"));
+        custom.setItemMeta(meta);
+        player.getInventory().addItem(custom);
+        double startBalance = economy.get(player.getUniqueId());
+
+        ShopManager.TradeOutcome outcome = manager.sell(player, Material.STONE, 20);
+
+        assertEquals(ShopManager.TradeResult.NOT_ENOUGH_ITEMS, outcome.result());
+        assertEquals(startBalance, economy.get(player.getUniqueId()), 0.0001);
+        assertEquals(20, countInInventory(Material.STONE));
+        assertTrue(java.util.Arrays.stream(player.getInventory().getStorageContents())
+                .filter(item -> item != null && item.getType() == Material.STONE)
+                .allMatch(org.bukkit.inventory.ItemStack::hasItemMeta));
     }
 
     @Test

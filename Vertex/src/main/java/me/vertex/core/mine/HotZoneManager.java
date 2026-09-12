@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 /**
@@ -58,6 +60,8 @@ public final class HotZoneManager {
     private volatile boolean preAnnounced;
 
     private BukkitTask task;
+    private final Object writeLock = new Object();
+    private CompletableFuture<Void> writeTail = CompletableFuture.completedFuture(null);
 
     public HotZoneManager(Plugin plugin, MineManager mines, HotZoneStorage storage, Messages messages) {
         this(plugin, mines, storage, messages, null);
@@ -224,10 +228,30 @@ public final class HotZoneManager {
     }
 
     private void persist(String mineId, long startedAt, long endsAt) {
+        synchronized (writeLock) {
+            writeTail = writeTail.handle((ignored, error) -> null).thenRunAsync(() -> {
+                try {
+                    me.vertex.core.storage.SqlRetry.run(plugin, "Hot Zone save for " + mineId,
+                            () -> storage.save(mineId, startedAt, endsAt));
+                } catch (Exception e) {
+                    plugin.getLogger().log(Level.SEVERE,
+                            "Failed to persist Hot Zone state for " + mineId + " after retries.", e);
+                }
+            });
+        }
+    }
+
+    public void awaitWrites() {
+        CompletableFuture<Void> pending;
+        synchronized (writeLock) {
+            pending = writeTail;
+        }
         try {
-            storage.save(mineId, startedAt, endsAt);
-        } catch (Exception e) {
-            plugin.getLogger().log(Level.WARNING, "Failed to persist Hot Zone state for " + mineId, e);
+            pending.get(10, TimeUnit.SECONDS);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.WARNING, "Timed out waiting for Hot Zone persistence.", error);
         }
     }
 
@@ -280,5 +304,6 @@ public final class HotZoneManager {
             task.cancel();
             task = null;
         }
+        awaitWrites();
     }
 }

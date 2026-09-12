@@ -24,7 +24,7 @@ public final class AbilitiesMenu {
         int size = Math.max(9, ((abilities.size() / 9) + 1) * 9);
 
         Holder holder = new Holder();
-        Inventory inventory = Bukkit.createInventory(holder, size, messages.get(player, "ability.gui-title"));
+        Inventory inventory = Bukkit.createInventory(holder, size, messages.getGui(player, "ability.gui-title"));
         holder.inventory = inventory;
 
         boolean canGive = player.hasPermission("vertex.ability.give");
@@ -37,8 +37,8 @@ public final class AbilitiesMenu {
             List<Component> lore = new ArrayList<>(existingLore == null ? List.of() : existingLore);
             lore.add(Component.empty());
             lore.add(canGive
-                    ? messages.get(player, "ability.gui-click-to-receive")
-                    : messages.get(player, "ability.gui-cooldown", "seconds",
+                    ? messages.getGui(player, "ability.gui-click-to-receive")
+                    : messages.getGui(player, "ability.gui-cooldown", "seconds",
                             String.valueOf(ability.getCooldownSeconds())));
             meta.lore(lore);
             icon.setItemMeta(meta);

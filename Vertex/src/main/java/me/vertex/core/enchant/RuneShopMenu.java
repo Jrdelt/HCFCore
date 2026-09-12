@@ -29,7 +29,7 @@ public final class RuneShopMenu {
 
     public static void open(Player player, EnchantManager manager, Messages messages) {
         Holder holder = new Holder();
-        Inventory inventory = Bukkit.createInventory(holder, 27, messages.get(player, "rune.shop-title"));
+        Inventory inventory = Bukkit.createInventory(holder, 27, messages.getGui(player, "rune.shop-title"));
         holder.inventory = inventory;
 
         for (int index = 0; index < RuneTier.values().length && index < TIER_SLOTS.size(); index++) {
@@ -45,8 +45,8 @@ public final class RuneShopMenu {
         ItemStack item = manager.createRune(tier);
         ItemMeta meta = item.getItemMeta();
         List<Component> lore = new ArrayList<>(meta.hasLore() && meta.lore() != null ? meta.lore() : List.of());
-        lore.add(messages.get(player, "rune.shop-price", "amount", EconomyHook.format(manager.runeShopPrice(tier))));
-        lore.add(messages.get(player, "rune.shop-hint"));
+        lore.add(messages.getGui(player, "rune.shop-price", "amount", EconomyHook.format(manager.runeShopPrice(tier))));
+        lore.add(messages.getGui(player, "rune.shop-hint"));
         meta.lore(lore);
         item.setItemMeta(meta);
         return item;

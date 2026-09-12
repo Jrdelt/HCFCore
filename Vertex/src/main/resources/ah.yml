@@ -3,7 +3,7 @@
 # ============================================
 # /ah (alias /auctionhouse) -- a buy-it-now marketplace for any item.
 # List whatever you're holding at a fixed price; the first player to buy
-# it gets it immediately, no bidding, no waiting for an auction to end.
+# it owns it immediately and collects it safely through /ah collect.
 enabled: true
 
 # Bounds on a listing's buy-it-now price.

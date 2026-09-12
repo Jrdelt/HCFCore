@@ -35,24 +35,22 @@ public final class SandBotListener implements Listener {
         Block below = placed.getRelative(0, -1, 0);
 
         event.setCancelled(true);
-        manager.debug(player, "Placement intercepted at " + placed.getX() + ", " + placed.getY() + ", "
-                + placed.getZ() + "; floor material is " + below.getType() + ".");
+        manager.debug(player, "placement", "x", String.valueOf(placed.getX()), "y", String.valueOf(placed.getY()),
+                "z", String.valueOf(placed.getZ()), "material", below.getType().name());
 
         int factionId = FactionsHook.getFactionId(player);
         if (factionId == FactionsHook.NO_FACTION
                 || FactionsHook.getClaimFactionId(placed.getLocation()) != factionId) {
-            manager.debug(player, "Placement denied: this block is not claimed by your faction.");
-            Component msg = messages != null ? messages.get(player, "sandbot.not-own-claim") : Component.text("§cYou cannot place a Sand Bot outside your claim.");
-            player.sendMessage(msg);
+            manager.debug(player, "placement-denied");
+            player.sendMessage(messages.get(player, "sandbot.not-own-claim"));
             return;
         }
 
         Location spawnLocation = placed.getLocation().add(0.5, 0, 0.5);
         spawnLocation.setYaw(player.getLocation().getYaw());
         if (!manager.spawn(player, below, spawnLocation)) {
-            manager.debug(player, "Spawn failed: FancyNPCs is unavailable, still loading, or your faction was not resolved.");
-            Component msg = messages != null ? messages.get(player, "sandbot.spawn-failed") : Component.text("§cFailed to spawn Sand Bot.");
-            player.sendMessage(msg);
+            manager.debug(player, "spawn-failed");
+            player.sendMessage(messages.get(player, "sandbot.spawn-failed"));
             return;
         }
 
@@ -63,8 +61,7 @@ public final class SandBotListener implements Listener {
             heldItem.setAmount(heldItem.getAmount() - 1);
         }
 
-        Component msg = messages != null ? messages.get(player, "sandbot.spawned") : Component.text("§aSand Bot deployed successfully.");
-        player.sendMessage(msg);
+        player.sendMessage(messages.get(player, "sandbot.spawned"));
     }
 
     @EventHandler
@@ -97,12 +94,13 @@ public final class SandBotListener implements Listener {
                 || player.hasPermission("vertex.sandbot.admin"))) {
             if (event.getSlot() == 11) {
                 session.active = !session.active;
+                manager.persistState();
                 player.closeInventory();
                 manager.openControlPanel(player, session);
             } else if (event.getSlot() == 15) {
                 manager.destroy(session);
                 player.closeInventory();
-                player.sendMessage("§aSand Bot despawned.");
+                player.sendMessage(messages.get(player, "sandbot.despawned"));
             }
         }
     }

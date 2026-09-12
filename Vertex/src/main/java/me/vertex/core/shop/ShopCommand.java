@@ -91,6 +91,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             case NO_ECONOMY -> "spawner.no-economy";
             case CANNOT_AFFORD -> "shop.cannot-afford";
             case NOT_ENOUGH_ITEMS -> "shop.not-enough-items";
+            case STORAGE_UNAVAILABLE -> "delivery.storage-unavailable";
             case OK -> buying ? "shop.bought" : "shop.sold";
         };
     }

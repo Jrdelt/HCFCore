@@ -3,6 +3,10 @@ package me.vertex.core.util;
 import io.papermc.paper.chat.ChatRenderer;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
+import me.vertex.core.lang.Messages;
+import me.vertex.core.storage.Storage;
+import me.vertex.core.staff.Death;
+import me.vertex.core.user.UserManager;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.junit.jupiter.api.AfterEach;
@@ -15,6 +19,10 @@ import org.mockbukkit.mockbukkit.plugin.PluginMock;
 import org.mockbukkit.mockbukkit.scheduler.BukkitSchedulerMock;
 
 import java.util.Set;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -44,7 +52,9 @@ class ChatAmountPromptTest {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer();
-        prompt = new ChatAmountPrompt(plugin);
+        Messages messages = new Messages(plugin, new UserManager(plugin, new NoOpStorage()));
+        messages.load();
+        prompt = new ChatAmountPrompt(plugin, messages);
     }
 
     @AfterEach
@@ -189,5 +199,18 @@ class ChatAmountPromptTest {
 
     private static void fail() {
         throw new AssertionError("this callback should not have run");
+    }
+
+    private static final class NoOpStorage implements Storage {
+        @Override public void init() { }
+        @Override public Map<String, Long> loadCooldowns(UUID uuid) { return Map.of(); }
+        @Override public void saveCooldown(UUID uuid, String kitName, long availableAt) { }
+        @Override public Map<String, Long> loadAbilityCooldowns(UUID uuid) { return Map.of(); }
+        @Override public void saveAbilityCooldown(UUID uuid, String abilityId, long availableAt) { }
+        @Override public String loadLocale(UUID uuid) { return null; }
+        @Override public void saveLocale(UUID uuid, String locale) { }
+        @Override public void saveDeath(UUID uuid, Death death) { }
+        @Override public List<Death> loadDeaths(UUID uuid, int limit) { return List.of(); }
+        @Override public void close() { }
     }
 }

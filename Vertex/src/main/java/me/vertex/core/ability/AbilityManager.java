@@ -106,11 +106,11 @@ public final class AbilityManager implements Listener {
     public ItemStack createItem(Ability ability) {
         ItemStack item = new ItemStack(ability.getMaterial());
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(MessageFormatter.deserialize(ability.getDisplayName()));
+        meta.displayName(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(ability.getDisplayName())));
 
         List<Component> lore = new ArrayList<>();
         for (String line : ability.getLore()) {
-            lore.add(MessageFormatter.deserialize(line));
+            lore.add(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(line)));
         }
         meta.lore(lore);
 

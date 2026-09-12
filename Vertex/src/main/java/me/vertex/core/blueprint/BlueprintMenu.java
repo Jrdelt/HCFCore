@@ -32,7 +32,7 @@ public final class BlueprintMenu {
     /** Opened when the blueprint is still actively building. */
     public static void openActive(Player player, BlueprintManager manager, Messages messages, ActiveBuild build) {
         Holder holder = new Holder(build.id(), build.anchor(), build.template().name(), null);
-        Inventory inventory = Bukkit.createInventory(holder, 9, messages.get(player, "blueprint.gui-active-title"));
+        Inventory inventory = Bukkit.createInventory(holder, 9, messages.getGui(player, "blueprint.gui-active-title"));
         holder.inventory = inventory;
 
         int total = build.blocks() == null ? 0 : build.blocks().size();
@@ -44,30 +44,30 @@ public final class BlueprintMenu {
         infoMeta.displayName(MessageFormatter.deserialize(build.template().displayName()));
         infoMeta.lore(build.isPaused()
                 ? List.of(
-                        messages.get(player, "blueprint.menu-progress", "done", String.valueOf(done), "total",
+                        messages.getGui(player, "blueprint.menu-progress", "done", String.valueOf(done), "total",
                                 String.valueOf(total)),
-                        messages.get(player, "blueprint.menu-remaining", "seconds", String.valueOf(remainingSeconds)),
-                        messages.get(player, "blueprint.menu-paused"))
+                        messages.getGui(player, "blueprint.menu-remaining", "seconds", String.valueOf(remainingSeconds)),
+                        messages.getGui(player, "blueprint.menu-paused"))
                 : List.of(
-                        messages.get(player, "blueprint.menu-progress", "done", String.valueOf(done), "total",
+                        messages.getGui(player, "blueprint.menu-progress", "done", String.valueOf(done), "total",
                                 String.valueOf(total)),
-                        messages.get(player, "blueprint.menu-remaining", "seconds", String.valueOf(remainingSeconds))));
+                        messages.getGui(player, "blueprint.menu-remaining", "seconds", String.valueOf(remainingSeconds))));
         info.setItemMeta(infoMeta);
         inventory.setItem(4, info);
 
         if (build.isPaused()) {
             ItemStack resume = new ItemStack(Material.LIME_DYE);
             ItemMeta resumeMeta = resume.getItemMeta();
-            resumeMeta.displayName(messages.get(player, "blueprint.gui-resume-button"));
-            resumeMeta.lore(List.of(messages.get(player, "blueprint.menu-resume-lore")));
+            resumeMeta.displayName(messages.getGui(player, "blueprint.gui-resume-button"));
+            resumeMeta.lore(List.of(messages.getGui(player, "blueprint.menu-resume-lore")));
             resume.setItemMeta(resumeMeta);
             inventory.setItem(RESUME_SLOT, resume);
         }
 
         ItemStack cancel = new ItemStack(Material.BARRIER);
         ItemMeta cancelMeta = cancel.getItemMeta();
-        cancelMeta.displayName(messages.get(player, "blueprint.gui-cancel-button"));
-        cancelMeta.lore(List.of(messages.get(player, "blueprint.menu-cancel-lore")));
+        cancelMeta.displayName(messages.getGui(player, "blueprint.gui-cancel-button"));
+        cancelMeta.lore(List.of(messages.getGui(player, "blueprint.menu-cancel-lore")));
         cancel.setItemMeta(cancelMeta);
         inventory.setItem(CANCEL_SLOT, cancel);
 
@@ -78,7 +78,7 @@ public final class BlueprintMenu {
     public static void openCompleted(Player player, BlueprintManager manager, Messages messages, Location anchor,
             BlueprintTemplate template, List<ActiveBuild.PendingBlock> missingBlocks) {
         Holder holder = new Holder(-1, anchor, template.name(), missingBlocks);
-        Inventory inventory = Bukkit.createInventory(holder, 9, messages.get(player, "blueprint.gui-status-title"));
+        Inventory inventory = Bukkit.createInventory(holder, 9, messages.getGui(player, "blueprint.gui-status-title"));
         holder.inventory = inventory;
 
         int totalTasks = missingBlocks.size();
@@ -96,17 +96,17 @@ public final class BlueprintMenu {
 
         ItemStack diamond = new ItemStack(Material.DIAMOND);
         ItemMeta meta = diamond.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "blueprint.gui-repair-button")));
+        meta.displayName(noItalic(messages.getGui(player, "blueprint.gui-repair-button")));
 
-        Component statusComponent = noItalic(messages.get(player,
+        Component statusComponent = noItalic(messages.getGui(player,
                 totalTasks == 0 ? "blueprint.gui-repair-intact" : "blueprint.gui-repair-action"));
 
         meta.lore(List.of(
-                noItalic(messages.get(player, "blueprint.gui-repair-lore-template", "template",
+                noItalic(messages.getGui(player, "blueprint.gui-repair-lore-template", "template",
                         MessageFormatter.plain(template.displayName()))),
-                noItalic(messages.get(player, "blueprint.gui-repair-lore-missing", "missing",
+                noItalic(messages.getGui(player, "blueprint.gui-repair-lore-missing", "missing",
                         String.valueOf(totalTasks))),
-                noItalic(messages.get(player, "blueprint.gui-repair-lore-time", "seconds",
+                noItalic(messages.getGui(player, "blueprint.gui-repair-lore-time", "seconds",
                         String.valueOf(durationSeconds))),
                 Component.empty().decoration(TextDecoration.ITALIC, false),
                 statusComponent));
@@ -116,8 +116,8 @@ public final class BlueprintMenu {
 
         ItemStack barrier = new ItemStack(Material.BARRIER);
         ItemMeta barrierMeta = barrier.getItemMeta();
-        barrierMeta.displayName(noItalic(messages.get(player, "blueprint.gui-destroy-button")));
-        barrierMeta.lore(List.of(noItalic(messages.get(player, "blueprint.gui-destroy-lore"))));
+        barrierMeta.displayName(noItalic(messages.getGui(player, "blueprint.gui-destroy-button")));
+        barrierMeta.lore(List.of(noItalic(messages.getGui(player, "blueprint.gui-destroy-lore"))));
         barrier.setItemMeta(barrierMeta);
         inventory.setItem(DESTROY_SLOT, barrier);
 

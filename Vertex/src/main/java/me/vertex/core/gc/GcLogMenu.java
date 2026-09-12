@@ -53,7 +53,7 @@ public final class GcLogMenu {
         int page = Math.max(0, Math.min(requestedPage, totalPages - 1));
 
         Holder holder = new Holder(page);
-        Inventory inventory = Bukkit.createInventory(holder, 54, messages.get(player, "gc.log-gui-title"));
+        Inventory inventory = Bukkit.createInventory(holder, 54, messages.getGui(player, "gc.log-gui-title"));
         holder.setInventory(inventory);
 
         for (int slot = 0; slot < 9; slot++) {
@@ -91,15 +91,15 @@ public final class GcLogMenu {
         };
         ItemStack icon = new ItemStack(material);
         ItemMeta meta = icon.getItemMeta();
-        meta.displayName(noItalic(messages.get(viewer, "gc.log-entry-title", "action", entry.action().name())));
+        meta.displayName(noItalic(messages.getGui(viewer, "gc.log-entry-title", "action", entry.action().name())));
 
         String actorName = entry.actorUuid() == null ? "-" : nameOf(entry.actorUuid());
         meta.lore(List.of(
-                noItalic(messages.get(viewer, "gc.log-amount", "amount", Numbers.formatFull(entry.amount()))),
-                noItalic(messages.get(viewer, "gc.log-balance-after", "balance", Numbers.formatFull(entry.balanceAfter()))),
-                noItalic(messages.get(viewer, "gc.log-actor", "player", actorName)),
-                noItalic(messages.get(viewer, "gc.log-note", "note", entry.note() == null ? "-" : entry.note())),
-                noItalic(messages.get(viewer, "gc.log-date", "date", DATE_FORMAT.format(Instant.ofEpochMilli(entry.createdAtMillis()))))
+                noItalic(messages.getGui(viewer, "gc.log-amount", "amount", Numbers.formatFull(entry.amount()))),
+                noItalic(messages.getGui(viewer, "gc.log-balance-after", "balance", Numbers.formatFull(entry.balanceAfter()))),
+                noItalic(messages.getGui(viewer, "gc.log-actor", "player", actorName)),
+                noItalic(messages.getGui(viewer, "gc.log-note", "note", entry.note() == null ? "-" : entry.note())),
+                noItalic(messages.getGui(viewer, "gc.log-date", "date", DATE_FORMAT.format(Instant.ofEpochMilli(entry.createdAtMillis()))))
         ));
         icon.setItemMeta(meta);
         return icon;
@@ -113,7 +113,7 @@ public final class GcLogMenu {
     private static ItemStack backButton(Player player, Messages messages) {
         ItemStack item = new ItemStack(Material.ARROW);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "gc.back-button")));
+        meta.displayName(noItalic(messages.getGui(player, "gc.back-button")));
         item.setItemMeta(meta);
         return item;
     }
@@ -121,7 +121,7 @@ public final class GcLogMenu {
     private static ItemStack pageButton(Messages messages, Player player, String key, Material material, boolean enabled) {
         ItemStack item = new ItemStack(enabled ? material : Material.GRAY_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, key)));
+        meta.displayName(noItalic(messages.getGui(player, key)));
         item.setItemMeta(meta);
         return item;
     }

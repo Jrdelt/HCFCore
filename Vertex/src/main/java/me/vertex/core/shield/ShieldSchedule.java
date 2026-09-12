@@ -1,97 +1,44 @@
 package me.vertex.core.shield;
 
-import java.time.Instant;
-import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
-/**
- * One faction's Shield protection window: a single daily recurring window,
- * expressed in real-world Eastern time ("EST" per spec; this actually
- * follows America/New_York, which observes EDT in summer -- the spec's own
- * wording, matched here rather than a fixed non-DST offset).
- *
- * <p>The window is anchored to wall-clock time of day, not an elapsing
- * countdown, so it naturally "keeps advancing during server downtime" --
- * there is nothing to persist beyond the two integers below; whether the
- * window is active at any instant is always recomputed live from that
- * instant's Eastern local time.
- */
-public record ShieldSchedule(int startMinuteOfDay, int durationMinutes) {
-
-    public static final ZoneId ZONE = ZoneId.of("America/New_York");
-
+/** Seven independent daily windows; duration zero disables that day. */
+public record ShieldSchedule(List<Window> days, boolean pvpProtected) {
     public ShieldSchedule {
-        if (startMinuteOfDay < 0 || startMinuteOfDay > 1439) {
-            throw new IllegalArgumentException("startMinuteOfDay must be 0-1439");
+        List<Window> normalized = new ArrayList<>(7);
+        for (int i=0;i<7;i++) normalized.add(days != null && i < days.size() && days.get(i) != null ? days.get(i) : Window.DISABLED);
+        days = List.copyOf(normalized);
+    }
+    public static ShieldSchedule empty(){return new ShieldSchedule(List.of(),false);}
+    public Window day(int mondayBasedIndex){return days.get(Math.floorMod(mondayBasedIndex,7));}
+    public ShieldSchedule withDay(int index,Window value){List<Window> copy=new ArrayList<>(days);copy.set(Math.floorMod(index,7),value);return new ShieldSchedule(copy,pvpProtected);}
+    public ShieldSchedule withPvpProtected(boolean value){return new ShieldSchedule(days,value);}
+    /** Effective protected minutes in one calendar day, including yesterday's spill-over. */
+    public int protectedMinutes(int mondayBasedIndex){
+        boolean[] protectedMinute=new boolean[1440];
+        Window current=day(mondayBasedIndex);
+        for(int minute=current.startMinute();minute<Math.min(1440,current.endMinute());minute++)protectedMinute[minute]=true;
+        Window previous=day(mondayBasedIndex-1);
+        if(previous.crossesMidnight())for(int minute=0;minute<Math.min(1440,previous.endMinute()-1440);minute++)protectedMinute[minute]=true;
+        int total=0;for(boolean protectedNow:protectedMinute)if(protectedNow)total++;return total;
+    }
+    public boolean activeAt(ZonedDateTime now){int today=now.getDayOfWeek().getValue()-1;int minute=now.getHour()*60+now.getMinute();Window current=day(today);if(current.contains(minute))return true;Window previous=day(today-1);return previous.crossesMidnight()&&minute<previous.endMinute()-1440;}
+    public long secondsUntilWindowEnd(ZonedDateTime now){if(!activeAt(now))return 0L;int today=now.getDayOfWeek().getValue()-1;int minute=now.getHour()*60+now.getMinute();Window window=day(today);int remaining=window.contains(minute)?window.endMinute()-minute:day(today-1).endMinute()-1440-minute;return Math.max(0L,remaining*60L-now.getSecond());}
+    public long secondsUntilNextStart(ZonedDateTime now){
+        for(int offset=0;offset<=7;offset++){
+            ZonedDateTime date=now.plusDays(offset).toLocalDate().atStartOfDay(now.getZone());
+            Window window=day(date.getDayOfWeek().getValue()-1);
+            if(window.durationMinutes()<=0)continue;
+            ZonedDateTime start=date.plusMinutes(window.startMinute());
+            if(!start.isAfter(now))continue;
+            return Math.max(0L,Duration.between(now,start).getSeconds());
         }
-        if (durationMinutes <= 0 || durationMinutes > 1440) {
-            throw new IllegalArgumentException("durationMinutes must be 1-1440");
-        }
+        return 0L;
     }
-
-    /** Whether this window is active at the given instant. */
-    public boolean isActiveAt(long epochMillis) {
-        long todayStart = windowStartOnOrBefore(epochMillis);
-        long todayEnd = todayStart + durationMinutes * 60_000L;
-        return epochMillis >= todayStart && epochMillis < todayEnd;
-    }
-
-    /** The end of the window currently containing {@code epochMillis}, or -1 if not currently active. */
-    public long currentWindowEndMillis(long epochMillis) {
-        if (!isActiveAt(epochMillis)) {
-            return -1L;
-        }
-        return windowStartOnOrBefore(epochMillis) + durationMinutes * 60_000L;
-    }
-
-    private static final long DAY_MILLIS = 24 * 60 * 60_000L;
-
-    /** The next time (strictly after {@code epochMillis} if already active) this window starts. */
-    public long nextActivationAfter(long epochMillis) {
-        if (isActiveAt(epochMillis)) {
-            return windowStartOnOrBefore(epochMillis) + DAY_MILLIS;
-        }
-        long todayStart = windowStartToday(epochMillis);
-        return todayStart > epochMillis ? todayStart : todayStart + DAY_MILLIS;
-    }
-
-    private long windowStartToday(long epochMillis) {
-        ZonedDateTime now = Instant.ofEpochMilli(epochMillis).atZone(ZONE);
-        return now.toLocalDate().atStartOfDay(ZONE).plusMinutes(startMinuteOfDay).toInstant().toEpochMilli();
-    }
-
-    /** Today's (Eastern-local-date) scheduled start, expressed as an absolute instant. */
-    private long windowStartOnOrBefore(long epochMillis) {
-        ZonedDateTime now = Instant.ofEpochMilli(epochMillis).atZone(ZONE);
-        ZonedDateTime midnight = now.toLocalDate().atStartOfDay(ZONE);
-        ZonedDateTime candidate = midnight.plusMinutes(startMinuteOfDay);
-        if (candidate.toInstant().toEpochMilli() > epochMillis) {
-            candidate = candidate.minusDays(1);
-        }
-        return candidate.toInstant().toEpochMilli();
-    }
-
-    public String serialize() {
-        return startMinuteOfDay + ":" + durationMinutes;
-    }
-
-    public static ShieldSchedule parse(String text) {
-        String[] parts = text.split(":");
-        if (parts.length != 2) {
-            throw new IllegalArgumentException("Expected START:DURATION, got: " + text);
-        }
-        return new ShieldSchedule(Integer.parseInt(parts[0].trim()), Integer.parseInt(parts[1].trim()));
-    }
-
-    public static ShieldSchedule ofHourMinuteDuration(int hour, int minute, int durationMinutes) {
-        if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-            throw new IllegalArgumentException("Invalid time of day: " + hour + ":" + minute);
-        }
-        return new ShieldSchedule(hour * 60 + minute, durationMinutes);
-    }
-
-    @Override
-    public String toString() {
-        return String.format("%02d:%02d for %dm (ET)", startMinuteOfDay / 60, startMinuteOfDay % 60, durationMinutes);
-    }
+    public String encode(){StringBuilder out=new StringBuilder();for(int i=0;i<7;i++){if(i>0)out.append(';');Window window=day(i);out.append(window.startMinute()).append(',').append(window.durationMinutes());}return out.toString();}
+    public static ShieldSchedule decode(String raw,boolean pvp){if(raw==null||raw.isBlank())return new ShieldSchedule(List.of(),pvp);List<Window> values=new ArrayList<>();for(String token:raw.split(";",-1)){String[] pair=token.split(",",-1);try{values.add(new Window(Integer.parseInt(pair[0]),Integer.parseInt(pair[1])));}catch(Exception ignored){values.add(Window.DISABLED);}}return new ShieldSchedule(values,pvp);}
+    public record Window(int startMinute,int durationMinutes){public static final Window DISABLED=new Window(0,0);public Window{startMinute=Math.floorMod(startMinute,1440);durationMinutes=Math.max(0,Math.min(1440,durationMinutes));}boolean contains(int minute){return durationMinutes>0&&minute>=startMinute&&minute<Math.min(1440,endMinute());}boolean crossesMidnight(){return durationMinutes>0&&endMinute()>1440;}int endMinute(){return startMinute+durationMinutes;}}
 }

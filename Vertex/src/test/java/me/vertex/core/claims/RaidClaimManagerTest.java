@@ -10,6 +10,7 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.plugin.PluginMock;
 
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -37,7 +38,8 @@ class RaidClaimManagerTest {
         Database database = new Database(new YamlConfiguration(), dataFolder.toFile());
         storage = new ClaimStorage(database);
         storage.init();
-        manager = new RaidClaimManager(plugin, storage);
+        // Faction ownership is outside this persistence/recovery unit test.
+        manager = new RaidClaimManager(plugin, storage, key -> true);
         manager.load();
     }
 
@@ -54,6 +56,7 @@ class RaidClaimManagerTest {
         manager.track(1, chunk);
         assertTrue(manager.isTracked(chunk));
         assertTrue(manager.remainingSeconds(chunk) > 0);
+        assertTrue(manager.expiresAtMillis(chunk) > System.currentTimeMillis());
     }
 
     @Test
@@ -99,5 +102,36 @@ class RaidClaimManagerTest {
         // survived the restart instead of being reset.
         assertTrue(remaining <= 1_800L && remaining > 1_700L,
                 "expected roughly 1800s remaining, was " + remaining);
+    }
+
+    @Test
+    void failedExpiryRetainsTheDurableTimerForRetry() throws Exception {
+        ChunkKey chunk = new ChunkKey("world", 8, 8);
+        storage.upsertRaidClaim("world", 8, 8, 12, System.currentTimeMillis() - 1L);
+        manager.shutdown();
+        manager = new RaidClaimManager(plugin, storage, (key, owner) -> false, key -> 12);
+        manager.load();
+        manager.loadState();
+        manager.recoverState();
+
+        assertTrue(manager.isTracked(chunk));
+        assertEquals(1, storage.loadRaidClaims().size(), "a failed unclaim must remain retryable");
+    }
+
+    @Test
+    void staleExpiryNeverRemovesTheCurrentOwner() throws Exception {
+        ChunkKey chunk = new ChunkKey("world", 9, 9);
+        storage.upsertRaidClaim("world", 9, 9, 12, System.currentTimeMillis() - 1L);
+        AtomicInteger removals = new AtomicInteger();
+        manager.shutdown();
+        manager = new RaidClaimManager(plugin, storage,
+                (key, owner) -> { removals.incrementAndGet(); return true; }, key -> 99);
+        manager.load();
+        manager.loadState();
+        manager.recoverState();
+
+        assertEquals(0, removals.get(), "the replacement owner's claim must not be touched");
+        assertFalse(manager.isTracked(chunk));
+        assertTrue(storage.loadRaidClaims().isEmpty(), "the stale timer itself should be cleaned up");
     }
 }

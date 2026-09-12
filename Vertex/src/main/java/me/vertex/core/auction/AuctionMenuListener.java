@@ -136,24 +136,16 @@ public final class AuctionMenuListener implements Listener {
             return;
         }
         player.closeInventory();
-        // The database delete decides what is paid out, not the snapshot this
-        // menu was drawn from -- so nothing is granted twice, and a claim
-        // queued while this runs is left alone rather than destroyed.
-        manager.takeClaims(player.getUniqueId()).whenComplete((items, error) ->
+        manager.deliverClaims(player).whenComplete((result, error) ->
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     try {
-                        if (error != null) {
+                        if (error != null || result == AuctionManager.ClaimResult.FAILED) {
                             player.sendMessage(messages.get(player, "auction.claim-failed"));
                             return;
                         }
-                        if (items.isEmpty()) {
-                            return;
+                        if (result == AuctionManager.ClaimResult.CLAIMED) {
+                            player.sendMessage(messages.get(player, "auction.claim-all-claimed"));
                         }
-                        for (ItemStack item : items) {
-                            player.getInventory().addItem(item).values().forEach(leftover ->
-                                    player.getWorld().dropItemNaturally(player.getLocation(), leftover));
-                        }
-                        player.sendMessage(messages.get(player, "auction.claim-all-claimed"));
                     } finally {
                         claiming.remove(player.getUniqueId());
                     }

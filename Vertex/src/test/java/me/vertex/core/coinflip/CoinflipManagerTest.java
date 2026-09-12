@@ -163,6 +163,7 @@ class CoinflipManagerTest {
         Coinflip coinflip = manager.activeCoinflips().get(0);
 
         CoinflipManager.PlayOutcome outcome = manager.play(coinflip.id(), opponent);
+        settle();
 
         assertEquals(CoinflipManager.PlayResult.OK, outcome.result());
         assertTrue(manager.activeCoinflips().isEmpty(), "a resolved coinflip must leave the active list");
@@ -234,6 +235,7 @@ class CoinflipManagerTest {
         Coinflip coinflip = manager.activeCoinflips().get(0);
 
         boolean cancelled = manager.cancel(coinflip, host);
+        settle();
 
         assertTrue(cancelled);
         assertEquals(1000.0, economy.get(host.getUniqueId()));
@@ -275,6 +277,7 @@ class CoinflipManagerTest {
 
         Coinflip coinflip = manager.activeCoinflips().get(0);
         manager.play(coinflip.id(), opponent);
+        settle();
 
         // Both started at 50 (100 total); the wager only ever moves levels
         // between these two, so the pre-wager total must be conserved.
@@ -883,7 +886,19 @@ class CoinflipManagerTest {
                 return;
             }
         }
-        scheduler.performTicks(1L);
+        // A completed SQL reservation schedules its Vault/EXP phase back on
+        // the primary thread, which may itself enqueue an acknowledgement.
+        // Alternate ticks and drains so every generation becomes visible.
+        for (int attempt = 0; attempt < 10; attempt++) {
+            scheduler.performTicks(1L);
+            manager.awaitWrites();
+            try {
+                Thread.sleep(2L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
 

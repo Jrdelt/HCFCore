@@ -331,12 +331,12 @@ public final class KitManager {
             return;
         }
         if (nameValue != null) {
-            meta.displayName(MessageFormatter.deserialize(String.valueOf(nameValue)));
+            meta.displayName(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(String.valueOf(nameValue))));
         }
         if (loreValue instanceof List<?> loreList) {
             List<Component> lore = new ArrayList<>();
             for (Object line : loreList) {
-                lore.add(MessageFormatter.deserialize(String.valueOf(line)));
+                lore.add(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(String.valueOf(line))));
             }
             meta.lore(lore);
         }

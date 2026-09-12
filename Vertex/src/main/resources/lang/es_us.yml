@@ -1,7 +1,7 @@
 # Bumped whenever a bundled message changes. On startup Vertex replaces an
 # older on-disk copy of this file with the new bundled one, moving the
 # previous file into lang/backup/ first so customizations can be re-applied.
-lang-version: 3
+lang-version: 5
 
 general:
   no-permission: '<red>✖ No tienes acceso a ese comando.'
@@ -28,9 +28,9 @@ admin:
   storage-already: '<yellow>Ya se está usando el almacenamiento <white>{type}<yellow>.'
   storage-migrating: '<gray>Copiando datos de <white>{from}<gray> a <white>{to}<gray>...'
   storage-not-empty: '<red>La base de datos {type} ya contiene {rows} fila(s). Vuelve a ejecutar con confirm para sobrescribirla.'
-  storage-migrated: '<green>Se copiaron {rows} fila(s) a {type}. Reinicia el servidor para usarlo.'
+  storage-migrated: '<green>Se copiaron y verificaron {rows} fila(s) a {type}. El servidor se detendrá ahora para completar el cambio.'
   storage-failed: '<red>La migración falló, no se cambió nada: {error}'
-  storage-requires-idle-server: '<red>La migración requiere que no haya jugadores conectados ni Blueprints activos.'
+  storage-requires-idle-server: '<red>La migración requiere cero jugadores, ningún Blueprint activo y el modo de red desactivado. Detén primero los demás shards.'
   storage-login-blocked: '<red>Hay una breve migración de almacenamiento en curso. Vuelve a conectarte pronto.'
 
 sandbot:
@@ -49,11 +49,12 @@ sandbot:
     paused-status: '&cEstado: Pausado &7(Clic para Reanudar)'
     despawn: '&cEliminar Sand Bot'
   item:
-    name: '&eSand Bot'
+    name: '<gold>✦ Sand Bot ✦'
     lore:
-      - '&7Colócalo sobre cualquier bloque -- busca andesita,'
-      - '&7arenisca, arenisca roja o concreto'
-      - '&7cerca; debe estar en tu claim.'
+      - '<gray>Los Sand Bots colocan rápidamente bloques'
+      - '<gray>bajo soportes cercanos compatibles.'
+      - ''
+      - '<aqua>Área de colocación: <green>{area} x {area} bloques'
 
 tntfill:
   filled-partial: '&<red>✖ Se rellenaron {filled} dispensadores (&cfondos/TNT insuficientes&7).'
@@ -246,7 +247,7 @@ factions:
   leader-cannot-leave: '<red>No puedes abandonar tu faccion como lider. Usa /f disband para disolverla.'
   must-be-in-faction: '<red>Debes estar en una faccion para establecer un punto de encuentro.'
   rally-usage: '<red>Uso: /f rally [set|clear]'
-  permissions-leader-only: '<red>Solo el lider de tu faccion puede cambiar los permisos de la faccion.'
+  permissions-leader-only: '<red>Solo Lider, Colider o Admin pueden cambiar los permisos de la faccion.'
   role-permission-denied: '<red>Tu rol de faccion no puede usar esa accion.'
   rally-no-permission: '<red>Tu rol de faccion no puede usar esa accion de punto de encuentro.'
   rally-set-broadcast: '&a&lRALLY &r&8» &e{player} &8establecio un punto en &e{x}, {y}, {z} &8en &e{world}'
@@ -259,7 +260,7 @@ faction-upgrades:
   no-faction: "<red>✖ <yellow>You must be in a faction to view faction upgrades."
   disabled: "<red>✖ <yellow>Faction upgrades are currently disabled."
   role-permission-denied: "<red>✖ <yellow>Your faction role cannot use faction upgrades."
-  leader-only: "<red>✖ <yellow>Only your faction leader can purchase faction upgrades."
+  leader-only: "<red>✖ <yellow>Solo Lider o Colider pueden comprar mejoras de faccion."
   no-economy: "<red>✖ <yellow>Faction upgrades need a Vault economy provider."
   cannot-afford: "<red>✖ <yellow>You need <green>{amount}<yellow> for that upgrade."
   maxed: "<yellow>That faction upgrade is already at its maximum level."
@@ -272,7 +273,7 @@ faction-upgrades:
     next-effect: "<gray>Next: <green>{effect}"
     cost: "<gray>Cost: <gold>{amount}"
     click-to-upgrade: "<green>Click to purchase the next level."
-    leader-only: "<red>Only your faction leader can purchase levels."
+    leader-only: "<red>Solo Lider o Colider pueden comprar niveles."
     maxed: "<green>Maximum level reached."
     disabled: "<red>This upgrade is disabled in the server config."
     lore:
@@ -287,7 +288,7 @@ faction-upgrades:
         - "<gray>Current: <white>{current}"
         - "<gray>Next: <green>{next}"
         - "<gray>Cost: <gold>{cost}"
-        - "<red>Only your faction leader can purchase levels."
+        - "<red>Solo Lider o Colider pueden comprar niveles."
       maxed:
         - "<gray>Level: <green>{level}<gray>/<green>{max}"
         - "<gray>Current: <white>{current}"
@@ -552,6 +553,7 @@ backpack:
   filter-enabled: '&e&lBACKPACKS &7> <green>{item} will be discarded while a Backpack is equipped.'
   filter-disabled: '&e&lBACKPACKS &7> <gray>{item} will no longer be discarded.'
   filter-cleared: '&e&lBACKPACKS &7> <green>Cleared {count} Backpack filter(s).'
+  filter-save-failed: '&e&lBACKPACKS &7> <red>Your filter was not changed because storage is unavailable. Try again later.'
   filter-invalid-item: '&e&lBACKPACKS &7> <red>Use a valid Minecraft material name.'
 
 item-restrictions:
@@ -741,14 +743,9 @@ shop:
 
 trade:
   gui-title: "<dark_gray>trade with {player}"
-  anvil-title: "<dark_gray>trade offer"
   peek-title: "<dark_gray>trade contents"
   requester-head: "<yellow>{player}'s offer"
   target-head: "<yellow>{player}'s offer"
-  money-title: "<gold><bold>money"
-  exp-title: "<aqua><bold>experience"
-  value-lore: "<gray>offering: <yellow>{amount}"
-  value-click-lore: "<green>click to set amount"
   lock-title: "<green><bold>lock offer"
   lock-lore: "<gray>locks your offer."
   locked-title: "<gray><bold>offer locked"
@@ -772,15 +769,10 @@ trade:
   complete: "&b&lTRADE&r &7> <green>Trade with {player} completed!"
   locked: "&b&lTRADE&r &7> <yellow>Your offer is locked."
   wait-final: "&b&lTRADE&r &7> <gray>Waiting for final acceptance."
-  invalid-amount: "&b&lTRADE&r &7> <red>Invalid amount."
-  cannot-afford: "&b&lTRADE&r &7> <red>You cannot afford that."
-  no-economy: "&b&lTRADE&r &7> <red>No economy provider is available."
   inventory-full: "&b&lTRADE&r &7> <red>An inventory is full; trade cancelled."
   item-blocked: "&b&lTRADE&r &7> <red>That item cannot be traded."
   toggle-on: "&b&lTRADE&r &7> <yellow>Incoming trades blocked."
   toggle-off: "&b&lTRADE&r &7> <green>Incoming trades enabled."
-  admin-usage: "&b&lTRADE&r &7> <gray>Usage: /tradeadmin reload"
-  admin-reloaded: "&b&lTRADE&r &7> <green>traders.yml reloaded."
   history-title: "<dark_gray>trade history • {player}"
   history-entry: "<yellow>trade #{id} • {player}"
   history-status: "<gray>status: <white>{status}"

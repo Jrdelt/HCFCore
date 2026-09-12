@@ -24,12 +24,19 @@ select.
 The two mines ship fully configured except for *where* they are. You define
 that in-game rather than by typing coordinates, exactly like `/koth create`:
 
-```
-/mines wand stonewake     gives the blaze rod and starts a selection
-left-click                first corner
-right-click               second corner
-sneak + click air         saves it
-```
+| Command | Permission | What it does |
+|---|---|---|
+| `/mines` | Open to all | Opens `/mines` overview and detail GUIs. |
+| `/mines wand <mine>` | `vertex.mines.admin` | Gives the blaze-rod selector for that mine and starts corner selection. |
+| `/mines cancel` | `vertex.mines.admin` | Abandons an in-progress selection. |
+| `/mines list` | `vertex.mines.admin` | Shows all placed mines. |
+| `/mines fill <mine>` | `vertex.mines.admin` | Seeds or reseeds the mine ore table after major edits. |
+
+Selection flow:
+- Use `/mines wand <mine>` (for example `stonewake`) to receive the selection rod.
+- Left-click once for the first corner.
+- Right-click once for the second corner.
+- Sneak + click air to save.
 
 Saving writes the **world and both corners into `mines.yml` for you** — the
 world is taken from where you were standing, so the config can never name a

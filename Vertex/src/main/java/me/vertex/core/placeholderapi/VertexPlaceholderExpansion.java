@@ -1,6 +1,5 @@
 package me.vertex.core.placeholderapi;
 
-import dev.kitteh.factions.Faction;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import me.vertex.core.VertexPlugin;
 import me.vertex.core.ability.Ability;
@@ -16,6 +15,11 @@ import me.vertex.core.faction.FactionUpgrade;
 import me.vertex.core.faction.FactionUpgradeManager;
 import me.vertex.core.faction.RallyManager;
 import me.vertex.core.factions.FactionsHook;
+import me.vertex.core.factions.FactionData;
+import me.vertex.core.factions.FactionMember;
+import me.vertex.core.factions.FactionPowerProfile;
+import me.vertex.core.factions.FactionRelation;
+import me.vertex.core.factions.FactionRole;
 import me.vertex.core.kit.Kit;
 import me.vertex.core.kit.KitManager;
 import me.vertex.core.luckperms.LuckPermsHook;
@@ -27,14 +31,19 @@ import me.vertex.core.tag.TagManager;
 import me.vertex.core.trade.TradeManager;
 import me.vertex.core.user.User;
 import me.vertex.core.user.UserManager;
+import me.vertex.core.stats.PlayerStatsManager;
+import me.vertex.core.util.Numbers;
 import me.vertex.core.zone.ZoneManager;
 import me.vertex.core.zone.ZoneType;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -68,6 +77,7 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
     private final RallyManager rallyManager;
     private final FactionUpgradeManager factionUpgradeManager;
     private final SandBotManager sandBotManager;
+    private final PlayerStatsManager playerStatsManager;
     private volatile ZoneManager zoneManager;
 
     public VertexPlaceholderExpansion(VertexPlugin plugin, UserManager userManager, KitManager kitManager,
@@ -77,7 +87,8 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
                                        TagManager tagManager, BlueprintManager blueprintManager,
                                        CoinflipManager coinflipManager, AuctionManager auctionManager,
                                        TradeManager tradeManager, RallyManager rallyManager,
-                                       FactionUpgradeManager factionUpgradeManager, SandBotManager sandBotManager) {
+                                       FactionUpgradeManager factionUpgradeManager, SandBotManager sandBotManager,
+                                       PlayerStatsManager playerStatsManager) {
         this.plugin = plugin;
         this.userManager = userManager;
         this.kitManager = kitManager;
@@ -95,6 +106,7 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
         this.rallyManager = rallyManager;
         this.factionUpgradeManager = factionUpgradeManager;
         this.sandBotManager = sandBotManager;
+        this.playerStatsManager = playerStatsManager;
     }
 
     /** Installed after Haven/Riftlands has completed its durable startup load. */
@@ -126,8 +138,11 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
     @Override
     public String onPlaceholderRequest(Player player, String identifier) {
         if (player == null) {
-            return "";
+            return "&7";
         }
+
+        String finalized = finalizedPlaceholder(player, identifier);
+        if (finalized != null) return finalized;
 
         if (identifier.startsWith("kit_cooldown_")) {
             return kitCooldown(player, identifier.substring("kit_cooldown_".length()));
@@ -218,6 +233,153 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
         };
     }
 
+    /** Finalized addme.md placeholder set, including suffix-target syntax such as player_power_Notch. */
+    private String finalizedPlaceholder(Player viewer, String identifier) {
+        PlaceholderRequest request = parseFinalized(identifier);
+        if (request == null) return null;
+        Subject subject = resolveSubject(viewer, request.targetName());
+        if (subject == null) return "&7";
+        UUID uuid = subject.uuid();
+        Player online = Bukkit.getPlayer(uuid);
+        FactionMember member = FactionsHook.service().member(uuid);
+        FactionData faction = member == null ? null : FactionsHook.service().faction(member.factionId()).orElse(null);
+        FactionPowerProfile power = FactionsHook.service().powerProfile(uuid);
+        String missing = "&7";
+
+        return switch (request.key()) {
+            case "player" -> "&7" + (online == null ? subject.name() : EssentialsHook.resolveName(online));
+            case "player_name" -> subject.name();
+            case "player_title" -> member == null ? missing : member.role().displayName();
+            case "player_name_and_title" -> member == null ? subject.name()
+                    : subject.name() + " &8| " + member.role().displayName();
+            case "player_role" -> member == null ? missing : member.role().displayName();
+            case "player_power" -> power == null ? missing : compact(power.current());
+            case "player_max_power" -> power == null ? missing : compact(power.maximum());
+            case "player_regentime" -> power == null ? missing : power.current() >= power.maximum()
+                    ? "Full" : compactDuration(FactionsHook.service().millisecondsUntilPowerRegeneration(uuid), false);
+            case "player_kills" -> playerStatsManager == null ? missing
+                    : String.valueOf(playerStatsManager.stats(uuid).kills());
+            case "player_deaths" -> playerStatsManager == null ? missing
+                    : String.valueOf(playerStatsManager.stats(uuid).deaths());
+            case "player_kills_deaths" -> playerStatsManager == null ? missing
+                    : playerStatsManager.stats(uuid).kills() + "/" + playerStatsManager.stats(uuid).deaths();
+            case "player_last_seen" -> online != null ? "Online" : relativeTime(subject.lastSeenMillis());
+            case "faction" -> factionName(viewer, faction);
+            case "faction_description" -> faction == null || faction.description().isBlank() ? missing : faction.description();
+            case "faction_creation" -> faction == null ? missing : relativeTime(faction.createdAtMillis());
+            case "faction_leader" -> faction == null ? missing : FactionsHook.service().members(faction.id()).stream()
+                    .filter(candidate -> candidate.role() == FactionRole.LEADER).map(FactionMember::lastName)
+                    .findFirst().orElse(missing);
+            case "faction_members" -> faction == null ? missing : String.valueOf(FactionsHook.service().members(faction.id()).size());
+            case "faction_members_online" -> faction == null ? missing : String.valueOf(Bukkit.getOnlinePlayers().stream()
+                    .filter(candidate -> FactionsHook.getFactionId(candidate) == faction.id()).count());
+            case "faction_power" -> faction == null ? missing : compact(faction.power());
+            case "faction_max_power" -> faction == null ? missing : compact(faction.powerMax());
+            case "faction_power_display" -> faction == null ? missing : compact(faction.power()) + "/" + compact(faction.powerMax());
+            case "faction_claims" -> faction == null ? missing : String.valueOf(FactionsHook.service().claimCount(faction.id()));
+            case "faction_max_claims" -> faction == null ? missing : String.valueOf(Math.max(0L, (long) Math.floor(faction.power())));
+            case "faction_claim_balance" -> faction == null ? missing : String.valueOf((long) Math.floor(faction.power())
+                    - FactionsHook.service().claimCount(faction.id()));
+            case "faction_warps" -> faction == null ? missing : String.valueOf(FactionsHook.service().warps(faction.id()).size());
+            case "faction_max_warps" -> faction == null ? missing : String.valueOf(FactionsHook.service().warpLimit(faction.id()));
+            case "faction_bank" -> faction == null || factionBankManager == null ? missing
+                    : EconomyHook.format(factionBankManager.money(faction.id()));
+            case "faction_bank_formatted" -> faction == null || factionBankManager == null ? missing
+                    : Numbers.money(factionBankManager.money(faction.id()));
+            case "faction_tnt_bank" -> faction == null || factionBankManager == null ? missing
+                    : String.valueOf(factionBankManager.tnt(faction.id()));
+            case "faction_tnt_bank_max" -> faction == null || factionUpgradeManager == null ? missing
+                    : String.valueOf(factionUpgradeManager.tntCapacity(faction.id()));
+            case "faction_shield_status" -> faction == null ? missing
+                    : FactionsHook.service().shieldDisplay(faction.id()).active() ? "&aActive" : "&cInactive";
+            case "faction_shield_remaining" -> faction == null ? missing
+                    : "&7" + compactDuration(FactionsHook.service().shieldDisplay(faction.id()).remainingSeconds() * 1_000L, false);
+            case "faction_shield_next" -> faction == null ? missing
+                    : "&7" + compactDuration(FactionsHook.service().shieldDisplay(faction.id()).nextSeconds() * 1_000L, false);
+            default -> null;
+        };
+    }
+
+    private PlaceholderRequest parseFinalized(String raw) {
+        if (raw == null) return null;
+        String identifier = raw.toLowerCase(Locale.ROOT);
+        // Longest first prevents player_name_and_title from being parsed as player_name + a target.
+        for (String key : FINALIZED_KEYS) {
+            if (identifier.equals(key)) return new PlaceholderRequest(key, null);
+            String prefix = key + "_";
+            if (identifier.startsWith(prefix) && raw.length() > prefix.length()) {
+                return new PlaceholderRequest(key, raw.substring(prefix.length()));
+            }
+        }
+        return null;
+    }
+
+    private Subject resolveSubject(Player viewer, String targetName) {
+        if (targetName == null || targetName.isBlank()) {
+            return new Subject(viewer.getUniqueId(), viewer.getName(), viewer.getLastSeen());
+        }
+        Player online = Bukkit.getPlayerExact(targetName);
+        if (online != null) return new Subject(online.getUniqueId(), online.getName(), online.getLastSeen());
+        Optional<FactionMember> member = FactionsHook.service().member(targetName);
+        if (member.isPresent()) {
+            OfflinePlayer cached = Bukkit.getOfflinePlayer(member.get().playerUuid());
+            return new Subject(member.get().playerUuid(), member.get().lastName(), cached.getLastSeen());
+        }
+        return null;
+    }
+
+    private String factionName(Player viewer, FactionData target) {
+        if (target == null) return "&8[&7None&8]";
+        int viewerFaction = FactionsHook.getFactionId(viewer);
+        String color;
+        if (viewerFaction == target.id()) color = "&a";
+        else {
+            FactionRelation relation = FactionsHook.service().relation(viewerFaction, target.id());
+            color = relation == FactionRelation.ALLY ? "&d" : relation == FactionRelation.ENEMY ? "&c" : "&7";
+        }
+        return "&8[" + color + target.tag() + "&8]";
+    }
+
+    private static String compact(double value) {
+        return value == Math.rint(value) ? String.valueOf((long) value) : String.format(Locale.ROOT, "%.2f", value);
+    }
+
+    private static String compactDuration(long millis, boolean ago) {
+        if (millis < 0L) return "&7";
+        long seconds = Math.max(0L, millis / 1_000L);
+        long years = seconds / 31_536_000L; seconds %= 31_536_000L;
+        long months = seconds / 2_592_000L; seconds %= 2_592_000L;
+        long days = seconds / 86_400L; seconds %= 86_400L;
+        long hours = seconds / 3_600L; seconds %= 3_600L;
+        long minutes = seconds / 60L; seconds %= 60L;
+        String value;
+        if (years > 0) value = years + "y" + (months > 0 ? " " + months + "mo" : "");
+        else if (months > 0) value = months + "mo" + (days > 0 ? " " + days + "d" : "");
+        else if (days > 0) value = days + "d" + (hours > 0 ? " " + hours + "h" : "");
+        else if (hours > 0) value = hours + "h" + (minutes > 0 ? " " + minutes + "m" : "");
+        else if (minutes > 0) value = minutes + "m" + (seconds > 0 ? " " + seconds + "s" : "");
+        else value = seconds + "s";
+        return ago ? value + " ago" : value;
+    }
+
+    private static String relativeTime(long timestamp) {
+        return timestamp <= 0L ? "&7" : compactDuration(System.currentTimeMillis() - timestamp, true);
+    }
+
+    private static final List<String> FINALIZED_KEYS = List.of(
+            "player_name_and_title", "player_kills_deaths", "faction_members_online",
+            "faction_bank_formatted", "faction_shield_remaining", "faction_tnt_bank_max",
+            "faction_power_display", "faction_claim_balance", "faction_shield_status",
+            "faction_description", "faction_creation", "faction_max_claims", "faction_max_power",
+            "faction_members", "faction_max_warps", "faction_tnt_bank", "faction_shield_next",
+            "player_max_power", "player_regentime", "player_last_seen", "player_deaths",
+            "player_title", "player_name", "player_power", "player_kills", "player_role",
+            "faction_leader", "faction_claims", "faction_warps", "faction_power",
+            "faction_bank", "player", "faction");
+
+    private record PlaceholderRequest(String key, String targetName) { }
+    private record Subject(UUID uuid, String name, long lastSeenMillis) { }
+
     private static String trim(double value) {
         return value == Math.rint(value) ? String.valueOf((long) value) : String.format(Locale.ROOT, "%.2f", value);
     }
@@ -274,14 +436,9 @@ public final class VertexPlaceholderExpansion extends PlaceholderExpansion {
     }
 
     private String factionMoney(Player player) {
-        if (!FactionsHook.isFactionMoneyAvailable()) {
-            return "";
-        }
-        Faction faction = FactionsHook.getFaction(player);
-        if (faction == null) {
-            return "0";
-        }
-        return EconomyHook.format(dev.kitteh.factions.integration.Econ.getBalance(faction));
+        if (factionBankManager == null) return "0";
+        int factionId = FactionsHook.getFactionId(player);
+        return factionId == FactionsHook.NO_FACTION ? "0" : EconomyHook.format(factionBankManager.money(factionId));
     }
 
     private String factionBankMoney(Player player) {

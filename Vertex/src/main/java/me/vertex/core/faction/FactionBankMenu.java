@@ -1,8 +1,7 @@
 package me.vertex.core.faction;
 
-import dev.kitteh.factions.Faction;
-import dev.kitteh.factions.command.ThirdPartyCommands;
 import me.vertex.core.economy.EconomyHook;
+import me.vertex.core.factions.FactionData;
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
@@ -32,10 +31,9 @@ import org.bukkit.plugin.Plugin;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Supplier;
 
 /**
- * Six-row faction bank for money, experience, and FactionsUUID's TNT bank.
+ * Six-row faction bank for money, experience, and Vertex's TNT bank.
  * Paper's standard chest inventory API permits 9–54 slots only; a seventh
  * row (63 slots) is not a valid client inventory.
  *
@@ -75,26 +73,15 @@ public final class FactionBankMenu implements Listener {
         this.operationKey = new NamespacedKey(plugin, "faction_bank_operation");
     }
 
-    /** Registers /f bank early enough that Paper's client command tree recognizes it. */
-    public static void registerFactionsSubcommand(Plugin plugin, Supplier<FactionBankMenu> menuSupplier) {
-        ThirdPartyCommands.register(plugin, "bank", (manager, root, help) -> manager.command(root.literal("bank")
-                .handler(context -> {
-                    FactionBankMenu menu = menuSupplier.get();
-                    if (menu != null && context.sender().sender() instanceof Player player) {
-                        menu.open(player);
-                    }
-                })));
-    }
-
     public void open(Player player) {
-        Faction faction = FactionsHook.getFaction(player);
+        FactionData faction = FactionsHook.getFaction(player).orElse(null);
         if (faction == null) {
-            player.sendMessage(messages.get(player, "factions.must-be-in-faction"));
+            player.sendMessage(messages.getGui(player, "factions.must-be-in-faction"));
             return;
         }
 
         Holder holder = new Holder(faction.id());
-        Inventory inventory = Bukkit.createInventory(holder, SIZE, messages.get(player, "faction-bank.gui-title"));
+        Inventory inventory = Bukkit.createInventory(holder, SIZE, messages.getGui(player, "faction-bank.gui-title"));
         holder.inventory = inventory;
         ItemStack border = border();
         for (int slot = 0; slot < SIZE; slot++) {
@@ -165,7 +152,7 @@ public final class FactionBankMenu implements Listener {
                 || event.getClickedInventory() != event.getView().getTopInventory()) {
             return;
         }
-        Faction faction = FactionsHook.getFaction(player);
+        FactionData faction = FactionsHook.getFaction(player).orElse(null);
         if (faction == null || faction.id() != bankHolder.factionId) {
             player.closeInventory();
             return;
@@ -185,9 +172,9 @@ public final class FactionBankMenu implements Listener {
         if (resource == null || operation == null) {
             return;
         }
-        String permission = operation == Operation.DEPOSIT ? "bank-deposit" : "bank-withdraw";
+        String permission = permission(resource, operation);
         if (!rolePermissions.canUse(player, permission)) {
-            player.sendMessage(messages.get(player, "factions.role-permission-denied"));
+            player.sendMessage(messages.getGui(player, "factions.role-permission-denied"));
             return;
         }
         promptForAmount(player, faction.id(), resource, operation);
@@ -198,16 +185,16 @@ public final class FactionBankMenu implements Listener {
         String promptKey = operation == Operation.DEPOSIT
                 ? "faction-bank.amount-chat-prompt-deposit" : "faction-bank.amount-chat-prompt-withdraw";
         chatAmountPrompt.request(player,
-                messages.get(player, promptKey, "resource", resource.label(messages, player)),
+                messages.getGui(player, promptKey, "resource", resource.label(messages, player)),
                 amount -> apply(player, factionId, resource, operation, amount),
                 () -> { });
     }
 
-    private ItemStack balanceItem(Player player, Faction faction, Resource resource) {
+    private ItemStack balanceItem(Player player, FactionData faction, Resource resource) {
         ItemStack item = new ItemStack(resource.material);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "faction-bank." + resource.key + "-name")));
-        meta.lore(messages.getList(player, "faction-bank.balance-lore",
+        meta.displayName(noItalic(messages.getGui(player, "faction-bank." + resource.key + "-name")));
+        meta.lore(messages.getGuiList(player, "faction-bank.balance-lore",
                 "value", resource.value(this, faction), "max", resource.max(this, faction),
                 "resource", resource.label(messages, player)));
         item.setItemMeta(meta);
@@ -217,9 +204,9 @@ public final class FactionBankMenu implements Listener {
     private ItemStack actionItem(Player player, Resource resource, Operation operation) {
         ItemStack item = new ItemStack(operation == Operation.DEPOSIT ? Material.LIME_DYE : Material.RED_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "faction-bank." + operation.key + "-name",
+        meta.displayName(noItalic(messages.getGui(player, "faction-bank." + operation.key + "-name",
                 "resource", resource.label(messages, player))));
-        meta.lore(messages.getList(player, "faction-bank." + operation.key + "-lore",
+        meta.lore(messages.getGuiList(player, "faction-bank." + operation.key + "-lore",
                 "resource", resource.label(messages, player)));
         meta.getPersistentDataContainer().set(resourceKey, PersistentDataType.STRING, resource.key);
         meta.getPersistentDataContainer().set(operationKey, PersistentDataType.STRING, operation.key);
@@ -234,24 +221,25 @@ public final class FactionBankMenu implements Listener {
             // a larger value, but the same cap applies to all three
             // uniformly rather than plumbing a resource-specific one through
             // the chat prompt.
-            player.sendMessage(messages.get(player, "faction-bank.invalid-amount"));
+            player.sendMessage(messages.getGui(player, "faction-bank.invalid-amount"));
             return;
         }
-        Faction faction = FactionsHook.getFaction(player);
+        FactionData faction = FactionsHook.getFaction(player).orElse(null);
         if (faction == null || faction.id() != factionId) {
             player.closeInventory();
             return;
         }
-        String permission = operation == Operation.DEPOSIT ? "bank-deposit" : "bank-withdraw";
+        String permission = permission(resource, operation);
         if (!rolePermissions.canUse(player, permission)) {
-            player.sendMessage(messages.get(player, "factions.role-permission-denied"));
+            player.sendMessage(messages.getGui(player, "factions.role-permission-denied"));
             return;
         }
         OperationResult result = success -> {
-            if (!success || !player.isOnline()) {
-                return;
-            }
-            player.sendMessage(messages.get(player, "faction-bank." + operation.key + "-success",
+            if (!success) return;
+            manager.audit(factionId, resource.name() + "_" + operation.name(), player,
+                    "amount=" + amount);
+            if (!player.isOnline()) return;
+            player.sendMessage(messages.getGui(player, "faction-bank." + operation.key + "-success",
                     "amount", String.format("%,d", amount), "resource", resource.label(messages, player)));
             open(player);
         };
@@ -262,20 +250,21 @@ public final class FactionBankMenu implements Listener {
         }
     }
 
-    private void deposit(Player player, Faction faction, Resource resource, long amount, OperationResult result) {
+    private void deposit(Player player, FactionData faction, Resource resource, long amount, OperationResult result) {
         switch (resource) {
             case MONEY -> depositMoney(player, faction.id(), amount, result);
             case EXPERIENCE -> {
                 if (player.getTotalExperience() < amount) {
-                    player.sendMessage(messages.get(player, "faction-bank.not-enough"));
+                    player.sendMessage(messages.getGui(player, "faction-bank.not-enough"));
                     result.complete(false);
                     return;
                 }
                 player.giveExp(-Math.toIntExact(amount));
-                manager.depositExperience(faction.id(), amount).whenComplete((saved, error) -> onMain(() -> {
+                manager.depositExperience(player, faction.id(), amount, "xp-deposit")
+                        .whenComplete((saved, error) -> onMain(() -> {
                     if (error != null || !Boolean.TRUE.equals(saved)) {
                         player.giveExp(Math.toIntExact(amount));
-                        player.sendMessage(messages.get(player, "faction-bank.transaction-failed"));
+                        player.sendMessage(messages.getGui(player, "faction-bank.transaction-failed"));
                         result.complete(false);
                         return;
                     }
@@ -286,13 +275,14 @@ public final class FactionBankMenu implements Listener {
         }
     }
 
-    private void withdraw(Player player, Faction faction, Resource resource, long amount, OperationResult result) {
+    private void withdraw(Player player, FactionData faction, Resource resource, long amount, OperationResult result) {
         switch (resource) {
             case MONEY -> withdrawMoney(player, faction.id(), amount, result);
             case EXPERIENCE -> {
-                manager.withdrawExperience(faction.id(), amount).whenComplete((saved, error) -> onMain(() -> {
+                manager.withdrawExperience(player, faction.id(), amount, "xp-withdraw")
+                        .whenComplete((saved, error) -> onMain(() -> {
                     if (error != null || !Boolean.TRUE.equals(saved)) {
-                        player.sendMessage(messages.get(player, "faction-bank.not-enough"));
+                        player.sendMessage(messages.getGui(player, "faction-bank.not-enough"));
                         result.complete(false);
                         return;
                     }
@@ -306,26 +296,27 @@ public final class FactionBankMenu implements Listener {
 
     private void depositMoney(Player player, int factionId, long amount, OperationResult result) {
         if (!EconomyHook.isAvailable()) {
-            player.sendMessage(messages.get(player, "faction-bank.no-economy"));
+            player.sendMessage(messages.getGui(player, "faction-bank.no-economy"));
             result.complete(false);
             return;
         }
         Economy economy = EconomyHook.getEconomy();
         if (!economy.has(player, amount)) {
-            player.sendMessage(messages.get(player, "faction-bank.not-enough"));
+            player.sendMessage(messages.getGui(player, "faction-bank.not-enough"));
             result.complete(false);
             return;
         }
         EconomyResponse response = economy.withdrawPlayer(player, amount);
         if (response == null || !response.transactionSuccess()) {
-            player.sendMessage(messages.get(player, "faction-bank.transaction-failed"));
+            player.sendMessage(messages.getGui(player, "faction-bank.transaction-failed"));
             result.complete(false);
             return;
         }
-        manager.depositMoney(factionId, amount).whenComplete((saved, error) -> onMain(() -> {
+        manager.depositMoney(player, factionId, amount, "bank-deposit")
+                .whenComplete((saved, error) -> onMain(() -> {
             if (error != null || !Boolean.TRUE.equals(saved)) {
                 economy.depositPlayer(player, amount);
-                player.sendMessage(messages.get(player, "faction-bank.transaction-failed"));
+                player.sendMessage(messages.getGui(player, "faction-bank.transaction-failed"));
                 result.complete(false);
                 return;
             }
@@ -335,13 +326,14 @@ public final class FactionBankMenu implements Listener {
 
     private void withdrawMoney(Player player, int factionId, long amount, OperationResult result) {
         if (!EconomyHook.isAvailable()) {
-            player.sendMessage(messages.get(player, "faction-bank.no-economy"));
+            player.sendMessage(messages.getGui(player, "faction-bank.no-economy"));
             result.complete(false);
             return;
         }
-        manager.withdrawMoney(factionId, amount).whenComplete((saved, error) -> onMain(() -> {
+        manager.withdrawMoney(player, factionId, amount, "bank-withdraw")
+                .whenComplete((saved, error) -> onMain(() -> {
             if (error != null || !Boolean.TRUE.equals(saved)) {
-                player.sendMessage(messages.get(player, "faction-bank.not-enough"));
+                player.sendMessage(messages.getGui(player, "faction-bank.not-enough"));
                 result.complete(false);
                 return;
             }
@@ -351,7 +343,7 @@ public final class FactionBankMenu implements Listener {
                 // withdrawal behind. The compensation is serialized after
                 // the successful withdrawal for this faction.
                 manager.depositMoney(factionId, amount);
-                player.sendMessage(messages.get(player, "faction-bank.transaction-failed"));
+                player.sendMessage(messages.getGui(player, "faction-bank.transaction-failed"));
                 result.complete(false);
                 return;
             }
@@ -363,10 +355,19 @@ public final class FactionBankMenu implements Listener {
         Bukkit.getScheduler().runTask(plugin, task);
     }
 
-    private void depositTnt(Player player, Faction faction, long amount, OperationResult result) {
+    private static String permission(Resource resource, Operation operation) {
+        String suffix = operation == Operation.DEPOSIT ? "deposit" : "withdraw";
+        return switch (resource) {
+            case MONEY -> "bank-" + suffix;
+            case EXPERIENCE -> "xp-" + suffix;
+            case TNT -> "tnt-" + suffix;
+        };
+    }
+
+    private void depositTnt(Player player, FactionData faction, long amount, OperationResult result) {
         long capacity = upgrades.tntCapacity(faction.id());
         if (manager.tnt(faction.id()) + amount > capacity) {
-            player.sendMessage(messages.get(player, "faction-bank.tnt-full", "max", Numbers.formatFull(capacity)));
+            player.sendMessage(messages.getGui(player, "faction-bank.tnt-full", "max", Numbers.formatFull(capacity)));
             result.complete(false);
             return;
         }
@@ -374,14 +375,15 @@ public final class FactionBankMenu implements Listener {
         // credit is applied only after the database write succeeds -- so a
         // failed write hands the TNT straight back instead of consuming it.
         if (!removeItems(player, Material.TNT, amount)) {
-            player.sendMessage(messages.get(player, "faction-bank.not-enough"));
+            player.sendMessage(messages.getGui(player, "faction-bank.not-enough"));
             result.complete(false);
             return;
         }
-        manager.depositTnt(faction.id(), amount, capacity).whenComplete((saved, error) -> onMain(() -> {
+        manager.depositTnt(player, faction.id(), amount, capacity, "tnt-deposit")
+                .whenComplete((saved, error) -> onMain(() -> {
             if (error != null || !Boolean.TRUE.equals(saved)) {
                 giveTnt(player, amount);
-                player.sendMessage(messages.get(player, "faction-bank.transaction-failed"));
+                player.sendMessage(messages.getGui(player, "faction-bank.transaction-failed"));
                 result.complete(false);
                 return;
             }
@@ -389,15 +391,16 @@ public final class FactionBankMenu implements Listener {
         }));
     }
 
-    private void withdrawTnt(Player player, Faction faction, long amount, OperationResult result) {
+    private void withdrawTnt(Player player, FactionData faction, long amount, OperationResult result) {
         if (!canFullyFit(player.getInventory(), Material.TNT, amount)) {
-            player.sendMessage(messages.get(player, "faction-bank.inventory-full"));
+            player.sendMessage(messages.getGui(player, "faction-bank.inventory-full"));
             result.complete(false);
             return;
         }
-        manager.withdrawTnt(faction.id(), amount).whenComplete((saved, error) -> onMain(() -> {
+        manager.withdrawTnt(player, faction.id(), amount, "tnt-withdraw")
+                .whenComplete((saved, error) -> onMain(() -> {
             if (error != null || !Boolean.TRUE.equals(saved)) {
-                player.sendMessage(messages.get(player, "faction-bank.not-enough"));
+                player.sendMessage(messages.getGui(player, "faction-bank.not-enough"));
                 result.complete(false);
                 return;
             }
@@ -406,7 +409,7 @@ public final class FactionBankMenu implements Listener {
             // balance back if it no longer fits, then ask them to free space.
             if (!giveTnt(player, amount)) {
                 manager.depositTnt(faction.id(), amount, upgrades.tntCapacity(faction.id()));
-                player.sendMessage(messages.get(player, "faction-bank.inventory-full"));
+                player.sendMessage(messages.getGui(player, "faction-bank.inventory-full"));
                 result.complete(false);
                 return;
             }
@@ -482,14 +485,14 @@ public final class FactionBankMenu implements Listener {
         Resource(String key, Material material) { this.key = key; this.material = material; }
         static Resource from(String value) { for (Resource resource : values()) if (resource.key.equals(value)) return resource; return null; }
         String label(Messages messages, Player player) { return MessageFormatter.plain(messages.getRaw(player, "faction-bank." + key + "-name")); }
-        String value(FactionBankMenu menu, Faction faction) {
+        String value(FactionBankMenu menu, FactionData faction) {
             return switch (this) {
                 case MONEY -> EconomyHook.format(menu.manager.money(faction.id()));
                 case EXPERIENCE -> Numbers.formatFull(menu.manager.experience(faction.id()));
                 case TNT -> Numbers.formatFull(menu.manager.tnt(faction.id()));
             };
         }
-        String max(FactionBankMenu menu, Faction faction) {
+        String max(FactionBankMenu menu, FactionData faction) {
             return this == TNT ? Numbers.formatFull(menu.upgrades.tntCapacity(faction.id())) : "∞";
         }
     }

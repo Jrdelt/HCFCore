@@ -47,7 +47,7 @@ public final class PlaceholderResolver {
         // name or nickname could otherwise make contain a literal
         // "{placeholder}"-looking substring of its own) containing that
         // exact token first. This isn't just an optimization: several of
-        // these calls reach into FactionsUUID's/LuckPerms'/Vault's own
+        // these calls reach into Vertex's/LuckPerms'/Vault's own
         // live state, which is unsafe to touch at all when that plugin
         // isn't actually running -- a template that never asks for
         // {faction} shouldn't pay for (or risk) resolving it.

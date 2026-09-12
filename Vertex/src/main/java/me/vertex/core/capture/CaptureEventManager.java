@@ -1,11 +1,10 @@
 package me.vertex.core.capture;
 
 import eu.decentsoftware.holograms.api.DHAPI;
-import dev.kitteh.factions.event.FactionAutoDisbandEvent;
-import dev.kitteh.factions.event.FactionDisbandEvent;
 import me.vertex.core.ability.AbilityGate;
 import me.vertex.core.faction.RallyManager;
 import me.vertex.core.factions.FactionsHook;
+import me.vertex.core.factions.event.FactionLifecycleEvent;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.preferences.AnnouncementCategory;
@@ -39,9 +38,11 @@ import org.bukkit.scheduler.BukkitTask;
 import java.io.File;
 import java.io.IOException;
 import java.time.DateTimeException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -185,6 +186,53 @@ public final class CaptureEventManager implements Listener {
                 .sorted(Comparator.comparing(CaptureDefinition::id, String.CASE_INSENSITIVE_ORDER)).toList();
     }
 
+    /**
+     * Read-only state used by /events. It is derived from the scheduler's
+     * live maps, so the GUI cannot drift into a second definition of whether
+     * a KOTH is active, who is taking it, or when the next configured start
+     * is due.
+     */
+    public EventSnapshot snapshot(CaptureEventType type) {
+        ActiveCapture capture = active.values().stream()
+                .filter(candidate -> candidate.definition.type() == type)
+                .min(Comparator.comparing(candidate -> candidate.definition.id(), String.CASE_INSENSITIVE_ORDER))
+                .orElse(null);
+        long next = secondsUntilNextScheduled(type);
+        if (capture == null) {
+            return new EventSnapshot(false, "", "", 0L, next);
+        }
+        String owner = capture.capturingTeamKey == null || capture.capturingName == null
+                || capture.capturingName.isBlank() || capture.capturingName.equals("-")
+                ? neutralDisplayName : capture.capturingName;
+        long remaining = Math.max(0L, capture.definition.maxDurationSeconds()
+                - (System.currentTimeMillis() - capture.startedAtMillis) / 1_000L);
+        return new EventSnapshot(true, capture.definition.displayName(), owner, remaining, next);
+    }
+
+    /** Seconds until the next configured HH:mm start for this event type, or -1 when none is scheduled. */
+    public long secondsUntilNextScheduled(CaptureEventType type) {
+        ZonedDateTime now = ZonedDateTime.now(scheduleZone);
+        long shortest = Long.MAX_VALUE;
+        for (CaptureDefinition definition : definitions(type)) {
+            for (String configured : definition.scheduleTimes()) {
+                try {
+                    LocalTime time = LocalTime.parse(configured, SCHEDULE_TIME);
+                    ZonedDateTime candidate = now.toLocalDate().atTime(time).atZone(scheduleZone);
+                    if (!candidate.isAfter(now)) {
+                        candidate = candidate.plusDays(1L);
+                    }
+                    shortest = Math.min(shortest, Math.max(0L, Duration.between(now, candidate).getSeconds()));
+                } catch (DateTimeException ignored) {
+                    // load()/validate() already reports malformed schedule entries.
+                }
+            }
+        }
+        return shortest == Long.MAX_VALUE ? -1L : shortest;
+    }
+
+    public record EventSnapshot(boolean active, String name, String owner, long remainingSeconds,
+            long nextScheduledSeconds) { }
+
     /** Validates raw YAML as well as loaded definitions, so staff can repair a bad file without reading console stack traces. */
     public List<ValidationIssue> validate(CaptureEventType requestedType) {
         List<ValidationIssue> issues = new ArrayList<>();
@@ -318,12 +366,14 @@ public final class CaptureEventManager implements Listener {
     public void giveWand(Player player, CaptureEventType type) {
         ItemStack wand = new ItemStack(Material.BLAZE_ROD);
         ItemMeta meta = wand.getItemMeta();
-        meta.displayName(MessageFormatter.deserialize(messages.getRaw(player, "capture.wand-name")));
-        meta.lore(messages.getList(player, "capture.wand-lore"));
+        meta.displayName(messages.getGui(player, "capture.wand-name"));
+        meta.lore(messages.getGuiList(player, "capture.wand-lore"));
         meta.getPersistentDataContainer().set(wandKey, PersistentDataType.STRING, type.id());
         wand.setItemMeta(meta);
-        player.getInventory().addItem(wand).values()
-                .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
+                plugin, player, List.of(wand), "capture-selector")) {
+            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+        }
     }
 
     public boolean cancelSelection(Player player) {
@@ -488,13 +538,8 @@ public final class CaptureEventManager implements Listener {
     }
 
     @EventHandler
-    public void onFactionDisband(FactionDisbandEvent event) {
-        xpBoosters.revoke(event.getFaction().id());
-    }
-
-    @EventHandler
-    public void onFactionAutoDisband(FactionAutoDisbandEvent event) {
-        xpBoosters.revoke(event.getFaction().id());
+    public void onFactionDisband(FactionLifecycleEvent event) {
+        if (event.action() == FactionLifecycleEvent.Action.DISBAND) xpBoosters.revoke(event.faction().id());
     }
 
     public void shutdown() {
@@ -792,7 +837,8 @@ public final class CaptureEventManager implements Listener {
         }
         me.vertex.core.faction.PvpTopManager pvpTop = pvpTopManager;
         if (pvpTop != null) {
-            pvpTop.awardCapture(definition.type(), completion.factionId, completion.player, definition.id());
+            pvpTop.awardCapture(definition.type(), completion.factionId, completion.player,
+                    definition.id(), capture.operationId);
         }
         removeHologram(capture);
         clearFocusFor(definition.id());
@@ -1077,6 +1123,7 @@ public final class CaptureEventManager implements Listener {
 
     private static final class ActiveCapture {
         private final CaptureDefinition definition;
+        private final String operationId = UUID.randomUUID().toString();
         private final long startedAtMillis = System.currentTimeMillis();
         private final Map<UUID, Contribution> contributions = new HashMap<>();
         private int capturingFactionId = FactionsHook.NO_FACTION;

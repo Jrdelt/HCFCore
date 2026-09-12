@@ -83,8 +83,10 @@ public final class BackpackCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(messages.get(sender, "backpack.invalid-item-type"));
             return true;
         }
-        for (ItemStack dropped : target.getInventory().addItem(item).values()) {
-            target.getWorld().dropItemNaturally(target.getLocation(), dropped);
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
+                manager.plugin(), target, List.of(item), "backpack-admin-give")) {
+            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
+            return true;
         }
         sender.sendMessage(messages.get(sender, "backpack.gave", "player", target.getName(),
                 "tier", tier.displayName(), "level", String.valueOf(level)));

@@ -117,7 +117,7 @@ enforced at **both ends** of a throw:
 
 Between the two, a pearl can never cross into, out of, or through a
 protected zone in either direction. Either way the pearl itself is
-refunded (dropped at your feet if your inventory is full), since vanilla
+refunded (queued in the durable delivery inbox if your inventory is full), since vanilla
 consumes it on throw, not on landing. The Time Warp Pearl ability checks
 its recorded origin against the same zones, so a pearl thrown out of
 spawn long before a fight can't become an anytime recall-to-safety
@@ -208,7 +208,7 @@ Every ability and PvP mechanic respects faction relationships:
 - Portable Bard's buffs are the exception — they're designed to be shared
   with faction members.
 - Melee combat itself is unaffected — it always works normally,
-  regardless of relation (FactionsUUID's own claim/friendly-fire rules
+  regardless of relation (Vertex's native claim/friendly-fire rules
   still apply as usual).
 
 ## Staff punishments during combat

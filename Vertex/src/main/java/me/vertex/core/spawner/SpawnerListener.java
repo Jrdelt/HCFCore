@@ -62,7 +62,7 @@ public final class SpawnerListener implements Listener {
             player.sendMessage(messages.get(player, "spawner.claim-only"));
             return;
         }
-        if (!staffBuild && !rolePermissions.canUse(player, "spawner-add")) { event.setCancelled(true); player.sendMessage(messages.get(player, "factions.role-permission-denied")); return; }
+        if (!staffBuild && !rolePermissions.canUse(player, "spawner-place")) { event.setCancelled(true); player.sendMessage(messages.get(player, "factions.role-permission-denied")); return; }
         spawnerManager.place(location, mobType, claimTag != null ? claimTag : playerTag);
     }
 
@@ -95,10 +95,14 @@ public final class SpawnerListener implements Listener {
         ItemStack handItem = event.getItem();
         EntityType handType = SpawnerManager.readSpawnedType(handItem);
         if (handType == null || handType != data.mobType()) {
+            if (!staffManager.isStaffBuild(player.getUniqueId()) && !rolePermissions.canUse(player, "spawner-gui")) {
+                player.sendMessage(messages.get(player, "factions.role-permission-denied"));
+                return;
+            }
             SpawnerManagementMenu.open(player, spawnerManager, messages, location, data);
             return;
         }
-        if (!staffManager.isStaffBuild(player.getUniqueId()) && !rolePermissions.canUse(player, "spawner-add")) { player.sendMessage(messages.get(player, "factions.role-permission-denied")); return; }
+        if (!staffManager.isStaffBuild(player.getUniqueId()) && !rolePermissions.canUse(player, "spawner-place")) { player.sendMessage(messages.get(player, "factions.role-permission-denied")); return; }
 
         int originalSize = data.stackSize();
         int deposited = player.isSneaking() ? countMatching(player, handType) : 1;
@@ -183,19 +187,27 @@ public final class SpawnerListener implements Listener {
         // stack into an invisible database/PDC record with no block.
         if (spawnerManager.breakMode() == SpawnerManager.BreakMode.DECREMENT && stackSize > 1) {
             event.setCancelled(true);
-            block.getWorld().dropItemNaturally(location.clone().add(0.5, 0.5, 0.5),
-                    SpawnerManager.createSpawnerItem(mobType, displayName));
+            ItemStack item=SpawnerManager.createSpawnerItem(mobType,displayName);
+            if (!me.vertex.core.storage.DeliveryManager.queueOverflow(spawnerManager.plugin(), player,
+                    java.util.List.of(item), "spawner-break")) {
+                player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+                return;
+            }
             spawnerManager.decreaseStack(location, 1);
             return;
         }
 
-        event.setDropItems(false);
         int dropped = stackSize;
-        for (int i = 0; i < dropped; i++) {
-            block.getWorld().dropItemNaturally(location.clone().add(0.5, 0.5, 0.5),
-                    SpawnerManager.createSpawnerItem(mobType, displayName));
+        java.util.List<ItemStack> items=new java.util.ArrayList<>();
+        for(int i=0;i<dropped;i++)items.add(SpawnerManager.createSpawnerItem(mobType,displayName));
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(spawnerManager.plugin(), player,
+                items, "spawner-break")) {
+            event.setCancelled(true);
+            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+            return;
         }
 
+        event.setDropItems(false);
         spawnerManager.remove(location);
     }
 

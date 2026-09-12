@@ -28,12 +28,12 @@ final class BlueprintOutline {
      * @return {minX, minY, minZ, maxX, maxY, maxZ}
      */
     static double[] worldBounds(Location anchor, BlockVector3 relMin, BlockVector3 relMax) {
-        int minX = Math.min(relMin.getBlockX(), relMax.getBlockX());
-        int minY = Math.min(relMin.getBlockY(), relMax.getBlockY());
-        int minZ = Math.min(relMin.getBlockZ(), relMax.getBlockZ());
-        int maxX = Math.max(relMin.getBlockX(), relMax.getBlockX());
-        int maxY = Math.max(relMin.getBlockY(), relMax.getBlockY());
-        int maxZ = Math.max(relMin.getBlockZ(), relMax.getBlockZ());
+        int minX = Math.min(relMin.x(), relMax.x());
+        int minY = Math.min(relMin.y(), relMax.y());
+        int minZ = Math.min(relMin.z(), relMax.z());
+        int maxX = Math.max(relMin.x(), relMax.x());
+        int maxY = Math.max(relMin.y(), relMax.y());
+        int maxZ = Math.max(relMin.z(), relMax.z());
 
         return new double[] {
                 anchor.getBlockX() + minX,

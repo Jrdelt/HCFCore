@@ -9,7 +9,7 @@ import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Durable F Top snapshot and schedule state, independent of FactionsUUID's power leaderboard. */
+/** Durable F Top snapshot and schedule state, independent of native faction power. */
 public final class FTopStorage {
 
     private static final String CREATE_SCORES = """

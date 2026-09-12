@@ -85,5 +85,6 @@ silently refuses to open.
 
 ## Reloading
 
-`/vertex reload` re-reads every `gui/*.yml`. Menus already open keep their
-current contents until reopened.
+| Command | Permission | What it does |
+|---|---|---|
+| `/vertex reload` | `vertex.admin` | Re-reads every `gui/*.yml`. Menus already open keep their current contents until reopened. |

@@ -174,7 +174,7 @@ class MenuRegistryTest {
         assertEquals(4, lore.size());
         assertEquals("one", plain(lore.get(0)));
         assertEquals("three", plain(lore.get(2)));
-        assertEquals("end", plain(lore.get(3)));
+        assertEquals("ᴇɴᴅ", plain(lore.get(3)));
     }
 
     /**

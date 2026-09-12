@@ -9,6 +9,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.EntityType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 /**
@@ -38,6 +40,7 @@ public final class FTopManager {
     private volatile Map<Integer, FTopStorage.Score> scores = Map.of();
     private volatile long nextUpdateAtMillis;
     private CompletableFuture<Void> writeChain = CompletableFuture.completedFuture(null);
+    private BukkitTask task;
 
     public FTopManager(Plugin plugin, SpawnerManager spawners, FTopStorage storage) {
         this.plugin = plugin;
@@ -82,13 +85,16 @@ public final class FTopManager {
     }
 
     public void start() {
+        if (task != null) {
+            task.cancel();
+        }
         long now = System.currentTimeMillis();
         if (nextUpdateAtMillis <= 0) {
             nextUpdateAtMillis = now + updateIntervalMillis;
             persist();
         }
         // This lightweight due-date check does no spawner/claim scanning.
-        Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+        task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (System.currentTimeMillis() >= nextUpdateAtMillis) {
                 recalculateScheduled();
             }
@@ -200,11 +206,36 @@ public final class FTopManager {
         long now = System.currentTimeMillis();
         writeChain = writeChain.handle((ignored, error) -> null).thenRunAsync(() -> {
             try {
-                storage.save(snapshot, deadline, now);
+                me.vertex.core.storage.SqlRetry.run(plugin, "F Top snapshot save",
+                        () -> storage.save(snapshot, deadline, now));
             } catch (Exception error) {
-                plugin.getLogger().log(Level.SEVERE, "Failed to persist F Top snapshot.", error);
+                plugin.getLogger().log(Level.SEVERE,
+                        "Failed to persist F Top snapshot after retries.", error);
             }
         });
+    }
+
+    /** Waits for the serialized snapshot writer before migration or database shutdown. */
+    public void awaitWrites() {
+        CompletableFuture<Void> pending;
+        synchronized (this) {
+            pending = writeChain;
+        }
+        try {
+            pending.get(10, TimeUnit.SECONDS);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.WARNING, "Timed out waiting for F Top persistence.", error);
+        }
+    }
+
+    public void shutdown() {
+        if (task != null) {
+            task.cancel();
+            task = null;
+        }
+        awaitWrites();
     }
 
     public record Entry(int factionId, FTopStorage.Score score) { }

@@ -11,9 +11,6 @@ gui:
   filler-material: GRAY_STAINED_GLASS_PANE
   confirm-item: LIME_DYE
   locked-item: GRAY_DYE
-number-formatting:
-  style: compact
-  decimal-places: 1
 blacklist:
   worlds: []
   gamemodes: [CREATIVE, SPECTATOR]

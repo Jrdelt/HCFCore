@@ -26,6 +26,7 @@ import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -309,8 +310,8 @@ public final class BlueprintListener implements Listener {
             return;
         }
 
-        int lowestY = anchor.getBlockY() + Math.min(bounds[0].getBlockY(), bounds[1].getBlockY());
-        int highestY = anchor.getBlockY() + Math.max(bounds[0].getBlockY(), bounds[1].getBlockY());
+        int lowestY = anchor.getBlockY() + Math.min(bounds[0].y(), bounds[1].y());
+        int highestY = anchor.getBlockY() + Math.max(bounds[0].y(), bounds[1].y());
         if (lowestY < world.getMinHeight() || highestY >= world.getMaxHeight()) {
             failActivation(player, "blueprint.height-limit-exceeded");
             return;
@@ -381,7 +382,7 @@ public final class BlueprintListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent event) {
-        if (event.getHand() != EquipmentSlot.HAND || event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
             return;
         }
         Block block = event.getClickedBlock();
@@ -390,17 +391,55 @@ public final class BlueprintListener implements Listener {
         }
 
         Location loc = block.getLocation();
-        ActiveBuild activeBuild = manager.activeBuildAt(loc);
-        boolean isCompleted = isCompletedAnchor(loc);
-
-        // Not a blueprint anchor block
-        if (activeBuild == null && !isCompleted && !(block.getState() instanceof org.bukkit.block.Beacon b
-                && b.getPersistentDataContainer().has(templateKey, PersistentDataType.STRING))) {
+        if (!isBlueprintAnchor(loc)) {
             return;
         }
 
+        // Cancel both hand events so Bukkit never gets a chance to open the
+        // vanilla Beacon payment/effect container. Only the main-hand event
+        // opens Vertex's menu, avoiding a duplicate open from one click.
         event.setCancelled(true);
-        Player player = event.getPlayer();
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
+        openAnchorMenu(event.getPlayer(), loc);
+    }
+
+    /**
+     * Fallback for another plugin calling {@code Player#openInventory} on a
+     * Blueprint Beacon, or for a server version that begins the vanilla
+     * Beacon open before the interaction cancellation is observed.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onInventoryOpen(InventoryOpenEvent event) {
+        if (!(event.getPlayer() instanceof Player player)
+                || !(event.getInventory().getHolder() instanceof org.bukkit.block.Beacon beacon)
+                || !isBlueprintAnchor(beacon.getLocation())) {
+            return;
+        }
+        event.setCancelled(true);
+        Location anchor = beacon.getLocation();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (player.isOnline() && isBlueprintAnchor(anchor)) {
+                openAnchorMenu(player, anchor);
+            }
+        });
+    }
+
+    private boolean isBlueprintAnchor(Location location) {
+        if (location == null || location.getWorld() == null || location.getBlock().getType() != Material.BEACON) {
+            return false;
+        }
+        if (manager.activeBuildAt(location) != null || isCompletedAnchor(location)) {
+            return true;
+        }
+        return location.getBlock().getState() instanceof org.bukkit.block.Beacon beacon
+                && beacon.getPersistentDataContainer().has(templateKey, PersistentDataType.STRING);
+    }
+
+    private void openAnchorMenu(Player player, Location loc) {
+        ActiveBuild activeBuild = manager.activeBuildAt(loc);
+        Block block = loc.getBlock();
 
         // Check faction claim membership
         int playerFactionId = FactionsHook.getFactionId(player);
@@ -543,9 +582,19 @@ public final class BlueprintListener implements Listener {
             if (unactivatedTemplate != null) {
                 BlueprintTemplate template = manager.getTemplate(unactivatedTemplate);
 
-                // Prevent vanilla beacon drop
-                event.setDropItems(false);
+                if (template != null) {
+                    ItemStack item = createBlueprintItem(template);
+                    if (!queueOverflow(event.getPlayer(), List.of(item), "blueprint-preview-break")) {
+                        event.setCancelled(true);
+                        event.getPlayer().sendMessage(messages.get(event.getPlayer(),
+                                "delivery.storage-unavailable"));
+                        return;
+                    }
+                }
 
+                // Prevent vanilla beacon drop only after the custom item was
+                // accepted by durable delivery.
+                event.setDropItems(false);
                 // Clean up preview hologram
                 String previewHolo = previewHologramName(loc);
                 if (hologramsAvailable) {
@@ -553,12 +602,6 @@ public final class BlueprintListener implements Listener {
                         DHAPI.removeHologram(previewHolo);
                     } catch (Exception ignored) {
                     }
-                }
-
-                // Drop the custom blueprint item with PDC data
-                if (template != null) {
-                    ItemStack item = createBlueprintItem(template);
-                    loc.getWorld().dropItemNaturally(loc, item);
                 }
             }
         }
@@ -574,8 +617,8 @@ public final class BlueprintListener implements Listener {
 
         java.util.Map<String, org.bukkit.block.data.BlockData> expectedMap = new java.util.HashMap<>();
         for (ActiveBuild.PendingBlock pb : expectedBlocks) {
-            String key = pb.relativeOffset().getBlockX() + "," + pb.relativeOffset().getBlockY() + ","
-                    + pb.relativeOffset().getBlockZ();
+            String key = pb.relativeOffset().x() + "," + pb.relativeOffset().y() + ","
+                    + pb.relativeOffset().z();
             expectedMap.put(key, pb.data());
         }
 
@@ -589,12 +632,12 @@ public final class BlueprintListener implements Listener {
             return List.of();
         }
 
-        int minX = Math.min(bounds[0].getBlockX(), bounds[1].getBlockX());
-        int maxX = Math.max(bounds[0].getBlockX(), bounds[1].getBlockX());
-        int minY = Math.min(bounds[0].getBlockY(), bounds[1].getBlockY());
-        int maxY = Math.max(bounds[0].getBlockY(), bounds[1].getBlockY());
-        int minZ = Math.min(bounds[0].getBlockZ(), bounds[1].getBlockZ());
-        int maxZ = Math.max(bounds[0].getBlockZ(), bounds[1].getBlockZ());
+        int minX = Math.min(bounds[0].x(), bounds[1].x());
+        int maxX = Math.max(bounds[0].x(), bounds[1].x());
+        int minY = Math.min(bounds[0].y(), bounds[1].y());
+        int maxY = Math.max(bounds[0].y(), bounds[1].y());
+        int minZ = Math.min(bounds[0].z(), bounds[1].z());
+        int maxZ = Math.max(bounds[0].z(), bounds[1].z());
 
         for (int x = minX; x <= maxX; x++) {
             for (int y = minY; y <= maxY; y++) {
@@ -641,15 +684,15 @@ public final class BlueprintListener implements Listener {
             if (!aIsAir && bIsAir)
                 return 1;
 
-            int yCompare = Integer.compare(a.relativeOffset().getBlockY(), b.relativeOffset().getBlockY());
+            int yCompare = Integer.compare(a.relativeOffset().y(), b.relativeOffset().y());
             if (yCompare != 0)
                 return yCompare;
 
-            int zCompare = Integer.compare(a.relativeOffset().getBlockZ(), b.relativeOffset().getBlockZ());
+            int zCompare = Integer.compare(a.relativeOffset().z(), b.relativeOffset().z());
             if (zCompare != 0)
                 return zCompare;
 
-            return Integer.compare(a.relativeOffset().getBlockX(), b.relativeOffset().getBlockX());
+            return Integer.compare(a.relativeOffset().x(), b.relativeOffset().x());
         });
 
         return missing;
@@ -923,6 +966,22 @@ public final class BlueprintListener implements Listener {
     }
 
     private void finish(ActiveBuild build) {
+        if (!build.isComplete() && build.id() >= 0 && build.currentIndex() == 0
+                && build.isRefundEligible()) {
+            ItemStack refund = createBlueprintItem(build.template());
+            Player owner = Bukkit.getPlayer(build.ownerUuid());
+            boolean admitted = owner != null && owner.isOnline()
+                    ? queueOverflow(owner, List.of(refund), "blueprint-build-refund")
+                    : queueOffline(build.ownerUuid(), List.of(refund), "blueprint-build-refund");
+            if (!admitted) {
+                plugin.getLogger().severe("Could not durably admit Blueprint build refund for "
+                        + build.ownerUuid() + "; retaining the build record and anchor for retry.");
+                if (owner != null && owner.isOnline()) {
+                    owner.sendMessage(messages.get(owner, "delivery.storage-unavailable"));
+                }
+                return;
+            }
+        }
         manager.unregister(build);
         if (build.id() >= 0) {
             manager.persistRemoval(build.id());
@@ -962,19 +1021,6 @@ public final class BlueprintListener implements Listener {
             if (beaconBlock.getType() == Material.BEACON) {
                 beaconBlock.setType(Material.AIR, false);
 
-                // Only an initial build cancelled before its first placed block
-                // can safely return its token. Repairs never consume one, and
-                // a partial build must not create a free duplicate structure.
-                if (build.id() >= 0 && build.currentIndex() == 0 && build.isRefundEligible()) {
-                    ItemStack blueprintItem = createBlueprintItem(build.template());
-                    Player owner = Bukkit.getPlayer(build.ownerUuid());
-                    if (owner != null && owner.isOnline()) {
-                        owner.getInventory().addItem(blueprintItem).values()
-                                .forEach(leftover -> owner.getWorld().dropItemNaturally(owner.getLocation(), leftover));
-                    } else {
-                        build.anchor().getWorld().dropItemNaturally(build.anchor(), blueprintItem);
-                    }
-                }
             }
         }
     }
@@ -982,10 +1028,21 @@ public final class BlueprintListener implements Listener {
     public ItemStack createBlueprintItem(BlueprintTemplate template) {
         ItemStack item = new ItemStack(Material.BEACON);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(MessageFormatter.deserialize(template.displayName()));
+        meta.displayName(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(template.displayName())));
         meta.getPersistentDataContainer().set(templateKey, PersistentDataType.STRING, template.name());
         item.setItemMeta(meta);
         return item;
+    }
+
+    public boolean queueOverflow(Player player, java.util.Collection<ItemStack> items, String source) {
+        return me.vertex.core.storage.DeliveryManager.queueOverflow(plugin, player, items, source);
+    }
+    private boolean queueOffline(UUID owner, java.util.Collection<ItemStack> items, String source) {
+        if (plugin instanceof me.vertex.core.VertexPlugin vertex && vertex.deliveryManager() != null) {
+            return vertex.deliveryManager().admit(owner, items, source);
+        }
+        plugin.getLogger().severe("Could not queue offline " + source + " for " + owner);
+        return false;
     }
 
     private void createOrUpdateHologram(ActiveBuild build, String progress) {

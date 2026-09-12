@@ -90,11 +90,11 @@ public final class SqlStorage implements Storage {
                 cause VARCHAR(255) NOT NULL,
                 killer_name VARCHAR(16),
                 items LONGBLOB NOT NULL,
-                helmet BLOB,
-                chestplate BLOB,
-                leggings BLOB,
-                boots BLOB,
-                offhand BLOB,
+                helmet LONGBLOB,
+                chestplate LONGBLOB,
+                leggings LONGBLOB,
+                boots LONGBLOB,
+                offhand LONGBLOB,
                 INDEX (uuid, timestamp DESC)
             )""";
     private static final String CREATE_DEATH_TABLE_SQLITE = """
@@ -155,6 +155,10 @@ public final class SqlStorage implements Storage {
             statement.executeUpdate(CREATE_ABILITY_TABLE);
             statement.executeUpdate(CREATE_LOCALE_TABLE);
             statement.executeUpdate(createDeathTable);
+            for (String column : List.of("items", "helmet", "chestplate", "leggings", "boots", "offhand")) {
+                SqlSchema.ensureLongBlob(connection, database.dialect(), "player_deaths", column,
+                        !column.equals("items"));
+            }
             if (sqlite) {
                 // MySQL's inline INDEX(...) table constraint has no SQLite
                 // equivalent -- it needs its own statement there instead.

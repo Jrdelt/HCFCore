@@ -33,7 +33,7 @@ public final class ChunkCollectorMenu {
     public static void open(Player player, ChunkCollectorManager manager, Messages messages, Location location, ChunkCollectorData data) {
         Holder holder = new Holder(location);
         Inventory inventory = Bukkit.createInventory(holder, SIZE,
-                messages.get(player, "collector.title", "tier", String.valueOf(data.upgradeTier())));
+                messages.getGui(player, "collector.title", "tier", String.valueOf(data.upgradeTier())));
         holder.inventory = inventory;
 
         long capacity = manager.capacityFor(data.upgradeTier());
@@ -50,12 +50,12 @@ public final class ChunkCollectorMenu {
             long stored = data.stored(material);
             ItemStack icon = new ItemStack(material);
             ItemMeta meta = icon.getItemMeta();
-            meta.displayName(nonItalic(messages.get(player, "collector.item-title", "item", material.name())));
+            meta.displayName(nonItalic(messages.getGui(player, "collector.item-title", "item", material.name())));
             meta.lore(List.of(
-                    nonItalic(messages.get(player, "collector.stored-lore",
+                    nonItalic(messages.getGui(player, "collector.stored-lore",
                             "stored", String.format("%,d", stored))),
-                    nonItalic(messages.get(player, "collector.withdraw-amount-lore")),
-                    nonItalic(messages.get(player, "collector.withdraw-shift-lore",
+                    nonItalic(messages.getGui(player, "collector.withdraw-amount-lore")),
+                    nonItalic(messages.getGui(player, "collector.withdraw-shift-lore",
                             "amount", String.format("%,d", manager.shiftWithdrawAmount())))));
             icon.setItemMeta(meta);
             inventory.setItem(slot, icon);
@@ -74,12 +74,12 @@ public final class ChunkCollectorMenu {
                                           int typeCount, long totalStored, long capacity) {
         ItemStack icon = new ItemStack(Material.BOOK);
         ItemMeta meta = icon.getItemMeta();
-        meta.displayName(nonItalic(messages.get(player, "collector.summary-title")));
+        meta.displayName(nonItalic(messages.getGui(player, "collector.summary-title")));
         meta.lore(List.of(
-                nonItalic(messages.get(player, "collector.summary-tier", "tier", String.valueOf(data.upgradeTier()))),
-                nonItalic(messages.get(player, "collector.summary-stored",
+                nonItalic(messages.getGui(player, "collector.summary-tier", "tier", String.valueOf(data.upgradeTier()))),
+                nonItalic(messages.getGui(player, "collector.summary-stored",
                         "stored", String.format("%,d", totalStored), "types", String.valueOf(typeCount))),
-                nonItalic(messages.get(player, "collector.summary-capacity", "capacity", String.format("%,d", capacity)))));
+                nonItalic(messages.getGui(player, "collector.summary-capacity", "capacity", String.format("%,d", capacity)))));
         icon.setItemMeta(meta);
         return icon;
     }
@@ -89,11 +89,11 @@ public final class ChunkCollectorMenu {
         ItemMeta meta = icon.getItemMeta();
         List<Component> lore = new ArrayList<>();
         if (cost < 0) {
-            meta.displayName(nonItalic(messages.get(player, "collector.upgrade-maxed-title")));
-            lore.add(nonItalic(messages.get(player, "collector.upgrade-maxed", "tier", String.valueOf(tier))));
+            meta.displayName(nonItalic(messages.getGui(player, "collector.upgrade-maxed-title")));
+            lore.add(nonItalic(messages.getGui(player, "collector.upgrade-maxed", "tier", String.valueOf(tier))));
         } else {
-            meta.displayName(nonItalic(messages.get(player, "collector.upgrade-title")));
-            lore.add(nonItalic(messages.get(player, "collector.upgrade-lore", "tier", String.valueOf(tier + 1),
+            meta.displayName(nonItalic(messages.getGui(player, "collector.upgrade-title")));
+            lore.add(nonItalic(messages.getGui(player, "collector.upgrade-lore", "tier", String.valueOf(tier + 1),
                     "cost", String.format("%,.0f", cost))));
         }
         meta.lore(lore);

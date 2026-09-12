@@ -1,13 +1,9 @@
 package me.vertex.core.faction;
 
-import dev.kitteh.factions.Faction;
-import dev.kitteh.factions.permissible.PermState;
-import dev.kitteh.factions.permissible.PermSelector;
-import dev.kitteh.factions.permissible.PermissibleActions;
-import dev.kitteh.factions.permissible.Role;
-import dev.kitteh.factions.permissible.selector.RoleSingleSelector;
+import me.vertex.core.factions.FactionData;
+import me.vertex.core.factions.FactionMember;
+import me.vertex.core.factions.FactionRole;
 import me.vertex.core.factions.FactionsHook;
-import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -18,7 +14,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
-import org.bukkit.event.server.TabCompleteEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -26,98 +21,64 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Edits a faction's real FactionsUUID role matrix, plus Vertex's rally actions. */
+/** Native Vertex faction permission editor. All rows are saved to the database. */
 public final class RallyPermissionMenu implements Listener {
-    private static final List<String> ROLES = List.of("mod", "member", "recruit");
-    private static final String RALLY_SET = "vertex:rally-set";
-    private static final String RALLY_CLEAR = "vertex:rally-clear";
-    private static final List<CustomAction> CUSTOM_ACTIONS = List.of(
-            new CustomAction(RALLY_SET, "Set Rally"),
-            new CustomAction(RALLY_CLEAR, "Clear Rally"),
-            new CustomAction("vertex:spawner-add", "Add Spawners"),
-            new CustomAction("vertex:spawner-remove", "Remove Spawners"),
-            new CustomAction("vertex:collector-open", "Open Collectors"),
-            new CustomAction("vertex:collector-break", "Break Collectors"),
-            new CustomAction("vertex:collector-withdraw", "Withdraw from Collectors"),
-            new CustomAction("vertex:collector-sell", "Sell from Collectors"),
-            new CustomAction("vertex:collector-upgrade", "Upgrade Collectors"),
-            new CustomAction("vertex:collector-filter", "Modify Collector Filters"),
-            new CustomAction("vertex:bank-deposit", "Deposit Bank Resources"),
-            new CustomAction("vertex:bank-withdraw", "Withdraw Bank Resources"),
-            new CustomAction("vertex:chunkbuster-use", "Use Chunk Busters"));
+    private static final List<String> ROLES = List.of("coleader", "admin", "mod", "member", "recruit", "ally");
+    private static final List<Action> ACTIONS = List.of(
+            new Action("place-blocks"), new Action("break-blocks"), new Action("containers"), new Action("doors"),
+            new Action("spawner-gui"), new Action("spawner-place"), new Action("spawner-remove"),
+            new Action("claim"), new Action("unclaim"), new Action("invite"), new Action("kick"),
+            new Action("promote"), new Action("demote"), new Action("ally-request"), new Action("enemy-declare"),
+            new Action("neutral-request"),
+            new Action("home"), new Action("sethome"), new Action("setwarp"), new Action("description"),
+            new Action("rally-set"), new Action("rally-clear"), new Action("collector-open"), new Action("collector-break"),
+            new Action("collector-withdraw"), new Action("collector-sell"), new Action("collector-upgrade"),
+            new Action("collector-filter"), new Action("bank-deposit"), new Action("bank-withdraw"),
+            new Action("xp-deposit"), new Action("xp-withdraw"), new Action("tnt-deposit"), new Action("tnt-withdraw"),
+            new Action("tnt-fill"), new Action("vault-use"), new Action("chunkbuster-use"));
+    private static final List<Action> ALLY_ACTIONS = List.of(new Action("sethome"), new Action("place-blocks"),
+            new Action("break-blocks"), new Action("containers"), new Action("levers"), new Action("buttons"),
+            new Action("pvp"));
     private final Plugin plugin;
-    private final RallyManager manager;
     private final Messages messages;
     private final NamespacedKey roleKey;
     private final NamespacedKey actionKey;
 
-    public RallyPermissionMenu(Plugin plugin, RallyManager manager, Messages messages) {
-        this.plugin = plugin; this.manager = manager; this.messages = messages;
-        this.roleKey = new NamespacedKey(plugin, "faction_perms_role");
-        this.actionKey = new NamespacedKey(plugin, "faction_perms_action");
+    public RallyPermissionMenu(Plugin plugin, RallyManager ignoredManager, Messages messages) {
+        this.plugin = plugin; this.messages = messages;
+        roleKey = new NamespacedKey(plugin, "faction_perms_role");
+        actionKey = new NamespacedKey(plugin, "faction_perms_action");
     }
 
     public void open(Player player) {
-        Faction faction = FactionsHook.getFaction(player);
-        if (faction != null && FactionsHook.isLeader(player)) open(player, faction, "mod");
+        FactionData faction = FactionsHook.getFaction(player).orElse(null);
+        FactionMember member = FactionsHook.service().member(player.getUniqueId());
+        if (faction != null && canEditAny(member)) open(player, faction,
+                member.role() == FactionRole.ADMIN ? "member" : member.role() == FactionRole.COLEADER ? "admin" : "coleader");
     }
 
-    /** FactionsUUID owns /f, so route only its permissions aliases before that command executes. */
     @EventHandler
     public void onFactionPermissionsCommand(PlayerCommandPreprocessEvent event) {
-        String[] parts = event.getMessage().toLowerCase(Locale.ROOT).trim().split("\\s+");
-        if (parts.length != 2 || !isFactionCommand(parts[0])
-                || !(parts[1].equals("permissions") || parts[1].equals("perms"))) return;
-        Player player = event.getPlayer();
-        if (FactionsHook.getFaction(player) == null) return;
+        String[] parts = event.getMessage().substring(1).trim().split("\\s+");
+        if (parts.length != 2 || !isFactionCommand(parts[0]) || !(parts[1].equalsIgnoreCase("permissions") || parts[1].equalsIgnoreCase("perms"))) return;
         event.setCancelled(true);
-        if (!FactionsHook.isLeader(player)) {
-            player.sendMessage(messages.get(player, "factions.permissions-leader-only"));
-            return;
-        }
-        open(player);
+        if (FactionsHook.getFaction(event.getPlayer()).isEmpty()) { event.getPlayer().sendMessage(messages.getGui(event.getPlayer(), "factions.must-be-in-faction")); return; }
+        if (!canEditAny(FactionsHook.service().member(event.getPlayer().getUniqueId()))) { event.getPlayer().sendMessage(messages.getGui(event.getPlayer(), "factions.permissions-leader-only")); return; }
+        open(event.getPlayer());
     }
 
-    /** Adds the routed permission subcommands to FactionsUUID's normal /f completion list. */
-    @EventHandler
-    public void onFactionTabComplete(TabCompleteEvent event) {
-        if (!(event.getSender() instanceof Player)) {
-            return;
-        }
-        String buffer = event.getBuffer();
-        if (!buffer.startsWith("/")) {
-            return;
-        }
-        String[] parts = buffer.substring(1).split("\\s+", -1);
-        if (parts.length != 2 || !isFactionCommand(parts[0])) {
-            return;
-        }
-        String partial = parts[1].toLowerCase(Locale.ROOT);
-        List<String> completions = new ArrayList<>(event.getCompletions());
-        for (String value : List.of("perms", "permissions")) {
-            if (value.startsWith(partial) && completions.stream().noneMatch(value::equalsIgnoreCase)) {
-                completions.add(value);
-            }
-        }
-        event.setCompletions(completions);
-    }
-
-    private void open(Player player, Faction faction, String selectedRole) {
+    private void open(Player player, FactionData faction, String selectedRole) {
         Holder holder = new Holder(faction.id(), selectedRole);
-        Inventory inventory = Bukkit.createInventory(holder, 54, MessageFormatter.deserialize(smallCaps(
-                plugin.getConfig().getString("rally.permission-gui.title", "<gold>Faction Permissions"))));
+        Inventory inventory = Bukkit.createInventory(holder, 54, messages.getGui(player, "faction-permissions.title"));
         holder.inventory = inventory;
-        for (String role : ROLES) inventory.setItem(roleSlot(role), roleItem(role, role.equals(selectedRole)));
-        int slot = 9;
-        for (PermissibleActions action : PermissibleActions.values()) {
-            inventory.setItem(slot++, actionItem(faction, selectedRole, action.name(), action.shortDescription()));
-        }
-        for (CustomAction action : CUSTOM_ACTIONS) {
-            inventory.setItem(slot++, actionItem(faction, selectedRole, action.id(), action.label()));
+        FactionMember editor = FactionsHook.service().member(player.getUniqueId());
+        for (String role : ROLES) if (canEditRole(editor, role)) inventory.setItem(roleSlot(role), roleItem(role, role.equals(selectedRole)));
+        List<Action> actions = selectedRole.equals("ally") ? ALLY_ACTIONS : ACTIONS;
+        for (int index = 0; index < actions.size() && index + 9 < inventory.getSize(); index++) {
+            Action action = actions.get(index); inventory.setItem(index + 9, actionItem(faction, selectedRole, action));
         }
         player.openInventory(inventory);
     }
@@ -127,127 +88,51 @@ public final class RallyPermissionMenu implements Listener {
         if (!(event.getInventory().getHolder() instanceof Holder holder)) return;
         event.setCancelled(true);
         if (!(event.getWhoClicked() instanceof Player player) || event.getClickedInventory() != event.getView().getTopInventory()) return;
-        Faction faction = FactionsHook.getFaction(player);
-        if (faction == null || faction.id() != holder.factionId || !FactionsHook.isLeader(player)) { player.closeInventory(); return; }
+        FactionData faction = FactionsHook.getFaction(player).orElse(null);
+        FactionMember editor = FactionsHook.service().member(player.getUniqueId());
+        if (faction == null || faction.id() != holder.factionId || !canEditAny(editor)) { player.closeInventory(); return; }
         ItemStack clicked = event.getCurrentItem(); if (clicked == null || !clicked.hasItemMeta()) return;
         ItemMeta meta = clicked.getItemMeta();
         String role = meta.getPersistentDataContainer().get(roleKey, PersistentDataType.STRING);
-        if (role != null) { open(player, faction, role); return; }
+        if (role != null) { if(canEditRole(editor,role))open(player, faction, role); return; }
         String action = meta.getPersistentDataContainer().get(actionKey, PersistentDataType.STRING);
-        if (action != null) {
-            set(faction, holder.role, action, !event.isRightClick());
-            open(player, faction, holder.role);
-        }
+        if (action == null) return;
+        String selectedRole=holder.role;boolean allowed=!event.isRightClick();
+        FactionsHook.service().submitMutation(()->FactionsHook.service().setAction(player,selectedRole,action,allowed))
+                .whenComplete((result,error)->Bukkit.getScheduler().runTask(plugin,()->{
+                    if(!player.isOnline())return;
+                    FactionData current=FactionsHook.getFaction(player).orElse(null);
+                    if(error!=null||result!=me.vertex.core.factions.FactionService.Result.OK||current==null
+                            ||current.id()!=holder.factionId||!canEditAny(FactionsHook.service().member(player.getUniqueId()))){
+                        player.closeInventory();return;
+                    }
+                    open(player,current,selectedRole);
+                }));
     }
 
     private ItemStack roleItem(String role, boolean selected) {
         String path = "rally.permission-gui.roles." + role;
         ItemStack item = new ItemStack(material(plugin.getConfig().getString(path + ".material", defaultMaterial(role))));
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(MessageFormatter.deserialize(smallCaps(plugin.getConfig().getString(path + ".name", "<gold>" + role))));
-        meta.lore(List.of(MessageFormatter.deserialize(smallCaps(selected ? "<green>Selected" : "<gray>Click to select"))));
+        ItemMeta meta = item.getItemMeta(); meta.displayName(messages.getGui(null, "faction-permissions.role-" + role));
+        meta.lore(List.of(messages.getGui(null, selected ? "faction-permissions.selected" : "faction-permissions.select")));
         meta.getPersistentDataContainer().set(roleKey, PersistentDataType.STRING, role); item.setItemMeta(meta); return item;
     }
 
-    private ItemStack actionItem(Faction faction, String role, String action, String label) {
-        boolean allowed = allowed(faction, role, action);
-        String actionPath = "rally.permission-gui.actions." + action.toLowerCase(Locale.ROOT).replace(':', '-');
-        String configuredLabel = plugin.getConfig().getString(actionPath + ".name", label);
-        // A green pane always means allowed and a red pane always means
-        // denied. In particular, Set/Clear Rally must never look blocked
-        // merely because their custom label was once paired with a Barrier.
+    private ItemStack actionItem(FactionData faction, String role, Action action) {
+        boolean allowed = FactionsHook.service().actionAllowed(faction.id(), role, action.id());
         ItemStack item = new ItemStack(allowed ? Material.GREEN_STAINED_GLASS_PANE : Material.RED_STAINED_GLASS_PANE);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(MessageFormatter.deserialize(smallCaps((allowed ? "<green>" : "<red>") + configuredLabel)));
-        meta.lore(List.of(MessageFormatter.deserialize(smallCaps(allowed ? "<green>Allowed" : "<red>Denied")),
-                MessageFormatter.deserialize(smallCaps("<gray>Left-click: allow | Right-click: deny"))));
-        meta.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, action); item.setItemMeta(meta); return item;
+        ItemMeta meta = item.getItemMeta(); meta.displayName(messages.getGui(null, "faction-permissions.action-" + action.id()));
+        meta.lore(List.of(messages.getGui(null, allowed ? "faction-permissions.allowed" : "faction-permissions.denied"),
+                messages.getGui(null, "faction-permissions.click-hint")));
+        meta.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, action.id()); item.setItemMeta(meta); return item;
     }
 
-    private boolean allowed(Faction faction, String role, String action) {
-        if (action.startsWith("vertex:")) return manager.rolePermission(faction.id(), role, action.substring("vertex:".length()));
-        return isNativeActionAllowed(faction, role, action);
-    }
-
-    /** Reads the same native FactionsUUID action state rendered by this menu. */
-    public static boolean isNativeActionAllowed(Faction faction, String role, PermissibleActions action) {
-        return isNativeActionAllowed(faction, role, action.name());
-    }
-
-    private static boolean isNativeActionAllowed(Faction faction, String role, String action) {
-        // Admin is intentionally not editable and FactionsUUID permits it.
-        if ("admin".equals(role)) {
-            return true;
-        }
-        Faction.Permissions permissions = faction.permissions();
-        return factionSelectors(role).stream().allMatch(selector -> !permissions.has(selector)
-                || permissions.get(selector).get(action) != PermState.DENY);
-    }
-
-    private void set(Faction faction, String role, String action, boolean allowed) {
-        if (action.startsWith("vertex:")) { manager.setRolePermission(faction.id(), role, action.substring("vertex:".length()), allowed); return; }
-        Faction.Permissions permissions = faction.permissions();
-        for (PermSelector selector : factionSelectors(role)) {
-            Faction.Permissions.SelectorPerms rolePermissions = permissions.has(selector) ? permissions.get(selector) : permissions.add(selector);
-            rolePermissions.set(action, allowed ? PermState.ALLOW : PermState.DENY);
-            // Exact role rows must take priority over FactionsUUID's inherited/default selectors.
-            while (permissions.selectors().indexOf(selector) > 0) permissions.moveSelectorUp(selector);
-        }
-    }
-
-    private static List<PermSelector> factionSelectors(String role) {
-        return switch (role) {
-            case "mod" -> List.of(new RoleSingleSelector(Role.COLEADER), new RoleSingleSelector(Role.MODERATOR));
-            case "recruit" -> List.of(new RoleSingleSelector(Role.RECRUIT));
-            default -> List.of(new RoleSingleSelector(Role.NORMAL));
-        };
-    }
-    private int roleSlot(String role) {
-        int fallback = switch (role) { case "mod" -> 2; case "member" -> 4; default -> 6; };
-        int configured = plugin.getConfig().getInt("rally.permission-gui.roles." + role + ".slot", fallback);
-        return configured >= 0 && configured < 9 ? configured : fallback;
-    }
-    private boolean isFactionCommand(String rawCommand) {
-        String command = rawCommand.startsWith("/") ? rawCommand.substring(1) : rawCommand;
-        int namespaceSeparator = command.indexOf(':');
-        if (namespaceSeparator >= 0) {
-            command = command.substring(namespaceSeparator + 1);
-        }
-        String normalized = command.toLowerCase(Locale.ROOT);
-        return plugin.getConfig().getStringList("factions.command-aliases").stream()
-                .map(alias -> alias.toLowerCase(Locale.ROOT))
-                .anyMatch(normalized::equals);
-    }
-
-    /** Converts only display text, preserving MiniMessage tags such as <gold>. */
-    private static String smallCaps(String value) {
-        StringBuilder output = new StringBuilder(value.length());
-        boolean inTag = false;
-        for (int index = 0; index < value.length(); index++) {
-            char character = value.charAt(index);
-            if (character == '<') inTag = true;
-            if (inTag) {
-                output.append(character);
-                if (character == '>') inTag = false;
-                continue;
-            }
-            output.append(smallCap(character));
-        }
-        return output.toString();
-    }
-
-    private static char smallCap(char character) {
-        return switch (Character.toLowerCase(character)) {
-            case 'a' -> 'ᴀ'; case 'b' -> 'ʙ'; case 'c' -> 'ᴄ'; case 'd' -> 'ᴅ'; case 'e' -> 'ᴇ';
-            case 'f' -> 'ꜰ'; case 'g' -> 'ɢ'; case 'h' -> 'ʜ'; case 'i' -> 'ɪ'; case 'j' -> 'ᴊ';
-            case 'k' -> 'ᴋ'; case 'l' -> 'ʟ'; case 'm' -> 'ᴍ'; case 'n' -> 'ɴ'; case 'o' -> 'ᴏ';
-            case 'p' -> 'ᴘ'; case 'q' -> 'ǫ'; case 'r' -> 'ʀ'; case 's' -> 'ꜱ'; case 't' -> 'ᴛ';
-            case 'u' -> 'ᴜ'; case 'v' -> 'ᴠ'; case 'w' -> 'ᴡ'; case 'x' -> 'x'; case 'y' -> 'ʏ';
-            case 'z' -> 'ᴢ'; default -> character;
-        };
-    }
-    private static String defaultMaterial(String role) { return switch (role) { case "admin" -> "NETHERITE_SWORD"; case "mod" -> "DIAMOND_SWORD"; case "member" -> "GOLDEN_SWORD"; default -> "WOODEN_SWORD"; }; }
-    private static Material material(String name) { try { return Material.valueOf(name.toUpperCase(Locale.ROOT)); } catch (Exception e) { return Material.BARRIER; } }
-    private record CustomAction(String id, String label) { }
-    private static final class Holder implements InventoryHolder { final int factionId; final String role; Inventory inventory; Holder(int factionId, String role) { this.factionId=factionId; this.role=role; } @Override public Inventory getInventory(){return inventory;} }
+    private int roleSlot(String role) { int fallback = switch (role) { case "coleader" -> 1; case "admin" -> 2; case "mod" -> 3; case "member" -> 4; case "recruit" -> 5; default -> 7; }; int configured = plugin.getConfig().getInt("rally.permission-gui.roles." + role + ".slot", fallback); return configured >= 0 && configured < 9 ? configured : fallback; }
+    private boolean isFactionCommand(String raw) { String command = raw.startsWith("/") ? raw.substring(1) : raw; int separator = command.indexOf(':'); if (separator >= 0) command = command.substring(separator + 1); String normalized = command.toLowerCase(Locale.ROOT); return plugin.getConfig().getStringList("factions.command-aliases").stream().map(value -> value.toLowerCase(Locale.ROOT)).anyMatch(normalized::equals); }
+    private static boolean canEditAny(FactionMember member){return member!=null&&member.role().atLeast(FactionRole.ADMIN);}
+    private static boolean canEditRole(FactionMember editor,String role){if(editor==null)return false;if(role.equals("ally"))return editor.role()==FactionRole.LEADER||editor.role()==FactionRole.COLEADER;FactionRole target=FactionRole.parse(role,FactionRole.RECRUIT);return editor.role()==FactionRole.LEADER&&target.weight()<FactionRole.LEADER.weight()||editor.role()==FactionRole.COLEADER&&target.weight()<=FactionRole.ADMIN.weight()||editor.role()==FactionRole.ADMIN&&(target==FactionRole.MEMBER||target==FactionRole.RECRUIT);}
+    private static String defaultMaterial(String role) { return switch (role) { case "coleader" -> "NETHERITE_SWORD"; case "admin" -> "DIAMOND_SWORD"; case "mod" -> "IRON_SWORD"; case "member" -> "GOLDEN_SWORD"; case "ally" -> "PURPLE_DYE"; default -> "WOODEN_SWORD"; }; }
+    private static Material material(String name) { try { return Material.valueOf(name.toUpperCase(Locale.ROOT)); } catch (Exception ignored) { return Material.BARRIER; } }
+    private record Action(String id) { }
+    private static final class Holder implements InventoryHolder { final int factionId; final String role; Inventory inventory; Holder(int factionId, String role) { this.factionId = factionId; this.role = role; } @Override public Inventory getInventory() { return inventory; } }
 }

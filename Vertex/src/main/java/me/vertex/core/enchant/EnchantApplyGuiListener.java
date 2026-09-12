@@ -91,13 +91,23 @@ public final class EnchantApplyGuiListener implements Listener {
                 || !(event.getPlayer() instanceof Player player)) {
             return;
         }
-        for (int slot : new int[] {EnchantApplyGui.TARGET_SLOT, EnchantApplyGui.ENCHANT_SLOT, EnchantApplyGui.GEM_SLOT}) {
+        int[] slots = {EnchantApplyGui.TARGET_SLOT, EnchantApplyGui.ENCHANT_SLOT, EnchantApplyGui.GEM_SLOT};
+        java.util.List<ItemStack> returns = new java.util.ArrayList<>();
+        for (int slot : slots) {
             ItemStack item = event.getInventory().getItem(slot);
-            if (item == null || item.isEmpty()) {
-                continue;
-            }
-            player.getInventory().addItem(item).values()
-                    .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+            if (item != null && !item.isEmpty()) returns.add(item.clone());
+        }
+        if (returns.isEmpty()) return;
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
+                plugin, player, returns, "enchant-gui-return")) {
+            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (player.isOnline()) player.openInventory(event.getInventory());
+            });
+            return;
+        }
+        for (int slot : slots) {
+            event.getInventory().setItem(slot, null);
         }
     }
 

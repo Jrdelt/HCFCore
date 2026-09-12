@@ -6,17 +6,17 @@ Winner takes both sides' stake.
 
 ## Hosting one
 
-| Command | Wagers |
-|---|---|
-| `/cf <amount>` | Money, open to anyone |
-| `/cf <amount> money` | Money, explicit keyword (identical to the plain form above) |
-| `/cf <amount> <player>` | Money, only that player can play it |
-| `/cf <amount> exp` or `/cf <amount> xp` | Experience levels, open to anyone |
-| `/cf <amount> exp <player>` or `/cf <amount> xp <player>` | Experience levels, targeted |
-| `/cf <amount> gc` | Vertex's own self-hosted GC balance — see [GC (Gift Card / Credit)](gc-currency.md#gc-as-a-coinflipauction-house-currency) |
-| `/cf <amount> gc <player>` | Same, targeted |
-| `/cf hand` | Items — opens a picker GUI to choose up to `max-item-stacks-per-wager` stacks |
-| `/cf hand <player>` | Same, targeted |
+| Command | Permission | Wagers |
+|---|---|---|
+| `/cf <amount>` | Open to all | Money |
+| `/cf <amount> money` | Open to all | Money (explicit keyword, same as above) |
+| `/cf <amount> <player>` | Open to all | Money, only that player can play |
+| `/cf <amount> exp` or `/cf <amount> xp` | Open to all | Experience levels |
+| `/cf <amount> exp <player>` or `/cf <amount> xp <player>` | Open to all | Experience levels, targeted |
+| `/cf <amount> gc` | Open to all | GC balance (see [GC](gc-currency.md#gc-as-a-coinflipauction-house-currency)) |
+| `/cf <amount> gc <player>` | Open to all | GC balance, targeted |
+| `/cf hand` | Open to all | Items — opens picker GUI |
+| `/cf hand <player>` | Open to all | Items, targeted |
 
 Amounts accept the server's normal formatted-number syntax: `10k`, `1.25m`,
 `1,000,000`, and the configured suffixes in `number-formatting.yml`.
@@ -25,15 +25,13 @@ Amounts accept the server's normal formatted-number syntax: `10k`, `1.25m`,
 never tab-completes there, only right after an explicit currency keyword
 (or as the second word of `/cf hand <player>`) — so a targeted wager
 always needs the wager type typed first. Typing a name never changes
-*what* you're wagering, only *who* can play it. A host's wager is taken
-immediately when the command runs — money via Vault, levels via
-`setLevel`, items straight out of the picker GUI. It's never merely
-"reserved": if creation fails partway (a database hiccup), the host is
-refunded automatically. Successfully hosting one opens the Active
+*what* you're wagering, only *who* can play it. Vertex records a creation
+intent before money or levels are removed; an item-picker wager is written as
+durable escrow before activation. Successfully hosting one opens the Active
 Coinflips browser right after, so you can see your own listing land.
 
-Once the listing is saved, the server announces its creator and wager in
-public chat. Players can disable only these notices in `/settings` (also
+Once the listing is saved, the server announces its creator and coinflip type
+in public chat without exposing the amount or item list. Players can disable only these notices in `/settings` (also
 `/preferences`) without hiding other server announcements.
 
 **One coinflip open at a time.** A player who already has an unresolved
@@ -131,8 +129,9 @@ Winning an item coinflip never drops items straight into your inventory —
 they go to your personal claim stash, shown by the **Collect Stash**
 button in `/cf` (lit up when you have something waiting). Open it and
 click **Claim All** to receive everything at once, with any overflow
-dropped at your feet rather than lost. Money and experience settle
-directly and instantly instead — there's nothing to claim for those.
+left in the durable stash until enough inventory space is available. Money and
+experience settle through the payout outbox instead — there is no item to
+claim for those.
 
 If you win experience while offline (only possible if you're the host and
 went offline after posting), it's credited automatically the next time you
@@ -167,19 +166,27 @@ log — host, opponent, wager, winner, and outcome — independent of the
 player. `log-retention-days` controls how long entries are kept (0 = never
 deleted).
 
+`/cf payouts [key] [paid|retry]` (`vertex.coinflip.payouts`) lists and
+reconciles Vault/EXP payouts left uncertain by an interrupted external
+acknowledgement. GC payouts use idempotent operation IDs and can safely
+recognize an already-applied transaction.
+
+`/cf intents [key] [debited|not-debited]` (`vertex.coinflip.intents`) lists
+interrupted wager creations. Staff must verify the external economy/XP debit
+before choosing; the decision is permanent, idempotent, and audit logged.
+
 ## Storage and persistence
 
-Coinflips, claims, self-bans, and the audit log all live in Vertex's own
+Coinflips, creation intents, claims, payout state, self-bans, and the audit log all live in Vertex's own
 database (SQLite by default, or MySQL) — not on any item, not in memory
 only. A crash or restart never loses an open coinflip, a pending item
 payout, or a self-ban: everything reloads exactly as it was. `/vertex
 storage local|mysql` (see [Configuration](configuration.md#database))
 carries all of it over when switching backends.
 
-A coinflip's wager is only ever taken from a real balance, level count,
-or inventory — never just "marked" as reserved — so there's no window
-where a crash could double-count or lose track of what's actually at
-stake.
+A predetermined transaction remains represented by durable escrow/payout rows
+until its handoff is acknowledged. Vertex never blindly retries an uncertain
+Vault/EXP credit, because those external APIs cannot accept an idempotency key.
 
 ## Configuration reference (`coinflips.yml`)
 
@@ -208,6 +215,8 @@ After changing this file, run `/vertex reload` or restart the server.
 |---|---|
 | `vertex.coinflip.remove` | Cancel any player's active coinflip |
 | `vertex.coinflip.logs` | Read the staff audit log |
+| `vertex.coinflip.payouts` | Inspect and reconcile uncertain Vault/EXP payouts |
+| `vertex.coinflip.intents` | Inspect and reconcile interrupted wager creations |
 
 Hosting, playing, browsing, claiming, and self-banning are open to every
 player — there's no permission node gating normal use.

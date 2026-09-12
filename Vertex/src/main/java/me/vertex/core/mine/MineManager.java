@@ -286,17 +286,22 @@ public final class MineManager {
     public void giveWand(Player player) {
         ItemStack wand = new ItemStack(Material.BLAZE_ROD);
         ItemMeta meta = wand.getItemMeta();
-        meta.displayName(MessageFormatter.deserialize(messages.getRaw(player, "mines.wand-name")));
-        meta.lore(messages.getList(player, "mines.wand-lore"));
+        meta.displayName(messages.getGui(player, "mines.wand-name"));
+        meta.lore(messages.getGuiList(player, "mines.wand-lore"));
         meta.getPersistentDataContainer().set(wandKey, PersistentDataType.STRING, "mine");
         wand.setItemMeta(meta);
-        player.getInventory().addItem(wand).values()
-                .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+        if (!queueOverflow(player, List.of(wand), "mine-selector")) {
+            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+        }
     }
 
     public boolean isSelectionWand(ItemStack item) {
         return item != null && item.getType() == Material.BLAZE_ROD && item.hasItemMeta()
                 && item.getItemMeta().getPersistentDataContainer().has(wandKey, PersistentDataType.STRING);
+    }
+
+    public boolean queueOverflow(Player player, java.util.Collection<ItemStack> items, String source) {
+        return me.vertex.core.storage.DeliveryManager.queueOverflow(plugin, player, items, source);
     }
 
     public void setCorner(Player player, Location location, boolean first) {

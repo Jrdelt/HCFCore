@@ -2,6 +2,7 @@ package me.vertex.core.staff;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import me.vertex.core.lang.Messages;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -47,10 +48,10 @@ public final class InvseeMenu {
     private InvseeMenu() {
     }
 
-    public static void open(Player viewer, Player target) {
+    public static void open(Player viewer, Player target, Messages messages) {
         Holder holder = new Holder(target.getUniqueId());
         Inventory inventory = Bukkit.createInventory(holder, SIZE,
-                Component.text(target.getName() + "'s Inventory", NamedTextColor.DARK_GRAY));
+                messages.getGui(viewer, "staff.invsee-title", "player", target.getName()));
         holder.inventory = inventory;
         populate(inventory, target);
         holder.lastKnownSnapshot = snapshot(inventory);

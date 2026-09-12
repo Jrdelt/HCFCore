@@ -18,6 +18,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 /**
@@ -37,7 +38,8 @@ public final class MineKothManager {
     private final AnnouncementPreferenceManager announcements;
 
     private final Map<String, State> states = new ConcurrentHashMap<>();
-    private final java.util.Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
+    private final Object writeLock = new Object();
+    private CompletableFuture<Void> writeTail = CompletableFuture.completedFuture(null);
 
     private volatile long tickIntervalTicks = 20L;
     private BukkitTask task;
@@ -226,15 +228,32 @@ public final class MineKothManager {
     }
 
     private void persist(String mineId, State state) {
-        CompletableFuture<Void> write = CompletableFuture.runAsync(() -> {
-            try {
-                storage.save(mineId, state.owner, state.control, state.ownedSince);
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to persist Mine KOTH state for " + mineId, e);
-            }
-        });
-        pendingWrites.add(write);
-        write.whenComplete((ignored, error) -> pendingWrites.remove(write));
+        synchronized (writeLock) {
+            writeTail = writeTail.handle((ignored, error) -> null).thenRunAsync(() -> {
+                try {
+                    me.vertex.core.storage.SqlRetry.run(plugin, "Mine KOTH save for " + mineId,
+                            () -> storage.save(mineId, state.owner, state.control, state.ownedSince));
+                } catch (Exception e) {
+                    plugin.getLogger().log(Level.SEVERE,
+                            "Failed to persist Mine KOTH state for " + mineId + " after retries.", e);
+                }
+            });
+        }
+    }
+
+    /** Drains older saves before a final flush so stale state cannot win a race. */
+    public void awaitWrites() {
+        CompletableFuture<Void> pending;
+        synchronized (writeLock) {
+            pending = writeTail;
+        }
+        try {
+            pending.get(10, TimeUnit.SECONDS);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.WARNING, "Timed out waiting for Mine KOTH persistence.", error);
+        }
     }
 
     /** Flushes every point's current state; called on shutdown so hold time is not lost. */
@@ -254,6 +273,7 @@ public final class MineKothManager {
             task.cancel();
             task = null;
         }
+        awaitWrites();
         flush();
         // A Mine KOTH is permanent, but its hologram is not: leaving one
         // behind on shutdown would strand a stale board in the world that

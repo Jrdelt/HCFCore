@@ -183,13 +183,13 @@ public final class ChunkCollectorListener implements Listener {
         return rejectedByTypeLimit ? stack.getAmount() : 0;
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
         if (!manager.isCollectorItem(event.getItemInHand())) {
             return;
         }
         Player player = event.getPlayer();
-        Location location = event.getBlock().getLocation();
+        Location location = event.getBlockPlaced().getLocation();
 
         String claimTag = FactionsHook.getClaimFactionTag(location);
         String playerTag = FactionsHook.getFactionTag(player);
@@ -210,6 +210,18 @@ public final class ChunkCollectorListener implements Listener {
             return;
         }
 
+    }
+
+    /** Commits tile/index state only after every placement protection accepted the block. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlaceCommitted(BlockPlaceEvent event) {
+        if (!manager.isCollectorItem(event.getItemInHand())) {
+            return;
+        }
+        Player player = event.getPlayer();
+        Location location = event.getBlockPlaced().getLocation();
+        String claimTag = FactionsHook.getClaimFactionTag(location);
+        String playerTag = FactionsHook.getFactionTag(player);
         ChunkCollectorData data = manager.readItemData(event.getItemInHand(), player.getUniqueId(),
                 claimTag != null ? claimTag : playerTag);
         // A collector item can be traded.  Its stored contents/tier travel
@@ -217,6 +229,10 @@ public final class ChunkCollectorListener implements Listener {
         // it now so per-player limits and claim-change protection remain
         // accurate.
         data = manager.withOwner(data, player.getUniqueId(), claimTag != null ? claimTag : playerTag);
+        // MONITOR runs after protection plugins have made their final
+        // cancellation decision. Register synchronously while the freshly
+        // placed ShulkerBox tile exists so the very first right-click can
+        // resolve the collector without a relog/chunk reload.
         manager.register(location, data);
     }
 
@@ -279,9 +295,13 @@ public final class ChunkCollectorListener implements Listener {
             if (!rolePermissions.canUse(player, "collector-break")) { event.setCancelled(true); player.sendMessage(messages.get(player, "collector.break-permission-denied")); return; }
         }
 
+        ItemStack collector=manager.createCollectorItem(manager.displayName(player),data);
+        if (!manager.queueOverflow(player, java.util.List.of(collector), "collector-break")) {
+            event.setCancelled(true);
+            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+            return;
+        }
         event.setDropItems(false);
-        block.getWorld().dropItemNaturally(location.clone().add(0.5, 0.5, 0.5),
-                manager.createCollectorItem(manager.displayName(player), data));
         manager.unregister(location);
     }
 

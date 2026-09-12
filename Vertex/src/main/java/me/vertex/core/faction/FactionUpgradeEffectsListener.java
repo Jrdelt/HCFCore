@@ -24,7 +24,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
-/** Applies the non-FactionsUUID-native faction upgrades during normal play. */
+/** Applies native Vertex faction upgrades during normal play. */
 public final class FactionUpgradeEffectsListener implements Listener {
     private final Plugin plugin;
     private final FactionUpgradeManager manager;
@@ -150,7 +150,7 @@ public final class FactionUpgradeEffectsListener implements Listener {
             // If another plugin changed flight speed since our previous
             // refresh, treat that value as its new baseline and reapply the
             // faction boost. This keeps Vertex's boost authoritative while
-            // still cooperating with FactionsUUID/other flight providers.
+            // still cooperating with other flight providers.
             if (Math.abs(player.getFlySpeed() - boosted) > 0.0001F) {
                 baseline = player.getFlySpeed();
                 priorFlySpeeds.put(player.getUniqueId(), baseline);

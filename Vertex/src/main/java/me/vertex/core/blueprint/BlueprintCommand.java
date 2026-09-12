@@ -26,8 +26,10 @@ public final class BlueprintCommand implements CommandExecutor, TabCompleter {
     private final BlueprintManager manager;
     private final Messages messages;
     private final NamespacedKey templateKey;
+    private final Plugin plugin;
 
     public BlueprintCommand(Plugin plugin, BlueprintManager manager, Messages messages) {
+        this.plugin=plugin;
         this.manager = manager;
         this.messages = messages;
         this.templateKey = new NamespacedKey(plugin, "blueprint_template");
@@ -63,12 +65,14 @@ public final class BlueprintCommand implements CommandExecutor, TabCompleter {
 
         ItemStack item = new ItemStack(Material.BEACON);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(MessageFormatter.deserialize(template.displayName()));
+        meta.displayName(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(template.displayName())));
         meta.getPersistentDataContainer().set(templateKey, PersistentDataType.STRING, template.name());
         item.setItemMeta(meta);
 
-        for (ItemStack dropped : target.getInventory().addItem(item).values()) {
-            target.getWorld().dropItemNaturally(target.getLocation(), dropped);
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
+                plugin, target, List.of(item), "blueprint-admin-give")) {
+            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
+            return true;
         }
         sender.sendMessage(messages.get(sender, "blueprint.gave", "player", target.getName(), "template",
                 MessageFormatter.plain(template.displayName())));

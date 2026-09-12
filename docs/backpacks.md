@@ -37,14 +37,15 @@ location to index it by.
 Storage capacity is measured in **individual items**, not used slots. A
 64-stack therefore uses 64 capacity. The shipped level-one capacity is
 1,250 items (`base-item-capacity`), and `item-capacity-per-level` adds
-capacity on every upgrade. Overflow is dropped safely at the player's location;
-it is never deleted. The Backpack's lore is rebuilt as soon as items are
+capacity on every upgrade. Items that do not fit remain on their normal routing
+path; account-bound command/shop rewards use Vertex's delivery inbox instead of
+being thrown on the ground. The Backpack's lore is rebuilt as soon as items are
 automatically stored or emptied, so its displayed `contents` value always
 matches what it currently holds.
 
-- **Empty Backpack** dumps all hidden contents into your inventory, dropping
-  anything that does not fit at your feet. Use it again only after it receives
-  more items.
+- **Empty Backpack** fills only the available inventory space. Everything else
+  remains inside the Backpack; click Empty again after freeing more room. It
+  never throws Backpack contents onto the ground.
 - **Upgrade Backpack** spends Vault money and reopens the GUI. The default
   `upgrade-cost` curve starts at `$500` and grows by `1.10` per level
   through level 50; from there the per-level multiplier ramps up
@@ -64,7 +65,8 @@ Backpack tier/level bonus to those resulting drops. The bundled tiers all
 start at a guaranteed **+25%** bonus at level 1, compounding higher every
 level from there (see [Leveling and the drop-bonus stat](#leveling-and-the-drop-bonus-stat)
 below) -- so a fresh Backpack gives a modest boost, and a heavily upgraded
-one gives dramatically more. This means enchantment and Backpack bonuses
+one grows until the configured `max-drop-bonus-percent` cap (250% by default).
+This means enchantment and Backpack bonuses
 stack without replacing each other.
 
 Player-killed, non-player mob drops are handled the same way when
@@ -78,8 +80,10 @@ Whenever a Backpack accepts one or more items, the player receives the
 drop bonus), and does not appear when all drops were filtered or the bag was
 already full.
 
-`/filter <material>` toggles a material in the player's persistent Backpack
-filter; `/filter clear` removes every filter. A filtered configured drop is
+`/filter add <material>` and `/filter remove <material>` edit the player's
+persistent Backpack filter; `/filter list` displays it and `/filter clear`
+removes every filter. The older `/filter <material>` toggle still works.
+Vertex intercepts these forms before Essentials. A filtered configured drop is
 discarded only while that player has a Backpack equipped. Without one, it is
 left to Minecraft's normal ground-drop behavior.
 
@@ -129,6 +133,7 @@ store or award experience.
 |---|---|
 | `enabled` | Master on/off switch |
 | `base-item-capacity` / `item-capacity-per-level` | Individual-item capacity at level 1 and extra capacity per level; stack amounts, not slots, are counted -- this is the only storage ceiling |
+| `max-drop-bonus-percent` | Hard cap on a Backpack's calculated extra-drop bonus (default 250%) |
 | `auto-store.mining-materials` | Block materials whose normal drops are automatically routed to an equipped Backpack |
 | `auto-store.mob-drops` | Whether player-killed non-player mob drops are automatically routed |
 | `upgrade-cost.base` | Cost to upgrade from level 1 to level 2 (default `500`) |

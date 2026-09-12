@@ -11,29 +11,55 @@ All code lives under `me.vertex.core`, one package per feature area:
 | Package | Contains |
 |---|---|
 | `ability` | Every ability item's listener/manager, cooldowns, `/abilities`, `/getitem`, `/cooldowns` |
+| `auction` | Auction House listings, escrow, sorting, history, and payouts |
+| `backpack` | Persistent backpacks, upgrades, boosters, filters, and auto-storage |
 | `blueprint` | The automated base builder |
+| `booster` | Player/faction booster categories and stacking rules |
+| `bucket` | Configurable vertical and outward source buckets |
+| `capture` | KOTH and Outpost capture events |
 | `chat` | Chat format renderer |
+| `chunkbuster` | Chunk/column clearing items and resumable operation records |
+| `claims` | Base/Raid Claim metadata, expiry, connectivity, and explosion protection |
+| `coinflip` | Money, XP, GC, and item coinflips with persisted settlement records |
 | `collector` | Chunk Collector |
+| `dupe` | Unique tracked-item IDs and staff investigation cases |
 | `economy` | Vault wrapper |
+| `enchant` | Custom enchants, runes, and the rune shop |
 | `essentials` | EssentialsX wrapper |
-| `faction` | Rally system, faction permission matrix, persistent upgrades, and faction bank |
-| `factions` | FactionsUUID wrapper and faction-command interception |
+| `event` | Player-facing event overview menu |
+| `faction` | Rally, F Top/PvP Top, upgrades, bank, TNT, and faction vault |
+| `factions` | Native persisted factions, claims, roles, relations, commands, and protection |
+| `gc` | Gift-card currency, redeem codes, ledger, and staff audit tools |
+| `grace` | Server-wide explosion grace state and admin controls |
+| `item` | Persistent IDs for configured high-value item types |
 | `kit` | Kit classes, GUI, armor-effect tracking |
 | `lang` | Message loading/formatting, `/language` |
 | `listener` | Cross-cutting listeners (combat, player connection) |
 | `luckperms` | LuckPerms wrapper |
+| `menu` | Shared configurable GUI layouts and placeholders |
+| `mine` | Private mines, ore tables, mine KOTH, Hot Zones, and mine travel |
+| `network` | Shared shard health, transfer handoffs, queues, and invalidation polling |
 | `performance` | OFF/BASIC/DETAILED profiling framework (`PerformanceManager`), `/vertex performance` |
 | `placeholderapi` | PlaceholderAPI expansion hook |
 | `portal` | Physical entry portal volumes and server-controlled guided destination flights |
+| `preferences` | Per-player broadcast/message settings |
 | `pvp` | Combat tag, Legacy Combat, Archer Tag, vanilla item cooldowns |
-| `zone` | Haven/Riftlands regions, guided entry, local zone mobs, progression, loot sessions, tickets, and Mob Kill Event |
 | `reboot` | Scheduled shutdown |
+| `sandbot` | Sand Bot printing, fuel balance, and territory validation |
+| `season` | Transactional reset of season-scoped Vertex data |
+| `shield` | Weekly faction Shield schedules and Base Claim protection |
+| `shop` | Dynamic shop pricing and configurable categories |
 | `spawner` | Spawner shop, stacking, mob stacking |
 | `staff` | Vanish, staff chat/build, freeze, invsee/endersee, death rollback |
+| `stats` | Persistent player kill/death statistics |
 | `storage` | Database layer: dialect selection, connection pool, and the shared `Storage` implementation |
 | `tag` | Cosmetic tags |
+| `teleport` | Network-aware Spawn, warps, RTP, and shared countdowns |
+| `trade` | Item-only player trading, escrow, history, and delivery |
 | `user` | Per-player data cache |
+| `wand` | Sell and TNT Wand container transactions |
 | `worldguard` | WorldGuard wrapper |
+| `zone` | Haven/Riftlands regions, guided entry, local zone mobs, progression, loot sessions, tickets, and Mob Kill Event |
 
 `VertexPlugin` is the single entry point — it owns every manager's
 lifecycle and wires listeners/commands together in `onEnable()`.
@@ -46,15 +72,16 @@ lifecycle and wires listeners/commands together in `onEnable()`.
   explicit `TextDecoration.ITALIC, false` — Minecraft renders those
   italic by default when unset, which otherwise silently affects any raw
   `Component.text(...)` used in a GUI.
-- **Gameplay database work is asynchronous.** Schema setup and the one-time
-  cache loads run during startup; recurring gameplay mutations use HikariCP
-  away from the server thread. HikariCP and both JDBC drivers (SQLite and
+- **Most gameplay database work is asynchronous.** Schema setup and the one-time
+  cache loads run during startup; recurring writes normally use HikariCP away
+  from the server thread. Integrity-sensitive settlement/claim mutations may
+  commit synchronously before live state is published. HikariCP and both JDBC drivers (SQLite and
   MySQL) are shaded and relocated into `me.vertex.core.libs.*` to avoid
   classpath collisions with other plugins bundling their own copies.
 - **Two backends, one implementation.** `Database` reads `storage.type`
   and connects to either a local SQLite file (the default) or a MySQL
   server, exposing which one it picked as a `Database.Dialect`.
-  `SqlStorage` and the five feature-specific stores
+  `SqlStorage` and the feature-specific stores
   (`SpawnerStorage`, `ChunkCollectorStorage`, `BlueprintStorage`,
   `FactionUpgradeStorage`, `FactionBankStorage`) then
   select only the statements that genuinely differ between the two --
@@ -82,8 +109,8 @@ lifecycle and wires listeners/commands together in `onEnable()`.
   player lookups, taking them as plain ints from the caller — keeps the
   stacking/expiry logic unit-testable with no Factions plugin running.
   `FactionsHook` centralizes normal faction/claim/relation reads; the
-  faction package uses the narrow native APIs needed for permissions, TNT,
-  Warp levels, and third-party faction commands.
+  legacy-adjacent feature packages use the narrow native APIs needed for
+  permissions, TNT, upgrades, and faction commands.
   `FactionsHook.NO_FACTION` is the factionless sentinel and never matches
   anything, so a mark from a factionless archer grants no melee bonus
   rather than arming every factionless player.
@@ -104,14 +131,14 @@ lifecycle and wires listeners/commands together in `onEnable()`.
   configured display name, so chat doesn't print the literal word
   `default` as everyone's rank.
 - **`EconomyHook` and `WorldGuardHook`** (Vault and WorldGuard are both
-  softdepends) share one shape with the FactionsUUID-specific
+  softdepends) share one shape with the native-faction
   `FactionsHook`: a static, stateless wrapper that checks the target
   plugin is actually enabled before touching any of its classes, so
   Vertex runs fine without them installed.
 - **`ChatFormatterListener`** registers at `EventPriority.MONITOR`, not
   `HIGHEST`. Paper's `AsyncChatEvent` has exactly one renderer slot — the
   last handler to call `event.renderer(...)` wins outright, nothing
-  merges — and FactionsUUID ships its own Paper-native chat formatter
+  merges — and Vertex formats faction chat itself
   (enabled by default) that also sets a renderer at `HIGHEST`. At equal
   priority, which formatter wins would come down to plugin load order.
   `MONITOR` guarantees Vertex's format always wins regardless.
@@ -127,6 +154,17 @@ lifecycle and wires listeners/commands together in `onEnable()`.
 - Same-location collector/spawner database writes are ordered per block
   location, so a rapid place/break or stack-size change can't leave a
   stale row behind.
+- Auction, Coinflip, and Trade collection rows move through `READY` and
+  `DELIVERING` reservations. Temporary item markers bridge the SQL-to-player
+  inventory handoff and are removed only after acknowledgement.
+- Valuable inventory overflow uses the shared persistent delivery inbox instead
+  of ground drops. Before the asynchronous SQL insert begins, each batch is
+  synchronously appended to `plugins/Vertex/delivery-wal.yml`; startup replays
+  that local write-ahead log with stable delivery IDs. Full inventories remain
+  queued for a later login/retry.
+- GC payout operation keys are unique in the ledger. Vault/vanilla EXP payouts
+  use a visible uncertain state for staff reconciliation because those APIs
+  cannot provide exactly-once transaction IDs.
 - Blueprint schematic bounds/blocks are parsed once and cached after the
   first successful read; ongoing progress/removal writes run
   asynchronously and are flushed before shutdown, while the actual world
@@ -134,14 +172,18 @@ lifecycle and wires listeners/commands together in `onEnable()`.
 
 - Ability cooldown writes are serialized per player/ability; tag saves are
   serialized on their dedicated I/O executor before reload or shutdown.
-  Blueprint ownership uses a stable FactionsUUID id rather than a mutable
+  Blueprint ownership uses a stable Vertex faction id rather than a mutable
   faction tag.
 - Faction-upgrade writes are serialized per faction and flushed during
   shutdown. A disband queues its delete behind every prior write, so a
   delayed upgrade save cannot recreate rows for a disbanded faction.
-- Faction-bank money/XP mutations are serialized per faction too. Cached
-  balances change only after their database write succeeds, so failed
-  transactions cannot silently change the durable balance.
+- Faction-bank money/XP/TNT mutations are serialized per faction. Normal
+  player mutations also re-check the actor's durable faction role and explicit
+  permission inside the same SQL transaction, so a demotion on another shard
+  cannot race a stale local permission cache. Vault leases use the same durable
+  authorization rule and permit only one viewer network-wide.
+- Base Claim anchor creation/removal and native faction mutations similarly
+  validate the actor against current shared SQL state before committing.
 
 ## Testing
 

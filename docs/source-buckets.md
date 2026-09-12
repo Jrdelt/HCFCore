@@ -199,10 +199,10 @@ none.
 
 ## Testability
 
-Every live-FactionsUUID/`CombatManager`/`BaseClaimManager` lookup is
+Every live native-faction/`CombatManager`/`BaseClaimManager` lookup is
 injected into `SourceBucketManager` as a plain functional interface,
 mirroring `ChunkBusterManager`'s exact shape (itself mirroring
-`ExplosionProtectionListener`'s `Predicate<Location> isBaseClaim`):
+`ExplosionProtectionListener`'s injected protected-location predicates):
 production wiring in `VertexPlugin` passes real method references
 (`FactionsHook::getClaimFactionId`, `FactionsHook::getClaimFactionTag`,
 `baseClaimManager::isBaseClaim`, `combatManager::isTagged`); tests pass
@@ -215,14 +215,14 @@ never-enters-unclaimed-land, `base-claim-only` enforcement (including a
 flow drifting out of a Base Claim region mid-flow), the charge-after-
 success ordering (asserting zero balance change on every failure path),
 and the per-variant combat gate — all with a real (mock) `World` for
-actual block mutation, but no live FactionsUUID or MockBukkit event
+actual block mutation, but no live external faction API or MockBukkit event
 simulation required.
 
 ## Commands & permissions
 
 | Command | Permission | Notes |
 |---|---|---|
-| Right-click a block with a Source Bucket | *(none — gated by zone/combat/economy checks in-code)* | Places the configured block immediately; no confirmation step. |
+| Right-click a block with a Source Bucket | Open to all *(gated by zone/combat/economy checks in-code)* | Places the configured block immediately; no confirmation step. |
 
 Source Buckets have no dedicated command of their own — acquisition is
 entirely through `/shop`.

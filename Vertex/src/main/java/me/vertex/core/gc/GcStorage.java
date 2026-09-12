@@ -1,6 +1,7 @@
 package me.vertex.core.gc;
 
 import me.vertex.core.storage.Database;
+import me.vertex.core.storage.SqlSchema;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -52,6 +53,7 @@ public final class GcStorage {
                 amount BIGINT NOT NULL,
                 balance_after BIGINT NOT NULL,
                 note VARCHAR(512) NULL,
+                operation_key VARCHAR(96) NULL,
                 created_at BIGINT NOT NULL
             )""";
     private static final String CREATE_LOG_SQLITE = """
@@ -63,12 +65,15 @@ public final class GcStorage {
                 amount BIGINT NOT NULL,
                 balance_after BIGINT NOT NULL,
                 note VARCHAR(512) NULL,
+                operation_key VARCHAR(96) NULL,
                 created_at BIGINT NOT NULL
             )""";
     private static final String CREATE_LOG_TARGET_INDEX =
             "CREATE INDEX IF NOT EXISTS idx_gc_log_target ON gc_log (target_uuid, created_at DESC)";
     private static final String CREATE_LOG_ACTOR_INDEX =
             "CREATE INDEX IF NOT EXISTS idx_gc_log_actor ON gc_log (actor_uuid, created_at DESC)";
+    private static final String CREATE_LOG_OPERATION_INDEX =
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_gc_log_operation ON gc_log (operation_key)";
 
     private static final String CREATE_REDEEM_CODES = """
             CREATE TABLE IF NOT EXISTS gc_redeem_codes (
@@ -106,8 +111,13 @@ public final class GcStorage {
         try (Connection connection = database.getConnection(); Statement statement = connection.createStatement()) {
             statement.executeUpdate(CREATE_BALANCES);
             statement.executeUpdate(createLog);
-            statement.executeUpdate(CREATE_LOG_TARGET_INDEX);
-            statement.executeUpdate(CREATE_LOG_ACTOR_INDEX);
+            SqlSchema.ensureColumn(connection, "gc_log", "operation_key", "VARCHAR(96) NULL");
+            SqlSchema.ensureIndex(connection, "gc_log", "idx_gc_log_target", false,
+                    "target_uuid", "created_at DESC");
+            SqlSchema.ensureIndex(connection, "gc_log", "idx_gc_log_actor", false,
+                    "actor_uuid", "created_at DESC");
+            SqlSchema.ensureIndex(connection, "gc_log", "idx_gc_log_operation", true,
+                    "operation_key");
             statement.executeUpdate(CREATE_REDEEM_CODES);
         }
     }
@@ -141,10 +151,31 @@ public final class GcStorage {
      */
     public long applyDelta(UUID targetUuid, UUID actorUuid, GcAction action, long delta, String note, long now)
             throws SQLException {
+        return applyDeltaOnce(targetUuid, actorUuid, action, delta, note, now, null).balanceAfter();
+    }
+
+    public record DeltaResult(boolean applied, long balanceAfter) { }
+
+    /** Applies a credit/debit once when {@code operationKey} is supplied. */
+    public DeltaResult applyDeltaOnce(UUID targetUuid, UUID actorUuid, GcAction action, long delta, String note,
+            long now, String operationKey) throws SQLException {
         try (Connection connection = database.getConnection()) {
             boolean originalAutoCommit = connection.getAutoCommit();
             connection.setAutoCommit(false);
             try {
+                if (operationKey != null) {
+                    try (PreparedStatement existing = connection.prepareStatement(
+                            "SELECT balance_after FROM gc_log WHERE operation_key = ?")) {
+                        existing.setString(1, operationKey);
+                        try (ResultSet row = existing.executeQuery()) {
+                            if (row.next()) {
+                                long current = readBalance(connection, targetUuid);
+                                connection.commit();
+                                return new DeltaResult(false, current);
+                            }
+                        }
+                    }
+                }
                 try (PreparedStatement upsert = connection.prepareStatement(upsertDeltaSql)) {
                     upsert.setString(1, targetUuid.toString());
                     upsert.setLong(2, delta);
@@ -152,9 +183,10 @@ public final class GcStorage {
                     upsert.executeUpdate();
                 }
                 long resultingBalance = readBalance(connection, targetUuid);
-                insertLogRow(connection, actorUuid, targetUuid, action, Math.abs(delta), resultingBalance, note, now);
+                insertLogRow(connection, actorUuid, targetUuid, action, Math.abs(delta), resultingBalance, note, now,
+                        operationKey);
                 connection.commit();
-                return resultingBalance;
+                return new DeltaResult(true, resultingBalance);
             } catch (SQLException e) {
                 connection.rollback();
                 throw e;
@@ -177,7 +209,7 @@ public final class GcStorage {
                     upsert.setLong(3, now);
                     upsert.executeUpdate();
                 }
-                insertLogRow(connection, actorUuid, targetUuid, action, newBalance, newBalance, note, now);
+                insertLogRow(connection, actorUuid, targetUuid, action, newBalance, newBalance, note, now, null);
                 connection.commit();
             } catch (SQLException e) {
                 connection.rollback();
@@ -198,9 +230,9 @@ public final class GcStorage {
     }
 
     private void insertLogRow(Connection connection, UUID actorUuid, UUID targetUuid, GcAction action, long amount,
-            long balanceAfter, String note, long now) throws SQLException {
-        String sql = "INSERT INTO gc_log (actor_uuid, target_uuid, action, amount, balance_after, note, created_at) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?)";
+            long balanceAfter, String note, long now, String operationKey) throws SQLException {
+        String sql = "INSERT INTO gc_log (actor_uuid, target_uuid, action, amount, balance_after, note, operation_key, "
+                + "created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             if (actorUuid == null) {
                 statement.setNull(1, Types.CHAR);
@@ -216,7 +248,9 @@ public final class GcStorage {
             } else {
                 statement.setString(6, note);
             }
-            statement.setLong(7, now);
+            if (operationKey == null) statement.setNull(7, Types.VARCHAR);
+            else statement.setString(7, operationKey);
+            statement.setLong(8, now);
             statement.executeUpdate();
         }
     }
@@ -331,7 +365,7 @@ public final class GcStorage {
                 }
                 long balanceAfter = readBalance(connection, ownerUuid);
                 insertLogRow(connection, ownerUuid, ownerUuid, GcAction.WITHDRAW_CODE,
-                        amount, balanceAfter, code, now);
+                        amount, balanceAfter, code, now, null);
                 connection.commit();
                 return WithdrawCodeAttempt.success(balanceAfter);
             } catch (SQLException e) {
@@ -416,7 +450,8 @@ public final class GcStorage {
                     upsert.executeUpdate();
                 }
                 long resultingBalance = readBalance(connection, playerUuid);
-                insertLogRow(connection, playerUuid, playerUuid, GcAction.REDEEM, amount, resultingBalance, code, now);
+                insertLogRow(connection, playerUuid, playerUuid, GcAction.REDEEM, amount, resultingBalance, code, now,
+                        null);
 
                 connection.commit();
                 return RedeemAttempt.success(amount);

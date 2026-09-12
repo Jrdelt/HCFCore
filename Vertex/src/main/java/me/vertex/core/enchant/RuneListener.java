@@ -79,16 +79,18 @@ public final class RuneListener implements Listener {
             return;
         }
 
+        // The rolled item is durably admitted before consuming the Rune.
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(manager.plugin(), player,
+                java.util.List.of(outcome.createdItem()), "rune-roll")) {
+            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+            return;
+        }
         int remaining = rune.getAmount() - 1;
         if (remaining <= 0) {
             player.getInventory().setItemInMainHand(null);
         } else {
             rune.setAmount(remaining);
         }
-        for (ItemStack leftover : player.getInventory().addItem(outcome.createdItem()).values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
-        }
-
         EnchantDefinition definition = manager.definition(outcome.enchantId());
         String enchantName = definition == null ? outcome.enchantId() : definition.displayName();
         player.sendMessage(messages.get(player, "rune.rolled", "enchant", enchantName,

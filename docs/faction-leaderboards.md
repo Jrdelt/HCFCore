@@ -1,10 +1,8 @@
 # Faction Leaderboards
 
-Two independent, Vertex-native leaderboards live under `/f`: **F Top**
-(claimed spawner value) and **PvP Top** (objective points). Both replace
-or sit alongside FactionsUUID's own leaderboards without touching its
-plugin jar — Vertex intercepts just the one subcommand it owns and lets
-every other `/f ...` command flow through to FactionsUUID untouched.
+Two independent, Vertex-native leaderboards are available: **F Top**
+(claimed spawner value) under `/f top`, and **PvP Top** (objective points)
+under `/pvptop`. Both are independent of Vertex's native faction power.
 
 Neither leaderboard reads the other. F Top never looks at PvP points, and
 PvP Top never looks at spawner value.
@@ -14,9 +12,8 @@ PvP Top never looks at spawner value.
 F Top ranks factions by the value of their **tracked spawners** — the
 buyable, stackable spawners covered in
 [Spawners & Collectors](spawners-and-collectors.md) — sitting in land
-they actually claim. This replaces FactionsUUID's built-in power-based
-`/f top` with a completely separate calculation; power itself is
-untouched.
+they actually claim. This is a separate calculation from native faction
+power.
 
 ### What counts
 
@@ -81,7 +78,7 @@ calculation, and `/f top` shows the change:
 
 | Command | Permission | Notes |
 |---|---|---|
-| `/f top` (or any configured `factions.command-aliases` alias, e.g. `/faction top`, `/t top`) | Open to all | Shows time until the next scheduled calculation, then each ranked faction: rank, name, value, and movement indicator. Vertex intercepts this specific subcommand and cancels it before FactionsUUID sees it; every other `/f` command is untouched. Tab-completion for `top` is added the same way. |
+| `/f top` | Open to all | Shows time until the next scheduled calculation, then each ranked faction: rank, name, value, and movement indicator. |
 | `/ftopforcecheck` | `vertex.ftop.forcecheck` (default: op) | Immediately recalculates every faction's F Top value on demand. It does **not** move the regular scheduled deadline — the next automatic recalculation still lands on its original schedule. The command sender's name and the action are written to the server console log; there is no separate persisted audit table for this action. |
 
 ### Schedule & persistence
@@ -97,7 +94,7 @@ passed; it does not scan spawners or claims on every tick.
 
 Scores and the next-run deadline are stored in dedicated `ftop_scores`
 and `ftop_schedule` tables (MySQL or SQLite, whichever backend Vertex is
-using) — entirely separate from FactionsUUID's own power data.
+using) — entirely separate from Vertex faction power.
 
 ### Spawner Stack GUI
 
@@ -143,7 +140,7 @@ player's UUID.
 
 | Command | Permission | Notes |
 |---|---|---|
-| `/pvptop` | Open to all | Shows each faction ranked by total points: rank, faction name, and point total. `/f pvptop` remains a compatibility alias. Ties break deterministically by faction ID (ascending). There is no movement indicator (unlike `/f top`) and no forced-recalculation or admin management command for PvP Top. |
+| `/pvptop` | Open to all | Shows each faction ranked by total points: rank, faction name, and point total. Ties break deterministically by faction ID (ascending). There is no movement indicator (unlike `/f top`) and no forced-recalculation or admin management command for PvP Top. |
 
 ### Persistence
 

@@ -1,6 +1,8 @@
 package me.vertex.core.faction;
 
+import me.vertex.core.factions.FactionRole;
 import me.vertex.core.storage.Database;
+import me.vertex.core.storage.SqlSchema;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -8,6 +10,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Function;
 
 /** Durable storage for Vertex-owned faction money, experience, and TNT balances. */
 public final class FactionBankStorage {
@@ -83,6 +88,114 @@ public final class FactionBankStorage {
             statement.setLong(3, experience);
             statement.setLong(4, tnt);
             statement.executeUpdate();
+        }
+    }
+
+    /**
+     * Locks the shared faction row, calculates from the database value, and
+     * commits the replacement in one transaction. This is the authoritative
+     * path for gameplay mutations when several shards share MySQL.
+     */
+    public Optional<StoredBank> mutate(int factionId, Function<StoredBank, StoredBank> mutation)
+            throws SQLException {
+        return mutate(factionId, null, null, null, false, mutation);
+    }
+
+    /** Gameplay mutation that checks the acting member's live role permission in the same transaction. */
+    public Optional<StoredBank> mutateAuthorized(int factionId, UUID actor,
+            FactionRole expectedRole, String action, boolean defaultAllowed,
+            Function<StoredBank, StoredBank> mutation) throws SQLException {
+        if (actor == null || expectedRole == null || action == null || action.isBlank()) {
+            return Optional.empty();
+        }
+        return mutate(factionId, actor, expectedRole, action, defaultAllowed, mutation);
+    }
+
+    private Optional<StoredBank> mutate(int factionId, UUID actor, FactionRole expectedRole,
+            String action, boolean defaultAllowed, Function<StoredBank, StoredBank> mutation)
+            throws SQLException {
+        try (Connection connection = database.getConnection()) {
+            boolean previous = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                if (!SqlSchema.lockFactionIfPresent(connection, database.dialect(), factionId)) {
+                    connection.rollback();
+                    return Optional.empty();
+                }
+                if (actor != null && !authorized(connection, factionId, actor, expectedRole,
+                        action, defaultAllowed)) {
+                    connection.rollback();
+                    return Optional.empty();
+                }
+                String insert = database.dialect() == Database.Dialect.SQLITE
+                        ? "INSERT OR IGNORE INTO faction_banks(faction_id,money,experience,tnt) VALUES(?,0,0,0)"
+                        : "INSERT IGNORE INTO faction_banks(faction_id,money,experience,tnt) VALUES(?,0,0,0)";
+                try (PreparedStatement ensure = connection.prepareStatement(insert)) {
+                    ensure.setInt(1, factionId);
+                    ensure.executeUpdate();
+                }
+                StoredBank current;
+                String select = "SELECT money,experience,tnt FROM faction_banks WHERE faction_id=?"
+                        + (database.dialect() == Database.Dialect.MYSQL ? " FOR UPDATE" : "");
+                try (PreparedStatement statement = connection.prepareStatement(select)) {
+                    statement.setInt(1, factionId);
+                    try (ResultSet row = statement.executeQuery()) {
+                        if (!row.next()) throw new SQLException("Faction bank row disappeared during mutation");
+                        current = new StoredBank(factionId, row.getDouble(1), row.getLong(2), row.getLong(3));
+                    }
+                }
+                StoredBank next = mutation.apply(current);
+                if (next == null) {
+                    connection.rollback();
+                    return Optional.empty();
+                }
+                if (!Double.isFinite(next.money()) || next.money() < 0D
+                        || next.experience() < 0L || next.tnt() < 0L) {
+                    throw new SQLException("Faction bank mutation produced an invalid balance");
+                }
+                try (PreparedStatement update = connection.prepareStatement(
+                        "UPDATE faction_banks SET money=?,experience=?,tnt=? WHERE faction_id=?")) {
+                    update.setDouble(1, next.money());
+                    update.setLong(2, next.experience());
+                    update.setLong(3, next.tnt());
+                    update.setInt(4, factionId);
+                    if (update.executeUpdate() != 1) throw new SQLException("Faction bank update was not committed");
+                }
+                connection.commit();
+                return Optional.of(next);
+            } catch (SQLException | RuntimeException error) {
+                connection.rollback();
+                throw error;
+            } finally {
+                connection.setAutoCommit(previous);
+            }
+        }
+    }
+
+    private boolean authorized(Connection connection, int factionId, UUID actor,
+            FactionRole expectedRole, String action, boolean defaultAllowed) throws SQLException {
+        if (!SqlSchema.tableExists(connection, "vertex_faction_members")) return false;
+        String suffix = database.dialect() == Database.Dialect.MYSQL ? " FOR UPDATE" : "";
+        FactionRole durableRole;
+        try (PreparedStatement member = connection.prepareStatement(
+                "SELECT role FROM vertex_faction_members WHERE player_uuid=? AND faction_id=?" + suffix)) {
+            member.setString(1, actor.toString());
+            member.setInt(2, factionId);
+            try (ResultSet row = member.executeQuery()) {
+                if (!row.next()) return false;
+                durableRole = FactionRole.parse(row.getString(1), FactionRole.RECRUIT);
+            }
+        }
+        if (durableRole != expectedRole) return false;
+        if (durableRole == FactionRole.LEADER) return true;
+        try (PreparedStatement permission = connection.prepareStatement(
+                "SELECT allowed FROM vertex_faction_permissions WHERE faction_id=? AND role=? AND action_key=?")) {
+            permission.setInt(1, factionId);
+            permission.setString(2, durableRole.permissionBucket());
+            permission.setString(3, action);
+            try (ResultSet row = permission.executeQuery()) {
+                return row.next() ? row.getBoolean(1) : defaultAllowed;
+            }
         }
     }
 

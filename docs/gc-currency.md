@@ -19,14 +19,19 @@ House listings.
 
 There is no sign or anvil input flow and no GC-to-money conversion.
 
+Public chat guards code-shaped messages against accidental leaks. An
+unescaped code is cancelled and the player receives a clickable approval;
+approving permits exactly their next chat message for 15 seconds. Prefixing
+the code with `\` bypasses the warning intentionally.
+
 ## Staff tools
 
-| Action | Command | Permission |
+| Command | Permission | Action |
 | --- | --- | --- |
-| View | `/gc admin balance <player>` | `vertex.gc.view` |
-| Credit/debit/set/reset | `/gc admin give\|remove\|set\|zero <player> <amount>` | `vertex.gc.adjust` |
-| Read audit history | `/gc admin logs [player] [page]` | `vertex.gc.logs` |
-| Create a staff code | `/gc redeem create <amount> [uses] [expires-in]` | `vertex.gc.redeem.create` |
+| `/gc admin balance <player>` | `vertex.gc.view` | View another player's balance |
+| `/gc admin give\|remove\|set\|zero <player> <amount>` | `vertex.gc.adjust` | Credit / debit / set / reset a balance |
+| `/gc admin logs [player] [page]` | `vertex.gc.logs` | Read audit history |
+| `/gc redeem create <amount> [uses] [expires-in]` | `vertex.gc.redeem.create` | Create a staff GC code |
 
 All staff balance actions are logged. Keep the adjust and logs permissions
 restricted: GC code values and balances are sensitive data.

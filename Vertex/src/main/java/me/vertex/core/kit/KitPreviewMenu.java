@@ -16,7 +16,7 @@ public final class KitPreviewMenu {
     public static void open(Player player, Kit kit, Messages messages) {
         Holder holder = new Holder();
         Inventory inventory = Bukkit.createInventory(holder, 45,
-                messages.get(player, "kit.preview-title", "kit", kit.getName()));
+                messages.getGui(player, "kit.preview-title", "kit", kit.getName()));
         holder.inventory = inventory;
 
         ItemStack[] armor = kit.getArmor();

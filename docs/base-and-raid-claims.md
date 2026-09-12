@@ -1,34 +1,31 @@
 # Base Claims and Raid Claims
 
-Vertex adds two claim types layered on top of FactionsUUID's own claim
-system — FactionsUUID itself still owns claiming/unclaiming; Vertex only
-tracks *which kind* each of a faction's claims is, and reacts to
-FactionsUUID's own claim events to keep that in sync.
+Vertex owns faction claims and layers two claim types on that native claim
+system. Claiming/unclaiming is performed through `/f`, and Vertex events keep
+Base Claims and Raid Claims synchronized.
 
 - **Base Claim** — a faction's designated safe region. Permanent unless
   explicitly removed.
 - **Raid Claim** — any faction claim that is *not* part of a Base Claim.
   Each one expires on its own real-world timer.
 
-Neither type exists without FactionsUUID's `dev.kitteh:factions` claim —
-Vertex never claims or unclaims land on its own outside of Raid Claim
-expiration.
+Both types are native Vertex claims. Raid Claim expiration safely removes the
+stored native claim; no external faction plugin is involved.
 
 ## Base Claims
 
 - The **first** Base Claim is free: any Leader or Co-Leader runs `/f
   baseclaim` while standing in one of their faction's own (non-Base)
   claims to anchor it there.
-- Up to **3** Base Claims total per faction. Slots #2 and #3 are
-  purchased with `/f baseclaim buy`, paid from the *purchasing member's*
-  personal balance (any member can buy a slot, not just leadership) —
-  priced by `claims.yml`'s `base-claim.slot-2-price` /
-  `slot-3-price`.
+- Up to **3** Base Claims total per faction. Slot 1 is always unlocked;
+  slots #2 and #3 are unlocked by the explicit levels of the existing
+  `base-claim-slots` faction upgrade. Only a Leader or Co-Leader can purchase
+  faction upgrades.
 - Only a Leader or Co-Leader can create or remove a Base Claim; any
   member can view one (`vertex.baseclaim.view`).
-- Removing a Base Claim requires confirming in a GUI (green confirm /
-  red cancel / closing the inventory without clicking either both count
-  as cancel — see `gui/baseclaim.yml`). Removal is blocked while:
+- Removing a Base Claim requires two GUI confirmations after the initial
+  left-click. Red cancel or closing either inventory cancels the operation.
+  Removal is blocked while:
   - the faction's Shield is active (now wired to the real check —
     `BaseClaimManager.setShieldActiveQuery` is set by `VertexPlugin` to
     `ShieldManager::isShieldActive` once both managers exist; see
@@ -42,7 +39,7 @@ expiration.
 Any same-faction claim **physically adjacent** (sharing an edge, not just
 a corner) to a chunk already in a Base Claim's region joins that region
 automatically the moment it's claimed — `ClaimEventListener` calls
-`BaseClaimManager.tryConnect` from FactionsUUID's `LandClaimEvent`. A
+`BaseClaimManager.tryConnect` from Vertex's native claim event. A
 multi-chunk region is treated as a single Base Claim; the original anchor
 chunk is always preserved as the region's reference point.
 
@@ -57,12 +54,11 @@ own expiration timer), and the claiming player gets a chat warning
 (`baseclaim.region-full`) that the connection failed because the region
 is full.
 
-If a chunk that's part of a region is later **unclaimed**, the
-relationship is *not* destroyed — `base_claim_region_chunks` never prunes
-a row on unclaim. Reclaiming that same chunk later is recognized as
-rejoining the region immediately, without re-running the adjacency
-search and without being newly subject to the cap (it was already
-counted once).
+If unclaiming a chunk would disconnect part of a Base region, Vertex shows a
+warning/confirmation GUI. Confirming unclaims the selected chunk, keeps the
+anchor-connected component as Base land, and atomically converts each
+disconnected still-owned chunk to a Raid Claim with a fresh configured timer.
+Closing or cancelling the GUI leaves the region unchanged.
 
 ## Raid Claims
 
@@ -90,50 +86,24 @@ timestamp, stored as an absolute epoch millisecond deadline
 
 ## TNT / explosion / Wither rules
 
-Three unconditional rules layered on top of the claim types above, all
-enforced by `me.vertex.core.claims.ExplosionProtectionListener` and
-`me.vertex.core.listener.WitherPreventionListener` — neither depends on
-Faction Shield, so these apply the same whether or not a faction's Shield
-is active.
+Explosion protection is controlled by [Grace and Faction Shield](faction-shield.md):
 
-- **Explosion block damage is disabled inside a Base Claim, always.**
-  `ExplosionProtectionListener` listens to `EntityExplodeEvent` and
-  `BlockExplodeEvent` and strips any block whose location is
-  `BaseClaimManager.isBaseClaim` out of the explosion's block list before
-  it can be destroyed. This is **not** a Shield effect — Base Claims block
-  explosion damage on their own, unconditionally, even while Shield is
-  inactive; Shield (see [Faction Shield](faction-shield.md)) only ever
-  gates combat, never block damage.
-- **Raid Claims and wilderness are left completely untouched by this
-  listener.** It only ever *removes* blocks from an explosion's block
-  list for the Base Claim case above — it never adds blocks back and
-  never inspects Raid Claim or wilderness locations at all. TNT raiding
-  in a Raid Claim works exactly as it does today: this phase found no
-  Vertex-owned "raid TNT" logic anywhere in the codebase to preserve or
-  extend (the only pre-existing explosion-event precedent,
-  `BlueprintListener`'s `onEntityExplode`/`onBlockExplode`, only reacts to
-  already-destroyed Blueprint anchor blocks after the fact — it never
-  gates whether a block breaks). Whatever block-breaking permission a Raid
-  Claim already has comes entirely from FactionsUUID's own native claim
-  protection, which this phase does not touch, weaken, or duplicate.
-- **Explosion damage to players and mobs is cancelled everywhere,
-  unconditionally.** A separate `EntityDamageEvent` handler cancels any
-  damage whose cause is `ENTITY_EXPLOSION` or `BLOCK_EXPLOSION` for every
-  `LivingEntity` (players and mobs alike) — this is claim-independent by
-  design: it applies the same in a Base Claim, a Raid Claim, and the
-  wilderness. An `EntityDamageEvent` cause check was chosen over trying to
-  filter entity lists out of the explosion events themselves, because
-  neither `EntityExplodeEvent` nor `BlockExplodeEvent` exposes the set of
-  entities about to take damage — only the block list — so the damage
-  event is the only hook fine-grained enough to cancel a specific
-  entity's explosion damage.
+- Active Grace protects blocks and living entities in every faction claim.
+- An active Shield protects blocks and living entities only in that faction's
+  Base Claim chunks. Raid Claims remain vulnerable.
+- Base Claims are not permanently explosion-proof. When neither Grace nor
+  the owning faction's Shield is active, explosion behavior is normal.
+- Wilderness is not protected by either system.
+- Protection removes only protected locations from an explosion's block
+  list; one explosion crossing a claim border can therefore protect inside
+  blocks while still damaging outside blocks.
 - **Withers are disabled server-wide.** `WitherPreventionListener`
   cancels `CreatureSpawnEvent` whenever the spawned type is `WITHER`,
   regardless of `SpawnReason` — this covers the vanilla
   soul-sand-and-three-skulls construction (`SpawnReason.BUILD_WITHER`,
   the primary way players make one) exactly the same as a spawn egg,
   spawner, or command. No world or claim scoping; no exceptions.
-- **No admin bypass was wired in for the block-damage rule.** This
+- **No admin bypass is wired in for the block-damage rule.** This
   codebase's one existing "admin bypasses claim protection" pattern,
   `StaffBuildListener`, un-cancels already-cancelled events for players in
   staff-build mode — but every event it covers carries a `Player` to
@@ -142,7 +112,7 @@ is active.
   hook a bypass onto without inventing new state (tracking who lit each
   TNT) that the spec never asked for. If a staff bypass for this specific
   rule is wanted later, it needs that new tracking built first.
-- **No new player-facing messages were added for this phase.** Both
+- **No player-facing messages are emitted for explosion suppression.** Both
   suppression rules are structurally silent — there is no player
   reference available at the moment block damage is stripped or a Wither
   spawn is cancelled, so there is no clean way to attribute either event
@@ -159,25 +129,23 @@ New tables (`me.vertex.core.claims.ClaimStorage`), added to
 - `base_claim_region_chunks` — every chunk ever admitted into a region,
   keyed by `(world, chunk_x, chunk_z)`. Never pruned on unclaim — see
   "Connected Base Claim regions" above for why.
-- `base_claim_slot_purchases` — which of slots #2/#3 a faction has paid
-  for, independent of whether that slot has been anchored yet.
+- `base_claim_slot_purchases` — legacy compatibility rows from builds that
+  sold slots directly. New unlocks come from `faction_upgrade_levels`.
 - `raid_claim_expirations` — one row per currently-tracked Raid Claim
   chunk, keyed by `(world, chunk_x, chunk_z)`.
 
-This is one table more than the two sketched in the original brief
-(`base_claims` / `raid_claim_expirations`); `base_claim_region_chunks`
-and `base_claim_slot_purchases` were added because the spec's "preserve
-the relationship across an unclaim" and "purchasable immediately, before
-ever being anchored" requirements both need durable state beyond a
-single anchor row per slot.
+`base_claim_region_chunks` is required because each Base is a connected
+multi-chunk region rather than only an anchor. The legacy slot-purchase table
+is read during upgrades so existing servers do not relock slots players had
+already bought; it is not written by current gameplay.
 
-## Integration points for later phases
+## Internal integration APIs
 
 - `BaseClaimManager.isBaseClaim(Location)` /
-  `isPartOfBaseClaimRegion(Location)` — the query API Shield, TNT rules,
-  Chunk Busters, and Source Buckets will call.
-- `BaseClaimManager.removeAnchor` — now backed by Phase 2's real
-  Shield-active check (see above).
+  `isPartOfBaseClaimRegion(Location)` — used by Shield, TNT rules,
+  Chunk Busters, and Source Buckets.
+- `BaseClaimManager.removeAnchor` — enforces the current Shield-active and
+  spawner checks before conversion.
 
 ## Commands & permissions
 
@@ -186,16 +154,14 @@ single anchor row per slot.
 | `/f baseclaim` | `vertex.baseclaim.view` | Opens the info/removal GUI if standing on an existing Base Claim; otherwise attempts to create one. |
 | `/f baseclaim` (create) | `vertex.baseclaim.create` | Leader/Co-Leader only. |
 | Remove confirm (GUI) | `vertex.baseclaim.remove` | Leader/Co-Leader only. |
-| `/f baseclaim buy` | `vertex.baseclaim.purchaseslot` | Any member; charges their personal balance. |
-
-All four default to `true` except the implicit leadership check enforced
-in code (`FactionsHook.isLeader`), which applies regardless of
-permissions.
+Slots #2/#3 are purchased from `/f upgrades`; there is no `/f baseclaim buy`
+command or separate slot-purchase permission.
 
 ## Configuration
 
-- `claims.yml` — region cap, Raid Claim duration/sweep interval, slot
-  prices.
+- `claims.yml` — region cap and Raid Claim duration/sweep interval.
+- `config.yml` — explicit `faction-upgrades.upgrades.base-claim-slots`
+  prices and unlocked-slot values.
 - `gui/baseclaim.yml` — the info/removal GUI, following the same
   `MenuLayout`-driven format as every other Vertex GUI (see
   [GUI Framework](gui-framework.md)).

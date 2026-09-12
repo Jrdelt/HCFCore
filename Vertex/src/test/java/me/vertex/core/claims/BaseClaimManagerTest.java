@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Covers {@link BaseClaimManager}'s connected-region bookkeeping without
- * touching FactionsUUID's own Board/Factions singletons (not initialized
+ * touching the native faction service (not initialized
  * in a unit test) -- {@link BaseClaimManager#tryConnect} deliberately never
  * calls {@code FactionsHook} itself (only the anchor-seeding BFS does, for
  * an already-claimed neighbor probe), so it's exercised here purely against
@@ -71,12 +71,12 @@ class BaseClaimManagerTest {
     }
 
     @Test
-    void purchaseFailsCleanlyWithoutAnEconomyPluginRegistered() throws Exception {
+    void upgradeProviderControlsUnlockedSlotsWithoutASecondPurchasePath() throws Exception {
         withMaxChunksPerRegion(2000);
         manager.loadState();
-        BaseClaimManager.PurchaseResult result = manager.purchaseNextSlot(server.addPlayer(), 1);
-        assertEquals(BaseClaimManager.PurchaseResult.NO_ECONOMY, result);
-        assertEquals(1, manager.unlockedSlots(1), "a failed purchase must not unlock a slot");
+        manager.setUpgradeSlotProvider(factionId -> factionId == 1 ? 3 : 1);
+        assertEquals(3, manager.unlockedSlots(1));
+        assertEquals(1, manager.unlockedSlots(2));
     }
 
     @Test
@@ -179,6 +179,19 @@ class BaseClaimManagerTest {
     }
 
     @Test
+    void activeShieldBlocksNormalBaseRemoval() throws Exception {
+        withMaxChunksPerRegion(2000);
+        int factionId = 12;
+        storage.insertBaseClaimWithAnchorChunk(factionId, 1, "world", 0, 0,
+                System.currentTimeMillis());
+        manager.loadState();
+        manager.setShieldActiveQuery(id -> id == factionId);
+
+        assertEquals(BaseClaimManager.RemoveResult.SHIELDED, manager.removeAnchor(factionId, 1));
+        assertEquals(1, storage.loadBaseClaims().size());
+    }
+
+    @Test
     void nextAvailableSlotReusesAFreedLowerSlotInsteadOfCollidingWithAHigherOne() throws Exception {
         withMaxChunksPerRegion(2000);
         int factionId = 5;
@@ -203,5 +216,33 @@ class BaseClaimManagerTest {
 
         assertEquals(1, manager.nextAvailableSlot(factionId),
                 "the freed slot 1 must be reused rather than colliding with the still-anchored slot 3");
+    }
+
+    @Test
+    void disbandCleanupPurgesAnchorsMembershipAndPurchasedSlots() throws Exception {
+        withMaxChunksPerRegion(2000);
+        int factionId = 31;
+        storage.insertPurchasedSlot(factionId, 2, System.currentTimeMillis());
+        storage.insertBaseClaimWithAnchorChunk(factionId, 1, "world", 0, 0, System.currentTimeMillis());
+        storage.insertRegionChunk(factionId, 1, "world", 1, 0);
+        manager.loadState();
+
+        assertTrue(manager.deleteFactionData(factionId));
+        assertEquals(0, manager.anchoredCount(factionId));
+        assertEquals(1, manager.unlockedSlots(factionId));
+        assertTrue(storage.loadBaseClaims().isEmpty());
+        assertTrue(storage.loadRegionChunks().isEmpty());
+        assertTrue(storage.loadPurchasedSlots(factionId).isEmpty());
+    }
+
+    @Test
+    void anchorAndMandatoryMembershipAreCreatedTogether() throws Exception {
+        int factionId = 44;
+        storage.insertBaseClaimWithAnchorChunk(factionId, 1, "world", 4, 6, System.currentTimeMillis());
+
+        assertEquals(1, storage.loadBaseClaims().size());
+        assertEquals(1, storage.loadRegionChunks().size());
+        assertEquals(4, storage.loadRegionChunks().getFirst().chunkX());
+        assertEquals(6, storage.loadRegionChunks().getFirst().chunkZ());
     }
 }

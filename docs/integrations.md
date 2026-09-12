@@ -1,21 +1,15 @@
 # Integrations
 
-Vertex has exactly one hard dependency. Every other plugin listed here is
+Vertex has no hard plugin dependency beyond Paper. Every plugin listed here is
 optional — Vertex boots and runs fine without any of them, and each
 missing integration simply turns off the specific feature it powers
 rather than causing an error.
 
-## FactionsUUID — required
+## Native factions
 
-The one hard dependency (`depend` in `plugin.yml`). Vertex refuses to
-enable if it isn't present and enabled. Vertex reads faction identity,
-claims, relations, power, roles, native permissions, and
-the native Warp upgrade through FactionsUUID's API. Vertex stores its own
-upgrade levels, money/XP bank balances, rally permissions, and managed
-block ownership in its selected database/configuration. It is built against
-**FactionsUUID 4.4.0**; the 4.7.0 API has also been checked for the direct
-methods Vertex uses. See
-[Factions Integration](factions-integration.md) for the full picture.
+Vertex owns faction identity, claims, relations, power, roles, permissions,
+homes, warps, chat, upgrades, banks, and managed-block ownership. No external
+faction plugin is used. See [Native Factions](factions-integration.md).
 
 ## Vault — optional
 
@@ -106,7 +100,7 @@ Ghost Players are native killable Villagers and do not require an NPC plugin.
 
 | Plugin | Required? | Powers |
 |---|---|---|
-| FactionsUUID | **Yes** | Claims, roles/permissions, relations, chat, rallies, native TNT/Warps |
+| Native Vertex factions | Built in | Claims, roles/permissions, relations, chat, rallies, TNT, and warps |
 | Vault | No | Kit money costs, spawner/collector/faction-upgrade economy, faction money bank, `{balance}` |
 | WorldGuard | No | Region-based ability and no-pearl restrictions |
 | LuckPerms | No | Rank display, the Repair ability |

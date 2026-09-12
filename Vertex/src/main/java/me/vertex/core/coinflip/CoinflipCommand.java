@@ -54,6 +54,8 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
             case "unban" -> handleUnban(player);
             case "hand" -> handleHand(player, args);
             case "logs" -> handleLogs(player, args);
+            case "payouts" -> handlePayouts(player, args);
+            case "intents" -> handleIntents(player, args);
             case "cancel" -> handleCancel(player, args);
             case "approve" -> handleApprove(player, args);
             case "deny" -> handleDeny(player, args);
@@ -248,6 +250,84 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void handlePayouts(Player player, String[] args) {
+        if (!player.hasPermission("vertex.coinflip.payouts")) {
+            player.sendMessage(messages.get(player, "general.no-permission"));
+            return;
+        }
+        if (args.length == 1) {
+            List<CoinflipStorage.PendingPayout> payouts = manager.uncertainPayouts();
+            if (payouts.isEmpty()) {
+                player.sendMessage(messages.get(player, "coinflip.payouts-empty"));
+                return;
+            }
+            player.sendMessage(messages.get(player, "coinflip.payouts-header", "count",
+                    String.valueOf(payouts.size())));
+            for (CoinflipStorage.PendingPayout payout : payouts) player.sendMessage(messages.get(player,
+                    "coinflip.payouts-line", "key", payout.key(), "player", nameOf(payout.ownerUuid()),
+                    "currency", payout.currency().name(), "amount", String.valueOf(payout.amount())));
+            return;
+        }
+        if (args.length != 3 || !(args[2].equalsIgnoreCase("paid") || args[2].equalsIgnoreCase("retry"))) {
+            player.sendMessage(messages.get(player, "coinflip.payouts-usage"));
+            return;
+        }
+        boolean paid = args[2].equalsIgnoreCase("paid");
+        boolean success = manager.resolveUncertainPayout(args[1], paid);
+        player.sendMessage(messages.get(player, success ? "coinflip.payouts-resolved" : "coinflip.payouts-missing",
+                "key", args[1], "action", paid ? "PAID" : "RETRY"));
+    }
+
+    private void handleIntents(Player player, String[] args) {
+        if (!player.hasPermission("vertex.coinflip.intents")) {
+            player.sendMessage(messages.get(player, "general.no-permission"));
+            return;
+        }
+        if (args.length == 1) {
+            List<CoinflipStorage.CreationIntent> intents = manager.unresolvedCreationIntents();
+            if (intents.isEmpty()) {
+                player.sendMessage(messages.get(player, "coinflip.intents-empty"));
+                return;
+            }
+            player.sendMessage(messages.get(player, "coinflip.intents-header", "count", String.valueOf(intents.size())));
+            for (CoinflipStorage.CreationIntent intent : intents) {
+                player.sendMessage(messages.get(player, "coinflip.intents-line", "key", intent.key(),
+                        "player", nameOf(intent.hostUuid()), "type", intent.type().name(),
+                        "amount", String.valueOf(intent.amount())));
+            }
+            return;
+        }
+        if (args.length == 2) {
+            manager.creationIntent(args[1]).ifPresentOrElse(intent -> player.sendMessage(messages.get(player,
+                    "coinflip.intents-detail", "key", intent.key(), "player", nameOf(intent.hostUuid()),
+                    "target", intent.targetUuid() == null ? "PUBLIC" : nameOf(intent.targetUuid()),
+                    "type", intent.type().name(), "amount", String.valueOf(intent.amount()))),
+                    () -> player.sendMessage(messages.get(player, "coinflip.intents-missing", "key", args[1])));
+            return;
+        }
+        if (args.length != 3 || !(args[2].equalsIgnoreCase("debited")
+                || args[2].equalsIgnoreCase("not-debited"))) {
+            player.sendMessage(messages.get(player, "coinflip.intents-usage"));
+            return;
+        }
+        CoinflipStorage.IntentResolution result = manager.resolveCreationIntent(args[1],
+                args[2].equalsIgnoreCase("debited"), player);
+        player.sendMessage(messages.get(player, intentResultKey(result.status()), "key", args[1],
+                "prior", result.priorDecision() == null ? "-" : result.priorDecision()));
+    }
+
+    private static String intentResultKey(CoinflipStorage.IntentResolutionStatus status) {
+        return switch (status) {
+            case ACTIVATED -> "coinflip.intents-activated";
+            case DISCARDED -> "coinflip.intents-discarded";
+            case ALREADY_RESOLVED -> "coinflip.intents-already-resolved";
+            case CONFLICT -> "coinflip.intents-conflict";
+            case INVALID_STATE -> "coinflip.intents-invalid";
+            case MISSING -> "coinflip.intents-missing";
+            case STORAGE_ERROR -> "coinflip.intents-storage-error";
+        };
+    }
+
     /**
      * {@code /cf <amount> [exp|xp|money] [player]}. Amounts use the shared
      * number grammar, so {@code 10k}, {@code 1.25m}, and {@code 1,000,000}
@@ -321,6 +401,8 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
             case TOO_MANY_ITEMS -> "coinflip.wager-too-many-items-generic";
             case ALREADY_HOSTING -> "coinflip.already-hosting";
             case GC_UNAVAILABLE -> "gc.no-economy";
+            case PERSIST_FAILED -> "coinflip.create-persist-failed";
+            case RECOVERY_REQUIRED -> "coinflip.create-recovery-required";
             case OK -> "coinflip.created";
         };
     }
@@ -328,7 +410,8 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
     /** The staff-only /cf logs syntax only gets appended for someone who could actually run it. */
     private void sendUsage(Player player) {
         player.sendMessage(messages.get(player, "coinflip.command-usage"));
-        if (player.hasPermission("vertex.coinflip.logs")) {
+        if (player.hasPermission("vertex.coinflip.logs") || player.hasPermission("vertex.coinflip.payouts")
+                || player.hasPermission("vertex.coinflip.intents")) {
             player.sendMessage(messages.get(player, "coinflip.command-usage-admin"));
         }
     }
@@ -354,6 +437,8 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
             if (sender.hasPermission("vertex.coinflip.logs")) {
                 options.add("logs");
             }
+            if (sender.hasPermission("vertex.coinflip.payouts")) options.add("payouts");
+            if (sender.hasPermission("vertex.coinflip.intents")) options.add("intents");
             if (sender instanceof Player player && hasAnyPendingMatchAsHost(player)) {
                 options.add("approve");
                 options.add("deny");
@@ -367,6 +452,29 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
                 }
             }
             return matches;
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("payouts")
+                && sender.hasPermission("vertex.coinflip.payouts")) {
+            String partial = args[1].toLowerCase(Locale.ROOT);
+            return manager.uncertainPayouts().stream().map(CoinflipStorage.PendingPayout::key)
+                    .filter(key -> key.toLowerCase(Locale.ROOT).startsWith(partial)).toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("payouts")
+                && sender.hasPermission("vertex.coinflip.payouts")) {
+            String partial = args[2].toLowerCase(Locale.ROOT);
+            return List.of("paid", "retry").stream().filter(value -> value.startsWith(partial)).toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("intents")
+                && sender.hasPermission("vertex.coinflip.intents")) {
+            String partial = args[1].toLowerCase(Locale.ROOT);
+            return manager.unresolvedCreationIntents().stream().map(CoinflipStorage.CreationIntent::key)
+                    .filter(key -> key.toLowerCase(Locale.ROOT).startsWith(partial)).toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("intents")
+                && sender.hasPermission("vertex.coinflip.intents")) {
+            String partial = args[2].toLowerCase(Locale.ROOT);
+            return List.of("debited", "not-debited").stream()
+                    .filter(value -> value.startsWith(partial)).toList();
         }
         if (args.length == 2
                 && (args[0].equalsIgnoreCase("approve") || args[0].equalsIgnoreCase("deny") || args[0].equalsIgnoreCase("review"))

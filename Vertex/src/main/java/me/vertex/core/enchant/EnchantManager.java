@@ -132,6 +132,8 @@ public final class EnchantManager {
         this.baseLoreKey = new NamespacedKey(plugin, "custom_enchants_base_lore");
     }
 
+    Plugin plugin() { return plugin; }
+
     // ------------------------------------------------------------------
     // Config loading
     // ------------------------------------------------------------------

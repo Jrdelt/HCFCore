@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Owns Vertex's `/f top` view while preserving every other FactionsUUID command. */
+/** Owns Vertex's native `/f top` view. */
 public final class FTopCommand implements CommandExecutor, Listener {
 
     private final Plugin plugin;

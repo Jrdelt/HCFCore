@@ -41,5 +41,14 @@ items:
       - "<gray>ʀᴇᴍᴀɪɴɪɴɢ: <white>{remaining}"
       - "<gray>ɴᴇxᴛ: <white>{next}"
 
+  # Live state comes from CaptureEventManager. When no KOTH is active and
+  # none is scheduled, {details} expands to no lore while this icon remains.
+  koth:
+    material: GOLDEN_HELMET
+    slot: 20
+    name: "<red><bold>қᴏᴛʜ"
+    lore:
+      - "{details}"
+
 layout:
   mine-koth-slots: [10, 12, 14, 16]

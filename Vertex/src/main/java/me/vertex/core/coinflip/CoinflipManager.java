@@ -7,6 +7,7 @@ import me.vertex.core.lang.Messages;
 import me.vertex.core.pvp.CombatManager;
 import me.vertex.core.preferences.AnnouncementCategory;
 import me.vertex.core.preferences.AnnouncementPreferenceManager;
+import me.vertex.core.storage.ClaimDelivery;
 import me.vertex.core.util.Numbers;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
@@ -18,22 +19,27 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import java.io.File;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 /**
  * Owns every Coinflip rule and all of its state. In-memory maps
- * ({@link #activeCoinflips}, bans, pending experience) are the moment-to-
+ * ({@link #activeCoinflips} and bans) are the moment-to-
  * moment source of truth -- updated synchronously on the main thread the
  * instant a command runs -- with {@link CoinflipStorage} as trailing,
  * eventually-consistent persistence behind them, the same pattern
@@ -74,7 +80,7 @@ public final class CoinflipManager {
 
     private final Map<Integer, Coinflip> activeCoinflips = new ConcurrentHashMap<>();
     private final Map<UUID, Long> bans = new ConcurrentHashMap<>();
-    private final Map<UUID, Integer> pendingExp = new ConcurrentHashMap<>();
+    private final java.util.Set<String> pendingPayoutsInProgress = ConcurrentHashMap.newKeySet();
     /** uuid -> the deadline for a "/cf ban confirm" to actually apply. */
     private final Map<UUID, Long> pendingBanConfirmations = new ConcurrentHashMap<>();
     /** coinflip id -> the one opponent item-wager awaiting that coinflip's host to approve or deny. */
@@ -84,7 +90,13 @@ public final class CoinflipManager {
     /** Suppresses a join-time notification read racing the scheduled in-session reveal. */
     private final java.util.Set<ResultNotificationKey> resultNotificationsInFlight = ConcurrentHashMap.newKeySet();
 
+    private final ExecutorService payoutExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "vertex-coinflip-payout");
+        thread.setDaemon(true);
+        return thread;
+    });
     private final java.util.Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
+    private final AtomicBoolean shuttingDown = new AtomicBoolean();
     private final AtomicInteger localIdCounter = new AtomicInteger(-1);
     /** Increments only when a browser-visible listing or pending-match state changes. */
     private final AtomicLong browserVersion = new AtomicLong();
@@ -106,6 +118,7 @@ public final class CoinflipManager {
     /** Wired in after construction, once {@code GcManager} exists -- same pattern as {@code setPvpTopManager}. */
     public void setGcManager(GcManager gcManager) {
         this.gcManager = gcManager;
+        processPendingPayouts(null);
     }
 
     public void load() {
@@ -137,26 +150,38 @@ public final class CoinflipManager {
                 Math.max(30, config.getInt("item-match-approval-timeout-seconds", 300))).toMillis();
     }
 
-    /** Loads active coinflips, bans, pending experience, and pending item-match approvals from the database on startup. */
+    /** Loads active coinflips, bans, durable payouts, and pending item-match approvals on startup. */
     public void loadState() {
         try {
+            for (CoinflipStorage.CreationIntent intent : storage.loadCreationIntents()) {
+                if ("PREPARED".equals(intent.state())) {
+                    storage.deleteCreationIntent(intent.key());
+                    continue;
+                }
+                if ("DEBITING".equals(intent.state())) {
+                    plugin.getLogger().severe("Coinflip creation intent " + intent.key()
+                            + " is awaiting staff reconciliation and was not replayed.");
+                    continue;
+                }
+                int id = storage.activateCreationIntent(intent);
+                if (id >= 0) activeCoinflips.put(id, coinflipFrom(intent, id));
+            }
             for (Coinflip coinflip : storage.loadAllCoinflips()) {
                 activeCoinflips.put(coinflip.id(), coinflip);
             }
             bans.putAll(storage.loadBans());
-            pendingExp.putAll(storage.loadPendingExp());
             for (CoinflipPendingMatch match : storage.loadAllPendingMatches()) {
                 if (!activeCoinflips.containsKey(match.coinflipId())) {
                     // Its coinflip resolved or was cancelled through some
                     // other path before the server stopped -- nobody can
                     // ever approve this anymore, so refund it now instead
                     // of leaving it stuck forever.
-                    queueClaim(match.opponentUuid(), match.items());
-                    deletePendingMatchRow(match.id());
+                    refundPendingMatch(match);
                     continue;
                 }
                 pendingItemMatches.put(match.coinflipId(), match);
             }
+            reportUncertainPayouts();
             browserChanged();
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to load Coinflip state from the database.", e);
@@ -302,7 +327,7 @@ public final class CoinflipManager {
 
     public enum CreateResult {
         OK, DISABLED, BANNED, OUT_OF_RANGE, NO_ECONOMY, CANNOT_AFFORD, EMPTY_WAGER, TOO_MANY_ITEMS, ALREADY_HOSTING,
-        GC_UNAVAILABLE
+        GC_UNAVAILABLE, PERSIST_FAILED, RECOVERY_REQUIRED
     }
 
     public record CreateOutcome(CreateResult result, Coinflip coinflip) {
@@ -338,12 +363,16 @@ public final class CoinflipManager {
             return CreateOutcome.failure(CreateResult.NO_ECONOMY);
         }
         Economy economy = EconomyHook.getEconomy();
+        CoinflipStorage.CreationIntent intent = prepareCreation(host, targetUuid, CoinflipType.MONEY, amount,
+                new ItemStack[0]);
+        if (intent == null) return CreateOutcome.failure(CreateResult.PERSIST_FAILED);
+        if (!beginDebit(intent)) return recoveryIntent(intent);
         EconomyResponse response = economy.withdrawPlayer(host, amount);
         if (!response.transactionSuccess()) {
+            cancelUnusedCreation(intent);
             return CreateOutcome.failure(CreateResult.CANNOT_AFFORD);
         }
-        return finishCreate(host, targetUuid, CoinflipType.MONEY, amount, new ItemStack[0],
-                () -> economy.depositPlayer(host, amount));
+        return finishCreateAfterDebit(host,intent,CompletableFuture.completedFuture(true));
     }
 
     public CreateOutcome createExpCoinflip(Player host, int levels, UUID targetUuid) {
@@ -362,9 +391,12 @@ public final class CoinflipManager {
         if (host.getLevel() < levels) {
             return CreateOutcome.failure(CreateResult.CANNOT_AFFORD);
         }
+        CoinflipStorage.CreationIntent intent = prepareCreation(host, targetUuid, CoinflipType.EXP, levels,
+                new ItemStack[0]);
+        if (intent == null) return CreateOutcome.failure(CreateResult.PERSIST_FAILED);
+        if (!beginDebit(intent)) return recoveryIntent(intent);
         host.setLevel(host.getLevel() - levels);
-        return finishCreate(host, targetUuid, CoinflipType.EXP, levels, new ItemStack[0],
-                () -> host.setLevel(host.getLevel() + levels));
+        return finishCreateAfterDebit(host,intent,CompletableFuture.completedFuture(true));
     }
 
     /** GC wagers move through {@code GcManager} the same way a money wager moves through {@code EconomyHook}. */
@@ -385,12 +417,17 @@ public final class CoinflipManager {
         if (gc == null) {
             return CreateOutcome.failure(CreateResult.GC_UNAVAILABLE);
         }
-        boolean debited = gc.tryDebit(host.getUniqueId(), host.getUniqueId(), GcAction.COINFLIP_WAGER, amount, null);
-        if (!debited) {
+        CoinflipStorage.CreationIntent intent = prepareCreation(host, targetUuid, CoinflipType.GC, amount,
+                new ItemStack[0]);
+        if (intent == null) return CreateOutcome.failure(CreateResult.PERSIST_FAILED);
+        if (!beginDebit(intent)) return recoveryIntent(intent);
+        GcManager.DurableDebit debit=gc.tryDebitDurably(host.getUniqueId(),host.getUniqueId(),
+                GcAction.COINFLIP_WAGER,amount,intent.key(),"coinflip-create:"+intent.key());
+        if (!debit.accepted()) {
+            cancelUnusedCreation(intent);
             return CreateOutcome.failure(CreateResult.CANNOT_AFFORD);
         }
-        return finishCreate(host, targetUuid, CoinflipType.GC, amount, new ItemStack[0],
-                () -> gc.credit(host.getUniqueId(), host.getUniqueId(), GcAction.COINFLIP_REFUND, amount, null));
+        return finishCreateAfterDebit(host,intent,debit.persisted());
     }
 
     /** {@code items} must already be removed from the host's real inventory (e.g. taken out of a wager-builder GUI). */
@@ -417,50 +454,116 @@ public final class CoinflipManager {
             return CreateOutcome.failure(CreateResult.TOO_MANY_ITEMS);
         }
         ItemStack[] wager = nonEmpty.toArray(new ItemStack[0]);
-        return finishCreate(host, targetUuid, CoinflipType.ITEMS, 0, wager,
-                () -> giveOrDrop(host, wager));
+        CoinflipStorage.CreationIntent intent = prepareCreation(host, targetUuid, CoinflipType.ITEMS, 0, wager,
+                "ESCROWED");
+        if (intent == null) return CreateOutcome.failure(CreateResult.PERSIST_FAILED);
+        return finishCreate(host, intent);
     }
 
-    private CreateOutcome finishCreate(Player host, UUID targetUuid, CoinflipType type, double amount,
-            ItemStack[] items, Runnable refundIfPersistFails) {
-        long createdAt = System.currentTimeMillis();
+    private CoinflipStorage.CreationIntent prepareCreation(Player host, UUID targetUuid, CoinflipType type,
+            double amount, ItemStack[] items) {
+        return prepareCreation(host, targetUuid, type, amount, items, "PREPARED");
+    }
+
+    private CoinflipStorage.CreationIntent prepareCreation(Player host, UUID targetUuid, CoinflipType type,
+            double amount, ItemStack[] items, String state) {
+        try {
+            return storage.insertCreationIntent(host.getUniqueId(), targetUuid, type, amount, items,
+                    System.currentTimeMillis(), state);
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not persist Coinflip creation intent; wager was untouched.",
+                    error);
+            return null;
+        }
+    }
+
+    private boolean beginDebit(CoinflipStorage.CreationIntent intent) {
+        try {
+            return storage.setCreationIntentState(intent.key(), "PREPARED", "DEBITING");
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not reserve Coinflip creation intent " + intent.key(), error);
+            return false;
+        }
+    }
+
+    private CreateOutcome recoveryIntent(CoinflipStorage.CreationIntent intent) {
+        plugin.getLogger().severe("Coinflip creation intent " + intent.key()
+                + " is in DEBITING state and requires staff reconciliation.");
+        return CreateOutcome.failure(CreateResult.RECOVERY_REQUIRED);
+    }
+
+    private void cancelUnusedCreation(CoinflipStorage.CreationIntent intent) {
+        try { storage.deleteCreationIntent(intent.key()); }
+        catch (Exception error) { plugin.getLogger().log(Level.SEVERE,
+                "Could not remove unused Coinflip creation intent " + intent.key(), error); }
+    }
+
+    private CreateOutcome finishCreate(Player host, CoinflipStorage.CreationIntent intent) {
+        return finishCreate(host,intent,CompletableFuture.completedFuture(true),false);
+    }
+
+    private CreateOutcome finishCreateAfterDebit(Player host,CoinflipStorage.CreationIntent intent,
+            CompletableFuture<Boolean> debitCommitted){
+        return finishCreate(host,intent,debitCommitted,true);
+    }
+
+    private CreateOutcome finishCreate(Player host,CoinflipStorage.CreationIntent intent,
+            CompletableFuture<Boolean> debitCommitted,boolean transitionEscrow){
         // A negative placeholder id lets the coinflip render immediately
         // while the real id comes back from the database asynchronously;
         // swapped for the real one the moment the insert completes.
         int placeholderId = localIdCounter.getAndDecrement();
-        Coinflip placeholder = new Coinflip(placeholderId, host.getUniqueId(), targetUuid, type, amount, items, createdAt);
+        Coinflip placeholder = coinflipFrom(intent, placeholderId);
         activeCoinflips.put(placeholderId, placeholder);
         browserChanged();
 
-        CompletableFuture<Integer> insert = CompletableFuture.supplyAsync(() -> {
+        CompletableFuture<CreationActivation> insert = debitCommitted.thenApplyAsync(committed -> {
+            if(!committed)return new CreationActivation(-1,true);
             try {
-                return storage.insertCoinflip(host.getUniqueId(), targetUuid, type, amount, items, createdAt);
+                if(transitionEscrow&&!storage.setCreationIntentState(intent.key(),"DEBITING","ESCROWED"))
+                    return new CreationActivation(-1,true);
+                return new CreationActivation(storage.activateCreationIntent(intent),false);
             } catch (Exception e) {
                 throw new java.util.concurrent.CompletionException(e);
             }
         });
         track(insert);
-        insert.whenComplete((id, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+        insert.whenComplete((activation, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
             activeCoinflips.remove(placeholderId);
             browserChanged();
-            if (error != null || id == null || id < 0) {
-                plugin.getLogger().log(Level.SEVERE, "Failed to persist a new Coinflip -- refunding the host.", error);
-                refundIfPersistFails.run();
+            if(activation!=null&&activation.recoveryRequired()){
+                plugin.getLogger().severe("Coinflip creation intent "+intent.key()+" requires staff reconciliation.");
+                if(host.isOnline())host.sendMessage(messages.get(host,"coinflip.create-recovery-required"));
+                return;
+            }
+            if (error != null || activation == null || activation.id() < 0) {
+                plugin.getLogger().log(Level.SEVERE, "Failed to activate Coinflip creation intent " + intent.key()
+                        + "; keeping it as durable escrow for startup recovery.", error);
+                activeCoinflips.put(placeholderId, placeholder);
                 if (host.isOnline()) {
                     host.sendMessage(messages.get(host, "coinflip.create-failed"));
                 }
                 return;
             }
-            Coinflip created = new Coinflip(id, host.getUniqueId(), targetUuid, type, amount, items, createdAt);
+            int id=activation.id();
+            Coinflip created = coinflipFrom(intent, id);
             activeCoinflips.put(id, created);
             browserChanged();
             if (announcements != null) {
-                announcements.broadcast(AnnouncementCategory.COINFLIPS, "coinflip.public-created",
-                        "player", host.getName(), "wager", summarize(created));
+                announcements.broadcast(AnnouncementCategory.COINFLIPS,
+                        "coinflip.public-created-" + created.type().name().toLowerCase(java.util.Locale.ROOT),
+                        "player", host.getName());
             }
         }));
 
         return new CreateOutcome(CreateResult.OK, placeholder);
+    }
+
+    private record CreationActivation(int id,boolean recoveryRequired){}
+
+    private Coinflip coinflipFrom(CoinflipStorage.CreationIntent intent, int id) {
+        return new Coinflip(id, intent.hostUuid(), intent.targetUuid(), intent.type(), intent.amount(), intent.items(),
+                intent.createdAt());
     }
 
     // ---- Cancellation (self or admin) ----
@@ -481,39 +584,22 @@ public final class CoinflipManager {
             return false;
         }
         browserChanged();
-        refund(coinflip);
-
         boolean adminCancel = !coinflip.hostUuid().equals(actor.getUniqueId());
-        track(CompletableFuture.runAsync(() -> {
-            try {
-                storage.deleteCoinflip(coinflip.id());
-                storage.insertLogEntry(coinflip.hostUuid(), null, coinflip.type(), summarize(coinflip), null,
-                        System.currentTimeMillis(), CoinflipLogEntry.Status.CANCELLED,
-                        adminCancel ? actor.getUniqueId() : null);
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to persist a cancelled Coinflip " + coinflip.id(), e);
+        try {
+            if (!storage.cancelCoinflip(coinflip, adminCancel ? actor.getUniqueId() : null,
+                    summarize(coinflip), System.currentTimeMillis())) {
+                activeCoinflips.put(coinflip.id(), coinflip);
+                browserChanged();
+                return false;
             }
-        }));
-        return true;
-    }
-
-    private void refund(Coinflip coinflip) {
-        OfflinePlayer host = Bukkit.getOfflinePlayer(coinflip.hostUuid());
-        switch (coinflip.type()) {
-            case MONEY -> {
-                if (EconomyHook.isAvailable()) {
-                    EconomyHook.getEconomy().depositPlayer(host, coinflip.amount());
-                }
-            }
-            case EXP -> creditExp(coinflip.hostUuid(), (int) coinflip.amount());
-            case ITEMS -> queueClaim(coinflip.hostUuid(), coinflip.items());
-            case GC -> {
-                GcManager gc = gcManager;
-                if (gc != null) {
-                    gc.credit(coinflip.hostUuid(), coinflip.hostUuid(), GcAction.COINFLIP_REFUND, (long) coinflip.amount(), null);
-                }
-            }
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE, "Failed to persist cancelled Coinflip " + coinflip.id(), error);
+            activeCoinflips.put(coinflip.id(), coinflip);
+            browserChanged();
+            return false;
         }
+        processPendingPayouts(coinflip.hostUuid());
+        return true;
     }
 
     // ---- Resolution ----
@@ -601,11 +687,13 @@ public final class CoinflipManager {
         boolean opponentWon = ThreadLocalRandom.current().nextBoolean();
         UUID winnerUuid = opponentWon ? opponent.getUniqueId() : coinflip.hostUuid();
         long resolvedAt = System.currentTimeMillis();
+        double keepFraction = 1.0 - (houseFeePercent / 100.0);
+        double payout = coinflip.amount() + coinflip.amount() * keepFraction;
 
         // The outcome is committed before a single coin moves. If it cannot
         // be, both wagers go back and the coinflip returns to the list, so a
         // failure leaves the world exactly as it was.
-        if (!persistResolution(coinflip, opponent.getUniqueId(), winnerUuid, resolvedAt)) {
+        if (!persistResolution(coinflip, opponent.getUniqueId(), winnerUuid, resolvedAt, null, payout, null)) {
             if (coinflip.type() == CoinflipType.MONEY) {
                 EconomyHook.getEconomy().depositPlayer(opponent, coinflip.amount());
             } else if (coinflip.type() == CoinflipType.GC) {
@@ -619,15 +707,7 @@ public final class CoinflipManager {
             return PlayOutcome.failure(PlayResult.GONE);
         }
 
-        double keepFraction = 1.0 - (houseFeePercent / 100.0);
-        double payout = coinflip.amount() + coinflip.amount() * keepFraction;
-        if (coinflip.type() == CoinflipType.MONEY) {
-            EconomyHook.getEconomy().depositPlayer(Bukkit.getOfflinePlayer(winnerUuid), payout);
-        } else if (coinflip.type() == CoinflipType.GC) {
-            gc.credit(winnerUuid, null, GcAction.COINFLIP_PAYOUT, Math.round(payout), null);
-        } else {
-            creditExp(winnerUuid, (int) Math.round(payout));
-        }
+        processPendingPayouts(winnerUuid);
 
         finishResolution(coinflip, opponent.getUniqueId(), winnerUuid, resolvedAt);
         return new PlayOutcome(PlayResult.OK, opponentWon);
@@ -669,32 +749,21 @@ public final class CoinflipManager {
         }
         browserChanged();
 
-        CompletableFuture<Integer> insert = CompletableFuture.supplyAsync(() -> {
-            try {
-                return storage.insertPendingMatch(coinflipId, opponentUuid, opponentItems, requestedAt);
-            } catch (Exception e) {
-                throw new java.util.concurrent.CompletionException(e);
-            }
-        });
-        track(insert);
-        insert.whenComplete((id, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
-            if (error != null || id == null || id < 0) {
-                plugin.getLogger().log(Level.SEVERE,
-                        "Failed to persist a pending Coinflip item match for coinflip " + coinflipId
-                                + " -- refunding the opponent.", error);
-                pendingItemMatches.remove(coinflipId, placeholder);
-                browserChanged();
-                // Denied/expired/undeliverable item wagers always land in the
-                // claim stash -- never straight into a live inventory -- so
-                // every refund path here behaves identically regardless of
-                // whether the opponent happens to be online at the moment.
-                queueClaim(opponentUuid, opponentItems);
-                return;
-            }
+        try {
+            int id = storage.insertPendingMatch(coinflipId, opponentUuid, opponentItems, requestedAt);
+            if (id < 0) throw new SQLException("No generated pending-match id was returned");
             pendingItemMatches.replace(coinflipId, placeholder,
                     new CoinflipPendingMatch(id, coinflipId, opponentUuid, opponentItems, requestedAt));
             browserChanged();
-        }));
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE,
+                    "Failed to persist a pending Coinflip item match for coinflip " + coinflipId
+                            + " -- refunding the opponent.", error);
+            pendingItemMatches.remove(coinflipId, placeholder);
+            browserChanged();
+            queueClaim(opponentUuid, opponentItems);
+            return PlayResult.GONE;
+        }
 
         Player host = Bukkit.getPlayer(coinflip.hostUuid());
         if (host != null) {
@@ -723,7 +792,7 @@ public final class CoinflipManager {
             return ApproveOutcome.failure(ApprovalResult.NOT_HOST);
         }
         CoinflipPendingMatch match = pendingItemMatches.get(coinflipId);
-        if (match == null) {
+        if (match == null || match.id() < 0) {
             return ApproveOutcome.failure(ApprovalResult.NO_PENDING_MATCH);
         }
         if (!activeCoinflips.remove(coinflipId, coinflip)) {
@@ -735,23 +804,21 @@ public final class CoinflipManager {
         boolean opponentWon = ThreadLocalRandom.current().nextBoolean();
         UUID winnerUuid = opponentWon ? match.opponentUuid() : coinflip.hostUuid();
         long resolvedAt = System.currentTimeMillis();
+        List<ItemStack> combined = new ArrayList<>(List.of(coinflip.items()));
+        combined.addAll(List.of(match.items()));
 
         // Committed before either side's items are handed to the winner. If it
         // fails, both wagers stay escrowed and the match goes back to pending,
         // so nobody gains or loses anything.
-        if (!persistResolution(coinflip, match.opponentUuid(), winnerUuid, resolvedAt)) {
+        if (!persistResolution(coinflip, match.opponentUuid(), winnerUuid, resolvedAt,
+                combined.toArray(new ItemStack[0]), 0D, match.id())) {
             activeCoinflips.put(coinflipId, coinflip);
             pendingItemMatches.put(coinflipId, match);
             browserChanged();
             return ApproveOutcome.failure(ApprovalResult.GONE);
         }
 
-        List<ItemStack> combined = new ArrayList<>(List.of(coinflip.items()));
-        combined.addAll(List.of(match.items()));
-        queueClaim(winnerUuid, combined.toArray(new ItemStack[0]));
-
         finishResolution(coinflip, match.opponentUuid(), winnerUuid, resolvedAt);
-        deletePendingMatchRow(match.id());
         return new ApproveOutcome(ApprovalResult.OK, opponentWon);
     }
 
@@ -765,13 +832,13 @@ public final class CoinflipManager {
         if (!coinflip.hostUuid().equals(host.getUniqueId())) {
             return ApprovalResult.NOT_HOST;
         }
-        CoinflipPendingMatch match = pendingItemMatches.remove(coinflipId);
+        CoinflipPendingMatch match = pendingItemMatches.get(coinflipId);
         if (match == null) {
             return ApprovalResult.NO_PENDING_MATCH;
         }
+        if (!refundPendingMatch(match)) return ApprovalResult.GONE;
+        pendingItemMatches.remove(coinflipId, match);
         browserChanged();
-        queueClaim(match.opponentUuid(), match.items());
-        deletePendingMatchRow(match.id());
         Player opponent = Bukkit.getPlayer(match.opponentUuid());
         if (opponent != null) {
             opponent.sendMessage(messages.get(opponent, "coinflip.item-match-denied"));
@@ -784,8 +851,7 @@ public final class CoinflipManager {
         CoinflipPendingMatch orphan = pendingItemMatches.remove(coinflipId);
         if (orphan != null) {
             browserChanged();
-            queueClaim(orphan.opponentUuid(), orphan.items());
-            deletePendingMatchRow(orphan.id());
+            if (!refundPendingMatch(orphan)) pendingItemMatches.put(coinflipId, orphan);
         }
     }
 
@@ -793,12 +859,11 @@ public final class CoinflipManager {
     public void sweepExpiredItemMatches() {
         long cutoff = System.currentTimeMillis() - itemMatchApprovalTimeoutMillis;
         for (CoinflipPendingMatch match : List.copyOf(pendingItemMatches.values())) {
-            if (match.requestedAtMillis() > cutoff || !pendingItemMatches.remove(match.coinflipId(), match)) {
+            if (match.requestedAtMillis() > cutoff) {
                 continue;
             }
+            if (!refundPendingMatch(match) || !pendingItemMatches.remove(match.coinflipId(), match)) continue;
             browserChanged();
-            queueClaim(match.opponentUuid(), match.items());
-            deletePendingMatchRow(match.id());
             Player opponent = Bukkit.getPlayer(match.opponentUuid());
             if (opponent != null) {
                 opponent.sendMessage(messages.get(opponent, "coinflip.item-match-expired"));
@@ -811,18 +876,13 @@ public final class CoinflipManager {
         }
     }
 
-    private void deletePendingMatchRow(int id) {
-        if (id < 0) {
-            // Still an unpersisted placeholder -- there's no row to delete yet.
-            return;
+    private boolean refundPendingMatch(CoinflipPendingMatch match) {
+        try {
+            return storage.refundPendingMatch(match, System.currentTimeMillis());
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE, "Failed to durably refund pending Coinflip match " + match.id(), error);
+            return false;
         }
-        track(CompletableFuture.runAsync(() -> {
-            try {
-                storage.deletePendingMatch(id);
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to remove a resolved Coinflip pending item match " + id, e);
-            }
-        }));
     }
 
     /**
@@ -837,14 +897,203 @@ public final class CoinflipManager {
      * @return false when nothing committed, meaning the caller must not pay
      *         out and should return the wagers instead
      */
-    private boolean persistResolution(Coinflip coinflip, UUID opponentUuid, UUID winnerUuid, long resolvedAt) {
+    private boolean persistResolution(Coinflip coinflip, UUID opponentUuid, UUID winnerUuid, long resolvedAt,
+            ItemStack[] payoutItems, double payoutAmount, Integer pendingMatchId) {
         try {
-            storage.resolveCoinflip(coinflip, opponentUuid, winnerUuid, summarize(coinflip), resolvedAt);
-            return true;
+            return storage.resolveCoinflip(coinflip, opponentUuid, winnerUuid, summarize(coinflip), resolvedAt,
+                    payoutItems, payoutAmount, pendingMatchId);
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE,
                     "Failed to persist resolved Coinflip " + coinflip.id() + " -- nobody was paid.", e);
             return false;
+        }
+    }
+
+    /** Retries every durable currency payout, optionally for one player only. */
+    public void processPendingPayouts(UUID ownerFilter) {
+        if (shuttingDown.get()) return;
+        CompletableFuture<List<CoinflipStorage.PendingPayout>> reserve = CompletableFuture.supplyAsync(() -> {
+            List<CoinflipStorage.PendingPayout> reserved = new ArrayList<>();
+            try {
+                for (CoinflipStorage.PendingPayout payout : storage.loadPendingPayouts()) {
+                    if (ownerFilter != null && !ownerFilter.equals(payout.ownerUuid())) continue;
+                    if (!pendingPayoutsInProgress.add(payout.key())) continue;
+                    try {
+                        if (storage.reservePendingPayout(payout.key(), System.currentTimeMillis())) {
+                            reserved.add(payout);
+                        } else {
+                            pendingPayoutsInProgress.remove(payout.key());
+                        }
+                    } catch (Exception error) {
+                        pendingPayoutsInProgress.remove(payout.key());
+                        plugin.getLogger().log(Level.SEVERE,
+                                "Could not reserve Coinflip payout " + payout.key(), error);
+                    }
+                }
+                return reserved;
+            } catch (Exception error) {
+                throw new java.util.concurrent.CompletionException(error);
+            }
+        }, payoutExecutor);
+        track(reserve);
+        reserve.whenComplete((reserved, error) -> {
+            if (error != null) {
+                plugin.getLogger().log(Level.SEVERE, "Failed to load pending Coinflip payouts", error);
+                return;
+            }
+            if (reserved.isEmpty()) return;
+            if (shuttingDown.get() || !plugin.isEnabled()) {
+                for (CoinflipStorage.PendingPayout payout : reserved) finishPendingPayout(payout.key(), false);
+                return;
+            }
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (shuttingDown.get()) {
+                    reserved.forEach(payout -> finishPendingPayout(payout.key(), false));
+                } else {
+                    reserved.forEach(this::deliverPendingPayout);
+                }
+            });
+        });
+    }
+
+    /** Performs only Bukkit/Vault work; every SQL transition stays off the primary thread. */
+    private void deliverPendingPayout(CoinflipStorage.PendingPayout payout) {
+        if (shuttingDown.get()) {
+            finishPendingPayout(payout.key(), false);
+            return;
+        }
+        if (payout.currency() == CoinflipType.GC) {
+            GcManager gc = gcManager;
+            if (gc == null) {
+                finishPendingPayout(payout.key(), false);
+                return;
+            }
+            gc.creditDurably(payout.ownerUuid(), null, GcAction.COINFLIP_PAYOUT,
+                    Math.round(payout.amount()), payout.key()).whenComplete((committed, error) -> {
+                if (error != null) {
+                    plugin.getLogger().log(Level.SEVERE,
+                            "Coinflip GC payout " + payout.key() + " could not be resolved", error);
+                    pendingPayoutsInProgress.remove(payout.key());
+                } else {
+                    finishPendingPayout(payout.key(), Boolean.TRUE.equals(committed));
+                }
+            });
+            return;
+        }
+
+        boolean delivered = false;
+        boolean definitelyNotDelivered = false;
+        try {
+            switch (payout.currency()) {
+                case MONEY -> {
+                    if (EconomyHook.isAvailable()) {
+                        delivered = EconomyHook.getEconomy().depositPlayer(
+                                Bukkit.getOfflinePlayer(payout.ownerUuid()), payout.amount()).transactionSuccess();
+                        definitelyNotDelivered = !delivered;
+                    } else definitelyNotDelivered = true;
+                }
+                case EXP -> {
+                    Player online = Bukkit.getPlayer(payout.ownerUuid());
+                    if (online != null) {
+                        online.setLevel(online.getLevel() + (int) Math.round(payout.amount()));
+                        delivered = true;
+                    } else definitelyNotDelivered = true;
+                }
+                case ITEMS -> definitelyNotDelivered = true;
+                case GC -> { /* handled above */ }
+            }
+        } catch (RuntimeException uncertain) {
+            plugin.getLogger().log(Level.SEVERE, "Coinflip payout " + payout.key()
+                    + " has an uncertain external result and will not be replayed automatically.", uncertain);
+        }
+        if (delivered) finishPendingPayout(payout.key(), true);
+        else if (definitelyNotDelivered) finishPendingPayout(payout.key(), false);
+        else pendingPayoutsInProgress.remove(payout.key());
+    }
+
+    private void finishPendingPayout(String key, boolean delivered) {
+        CompletableFuture<Void> finish = CompletableFuture.runAsync(() -> {
+            try {
+                if (delivered) storage.deletePendingPayout(key);
+                else storage.releasePendingPayout(key);
+            } catch (Exception error) {
+                plugin.getLogger().log(Level.SEVERE, "Could not record Coinflip payout " + key, error);
+            } finally {
+                pendingPayoutsInProgress.remove(key);
+            }
+        }, payoutExecutor);
+        track(finish);
+    }
+
+    public List<CoinflipStorage.PendingPayout> uncertainPayouts() {
+        try { return storage.loadUncertainPayouts(); }
+        catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not inspect uncertain Coinflip payouts", error);
+            return List.of();
+        }
+    }
+
+    public boolean resolveUncertainPayout(String key, boolean paid) {
+        try {
+            if (paid) {
+                if (!storage.acknowledgeUncertainPayout(key)) return false;
+            } else if (!storage.releasePendingPayout(key)) return false;
+            if (!paid) processPendingPayouts(null);
+            plugin.getLogger().warning("Coinflip payout " + key + " was manually marked "
+                    + (paid ? "PAID" : "RETRY") + ".");
+            return true;
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not reconcile Coinflip payout " + key, error);
+            return false;
+        }
+    }
+
+    private void reportUncertainPayouts() {
+        List<CoinflipStorage.PendingPayout> uncertain = uncertainPayouts();
+        if (!uncertain.isEmpty()) plugin.getLogger().severe("Coinflip has " + uncertain.size()
+                + " uncertain external payout(s). Inspect with /cf payouts before retrying them.");
+    }
+
+    /** Currency-wager creations whose external debit result needs a human decision. */
+    public List<CoinflipStorage.CreationIntent> unresolvedCreationIntents() {
+        try {
+            return storage.loadCreationIntents().stream()
+                    .filter(intent -> "DEBITING".equals(intent.state()))
+                    .toList();
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not inspect Coinflip creation intents", error);
+            return List.of();
+        }
+    }
+
+    public Optional<CoinflipStorage.CreationIntent> creationIntent(String key) {
+        try {
+            return storage.loadCreationIntent(key).filter(intent -> "DEBITING".equals(intent.state()));
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not inspect Coinflip creation intent " + key, error);
+            return Optional.empty();
+        }
+    }
+
+    /** Applies one irreversible, permanently audited staff decision. */
+    public CoinflipStorage.IntentResolution resolveCreationIntent(String key, boolean debited, Player actor) {
+        try {
+            CoinflipStorage.IntentResolution resolution = storage.resolveCreationIntent(key, debited,
+                    actor.getUniqueId(), actor.getName(), System.currentTimeMillis());
+            if (resolution.status() == CoinflipStorage.IntentResolutionStatus.ACTIVATED) {
+                activeCoinflips.put(resolution.coinflipId(), coinflipFrom(resolution.intent(), resolution.coinflipId()));
+                browserChanged();
+            }
+            if (resolution.status() == CoinflipStorage.IntentResolutionStatus.ACTIVATED
+                    || resolution.status() == CoinflipStorage.IntentResolutionStatus.DISCARDED) {
+                plugin.getLogger().warning(actor.getName() + " resolved Coinflip creation intent " + key + " as "
+                        + (debited ? "DEBITED" : "NOT_DEBITED") + ".");
+            }
+            return resolution;
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not reconcile Coinflip creation intent " + key, error);
+            return new CoinflipStorage.IntentResolution(CoinflipStorage.IntentResolutionStatus.STORAGE_ERROR,
+                    null, -1, null);
         }
     }
 
@@ -1027,7 +1276,127 @@ public final class CoinflipManager {
         }
     }
 
-    /** Deletes claims first; only the deleted rows may be delivered to a player. */
+    public enum ClaimResult { CLAIMED, EMPTY, FULL, OFFLINE, BUSY, FAILED }
+
+    public boolean queueOverflow(Player player, java.util.Collection<ItemStack> items, String source) {
+        return me.vertex.core.storage.DeliveryManager.queueOverflow(plugin, player, items, source);
+    }
+
+    Plugin plugin() {
+        return plugin;
+    }
+
+    public CompletableFuture<ClaimResult> deliverClaims(Player player) {
+        UUID owner = player.getUniqueId();
+        if (!claimsInProgress.add(owner)) return CompletableFuture.completedFuture(ClaimResult.BUSY);
+        CompletableFuture<ClaimDeliveryBatch> load = CompletableFuture.supplyAsync(() -> {
+            try {
+                List<CoinflipStorage.ClaimReservation> reservations = new ArrayList<>(
+                        storage.loadDeliveringClaims(owner));
+                CoinflipStorage.ClaimReservation fresh = storage.reserveClaims(owner);
+                if (!fresh.claims().isEmpty()) reservations.add(fresh);
+                return new ClaimDeliveryBatch(reservations,
+                        fresh.claims().isEmpty() ? null : fresh.token());
+            } catch (Exception error) {
+                throw new java.util.concurrent.CompletionException(error);
+            }
+        });
+        track(load);
+        CompletableFuture<ClaimResult> result = load.thenCompose(batch -> {
+            CompletableFuture<ClaimResult> delivered = new CompletableFuture<>();
+            Bukkit.getScheduler().runTask(plugin, () -> deliverReservations(player, batch, delivered));
+            return delivered;
+        }).exceptionally(error -> {
+            plugin.getLogger().log(Level.WARNING, "Failed to reserve Coinflip claims for " + owner, error);
+            return ClaimResult.FAILED;
+        });
+        result.whenComplete((ignored, error) -> claimsInProgress.remove(owner));
+        return result;
+    }
+
+    private record ClaimDeliveryBatch(List<CoinflipStorage.ClaimReservation> reservations, String freshToken) { }
+
+    private void deliverReservations(Player player, ClaimDeliveryBatch batch,
+            CompletableFuture<ClaimResult> result) {
+        List<CoinflipStorage.ClaimReservation> reservations = batch.reservations();
+        if (!player.isOnline()) {
+            releaseFreshReservation(player.getUniqueId(), batch, result, ClaimResult.OFFLINE);
+        } else if (reservations.isEmpty()) {
+            ClaimDelivery.clearSourceMarkers(player, plugin, "coinflip");
+            result.complete(ClaimResult.EMPTY);
+        } else {
+            deliverReservationAt(player, batch, 0, false, result);
+        }
+    }
+
+    private void deliverReservationAt(Player player, ClaimDeliveryBatch batch, int index,
+            boolean deliveredAny, CompletableFuture<ClaimResult> result) {
+        List<CoinflipStorage.ClaimReservation> reservations = batch.reservations();
+        if (index >= reservations.size()) {
+            result.complete(deliveredAny ? ClaimResult.CLAIMED : ClaimResult.EMPTY);
+            return;
+        }
+        CoinflipStorage.ClaimReservation reservation = reservations.get(index);
+        List<ClaimDelivery.TaggedItem> expected = new ArrayList<>();
+        for (CoinflipClaim claim : reservation.claims()) {
+            for (int itemIndex = 0; itemIndex < claim.items().length; itemIndex++) {
+                ItemStack item = claim.items()[itemIndex];
+                if (item != null && !item.isEmpty()) expected.add(ClaimDelivery.tagged(plugin, "coinflip",
+                        reservation.token(), claim.id(), itemIndex, item));
+            }
+        }
+        List<ClaimDelivery.TaggedItem> missing = ClaimDelivery.missing(player, plugin, expected);
+        if (!ClaimDelivery.canFit(player, missing) || !ClaimDelivery.add(player, missing)) {
+            releaseFreshReservation(player.getUniqueId(), batch, result, ClaimResult.FULL);
+            return;
+        }
+        CompletableFuture<Integer> complete = CompletableFuture.supplyAsync(() -> {
+            try { return storage.completeReservation(player.getUniqueId(), reservation.token()); }
+            catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
+        });
+        track(complete);
+        complete.whenComplete((changed, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+            if (error != null || changed == null || changed != reservation.claims().size()) {
+                plugin.getLogger().log(Level.SEVERE, "Could not acknowledge Coinflip claim reservation "
+                        + reservation.token() + "; tagged items remain reconcilable.", error);
+                result.complete(ClaimResult.FAILED);
+                return;
+            }
+            ClaimDelivery.clearMarkers(player, plugin, "coinflip", reservation.token());
+            deliverReservationAt(player, batch, index + 1, true, result);
+        }));
+    }
+
+    private void releaseFreshReservation(UUID owner, ClaimDeliveryBatch batch,
+            CompletableFuture<ClaimResult> result, ClaimResult releasedResult) {
+        if (batch.freshToken() == null) {
+            result.complete(releasedResult);
+            return;
+        }
+        List<CoinflipStorage.ClaimReservation> fresh = batch.reservations().stream()
+                .filter(reservation -> reservation.token().equals(batch.freshToken())).toList();
+        releaseReservations(owner, fresh, result, releasedResult);
+    }
+
+    private void releaseReservations(UUID owner, List<CoinflipStorage.ClaimReservation> reservations,
+            CompletableFuture<ClaimResult> result, ClaimResult releasedResult) {
+        CompletableFuture<Void> release = CompletableFuture.runAsync(() -> {
+            for (CoinflipStorage.ClaimReservation reservation : reservations) {
+                try { storage.releaseReservation(owner, reservation.token()); }
+                catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
+            }
+        });
+        track(release);
+        release.whenComplete((ignored, error) -> {
+            if (error != null) {
+                plugin.getLogger().log(Level.SEVERE, "Could not release Coinflip claim reservation for " + owner,
+                        error);
+                result.complete(ClaimResult.FAILED);
+            } else result.complete(releasedResult);
+        });
+    }
+
+    /** Compatibility API retained for tests and storage-only consumers. */
     public CompletableFuture<ClaimBatch> takeClaims(UUID uuid) {
         if (!claimsInProgress.add(uuid)) {
             return CompletableFuture.completedFuture(ClaimBatch.empty());
@@ -1083,54 +1452,15 @@ public final class CoinflipManager {
         }));
     }
 
-    /** Gives items directly if the player is online, otherwise queues them as a claim. */
-    private void giveOrDrop(Player player, ItemStack[] items) {
+    /** Gives items directly if possible and retains all overflow in the durable claim stash. */
+    private void giveOrClaim(Player player, ItemStack[] items) {
         if (player.isOnline()) {
             for (ItemStack leftover : player.getInventory().addItem(items).values()) {
-                player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+                queueClaim(player.getUniqueId(), new ItemStack[] { leftover });
             }
         } else {
             queueClaim(player.getUniqueId(), items);
         }
-    }
-
-    // ---- Experience credit (handles the recipient being offline) ----
-
-    private void creditExp(UUID uuid, int levels) {
-        if (levels <= 0) {
-            return;
-        }
-        Player online = Bukkit.getPlayer(uuid);
-        if (online != null) {
-            online.setLevel(online.getLevel() + levels);
-            return;
-        }
-        int total = pendingExp.merge(uuid, levels, Integer::sum);
-        track(CompletableFuture.runAsync(() -> {
-            try {
-                storage.savePendingExp(uuid, total);
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to persist pending Coinflip experience for " + uuid, e);
-            }
-        }));
-    }
-
-    /** Applies any experience owed from while this player was offline. Call this on join. */
-    public void applyPendingExp(Player player) {
-        Integer levels = pendingExp.remove(player.getUniqueId());
-        if (levels == null || levels <= 0) {
-            return;
-        }
-        player.setLevel(player.getLevel() + levels);
-        player.sendMessage(messages.get(player, "coinflip.pending-exp-applied", "levels", String.valueOf(levels)));
-        track(CompletableFuture.runAsync(() -> {
-            try {
-                storage.deletePendingExp(player.getUniqueId());
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to clear pending Coinflip experience for "
-                        + player.getUniqueId(), e);
-            }
-        }));
     }
 
     // ---- Audit log ----
@@ -1165,9 +1495,52 @@ public final class CoinflipManager {
         write.whenComplete((ignored, error) -> pendingWrites.remove(write));
     }
 
-    public void awaitWrites() {
+    public void shutdown() {
+        shuttingDown.set(true);
+        for (String key : List.copyOf(pendingPayoutsInProgress)) {
+            CompletableFuture<Void> clear = CompletableFuture.runAsync(() -> {
+                try {
+                    storage.releasePendingPayout(key);
+                } catch (Exception error) {
+                    plugin.getLogger().log(Level.SEVERE,
+                            "Could not release Coinflip payout " + key + " during shutdown", error);
+                } finally {
+                    pendingPayoutsInProgress.remove(key);
+                }
+            }, payoutExecutor);
+            track(clear);
+        }
+        awaitWrites();
+        payoutExecutor.shutdown();
         try {
-            CompletableFuture.allOf(pendingWrites.toArray(new CompletableFuture[0])).get(10, TimeUnit.SECONDS);
+            if (!payoutExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
+                payoutExecutor.shutdownNow();
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            payoutExecutor.shutdownNow();
+        }
+    }
+
+    public void awaitWrites() {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        int emptyRounds = 0;
+        try {
+            while (System.nanoTime() < deadline) {
+                CompletableFuture<?>[] snapshot = pendingWrites.toArray(new CompletableFuture[0]);
+                if (snapshot.length == 0) {
+                    if (++emptyRounds >= 3) return;
+                    TimeUnit.MILLISECONDS.sleep(2L);
+                    continue;
+                }
+                emptyRounds = 0;
+                long remaining = Math.max(1L, deadline - System.nanoTime());
+                CompletableFuture.allOf(snapshot).get(remaining, TimeUnit.NANOSECONDS);
+            }
+            plugin.getLogger().warning("Timed out waiting for pending Coinflip writes.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            plugin.getLogger().log(Level.WARNING, "Interrupted while waiting for Coinflip writes.", e);
         } catch (Exception e) {
             plugin.getLogger().log(Level.WARNING, "Timed out waiting for pending Coinflip writes.", e);
         }

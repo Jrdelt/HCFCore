@@ -46,7 +46,7 @@ public final class InvseeCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        InvseeMenu.open(viewer, target);
+        InvseeMenu.open(viewer, target, messages);
         viewer.sendMessage(messages.get(viewer, "staff.invsee-opened", "player", target.getName()));
         return true;
     }

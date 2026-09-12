@@ -84,7 +84,7 @@ public final class KitsMenu {
         int pageCount = Math.max(1, (pairs.size() + 6) / 7);
         int page = Math.max(0, Math.min(requestedPage, pageCount - 1));
         Holder holder = new Holder(page, userManager);
-        Inventory inventory = Bukkit.createInventory(holder, GRID_SIZE, messages.get(player, "kit.gui-title"));
+        Inventory inventory = Bukkit.createInventory(holder, GRID_SIZE, messages.getGui(player, "kit.gui-title"));
         holder.inventory = inventory;
 
         NamespacedKey kitIdKey = new NamespacedKey(plugin, KIT_ID_KEY);
@@ -131,10 +131,10 @@ public final class KitsMenu {
         boolean hasPermission = kit.getPermission() == null || kit.getPermission().isEmpty()
                 || player.hasPermission(kit.getPermission());
         lore.add(hasPermission
-                ? messages.get(player, "kit.gui-access")
-                : messages.get(player, "kit.gui-no-access"));
+                ? messages.getGui(player, "kit.gui-access")
+                : messages.getGui(player, "kit.gui-no-access"));
         if (kit.getPurpose() != null && !kit.getPurpose().isBlank()) {
-            lore.add(MessageFormatter.deserialize(kit.getPurpose()));
+            lore.add(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(kit.getPurpose())));
         }
 
         // A locked donor kit must not look claimable. Base kits normally have
@@ -143,28 +143,28 @@ public final class KitsMenu {
             long expiry = user == null ? 0L : user.getCooldownExpiry(key);
             if (expiry > now) {
                 long remaining = (expiry - now) / 1000L;
-                lore.add(messages.get(player, "kit.gui-cooldown", "seconds", String.valueOf(remaining)));
+                lore.add(messages.getGui(player, "kit.gui-cooldown", "seconds", String.valueOf(remaining)));
             } else {
-                lore.add(messages.get(player, "kit.gui-ready"));
+                lore.add(messages.getGui(player, "kit.gui-ready"));
             }
         }
 
         Kit.Cost cost = kit.getCost();
         if (cost.hasMoneyCost()) {
             boolean canAfford = bypassCost || (economy != null && economy.has(player, cost.money()));
-            lore.add(colorize(messages.get(player, "kit.gui-cost-money", "amount", EconomyHook.format(cost.money())),
+            lore.add(colorize(messages.getGui(player, "kit.gui-cost-money", "amount", EconomyHook.format(cost.money())),
                     canAfford));
         }
         if (cost.hasItemCost()) {
             boolean canAfford = bypassCost
                     || player.getInventory().containsAtLeast(new ItemStack(cost.itemType()), cost.itemAmount());
-            lore.add(colorize(messages.get(player, "kit.gui-cost-item",
+            lore.add(colorize(messages.getGui(player, "kit.gui-cost-item",
                     "amount", String.valueOf(cost.itemAmount()), "item", KitManager.formatMaterial(cost.itemType())),
                     canAfford));
         }
         lore.add(Component.empty());
-        lore.add(messages.get(player, "kit.gui-left-click"));
-        lore.add(messages.get(player, "kit.gui-right-click"));
+        lore.add(messages.getGui(player, "kit.gui-left-click"));
+        lore.add(messages.getGui(player, "kit.gui-right-click"));
         meta.lore(lore);
         meta.getPersistentDataContainer().set(kitIdKey, PersistentDataType.STRING, kit.getName());
         icon.setItemMeta(meta);
@@ -198,7 +198,7 @@ public final class KitsMenu {
     private static ItemStack pageButton(Plugin plugin, Player player, Messages messages, String key, String action) {
         ItemStack item = new ItemStack(Material.ARROW);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(messages.get(player, key).decoration(TextDecoration.ITALIC, false));
+        meta.displayName(messages.getGui(player, key).decoration(TextDecoration.ITALIC, false));
         meta.getPersistentDataContainer().set(new NamespacedKey(plugin, PAGE_ACTION_KEY), PersistentDataType.STRING, action);
         item.setItemMeta(meta);
         return item;

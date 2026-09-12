@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Covers {@link ChunkBusterManager} without touching FactionsUUID's live
+ * Covers {@link ChunkBusterManager} without booting the native faction
  * {@code Board} singleton or a real {@code CombatManager} -- every such
  * lookup is a plain lambda here, standing in for what {@code
  * FactionsHook}/{@code RallyManager}/{@code CombatManager} report in

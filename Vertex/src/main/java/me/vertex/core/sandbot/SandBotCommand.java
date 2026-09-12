@@ -37,8 +37,10 @@ public final class SandBotCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             ItemStack item = manager.createGiveItem();
-            for (ItemStack leftover : target.getInventory().addItem(item).values()) {
-                target.getWorld().dropItemNaturally(target.getLocation(), leftover);
+            if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
+                    manager.plugin(), target, List.of(item), "sandbot-admin-give")) {
+                sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
+                return true;
             }
             sender.sendMessage(messages.get(sender, "sandbot.given", "player", target.getName()));
             return true;

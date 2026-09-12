@@ -26,11 +26,16 @@ material tiles retain the normal left-buy/right-sell behavior.
 You can also trade directly by command, regardless of which category an
 item belongs to:
 
-| Command | Effect |
-|---|---|
-| `/shop` | Opens the category picker |
-| `/shop buy <item> [amount]` | Buys at the current price |
-| `/shop sell <item> [amount]` | Sells at the current price |
+| Command | Permission | Effect |
+|---|---|---|
+| `/shop` | Open to all | Opens the category picker |
+| `/shop buy <item> [amount]` | Open to all | Buys at the current price |
+| `/shop sell <item> [amount]` | Open to all | Sells at the current price |
+| `/sell hand` | Open to all | Sells the plain vanilla stack currently held |
+| `/sell all` | Open to all | Sells every eligible plain vanilla inventory stack |
+
+`/sell` is owned and intercepted by Vertex before Essentials. Custom items,
+including anything with item metadata/PDC, are never included in quick sales.
 
 In a category's GUI: left-click buys one (or `default-buy-amount`),
 shift-left-click buys a full stack; right-click sells one, shift-right-click

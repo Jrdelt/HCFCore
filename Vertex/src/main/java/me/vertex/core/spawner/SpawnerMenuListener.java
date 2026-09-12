@@ -120,11 +120,15 @@ public final class SpawnerMenuListener implements Listener {
             return;
         }
 
-        int newSize = spawnerManager.decreaseStack(location, amount);
-        for (ItemStack leftover : player.getInventory().addItem(payload.toArray(new ItemStack[0])).values()) {
-            // Unreachable after the check above; dropping beats vanishing.
-            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        // Admit the complete payload before touching the high-value stack.
+        // DeliveryManager persists this to its WAL (or SQL fallback) before
+        // returning, so a full inventory or crash cannot erase the items.
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(spawnerManager.plugin(), player,
+                payload, "spawner-withdraw")) {
+            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+            return;
         }
+        int newSize = spawnerManager.decreaseStack(location, amount);
         clearBlockIfEmpty(location, newSize);
         player.sendMessage(messages.get(player, "spawner.withdrew", "amount", String.valueOf(amount)));
     }
@@ -200,9 +204,7 @@ public final class SpawnerMenuListener implements Listener {
         }
         probe.setContents(copy);
         List<ItemStack> clones = new ArrayList<>();
-        for (ItemStack stack : payload) {
-            clones.add(stack.clone());
-        }
+        for (ItemStack stack : payload) clones.add(stack.clone());
         return probe.addItem(clones.toArray(new ItemStack[0])).isEmpty();
     }
 

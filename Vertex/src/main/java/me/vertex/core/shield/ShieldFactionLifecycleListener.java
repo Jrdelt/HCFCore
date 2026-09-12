@@ -1,9 +1,6 @@
 package me.vertex.core.shield;
 
-import dev.kitteh.factions.Faction;
-import dev.kitteh.factions.event.FactionAutoDisbandEvent;
-import dev.kitteh.factions.event.FactionCreateEvent;
-import dev.kitteh.factions.event.FactionDisbandEvent;
+import me.vertex.core.factions.event.FactionLifecycleEvent;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 
@@ -23,26 +20,8 @@ public final class ShieldFactionLifecycleListener implements Listener {
     }
 
     @EventHandler
-    public void onCreate(FactionCreateEvent event) {
-        Faction faction = event.getFaction();
-        if (faction != null) {
-            shield.onFactionCreated(faction.id());
-        }
-    }
-
-    @EventHandler
-    public void onDisband(FactionDisbandEvent event) {
-        Faction faction = event.getFaction();
-        if (faction != null) {
-            shield.onFactionDisbanded(faction.id());
-        }
-    }
-
-    @EventHandler
-    public void onAutoDisband(FactionAutoDisbandEvent event) {
-        Faction faction = event.getFaction();
-        if (faction != null) {
-            shield.onFactionDisbanded(faction.id());
-        }
+    public void onLifecycle(FactionLifecycleEvent event) {
+        if (event.action() == FactionLifecycleEvent.Action.CREATE) shield.onFactionCreated(event.faction().id());
+        if (event.action() == FactionLifecycleEvent.Action.DISBAND) shield.onFactionDisbanded(event.faction().id());
     }
 }

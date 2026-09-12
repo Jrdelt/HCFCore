@@ -9,6 +9,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -83,10 +84,14 @@ public final class EnchantCommand implements CommandExecutor, TabCompleter {
             }
         }
 
+        List<ItemStack> items = new ArrayList<>(amount);
         for (int i = 0; i < amount; i++) {
-            ItemStack item = kind.equals("rune") ? manager.createRune(tier) : manager.createLuckyGem();
-            target.getInventory().addItem(item).values()
-                    .forEach(leftover -> target.getWorld().dropItemNaturally(target.getLocation(), leftover));
+            items.add(kind.equals("rune") ? manager.createRune(tier) : manager.createLuckyGem());
+        }
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
+                manager.plugin(), target, items, "enchant-admin-give")) {
+            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
+            return true;
         }
         String kindLabel = kind.equals("rune") ? (tier.name() + " Rune") : "Lucky Gem";
         sender.sendMessage(messages.get(sender, "enchant.given", "player", target.getName(),

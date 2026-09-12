@@ -76,27 +76,18 @@ public final class InvRestoreMenuListener implements Listener {
 
     private void restoreToInventory(Player staffPlayer, Death death) {
         staffPlayer.closeInventory();
-        int added = 0;
-        int dropped = 0;
-
+        java.util.List<ItemStack> items = new java.util.ArrayList<>();
         for (ItemStack item : death.getAllItems()) {
             if (item != null && !item.getType().isAir()) {
-                java.util.Map<Integer, ItemStack> couldNotAdd = staffPlayer.getInventory().addItem(item);
-                if (couldNotAdd.isEmpty()) {
-                    added++;
-                } else {
-                    // Drop only the items that couldn't fit, not the original
-                    for (ItemStack overflow : couldNotAdd.values()) {
-                        staffPlayer.getWorld().dropItemNaturally(staffPlayer.getLocation(), overflow);
-                        dropped++;
-                    }
-                }
+                items.add(item.clone());
             }
         }
-
-        staffPlayer.sendMessage(messages.getChat(staffPlayer, "staff.restore-success", "added", String.valueOf(added)));
-        if (dropped > 0) {
-            staffPlayer.sendMessage(messages.getChat(staffPlayer, "staff.restore-overflow", "dropped", String.valueOf(dropped)));
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
+                plugin, staffPlayer, items, "staff-inventory-restore")) {
+            staffPlayer.sendMessage(messages.get(staffPlayer, "delivery.storage-unavailable"));
+            return;
         }
+        staffPlayer.sendMessage(messages.getChat(staffPlayer, "staff.restore-success",
+                "added", String.valueOf(items.size())));
     }
 }

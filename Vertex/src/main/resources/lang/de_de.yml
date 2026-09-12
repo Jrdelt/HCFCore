@@ -1,7 +1,7 @@
 # Bumped whenever a bundled message changes. On startup Vertex replaces an
 # older on-disk copy of this file with the new bundled one, moving the
 # previous file into lang/backup/ first so customizations can be re-applied.
-lang-version: 3
+lang-version: 5
 
 general:
   no-permission: '<red>✖ Du hast keinen Zugriff auf diesen Befehl.'
@@ -28,9 +28,9 @@ admin:
   storage-already: '<yellow>Speicher <white>{type}<yellow> wird bereits verwendet.'
   storage-migrating: '<gray>Kopiere Daten von <white>{from}<gray> nach <white>{to}<gray>...'
   storage-not-empty: '<red>Die {type}-Datenbank enthält bereits {rows} Zeile(n). Mit confirm erneut ausführen, um sie zu überschreiben.'
-  storage-migrated: '<green>{rows} Zeile(n) nach {type} kopiert. Starte den Server neu, um sie zu verwenden.'
+  storage-migrated: '<green>{rows} Zeile(n) nach {type} kopiert und geprüft. Der Server wird jetzt für den sicheren Wechsel gestoppt.'
   storage-failed: '<red>Migration fehlgeschlagen, nichts wurde geändert: {error}'
-  storage-requires-idle-server: '<red>Die Speichermigration erfordert keine Online-Spieler und keine aktiven Blueprints.'
+  storage-requires-idle-server: '<red>Die Speichermigration erfordert keine Online-Spieler, keine aktiven Blueprints und einen deaktivierten Netzwerkmodus. Stoppe zuerst alle anderen Shards.'
   storage-login-blocked: '<red>Eine kurze Speichermigration läuft. Bitte verbinde dich gleich erneut.'
 
 sandbot:
@@ -49,11 +49,12 @@ sandbot:
     paused-status: '&cStatus: Pausiert &7(Klicken zum Fortsetzen)'
     despawn: '&cSandbot entfernen'
   item:
-    name: '&eSandbot'
+    name: '<gold>✦ Sandbot ✦'
     lore:
-      - '&7Auf einen beliebigen Block platzieren -- sucht nach'
-      - '&7Andesit, Sandstein, rotem Sandstein oder Beton'
-      - '&7in der Nähe; muss in deinem Claim sein.'
+      - '<gray>Sandbots können schnell passende Blöcke'
+      - '<gray>unter nahegelegenen Stützen platzieren.'
+      - ''
+      - '<aqua>Platzierungsbereich: <green>{area} x {area} Blöcke'
 
 tntfill:
   filled-partial: '&<red>✖ {filled} Werfer befüllt (&cunzureichendes Geld/TNT&7).'
@@ -246,7 +247,7 @@ factions:
   leader-cannot-leave: '<red>Du kannst deine Fraktion als Anfuehrer nicht verlassen. Verwende /f disband zum Aufloesen.'
   must-be-in-faction: '<red>Du musst in einer Fraktion sein, um einen Sammelpunkt zu setzen.'
   rally-usage: '<red>Verwendung: /f rally [set|clear]'
-  permissions-leader-only: '<red>Nur dein Fraktionsleiter kann Fraktionsberechtigungen aendern.'
+  permissions-leader-only: '<red>Nur Anfuehrer, Co-Anfuehrer oder Admin koennen Fraktionsrechte aendern.'
   role-permission-denied: '<red>Deine Fraktionsrolle darf diese Aktion nicht verwenden.'
   rally-no-permission: '<red>Deine Fraktionsrolle darf diese Sammelpunkt-Aktion nicht verwenden.'
   rally-set-broadcast: '&a&lSAMMELPUNKT &r&8» &e{player} &8hat einen Sammelpunkt bei &e{x}, {y}, {z} &8in &e{world} &8gesetzt.'
@@ -259,7 +260,7 @@ faction-upgrades:
   no-faction: "<red>✖ <yellow>You must be in a faction to view faction upgrades."
   disabled: "<red>✖ <yellow>Faction upgrades are currently disabled."
   role-permission-denied: "<red>✖ <yellow>Your faction role cannot use faction upgrades."
-  leader-only: "<red>✖ <yellow>Only your faction leader can purchase faction upgrades."
+  leader-only: "<red>✖ <yellow>Nur Anfuehrer oder Co-Anfuehrer koennen Fraktionsupgrades kaufen."
   no-economy: "<red>✖ <yellow>Faction upgrades need a Vault economy provider."
   cannot-afford: "<red>✖ <yellow>You need <green>{amount}<yellow> for that upgrade."
   maxed: "<yellow>That faction upgrade is already at its maximum level."
@@ -272,7 +273,7 @@ faction-upgrades:
     next-effect: "<gray>Next: <green>{effect}"
     cost: "<gray>Cost: <gold>{amount}"
     click-to-upgrade: "<green>Click to purchase the next level."
-    leader-only: "<red>Only your faction leader can purchase levels."
+    leader-only: "<red>Nur Anfuehrer oder Co-Anfuehrer koennen Stufen kaufen."
     maxed: "<green>Maximum level reached."
     disabled: "<red>This upgrade is disabled in the server config."
     lore:
@@ -287,7 +288,7 @@ faction-upgrades:
         - "<gray>Current: <white>{current}"
         - "<gray>Next: <green>{next}"
         - "<gray>Cost: <gold>{cost}"
-        - "<red>Only your faction leader can purchase levels."
+        - "<red>Nur Anfuehrer oder Co-Anfuehrer koennen Stufen kaufen."
       maxed:
         - "<gray>Level: <green>{level}<gray>/<green>{max}"
         - "<gray>Current: <white>{current}"
@@ -552,6 +553,7 @@ backpack:
   filter-enabled: '&e&lBACKPACKS &7> <green>{item} will be discarded while a Backpack is equipped.'
   filter-disabled: '&e&lBACKPACKS &7> <gray>{item} will no longer be discarded.'
   filter-cleared: '&e&lBACKPACKS &7> <green>Cleared {count} Backpack filter(s).'
+  filter-save-failed: '&e&lBACKPACKS &7> <red>Your filter was not changed because storage is unavailable. Try again later.'
   filter-invalid-item: '&e&lBACKPACKS &7> <red>Use a valid Minecraft material name.'
 
 item-restrictions:
@@ -741,14 +743,9 @@ shop:
 
 trade:
   gui-title: "<dark_gray>trade with {player}"
-  anvil-title: "<dark_gray>trade offer"
   peek-title: "<dark_gray>trade contents"
   requester-head: "<yellow>{player}'s offer"
   target-head: "<yellow>{player}'s offer"
-  money-title: "<gold><bold>money"
-  exp-title: "<aqua><bold>experience"
-  value-lore: "<gray>offering: <yellow>{amount}"
-  value-click-lore: "<green>click to set amount"
   lock-title: "<green><bold>lock offer"
   lock-lore: "<gray>locks your offer."
   locked-title: "<gray><bold>offer locked"
@@ -772,15 +769,10 @@ trade:
   complete: "&b&lTRADE&r &7> <green>Trade with {player} completed!"
   locked: "&b&lTRADE&r &7> <yellow>Your offer is locked."
   wait-final: "&b&lTRADE&r &7> <gray>Waiting for final acceptance."
-  invalid-amount: "&b&lTRADE&r &7> <red>Invalid amount."
-  cannot-afford: "&b&lTRADE&r &7> <red>You cannot afford that."
-  no-economy: "&b&lTRADE&r &7> <red>No economy provider is available."
   inventory-full: "&b&lTRADE&r &7> <red>An inventory is full; trade cancelled."
   item-blocked: "&b&lTRADE&r &7> <red>That item cannot be traded."
   toggle-on: "&b&lTRADE&r &7> <yellow>Incoming trades blocked."
   toggle-off: "&b&lTRADE&r &7> <green>Incoming trades enabled."
-  admin-usage: "&b&lTRADE&r &7> <gray>Usage: /tradeadmin reload"
-  admin-reloaded: "&b&lTRADE&r &7> <green>traders.yml reloaded."
   history-title: "<dark_gray>trade history • {player}"
   history-entry: "<yellow>trade #{id} • {player}"
   history-status: "<gray>status: <white>{status}"

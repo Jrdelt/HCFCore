@@ -1,6 +1,6 @@
 package me.vertex.core.faction;
 
-import dev.kitteh.factions.Faction;
+import me.vertex.core.factions.FactionData;
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.Messages;
 import org.bukkit.Bukkit;
@@ -91,9 +91,13 @@ public final class TntFillCommand implements CommandExecutor, TabCompleter {
         }
 
         int factionId = FactionsHook.getFactionId(player);
-        Faction faction = FactionsHook.getFactionById(factionId);
+        FactionData faction = FactionsHook.getFactionById(factionId).orElse(null);
         if (faction == null) {
             player.sendMessage(messages.get(player, "tntfill.no-faction"));
+            return true;
+        }
+        if (!FactionsHook.service().hasAction(FactionsHook.service().member(player.getUniqueId()), "tnt-fill")) {
+            player.sendMessage(messages.get(player, "factions.role-permission-denied"));
             return true;
         }
 
@@ -118,6 +122,8 @@ public final class TntFillCommand implements CommandExecutor, TabCompleter {
         if (!fromBank) {
             FillResult filled = fill(dispensers, targetPerDispenser, reserve);
             player.getInventory().removeItem(new ItemStack(Material.TNT, filled.placed()));
+            if (filled.placed() > 0) bankManager.audit(factionId, "TNT_FILL", player,
+                    "amount=" + filled.placed() + ";source=inventory;dispensers=" + filled.dispensers());
             report(player, dispensers.size(), targetPerDispenser, filled);
             return true;
         }
@@ -126,7 +132,7 @@ public final class TntFillCommand implements CommandExecutor, TabCompleter {
         // concurrent withdrawal elsewhere loses the race here rather than
         // letting this fill place TNT the faction no longer has. Anything the
         // dispensers could not actually take is returned immediately after.
-        bankManager.withdrawTnt(factionId, reserve).whenComplete((withdrawn, error) ->
+        bankManager.withdrawTnt(player, factionId, reserve, "tnt-fill").whenComplete((withdrawn, error) ->
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     if (error != null || !Boolean.TRUE.equals(withdrawn)) {
                         player.sendMessage(messages.get(player, "tntfill.bank-empty"));
@@ -137,6 +143,8 @@ public final class TntFillCommand implements CommandExecutor, TabCompleter {
                     if (unused > 0) {
                         bankManager.depositTnt(factionId, unused, Long.MAX_VALUE);
                     }
+                    if (filled.placed() > 0) bankManager.audit(factionId, "TNT_FILL", player,
+                            "amount=" + filled.placed() + ";source=bank;dispensers=" + filled.dispensers());
                     report(player, dispensers.size(), targetPerDispenser, filled);
                 }));
         return true;

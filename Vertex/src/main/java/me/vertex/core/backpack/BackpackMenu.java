@@ -32,7 +32,7 @@ public final class BackpackMenu {
             BackpackTier tier, BackpackData data, ItemStack backpackItem) {
         int size = ROWS * 9;
         Holder holder = new Holder(backpackItem, tier);
-        Inventory inventory = Bukkit.createInventory(holder, size, messages.get(player, "backpack.gui-title"));
+        Inventory inventory = Bukkit.createInventory(holder, size, messages.getGui(player, "backpack.gui-title"));
         holder.inventory = inventory;
 
         for (int slot = 0; slot < size; slot++) {
@@ -55,8 +55,8 @@ public final class BackpackMenu {
     private static ItemStack emptyButton(Player player, Messages messages) {
         ItemStack item = new ItemStack(Material.CAULDRON);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "backpack.gui-empty-button")));
-        meta.lore(messages.getList(player, "backpack.gui-empty-lore").stream().map(BackpackMenu::noItalic).toList());
+        meta.displayName(noItalic(messages.getGui(player, "backpack.gui-empty-button")));
+        meta.lore(messages.getGuiList(player, "backpack.gui-empty-lore").stream().map(BackpackMenu::noItalic).toList());
         item.setItemMeta(meta);
         return item;
     }
@@ -67,10 +67,10 @@ public final class BackpackMenu {
         boolean maxed = cost < 0;
         ItemStack item = new ItemStack(maxed ? Material.BARRIER : Material.EMERALD);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "backpack.gui-upgrade-button")));
+        meta.displayName(noItalic(messages.getGui(player, "backpack.gui-upgrade-button")));
         meta.lore(List.of(
-                maxed ? noItalic(messages.get(player, "backpack.gui-upgrade-lore-maxed"))
-                        : noItalic(messages.get(player, "backpack.gui-upgrade-lore-cost", "cost", EconomyHook.format(cost)))));
+                maxed ? noItalic(messages.getGui(player, "backpack.gui-upgrade-lore-maxed"))
+                        : noItalic(messages.getGui(player, "backpack.gui-upgrade-lore-cost", "cost", EconomyHook.format(cost)))));
         item.setItemMeta(meta);
         return item;
     }

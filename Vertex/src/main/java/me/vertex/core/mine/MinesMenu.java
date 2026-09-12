@@ -87,8 +87,8 @@ public final class MinesMenu {
         if (layout.item("teleport") == null) {
             ItemStack teleport = new ItemStack(Material.EMERALD_BLOCK);
             ItemMeta meta = teleport.getItemMeta();
-            meta.displayName(MessageFormatter.deserialize("<green><bold>Teleport"));
-            meta.lore(List.of(MessageFormatter.deserialize("<gray>Confirm a safe mine teleport.")));
+            meta.displayName(messages.getGui(viewer, "mines.teleport-name"));
+            meta.lore(messages.getGuiList(viewer, "mines.teleport-lore"));
             teleport.setItemMeta(meta);
             inventory.setItem(20, teleport);
         } else {

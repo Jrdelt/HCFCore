@@ -54,6 +54,7 @@ public final class MobStackListener implements Listener {
     private final SpawnerManager spawnerManager;
     private final NamespacedKey stackCountKey;
     private final NamespacedKey spawnerMobKey;
+    private final NamespacedKey zoneMobKey;
     private final Random random = new Random();
 
     public MobStackListener(Plugin plugin, SpawnerManager spawnerManager) {
@@ -61,6 +62,7 @@ public final class MobStackListener implements Listener {
         this.spawnerManager = spawnerManager;
         this.stackCountKey = new NamespacedKey(plugin, "mob_stack_count");
         this.spawnerMobKey = new NamespacedKey(plugin, "spawner_mob_type");
+        this.zoneMobKey = new NamespacedKey(plugin, "zone_mob");
     }
 
     /** Lets a later-initialized feature (Backpacks) route peeled player-kill drops. */
@@ -87,6 +89,11 @@ public final class MobStackListener implements Listener {
         }
         EntityType type = event.getEntityType();
         if (!spawnerManager.stackableTypes().contains(type) || !(event.getEntity() instanceof Mob spawned)) {
+            return;
+        }
+        // Haven/Riftlands mobs carry individual health, names, drops and kill
+        // credit, so folding them into farm-mob stacks corrupts zone gameplay.
+        if (spawned.getPersistentDataContainer().has(zoneMobKey, PersistentDataType.STRING)) {
             return;
         }
 

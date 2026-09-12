@@ -1,6 +1,7 @@
 package me.vertex.core.zone;
 
 import me.vertex.core.storage.Database;
+import me.vertex.core.storage.SqlSchema;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -22,11 +23,12 @@ public final class ZoneStorage {
         try (Connection c = database.getConnection(); var s = c.createStatement()) {
             s.executeUpdate("CREATE TABLE IF NOT EXISTS zone_regions (id VARCHAR(64) PRIMARY KEY, type VARCHAR(16) NOT NULL, world VARCHAR(128) NOT NULL, min_x INT NOT NULL, min_y INT NOT NULL, min_z INT NOT NULL, max_x INT NOT NULL, max_y INT NOT NULL, max_z INT NOT NULL)");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS zone_routes (id VARCHAR(64) PRIMARY KEY, region_id VARCHAR(64) NOT NULL, enabled BOOLEAN NOT NULL, speed DOUBLE NOT NULL, auto_drop BOOLEAN NOT NULL, waypoints TEXT NOT NULL)");
-            s.executeUpdate("CREATE TABLE IF NOT EXISTS zone_loot (zone_type VARCHAR(16) NOT NULL, position INT NOT NULL, item BLOB NOT NULL, chance DOUBLE NOT NULL, PRIMARY KEY (zone_type, position))");
+            s.executeUpdate("CREATE TABLE IF NOT EXISTS zone_loot (zone_type VARCHAR(16) NOT NULL, position INT NOT NULL, item LONGBLOB NOT NULL, chance DOUBLE NOT NULL, PRIMARY KEY (zone_type, position))");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS zone_players (player_uuid VARCHAR(36) PRIMARY KEY, last_name VARCHAR(32) NOT NULL, haven_kills BIGINT NOT NULL, riftlands_kills BIGINT NOT NULL, haven_cooldown_until BIGINT NOT NULL, riftlands_cooldown_until BIGINT NOT NULL, rift_session_id VARCHAR(64), winner_boost DOUBLE NOT NULL, winner_cycle BIGINT NOT NULL)");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS zone_event_scores (event_start BIGINT NOT NULL, player_uuid VARCHAR(36) NOT NULL, player_name VARCHAR(32) NOT NULL, score DOUBLE NOT NULL, reached_at BIGINT NOT NULL, PRIMARY KEY (event_start, player_uuid))");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS zone_event_state (state_key VARCHAR(32) PRIMARY KEY, value BIGINT NOT NULL)");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS zone_flight_returns (player_uuid VARCHAR(36) PRIMARY KEY, zone_region VARCHAR(64) NOT NULL, world VARCHAR(128) NOT NULL, x DOUBLE NOT NULL, y DOUBLE NOT NULL, z DOUBLE NOT NULL)");
+            SqlSchema.ensureLongBlob(c, database.dialect(), "zone_loot", "item", false);
         }
     }
 
@@ -86,7 +88,6 @@ public final class ZoneStorage {
         String sql=database.dialect()==Database.Dialect.SQLITE ? "INSERT INTO zone_players (player_uuid,last_name,haven_kills,riftlands_kills,haven_cooldown_until,riftlands_cooldown_until,rift_session_id,winner_boost,winner_cycle) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(player_uuid) DO UPDATE SET last_name=excluded.last_name,haven_kills=excluded.haven_kills,riftlands_kills=excluded.riftlands_kills,haven_cooldown_until=excluded.haven_cooldown_until,riftlands_cooldown_until=excluded.riftlands_cooldown_until,rift_session_id=excluded.rift_session_id,winner_boost=excluded.winner_boost,winner_cycle=excluded.winner_cycle" : "INSERT INTO zone_players (player_uuid,last_name,haven_kills,riftlands_kills,haven_cooldown_until,riftlands_cooldown_until,rift_session_id,winner_boost,winner_cycle) VALUES (?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE last_name=VALUES(last_name),haven_kills=VALUES(haven_kills),riftlands_kills=VALUES(riftlands_kills),haven_cooldown_until=VALUES(haven_cooldown_until),riftlands_cooldown_until=VALUES(riftlands_cooldown_until),rift_session_id=VALUES(rift_session_id),winner_boost=VALUES(winner_boost),winner_cycle=VALUES(winner_cycle)";
         try(Connection c=database.getConnection();PreparedStatement s=c.prepareStatement(sql)){s.setString(1,row.uuid().toString());s.setString(2,row.name());s.setLong(3,row.havenKills());s.setLong(4,row.riftKills());s.setLong(5,row.havenCooldown());s.setLong(6,row.riftCooldown());s.setString(7,row.sessionId());s.setDouble(8,row.winnerBoost());s.setLong(9,row.winnerCycle());s.executeUpdate();}
     }
-    public void resetSeason() throws SQLException { try(Connection c=database.getConnection();PreparedStatement s=c.prepareStatement("UPDATE zone_players SET haven_kills=0,riftlands_kills=0,haven_cooldown_until=0,riftlands_cooldown_until=0,rift_session_id=NULL")){s.executeUpdate();} }
 
     public long loadLong(String key,long fallback) throws SQLException { try(Connection c=database.getConnection();PreparedStatement s=c.prepareStatement("SELECT value FROM zone_event_state WHERE state_key=?")){s.setString(1,key);try(ResultSet rs=s.executeQuery()){return rs.next()?rs.getLong(1):fallback;}} }
     public void saveLong(String key,long value) throws SQLException { String sql=database.dialect()==Database.Dialect.SQLITE ? "INSERT INTO zone_event_state (state_key,value) VALUES (?,?) ON CONFLICT(state_key) DO UPDATE SET value=excluded.value" : "INSERT INTO zone_event_state (state_key,value) VALUES (?,?) ON DUPLICATE KEY UPDATE value=VALUES(value)"; try(Connection c=database.getConnection();PreparedStatement s=c.prepareStatement(sql)){s.setString(1,key);s.setLong(2,value);s.executeUpdate();} }
@@ -106,6 +107,7 @@ public final class ZoneStorage {
     }
     public record WinnerRow(UUID uuid, String name, double boost) { }
     public void saveFlightReturn(UUID uuid,String region,String world,double x,double y,double z)throws SQLException {String sql=database.dialect()==Database.Dialect.SQLITE?"INSERT INTO zone_flight_returns (player_uuid,zone_region,world,x,y,z) VALUES (?,?,?,?,?,?) ON CONFLICT(player_uuid) DO UPDATE SET zone_region=excluded.zone_region,world=excluded.world,x=excluded.x,y=excluded.y,z=excluded.z":"INSERT INTO zone_flight_returns (player_uuid,zone_region,world,x,y,z) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE zone_region=VALUES(zone_region),world=VALUES(world),x=VALUES(x),y=VALUES(y),z=VALUES(z)";try(Connection c=database.getConnection();PreparedStatement s=c.prepareStatement(sql)){s.setString(1,uuid.toString());s.setString(2,region);s.setString(3,world);s.setDouble(4,x);s.setDouble(5,y);s.setDouble(6,z);s.executeUpdate();}}
-    public FlightReturn takeFlightReturn(UUID uuid)throws SQLException {try(Connection c=database.getConnection();PreparedStatement select=c.prepareStatement("SELECT zone_region,world,x,y,z FROM zone_flight_returns WHERE player_uuid=?");PreparedStatement delete=c.prepareStatement("DELETE FROM zone_flight_returns WHERE player_uuid=?")){c.setAutoCommit(false);select.setString(1,uuid.toString());FlightReturn result=null;try(ResultSet rs=select.executeQuery()){if(rs.next())result=new FlightReturn(rs.getString(1),rs.getString(2),rs.getDouble(3),rs.getDouble(4),rs.getDouble(5));}delete.setString(1,uuid.toString());delete.executeUpdate();c.commit();return result;}}
+    public FlightReturn loadFlightReturn(UUID uuid)throws SQLException {try(Connection c=database.getConnection();PreparedStatement select=c.prepareStatement("SELECT zone_region,world,x,y,z FROM zone_flight_returns WHERE player_uuid=?")){select.setString(1,uuid.toString());try(ResultSet rs=select.executeQuery()){return rs.next()?new FlightReturn(rs.getString(1),rs.getString(2),rs.getDouble(3),rs.getDouble(4),rs.getDouble(5)):null;}}}
+    public void deleteFlightReturn(UUID uuid)throws SQLException {try(Connection c=database.getConnection();PreparedStatement delete=c.prepareStatement("DELETE FROM zone_flight_returns WHERE player_uuid=?")){delete.setString(1,uuid.toString());delete.executeUpdate();}}
     public record FlightReturn(String region,String world,double x,double y,double z) { }
 }

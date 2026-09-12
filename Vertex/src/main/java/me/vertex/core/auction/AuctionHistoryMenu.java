@@ -67,7 +67,7 @@ public final class AuctionHistoryMenu {
         int page = Math.max(0, Math.min(requestedPage, totalPages - 1));
 
         Holder holder = new Holder(statusFilter, page);
-        Inventory inventory = Bukkit.createInventory(holder, 54, messages.get(player, titleKey));
+        Inventory inventory = Bukkit.createInventory(holder, 54, messages.getGui(player, titleKey));
         holder.inventory = inventory;
 
         for (int slot = 0; slot < 9; slot++) {
@@ -105,7 +105,7 @@ public final class AuctionHistoryMenu {
         };
         ItemStack icon = new ItemStack(material);
         ItemMeta meta = icon.getItemMeta();
-        meta.displayName(noItalic(messages.get(viewer, "auction.history-entry-title", "summary", entry.itemSummary())));
+        meta.displayName(noItalic(messages.getGui(viewer, "auction.history-entry-title", "summary", entry.itemSummary())));
 
         boolean wasSeller = entry.sellerUuid().equals(viewer.getUniqueId());
         String counterpart = wasSeller
@@ -119,11 +119,11 @@ public final class AuctionHistoryMenu {
         };
 
         icon.setItemMeta(withLore(meta, List.of(
-                noItalic(messages.get(viewer, roleKey)),
-                noItalic(messages.get(viewer, wasSeller ? "auction.history-buyer" : "auction.history-seller", "player", counterpart)),
-                noItalic(messages.get(viewer, "auction.history-price", "price", String.valueOf(entry.price()))),
-                noItalic(messages.get(viewer, statusKey)),
-                noItalic(messages.get(viewer, "auction.history-date", "date", DATE_FORMAT.format(Instant.ofEpochMilli(entry.resolvedAtMillis()))))
+                noItalic(messages.getGui(viewer, roleKey)),
+                noItalic(messages.getGui(viewer, wasSeller ? "auction.history-buyer" : "auction.history-seller", "player", counterpart)),
+                noItalic(messages.getGui(viewer, "auction.history-price", "price", String.valueOf(entry.price()))),
+                noItalic(messages.getGui(viewer, statusKey)),
+                noItalic(messages.getGui(viewer, "auction.history-date", "date", DATE_FORMAT.format(Instant.ofEpochMilli(entry.resolvedAtMillis()))))
         )));
         return icon;
     }
@@ -141,7 +141,7 @@ public final class AuctionHistoryMenu {
     private static ItemStack backButton(Player player, Messages messages) {
         ItemStack item = new ItemStack(Material.ARROW);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "auction.back-button")));
+        meta.displayName(noItalic(messages.getGui(player, "auction.back-button")));
         item.setItemMeta(meta);
         return item;
     }
@@ -149,7 +149,7 @@ public final class AuctionHistoryMenu {
     private static ItemStack pageButton(Messages messages, Player player, String key, Material material, boolean enabled) {
         ItemStack item = new ItemStack(enabled ? material : Material.GRAY_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, key)));
+        meta.displayName(noItalic(messages.getGui(player, key)));
         item.setItemMeta(meta);
         return item;
     }

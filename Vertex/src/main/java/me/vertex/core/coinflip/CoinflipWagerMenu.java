@@ -47,7 +47,7 @@ public final class CoinflipWagerMenu {
     }
 
     private static void open(Player player, Messages messages, Holder holder) {
-        Inventory inventory = Bukkit.createInventory(holder, ROWS * 9, messages.get(player, "coinflip.wager-title"));
+        Inventory inventory = Bukkit.createInventory(holder, ROWS * 9, messages.getGui(player, "coinflip.wager-title"));
         holder.inventory = inventory;
         for (int slot = 0; slot < GRID_START; slot++) {
             inventory.setItem(slot, border());
@@ -63,8 +63,8 @@ public final class CoinflipWagerMenu {
     private static ItemStack confirmButton(Player player, Messages messages) {
         ItemStack item = new ItemStack(Material.LIME_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "coinflip.wager-confirm-button")));
-        meta.lore(List.of(noItalic(messages.get(player, "coinflip.wager-confirm-lore"))));
+        meta.displayName(noItalic(messages.getGui(player, "coinflip.wager-confirm-button")));
+        meta.lore(List.of(noItalic(messages.getGui(player, "coinflip.wager-confirm-lore"))));
         item.setItemMeta(meta);
         return item;
     }
@@ -72,8 +72,8 @@ public final class CoinflipWagerMenu {
     private static ItemStack cancelButton(Player player, Messages messages) {
         ItemStack item = new ItemStack(Material.RED_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(noItalic(messages.get(player, "coinflip.wager-cancel-button")));
-        meta.lore(List.of(noItalic(messages.get(player, "coinflip.wager-cancel-lore"))));
+        meta.displayName(noItalic(messages.getGui(player, "coinflip.wager-cancel-button")));
+        meta.lore(List.of(noItalic(messages.getGui(player, "coinflip.wager-cancel-lore"))));
         item.setItemMeta(meta);
         return item;
     }

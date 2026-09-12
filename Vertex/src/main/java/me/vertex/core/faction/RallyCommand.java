@@ -1,6 +1,5 @@
 package me.vertex.core.faction;
 
-import dev.kitteh.factions.command.ThirdPartyCommands;
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.Messages;
 import org.bukkit.command.Command;
@@ -16,7 +15,6 @@ import org.bukkit.plugin.Plugin;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Supplier;
 
 public final class RallyCommand implements CommandExecutor, Listener {
 
@@ -28,31 +26,6 @@ public final class RallyCommand implements CommandExecutor, Listener {
         this.plugin = plugin;
         this.rallyManager = rallyManager;
         this.messages = messages;
-    }
-
-    /**
-     * Adds the Vertex rally branch to FactionsUUID's Paper command tree.
-     * This must be called from the dependent plugin's onLoad(), while
-     * FactionsUUID still accepts third-party commands. Registering only a
-     * PlayerCommandPreprocessEvent lets the command run, but cannot stop the
-     * Minecraft client from colouring the unknown `rally` literal red.
-     */
-    public static void registerFactionsSubcommand(Plugin plugin, Supplier<RallyCommand> commandSupplier) {
-        ThirdPartyCommands.register(plugin, "rally", (manager, root, help) -> {
-            manager.command(root.literal("rally")
-                    .handler(context -> executeRegistered(commandSupplier, context.sender().sender(), new String[0])));
-            manager.command(root.literal("rally").literal("set")
-                    .handler(context -> executeRegistered(commandSupplier, context.sender().sender(), new String[]{"set"})));
-            manager.command(root.literal("rally").literal("clear")
-                    .handler(context -> executeRegistered(commandSupplier, context.sender().sender(), new String[]{"clear"})));
-        });
-    }
-
-    private static void executeRegistered(Supplier<RallyCommand> commandSupplier, CommandSender sender, String[] args) {
-        RallyCommand command = commandSupplier.get();
-        if (command != null) {
-            command.execute(sender, args);
-        }
     }
 
     @Override
@@ -70,9 +43,8 @@ public final class RallyCommand implements CommandExecutor, Listener {
     }
 
     /**
-     * FactionsUUID owns the `/f` root command. A YAML alias containing a
-     * space is not a real Bukkit subcommand, so route its `rally` branch
-     * before FactionsUUID handles it, just like permissions and upgrades.
+     * `/f` is Vertex's root command. This listener opens the existing rally
+     * branch before Bukkit's root executor renders its generic fallback.
      */
     @EventHandler
     public void onFactionRallyCommand(PlayerCommandPreprocessEvent event) {

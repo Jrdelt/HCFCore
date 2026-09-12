@@ -2,17 +2,20 @@
 
 `/ah` (alias `/auctionhouse`) is a buy-it-now marketplace for any item a
 player is holding. List it at a fixed price; the first player to buy it
-gets it immediately — no bidding, no waiting for an auction to end.
+wins it immediately — no bidding or waiting for an auction to end. The
+purchased item is placed in the buyer's Collection Box for safe delivery.
 
-## Trading
+## Trading (command + permission quick view)
 
-| Command | Effect |
-|---|---|
-| `/ah` | Opens the browser |
-| `/ah sell <price> [money\|exp\|xp\|gc]` | Lists the item in your main hand at that price. "money" is the default if omitted; `xp` aliases `exp` |
-| `/ah cancel <id>` | Cancels your own listing (or any listing, with `vertex.auction.remove`) and puts the item in the Collection Box |
-| `/ah collect` | Opens the claim GUI for items waiting on you |
-| `/ah logs [player] [page]` | Staff audit log (`vertex.auction.logs`) |
+| Command | Permission | What it does |
+|---|---|---|
+| `/ah` | Open to all | Opens the browser. |
+| `/ah sell <price> [money\|exp\|xp\|gc]` | Open to all | Lists the item in your main hand at that price. |
+| `/ah cancel <id>` | `vertex.auction.remove` for someone else's listing (your own is always allowed) | Cancels an unsold listing and puts the item in the Collection Box. |
+| `/ah collect` | Open to all | Opens the claim GUI for items waiting on you. |
+| `/ah logs [player] [page]` | `vertex.auction.logs` | Reads the staff audit log. |
+| `/ah payouts [key] [paid\|retry]` | `vertex.auction.payouts` | Reviews/reconciles uncertain Vault/EXP payouts. |
+| `/ah intents [key] [debited\|not-debited\|item-not-removed]` | `vertex.auction.intents` | Reconciles interrupted listing creations. |
 
 Prices accept the same formatted-number syntax as every other Vertex economy
 surface: `/ah sell 10k money`, `/ah sell 1.25m exp`, and `/ah sell 1,000,000`.
@@ -30,10 +33,10 @@ put its item in the seller's Collection Box; **right-click** toggles it on your
   Experience → GC → All, narrowing the grid to just that currency.
 - Your own head, opening [Your Auction Page](#watchlist-and-your-auction-page).
 
-`/ah sell` takes the item straight out of your hand the moment you list
-it — if the listing is rejected (bad price, too many active listings,
-can't afford the fee), it's handed straight back rather than left in
-limbo.
+`/ah sell` first records a creation intent, then takes the held item. If a
+later validation or fee step rejects the listing, that same intent is moved
+atomically into the seller's Collection Box. A successful intent becomes the
+active listing atomically, so a restart cannot leave an untracked held item.
 
 ## Currency
 
@@ -74,13 +77,20 @@ opens **Your Auction Page**, a hub linking to:
 
 ## Claim stash
 
-If a listing expires or is cancelled before anyone buys it, its item is placed
-in a durable claim stash rather than being forced into an inventory. It can be
-collected any time via `/ah collect` or the claim button in the browse GUI. A money sale settles
-instantly through Vault, whether the seller is online or not; an
+Sold, expired, and cancelled items are placed in a durable claim stash rather
+than being forced into an inventory or dropped on the ground. They can be
+collected any time via `/ah collect` or the claim button in the browse GUI.
+Seller proceeds are recorded in a persistent payout outbox in the same
+transaction as the sale, then delivered and acknowledged. A money sale settles
+through Vault, whether the seller is online or not; an
 experience sale credits the seller's levels immediately if they're
 online, or waits (persisted) for their next login if not — either way, a
 sale never needs the seller to be logged in.
+
+GC payouts have idempotent operation IDs. Vault and vanilla EXP do not expose
+that facility, so a crash in their final acknowledgement window leaves the row
+in an uncertain state instead of paying it again. Authorized staff reconcile
+those rows with `/ah payouts` after checking the external balance.
 
 ## Expiry
 
@@ -105,8 +115,8 @@ destination) — set to `0.0` to disable either one entirely.
 
 ## Persistence
 
-Every active listing, pending claim, watchlist entry, pending offline
-experience payout, and log entry lives in Vertex's own database, not on
+Every active listing, creation intent, pending claim, watchlist entry, pending
+payout, and log entry lives in Vertex's own database, not on
 the item or in memory — a restart never loses a listing (whether it's
 priced in money or experience), and `/vertex storage local|mysql`
 carries all of it over like everything else this plugin stores.

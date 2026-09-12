@@ -5,8 +5,13 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.bukkit.configuration.file.FileConfiguration;
 
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.StampedLock;
 
 public final class Database {
 
@@ -18,6 +23,8 @@ public final class Database {
 
     private final HikariDataSource dataSource;
     private final Dialect dialect;
+    private final StampedLock connectionGate = new StampedLock();
+    private final AtomicBoolean maintenanceRequested = new AtomicBoolean();
 
     public Database(FileConfiguration config, File dataFolder) {
         this(config, dataFolder, dialectOf(config.getString("storage.type", "local")));
@@ -101,7 +108,119 @@ public final class Database {
     }
 
     public Connection getConnection() throws SQLException {
-        return dataSource.getConnection();
+        if (maintenanceRequested.get()) {
+            throw new SQLException("Vertex storage is in exclusive maintenance mode");
+        }
+        long stamp = connectionGate.tryReadLock();
+        if (stamp == 0L || maintenanceRequested.get()) {
+            if (stamp != 0L) {
+                connectionGate.unlockRead(stamp);
+            }
+            throw new SQLException("Vertex storage is in exclusive maintenance mode");
+        }
+        try {
+            return guardedConnection(dataSource.getConnection(), stamp);
+        } catch (SQLException | RuntimeException error) {
+            connectionGate.unlockRead(stamp);
+            throw error;
+        }
+    }
+
+    /**
+     * Stops new SQL and waits for every checked-out connection to close.
+     * The lease can open the source snapshot connection while normal storage
+     * calls remain blocked.
+     */
+    public ExclusiveLease beginExclusiveMaintenance(long timeout, TimeUnit unit) throws SQLException {
+        if (!maintenanceRequested.compareAndSet(false, true)) {
+            throw new SQLException("Vertex storage is already in exclusive maintenance mode");
+        }
+        long stamp;
+        try {
+            stamp = connectionGate.tryWriteLock(timeout, unit);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            maintenanceRequested.set(false);
+            throw new SQLException("Interrupted while waiting for active storage work to finish", error);
+        }
+        if (stamp == 0L) {
+            maintenanceRequested.set(false);
+            throw new SQLException("Timed out waiting for active storage work to finish");
+        }
+        return new ExclusiveLease(this, stamp);
+    }
+
+    public boolean maintenanceActive() {
+        return maintenanceRequested.get();
+    }
+
+    private Connection guardedConnection(Connection delegate, long stamp) {
+        AtomicBoolean released = new AtomicBoolean();
+        return (Connection) Proxy.newProxyInstance(
+                Database.class.getClassLoader(),
+                new Class<?>[]{Connection.class},
+                (proxy, method, args) -> {
+                    String name = method.getName();
+                    if (name.equals("close") || name.equals("abort")) {
+                        if (!released.compareAndSet(false, true)) {
+                            return null;
+                        }
+                        try {
+                            return method.invoke(delegate, args);
+                        } catch (InvocationTargetException error) {
+                            throw error.getCause();
+                        } finally {
+                            connectionGate.unlockRead(stamp);
+                        }
+                    }
+                    if (name.equals("isClosed") && released.get()) {
+                        return true;
+                    }
+                    try {
+                        return method.invoke(delegate, args);
+                    } catch (InvocationTargetException error) {
+                        throw error.getCause();
+                    }
+                });
+    }
+
+    public static final class ExclusiveLease implements AutoCloseable {
+        private final Database database;
+        private final long stamp;
+        private final AtomicBoolean active = new AtomicBoolean(true);
+
+        private ExclusiveLease(Database database, long stamp) {
+            this.database = database;
+            this.stamp = stamp;
+        }
+
+        public Connection openConnection() throws SQLException {
+            if (!active.get()) {
+                throw new SQLException("Storage maintenance lease is no longer active");
+            }
+            return database.dataSource.getConnection();
+        }
+
+        public boolean belongsTo(Database candidate) {
+            return active.get() && database == candidate;
+        }
+
+        /** Permanently closes this backend before a successful cutover. */
+        public void closeBackend() {
+            if (!active.get()) {
+                throw new IllegalStateException("Storage maintenance lease is no longer active");
+            }
+            database.close();
+        }
+
+        @Override
+        public void close() {
+            if (!active.compareAndSet(true, false)) {
+                return;
+            }
+            database.connectionGate.unlockWrite(stamp);
+            database.maintenanceRequested.set(false);
+        }
     }
 
     public void close() {

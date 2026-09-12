@@ -56,15 +56,19 @@ public final class ChunkBusterCommand implements CommandExecutor, TabCompleter {
         }
 
         ItemStack prototype = manager.createItem(type);
+        java.util.List<ItemStack> items = new java.util.ArrayList<>();
         int remaining = amount;
         while (remaining > 0) {
             ItemStack item = prototype.clone();
             int stackAmount = Math.min(item.getMaxStackSize(), remaining);
             item.setAmount(stackAmount);
-            for (ItemStack overflow : target.getInventory().addItem(item).values()) {
-                target.getWorld().dropItemNaturally(target.getLocation(), overflow);
-            }
+            items.add(item);
             remaining -= stackAmount;
+        }
+        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
+                plugin, target, items, "chunkbuster-admin-give")) {
+            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
+            return true;
         }
         sender.sendMessage(messages.get(sender, "chunkbuster.given", "amount", String.valueOf(amount),
                 "type", type.configKey(), "player", target.getName()));

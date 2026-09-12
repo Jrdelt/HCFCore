@@ -50,6 +50,8 @@ public final class WandManager {
         this.usesKey = new NamespacedKey(plugin, "wand_uses");
     }
 
+    Plugin plugin(){return plugin;}
+
     public void load() {
         File file = new File(plugin.getDataFolder(), "wands.yml");
         if (!file.exists()) {
@@ -210,10 +212,10 @@ public final class WandManager {
     }
 
     private void applyDisplay(ItemMeta meta, WandTier tier, int uses) {
-        meta.displayName(MessageFormatter.deserialize(tier.name()));
+        meta.displayName(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(tier.name())));
         List<net.kyori.adventure.text.Component> lore = new ArrayList<>();
         for (String line : tier.lore()) {
-            lore.add(MessageFormatter.deserialize(line.replace("{uses}", String.valueOf(uses))));
+            lore.add(MessageFormatter.deserialize(me.vertex.core.lang.SmallCaps.template(line).replace("{uses}", String.valueOf(uses))));
         }
         meta.lore(lore);
         if (tier.customModelData() != null) {

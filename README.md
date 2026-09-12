@@ -2,7 +2,7 @@
 
 # Vertex
 
-**An HCF gameplay layer for Paper, built on FactionsUUID.**
+**A self-contained HCF gameplay layer for Paper with native Vertex factions.**
 
 [Player Guide](docs/player-guide.md) · [Documentation](docs/README.md) · [Installation](docs/installation.md) · [Commands](docs/commands-and-permissions.md) · [Configuration](docs/configuration.md)
 
@@ -18,8 +18,8 @@
   faction KOTHs, reward Outposts, and claimed-spawner-value F Top / PvP
   Top leaderboards.
 - **Claims & land:** permanent, connectable Base Claims and real-time-
-  expiring Raid Claims, a schedule-based Faction Shield that protects
-  only Base Claims, claim-aware TNT/explosion rules, 4-type Chunk
+  expiring Raid Claims, global Grace and weekly scheduled Faction Shields,
+  claim-aware TNT/explosion rules, 4-type Chunk
   Busters for clearing land, and reusable claim-boundary-respecting
   Source Buckets.
 - **Automation:** stackable spawners that work in daylight, mob stacking,
@@ -56,14 +56,14 @@ configuration, permissions, and operational limits.
 | Dependency | Required for |
 | --- | --- |
 | Paper 1.21.10+ (built against 1.21.11) | Vertex itself |
-| FactionsUUID 4.4+ | Vertex itself and all faction features |
 | Vault | money costs, the money bank, and upgrade purchases |
 | FastAsyncWorldEdit + DecentHolograms | Blueprint base building |
 | FancyNPCs | optional Sand Bot displays |
 
-WorldGuard, LuckPerms, PlaceholderAPI, EssentialsX,
-MySQL/MariaDB is optional. Its exact effects are
-listed in [Integrations](docs/integrations.md).
+WorldGuard, LuckPerms, PlaceholderAPI, EssentialsX, and FancyNPCs are optional
+integrations. MySQL/MariaDB is optional for one standalone server but required
+when `network.enabled: true`; standalone mode uses SQLite. Exact integration
+behavior is listed in [Integrations](docs/integrations.md).
 
 ## Install
 
@@ -72,7 +72,7 @@ cd Vertex
 ./mvnw clean package
 ```
 
-1. Put `Vertex/target/vertex-1.0.0.jar` and FactionsUUID in `plugins/`.
+1. Put `Vertex/target/vertex-1.0.0.jar` in `plugins/`.
 2. Start the server once. Vertex creates `plugins/Vertex/`, its local SQLite
    database, and configuration files. With both Blueprint dependencies
    installed, it also creates the Blueprint `schematics/` folder.
@@ -83,10 +83,11 @@ cd Vertex
 
 | Guide | Use it for |
 | --- | --- |
-| [Factions](docs/factions-integration.md) | Permissions, rallies, upgrades, bank, and FactionsUUID interaction |
+| [Native Factions](docs/factions-integration.md) | Claims, roles, permissions, chat, rallies, upgrades, banks, and native faction data |
+| [Velocity Shards](docs/network-shards.md) | Shared MySQL state, shard health, handoffs, queues, recovery, Spawn/RTP/warps, and deployment limits |
 | [Faction Leaderboards](docs/faction-leaderboards.md) | Claimed-spawner-value F Top and PvP Top |
 | [Base and Raid Claims](docs/base-and-raid-claims.md) | Permanent Base Claims vs. real-time-expiring Raid Claims, and TNT/explosion rules |
-| [Faction Shield](docs/faction-shield.md) | Schedule-based Base Claim PvP protection and staff overrides |
+| [Grace and Faction Shield](docs/faction-shield.md) | Global Grace plus weekly Base-only Shield schedules, persistence, and overrides |
 | [Chunk Busters](docs/chunk-busters.md) | The 4 destructive area-clear items, batched processing, and current restart limitation |
 | [Source Buckets](docs/source-buckets.md) | Reusable, claim-boundary-respecting configured-block items |
 | [Custom Enchantments](docs/custom-enchantments.md) | Rune tiers, rolling, Lucky Gems, and the enchant application GUI |

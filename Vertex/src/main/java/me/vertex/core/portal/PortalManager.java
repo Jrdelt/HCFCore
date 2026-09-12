@@ -126,10 +126,8 @@ public final class PortalManager {
     public ItemStack selectorItem() {
         ItemStack item = new ItemStack(Material.BLAZE_ROD);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(MessageFormatter.deserialize("<gold>Portal Selector"));
-        meta.lore(List.of(MessageFormatter.deserialize("<gray>Portal: left/right click two corners"),
-                MessageFormatter.deserialize("<gray>Route: left adds, right removes last"),
-                MessageFormatter.deserialize("<gray>Sneak-air click: save")));
+        meta.displayName(messages.getGui(null, "portals.selector-name"));
+        meta.lore(messages.getGuiList(null, "portals.selector-lore"));
         meta.getPersistentDataContainer().set(selectorKey, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
         return item;
@@ -143,16 +141,25 @@ public final class PortalManager {
     public String beginPortalSelection(Player player, String rawId, PortalTarget target) {
         String id = PortalTarget.normalize(rawId);
         if (id == null || target == null || !targetExists(target)) return "invalid";
-        selections.put(player.getUniqueId(), Selection.portal(id, target));
-        giveSelector(player);
+        Selection selection = Selection.portal(id, target);
+        selections.put(player.getUniqueId(), selection);
+        if (!giveSelector(player)) {
+            selections.remove(player.getUniqueId(), selection);
+            return "storage";
+        }
         return "ok";
     }
 
     public String beginRouteSelection(Player player, PortalTarget target, String rawId, double requestedSpeed) {
         String id = PortalTarget.normalize(rawId);
         if (id == null || target == null || !targetExists(target)) return "invalid";
-        selections.put(player.getUniqueId(), Selection.route(id, target, requestedSpeed <= 0D ? defaultSpeed : requestedSpeed));
-        giveSelector(player);
+        Selection selection = Selection.route(id, target,
+                requestedSpeed <= 0D ? defaultSpeed : requestedSpeed);
+        selections.put(player.getUniqueId(), selection);
+        if (!giveSelector(player)) {
+            selections.remove(player.getUniqueId(), selection);
+            return "storage";
+        }
         return "ok";
     }
 
@@ -195,8 +202,13 @@ public final class PortalManager {
         EntryPortal portal = new EntryPortal(selection.id, selection.target, selection.first.getWorld().getName(),
                 selection.first.getBlockX(), selection.first.getBlockY(), selection.first.getBlockZ(),
                 selection.second.getBlockX(), selection.second.getBlockY(), selection.second.getBlockZ());
+        try {
+            storage.upsertPortal(portal);
+        } catch (SQLException error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not persist entry portal " + portal.id(), error);
+            return "persist";
+        }
         portals.put(portal.id(), portal);
-        persist(() -> storage.upsertPortal(portal));
         return "ok";
     }
 
@@ -210,24 +222,41 @@ public final class PortalManager {
             if (!segmentInsideTarget(selection.target, selection.points.get(index - 1), selection.points.get(index))) return "outside";
         }
         PortalRoute route = new PortalRoute(selection.id, selection.target, selection.speed, selection.points);
+        try {
+            storage.upsertRoute(route, encodeWaypoints(route.waypoints()));
+        } catch (SQLException error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not persist entry route " + route.id(), error);
+            return "persist";
+        }
         routes.put(route.id(), route);
-        persist(() -> storage.upsertRoute(route, encodeWaypoints(route.waypoints())));
         return "ok";
     }
 
     public boolean deletePortal(String rawId) {
         String id = PortalTarget.normalize(rawId);
-        EntryPortal portal = id == null ? null : portals.remove(id);
+        EntryPortal portal = id == null ? null : portals.get(id);
         if (portal == null) return false;
-        persist(() -> storage.deletePortal(portal.id()));
+        try {
+            storage.deletePortal(portal.id());
+        } catch (SQLException error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not delete entry portal " + portal.id(), error);
+            return false;
+        }
+        portals.remove(id, portal);
         return true;
     }
 
     public boolean deleteRoute(String rawId) {
         String id = PortalTarget.normalize(rawId);
-        PortalRoute route = id == null ? null : routes.remove(id);
+        PortalRoute route = id == null ? null : routes.get(id);
         if (route == null) return false;
-        persist(() -> storage.deleteRoute(route.id()));
+        try {
+            storage.deleteRoute(route.id());
+        } catch (SQLException error) {
+            plugin.getLogger().log(Level.SEVERE, "Could not delete entry route " + route.id(), error);
+            return false;
+        }
+        routes.remove(id, route);
         return true;
     }
 
@@ -250,7 +279,7 @@ public final class PortalManager {
         }
         if (portal.target().kind() != PortalTarget.Kind.MINE) {
             ZoneType type = portal.target().kind() == PortalTarget.Kind.HAVEN ? ZoneType.HAVEN : ZoneType.RIFTLANDS;
-            String admission = zones.requestEntry(player, type);
+            String admission = zones.requestPortalEntry(player, type);
             if (!"ok".equals(admission)) {
                 if (admission.startsWith("cooldown:")) {
                     player.sendMessage(messages.get(player, "zones.entry-cooldown", "seconds", admission.substring("cooldown:".length())));
@@ -279,6 +308,19 @@ public final class PortalManager {
 
     private PortalRoute chooseRoute(PortalTarget target) {
         List<PortalRoute> choices = routes(target).stream().filter(route -> route.waypoints().size() >= 2).toList();
+        // Haven/Riftlands already have a durable route system used by their
+        // normal entry GUI. Use those routes for physical portals as a safe
+        // fallback too, so admins do not have to create the same flight twice.
+        // Mine routes remain portal-specific because they are independent
+        // destinations and must never borrow a zone route.
+        if (choices.isEmpty() && target.kind() != PortalTarget.Kind.MINE) {
+            ZoneType type = target.kind() == PortalTarget.Kind.HAVEN ? ZoneType.HAVEN : ZoneType.RIFTLANDS;
+            choices = zones.regions(type).stream()
+                    .flatMap(region -> zones.routes(region).stream())
+                    .filter(route -> route.enabled() && route.waypoints().size() >= 2)
+                    .map(route -> new PortalRoute("zone-" + route.id(), target, route.speed(), route.waypoints()))
+                    .toList();
+        }
         return choices.isEmpty() ? null : choices.get(ThreadLocalRandom.current().nextInt(choices.size()));
     }
 
@@ -354,8 +396,8 @@ public final class PortalManager {
 
     private boolean targetExists(PortalTarget target) {
         return switch (target.kind()) {
-            case HAVEN -> !zones.regions(ZoneType.HAVEN).isEmpty();
-            case RIFTLANDS -> !zones.regions(ZoneType.RIFTLANDS).isEmpty();
+            case HAVEN -> zones.regions(ZoneType.HAVEN).stream().anyMatch(region -> !region.world().isBlank());
+            case RIFTLANDS -> zones.regions(ZoneType.RIFTLANDS).stream().anyMatch(region -> !region.world().isBlank());
             case MINE -> mines.region(target.id()) != null && mines.region(target.id()).isDefined();
         };
     }
@@ -409,19 +451,14 @@ public final class PortalManager {
         return output.toString();
     }
 
-    private void giveSelector(Player player) {
-        player.getInventory().addItem(selectorItem()).values().forEach(left -> player.getWorld().dropItemNaturally(player.getLocation(), left));
+    private boolean giveSelector(Player player) {
+        return me.vertex.core.storage.DeliveryManager.queueOverflow(
+                plugin, player, List.of(selectorItem()), "portal-selector");
     }
 
-    private void persist(SqlAction action) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            try { action.run(); }
-            catch (Exception exception) { plugin.getLogger().log(Level.WARNING, "Could not persist portal configuration", exception); }
-        });
-    }
+    Plugin plugin(){return plugin;}
 
     private static double bounded(double value, double min, double max) { return Math.max(min, Math.min(max, value)); }
-    @FunctionalInterface private interface SqlAction { void run() throws Exception; }
     private record FlightState(boolean allowFlight, boolean flying, float flySpeed) { }
     private record Flight(UUID playerId, PortalRoute route, int index, double progress, FlightState before) { }
     private static final class Selection {

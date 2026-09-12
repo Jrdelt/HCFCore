@@ -7,15 +7,22 @@ Vertex supplies two named, database-backed farming-zone types:
 
 ## Player commands
 
-| Command | Purpose |
-| --- | --- |
-| `/haven` | Open Haven’s confirmation screen. |
-| `/riftlands` | Open Riftlands’ confirmation screen. |
-| `/zones` | View both progression tracks, event standings, and active booster details. |
-| `/haven lootpool` | View Haven rewards. |
-| `/riftlands lootpool` | View Riftlands rewards. |
+| Command | Permission | Purpose |
+|---|---|---|
+| `/haven` | `vertex.zones.use` | Open the Haven hub with entry, live activity, and its loot pool. |
+| `/riftlands` | `vertex.zones.use` | Open the Riftlands hub with entry, live activity, and its loot pool. |
+| `/zones` | `vertex.zones.use` | View both progression tracks, event standings, and active booster details. |
+| `/haven lootpool` | `vertex.zones.use` | View Haven rewards. |
+| `/riftlands lootpool` | `vertex.zones.use` | View Riftlands rewards. |
 
-Entry uses an Emerald Block confirmation followed by a configurable stationary countdown. Movement, damage, changing world, teleportation, disconnecting, or becoming combat tagged cancels it. A valid route then carries the player server-side; clicking either mouse button, reaching the end, or being hit in Riftlands releases them with Slow Falling until ground contact.
+Each zone hub shows the current number of players physically inside its
+regions, the number of live Vertex zone mobs, an Enter button, and a Loot Pool
+button. The activity item can be clicked to refresh the counts. The read-only,
+paginated loot view preserves every custom item and displays its exact base
+drop percentage; Back returns to the corresponding zone hub. Admins still use
+the explicit `lootpool` subcommand to open the editable version.
+
+Entry uses an Emerald Block confirmation followed by a configurable stationary countdown. Entry permission, player-data readiness, cooldown, combat status, and a valid enabled route are rechecked only when Enter is clicked. Movement, damage, changing world, teleportation, disconnecting, or becoming combat tagged cancels it. A valid route then carries the player server-side; clicking either mouse button, reaching the end, or being hit in Riftlands releases them with Slow Falling until ground contact.
 
 `/spawn` channels for 10 seconds in Haven and 20 seconds in Riftlands by default. Combat cancels/blocks the exit channel. A successful Riftlands exit secures that session’s tagged loot.
 
@@ -29,28 +36,45 @@ The non-stackable **Riftlands Ticket** is a PDC-identified item. Right-click it 
 
 All setup requires `vertex.zones.admin`.
 
-```text
-/haven region create <name>
-/riftlands region create <name>
-/haven region list|delete <name>|wand
-/riftlands region list|delete <name>|wand
-/haven route create <region> <name>
-/riftlands route create <region> <name>
-/haven route list|preview|delete <name>
-/riftlands route list|preview|delete <name>
-/haven lootpool
-/riftlands lootpool
-/riftlands ticket give <player> <amount>
-/haven admin event start|stop|seasonreset|inspect <player>
-```
+| Command | Permission | What it does |
+|---|---|---|
+| `/haven create <name>` / `/riftlands create <name>` | `vertex.zones.admin` | Define the active region and metadata for each zone type. |
+| `/haven wand` / `/riftlands wand` | `vertex.zones.admin` | Give a Zone Selector for setting the first and second corners. |
+| `/haven list` / `/riftlands list` | `vertex.zones.admin` | Shows the currently defined zones for review/editing. |
+| `/haven portal create <portal-name>` / `/riftlands portal create <portal-name>` | `vertex.portals.admin` | Creates a physical portal selection for that zone type. |
+| `/haven route create <region> <name>` / `/riftlands route create <region> <name>` | `vertex.zones.admin` | Builds an explicit route for a zone. |
+| `/haven route list\|preview\|delete <name>` / `/riftlands route list\|preview\|delete <name>` | `vertex.zones.admin` | Manages or tests existing route definitions. |
+| `/haven lootpool` / `/riftlands lootpool` | `vertex.zones.admin` | Opens the editable loot-pool editor version. |
+| `/haven admin event start\|stop` | `vertex.zones.admin` | Starts or stops the hourly event. |
+| `/haven admin inspect <player>` | `vertex.zones.admin` | Inspects a player’s zone progression and current amplification. |
 
-The shared Zone Selector is a Blaze Rod: left-click sets the first corner (or adds a route point), right-click sets the second corner (or removes the newest route point), and sneak-air click saves. Regions may never overlap. Every route point and every interpolated 0.5-block segment must remain in its selected region.
+The shared Zone Selector is a Blaze Rod: left-click sets the first corner (or adds a route point), right-click sets the second corner (or removes the newest route point), and sneak-air click saves. Portal creation gives its separately tagged Portal Selector automatically, so a region wand cannot accidentally save a portal selection. Regions may never overlap. Every route point and every interpolated 0.5-block segment must remain in its selected region. The `region` and `route` setup branches remain available to staff; ticket issuing and the old season-reset command are not part of the command tree.
 
-The staff loot-pool GUI preserves real items and their metadata. Right-click an item changes its base chance by +1%; Shift-right-click changes it by -1%; closing saves atomically as a replacement pool. Players receive a read-only version.
+`/haven route ...` and `/riftlands route ...` create routes used by the zone
+entry GUI. A physical Haven/Riftlands portal uses one of those routes as a
+fallback when it has no dedicated `/portal route ...` route, so admins can
+configure the flight once. Stonewake and Bloodvein are mine destinations and
+must use their own portal route. The Portal Selector save action is Shift plus
+an air click; it accepts cancelled air events so the save is not swallowed by
+another item listener.
+
+The staff loot-pool GUI is always a six-row double chest. Its top 45 slots are
+a real in-game editor: admins can place, drag, shift-click, rearrange, or remove
+actual item stacks there. Right-click an item changes its base chance by +1%;
+Shift-right-click changes it by -1%; closing saves the 45-slot pool atomically.
+The editor-only chance lore is removed before rewards are stored, so custom
+names, lore, enchantments, and item data stay clean. Players receive a
+read-only version.
 
 ## Configuration and persistence
 
 `haven.yml` and `riftlands.yml` hold entry presentation, channels, death cooldowns, routes speed, local mob budgets, mob definitions, milestones, loot rules, and Riftlands Ticket settings. Definitions (regions/routes), exact loot stacks, player progression/cooldowns/sessions, event scores, cycle anchor, and offline flight landings are stored in the configured Vertex SQL backend.
+
+Zone mob spawning is configured per zone under `mob-spawning`. The current
+defaults use a 5–30 block ring, a distance bias of `2.5` so locations are
+weighted toward the player, and a 12-mob fill batch. Haven and Riftlands have
+separate local caps and per-player additions; changing these values affects
+the local population without scanning the whole world.
 
 Mob Drop Amplification grants whole independent extra loot-pool rolls; it never changes a listed item’s base chance. It combines the current zone milestone, current Top-3 event boost, equipped Backpack bonus, and future compatible shared sources. Items strictly below the configured rare threshold cannot be awarded twice from one mob death.
 

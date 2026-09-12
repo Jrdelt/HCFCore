@@ -1,6 +1,7 @@
 package me.vertex.core.faction;
 
 import me.vertex.core.factions.FactionsHook;
+import me.vertex.core.factions.event.FactionLifecycleEvent;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.lang.MessageFormatter;
 import net.kyori.adventure.bossbar.BossBar;
@@ -13,8 +14,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import dev.kitteh.factions.event.FactionAutoDisbandEvent;
-import dev.kitteh.factions.event.FactionDisbandEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -64,36 +63,20 @@ public final class RallyManager implements Listener {
         return location != null && player.getWorld().equals(location.getWorld());
     }
 
-    /** Rally permissions are faction-specific; every role starts allowed until its leader changes it. */
+    /** Rally permissions are persisted in Vertex's native faction permission matrix. */
     public boolean canUse(Player player, String action) {
         int factionId = FactionsHook.getFactionId(player);
-        return factionId != FactionsHook.NO_FACTION && rolePermission(factionId, roleId(player), action);
+        return factionId != FactionsHook.NO_FACTION && FactionsHook.service().actionAllowed(factionId, roleId(player), action);
     }
 
     public boolean rolePermission(int factionId, String role, String action) {
-        return plugin.getConfig().getBoolean("rally.faction-permissions." + factionId + "." + role + "." + action,
-                plugin.getConfig().getBoolean("rally.permission-gui.roles." + role + "." + action, true));
-    }
-
-    public boolean setRolePermission(int factionId, String role, String action, boolean allowed) {
-        if (!List.of("admin", "mod", "member", "recruit").contains(role)
-            || !List.of("rally-set", "rally-clear", "spawner-add", "spawner-remove", "collector-open", "collector-break",
-                        "collector-withdraw", "collector-sell", "collector-upgrade", "collector-filter",
-                        "bank-deposit", "bank-withdraw", "chunkbuster-use").contains(action)) {
-            return false;
-        }
-        plugin.getConfig().set("rally.faction-permissions." + factionId + "." + role + "." + action, allowed);
-        plugin.saveConfig();
-        return true;
+        return FactionsHook.service().actionAllowed(factionId, role, action);
     }
 
     public static String roleId(Player player) {
-        String role = FactionsHook.getRoleName(player).toLowerCase(java.util.Locale.ROOT)
-                .replaceAll("[^a-z]", "");
-        if (role.contains("admin") || role.contains("leader")) return "admin";
-        if (role.contains("mod") || role.contains("coleader")) return "mod";
-        if (role.contains("recruit")) return "recruit";
-        return "member";
+        me.vertex.core.factions.FactionMember member = player == null ? null
+                : FactionsHook.service().member(player.getUniqueId());
+        return member == null ? "member" : member.role().permissionBucket();
     }
 
     public void broadcastSet(Player setter) {
@@ -121,19 +104,12 @@ public final class RallyManager implements Listener {
     }
 
     @EventHandler
-    public void onFactionDisband(FactionDisbandEvent event) {
-        clearFactionState(event.getFaction().id());
-    }
-
-    @EventHandler
-    public void onFactionAutoDisband(FactionAutoDisbandEvent event) {
-        clearFactionState(event.getFaction().id());
+    public void onFactionDisband(FactionLifecycleEvent event) {
+        if (event.action() == FactionLifecycleEvent.Action.DISBAND) clearFactionState(event.faction().id());
     }
 
     private void clearFactionState(int factionId) {
         clearRally(factionId);
-        plugin.getConfig().set("rally.faction-permissions." + factionId, null);
-        plugin.saveConfig();
     }
 
     private boolean isRallyActive(int factionId) {

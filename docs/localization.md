@@ -25,14 +25,19 @@ it survives restarts and follows the player across sessions.
 
 ## Message categories
 
-Messages are namespaced by feature area in every `lang/*.yml` file:
-`ability`, `admin`, `blueprint`, `collector`, `combat`, `cooldowns`,
-`faction-bank`, `faction-upgrades`, `factions`, `general`, `kit`,
-`language`, `reboot`, `spawner`, `staff`, `tags`. A few templates are the exception and live in `config.yml`
-instead — the combat action bar (`pvp.actionbar`) and Archer Tag's hit
-messages (`archer-tag.message-attacker` / `message-victim`) — since
-those are single admin-authored templates rather than a per-locale
-message set.
+Messages are namespaced by feature area in every `lang/*.yml` file, such as
+`ability`, `admin`, `collector`, `combat`, `faction-bank`,
+`faction-permissions`, `native-factions`, `portals`, `sandbot`, `staff`, and
+`zones`. `lang/en_us.yml` is the authoritative complete set; translations
+may omit newer keys and automatically fall back to English.
+
+## GUI small caps
+
+Vertex automatically converts static GUI titles, item names, and lore to its
+small-caps alphabet. Write normal readable text in `lang/en_us.yml`; formatting
+tags and placeholders are protected. For example, `Level {level} for {player}`
+renders the words in small caps while the actual level and player name remain
+unchanged. `%placeholder_api_tokens%` are protected in the same way.
 
 ## Color codes
 
