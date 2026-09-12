@@ -16,7 +16,7 @@ import java.util.Set;
  * <p>Compatibility and world restriction live on the enchant as a whole,
  * not per level: a pickaxe enchant's levels are all still pickaxe-only, and
  * an enchant disabled in the Nether is disabled in the Nether at every
- * level. Everything that legitimately varies level to level (cosmetics,
+ * level. Everything that legitimately varies level to level (icon,
  * proc chance, ability strength, success rate) lives on {@link Level}
  * instead.
  */
@@ -26,9 +26,6 @@ public final class EnchantDefinition {
      * @param level           1-based level number
      * @param material        the physical enchant item's icon
      * @param customModelData optional resource-pack model override
-     * @param name            the physical enchant item's display-name template ({@code {key}} placeholders)
-     * @param lore            template lines reused for both the physical enchant item's own lore
-     *                        (section 20) and the descriptor block appended to a target item once applied
      * @param glow            whether the physical enchant item should glint
      * @param procChance      percent chance (0-100) this level's effect activates when it's live -- exposed
      *                        for a future gameplay-effect listener to consult; this phase stores and renders
@@ -37,8 +34,8 @@ public final class EnchantDefinition {
      *                        failure is simply the inverse, per spec -- never stored separately
      * @param abilityValue    a generic per-level numeric strength/effect value, purely for lore/config use
      */
-    public record Level(int level, Material material, Integer customModelData, String name, List<String> lore,
-            boolean glow, double procChance, double successRate, double abilityValue) {
+    public record Level(int level, Material material, Integer customModelData, boolean glow,
+            double procChance, double successRate, double abilityValue) {
 
         public double failureRate() {
             return Math.max(0D, Math.min(100D, 100D - successRate));
@@ -47,15 +44,17 @@ public final class EnchantDefinition {
 
     private final String id;
     private final String displayName;
+    private final String description;
     private final Set<String> compatibleTypes;
     private final Set<String> enabledWorlds;
     private final Set<String> disabledWorlds;
     private final List<Level> levels;
 
-    public EnchantDefinition(String id, String displayName, Set<String> compatibleTypes,
+    public EnchantDefinition(String id, String displayName, String description, Set<String> compatibleTypes,
             Set<String> enabledWorlds, Set<String> disabledWorlds, List<Level> levels) {
         this.id = id;
         this.displayName = displayName;
+        this.description = description;
         this.compatibleTypes = Set.copyOf(compatibleTypes);
         this.enabledWorlds = Set.copyOf(enabledWorlds);
         this.disabledWorlds = Set.copyOf(disabledWorlds);
@@ -70,12 +69,21 @@ public final class EnchantDefinition {
         return displayName;
     }
 
+    /** Canonical identified-Rune ability label, before its level value. */
+    public String description() {
+        return description;
+    }
+
     public int maxLevel() {
         return levels.size();
     }
 
     public List<Level> levels() {
         return levels;
+    }
+
+    public Set<String> compatibleTypes() {
+        return compatibleTypes;
     }
 
     /** @return the given level's config, or null when it doesn't exist on this enchant. */

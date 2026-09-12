@@ -5,11 +5,6 @@ shop:
   # XP_LEVELS removes whole experience levels. MONEY uses the Vault economy.
   currency: XP_LEVELS
   arena-rune-price: 100
-  lucky-gem-price: 10
-
-lucky-gem:
-  # Added per gem during a valid application attempt. Final success is capped at 100%.
-  success-bonus-percent: 3.5
 
 corrupted-detonation:
   # The chance is always 30%. Multiple equipped copies add only their damage value.

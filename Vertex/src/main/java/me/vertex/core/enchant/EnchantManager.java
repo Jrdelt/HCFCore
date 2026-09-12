@@ -3,9 +3,10 @@ package me.vertex.core.enchant;
 import me.vertex.core.item.ItemKind;
 import me.vertex.core.item.TrackedItemIds;
 import me.vertex.core.lang.MessageFormatter;
-import me.vertex.core.menu.MenuPlaceholders;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
@@ -52,12 +53,11 @@ import java.util.regex.Pattern;
  * `StorageMigrator` changes (mirroring Source Buckets' "the item is the
  * record" reasoning).
  *
- * <p><b>Duplication</b>: every physical Rune and physical enchant item is
- * tagged via {@link TrackedItemIds} at creation, and every target item is
- * tagged the moment it first receives a successful application -- see
- * {@code me.vertex.core.dupe.DupeManager#shouldTrack}, which now treats any
- * item carrying a real {@link ItemKind} as worth tracking. No second
- * detection system is built here; tagging is the entire integration.
+ * <p><b>Stacking and duplication</b>: base Runes, Lucky Gems, and rolled
+ * enchant items intentionally do not receive per-instance IDs. That keeps
+ * stackable commodities stackable and lets rolled items stack exactly when
+ * their stored enchant data is identical. Gear is non-stackable, so it is
+ * still given a tracked ID after a successful application.
  */
 public final class EnchantManager {
 
@@ -87,11 +87,11 @@ public final class EnchantManager {
         SUCCESS, FAILURE, REJECT_INVALID, REJECT_INCOMPATIBLE, REJECT_EQUAL_LEVEL, REJECT_HIGHER_EXISTS
     }
 
-    public record ApplyOutcome(ApplyResult result, boolean consumedEnchantItem, boolean consumedGems,
+    public record ApplyOutcome(ApplyResult result, boolean consumedEnchantItem,
             String enchantId, int level, double chanceUsed) {
 
         static ApplyOutcome reject(ApplyResult result, String enchantId, int level) {
-            return new ApplyOutcome(result, false, false, enchantId, level, 0D);
+            return new ApplyOutcome(result, false, enchantId, level, 0D);
         }
     }
 
@@ -99,8 +99,7 @@ public final class EnchantManager {
     public record EnchantItemInfo(String enchantId, int level, RuneTier originTier) {
     }
 
-    private record RuneCosmetic(Material material, Integer customModelData, String name, List<String> lore,
-            boolean glow) {
+    private record RuneCosmetic(Material material, Integer customModelData, boolean glow) {
     }
 
     private final Plugin plugin;
@@ -110,17 +109,24 @@ public final class EnchantManager {
     private final NamespacedKey enchantItemIdKey;
     private final NamespacedKey enchantItemLevelKey;
     private final NamespacedKey enchantItemOriginTierKey;
+    private final NamespacedKey enchantItemSuccessKey;
     private final NamespacedKey luckyGemKey;
+    private final NamespacedKey legacyArenaLuckyGemKey;
+    private final NamespacedKey legacyDraggedGemCountKey;
     private final NamespacedKey enchantsKey;
     private final NamespacedKey enchantTiersKey;
     private final NamespacedKey baseLoreKey;
+    private final NamespacedKey arenaAppliedKey;
 
     private volatile Map<String, EnchantDefinition> definitions = Map.of();
     private volatile Map<RuneTier, RuneRollTable> rollTables = Map.of();
     private volatile Map<RuneTier, RuneCosmetic> runeCosmetics = Map.of();
     private volatile Map<RuneTier, Double> runeShopPrices = Map.of();
-    private volatile Map<RuneTier, Double> luckyGemEffectiveness = Map.of();
-    private volatile RuneCosmetic luckyGemCosmetic = new RuneCosmetic(Material.EMERALD, null, "Lucky Gem", List.of(), true);
+    private volatile double luckyGemShopPrice;
+    private volatile RuneCosmetic luckyGemCosmetic = new RuneCosmetic(Material.EMERALD, null, true);
+
+    /** One fixed, shared bonus for every current and legacy Lucky Gem. */
+    public static final double LUCKY_GEM_BONUS_PERCENT = 3.5D;
 
     public EnchantManager(Plugin plugin, TrackedItemIds trackedItemIds) {
         this.plugin = plugin;
@@ -129,10 +135,14 @@ public final class EnchantManager {
         this.enchantItemIdKey = new NamespacedKey(plugin, "enchant_item_id");
         this.enchantItemLevelKey = new NamespacedKey(plugin, "enchant_item_level");
         this.enchantItemOriginTierKey = new NamespacedKey(plugin, "enchant_item_origin_tier");
+        this.enchantItemSuccessKey = new NamespacedKey(plugin, "rune_success_chance");
         this.luckyGemKey = new NamespacedKey(plugin, "lucky_gem");
+        this.legacyArenaLuckyGemKey = new NamespacedKey(plugin, "arena_lucky_gem");
+        this.legacyDraggedGemCountKey = new NamespacedKey(plugin, "drag_lucky_gem_count");
         this.enchantsKey = new NamespacedKey(plugin, "custom_enchants");
         this.enchantTiersKey = new NamespacedKey(plugin, "custom_enchant_tiers");
         this.baseLoreKey = new NamespacedKey(plugin, "custom_enchants_base_lore");
+        this.arenaAppliedKey = new NamespacedKey(plugin, "arena_enchants");
     }
 
     Plugin plugin() { return plugin; }
@@ -171,6 +181,7 @@ public final class EnchantManager {
 
     private EnchantDefinition readEnchant(String where, String id, ConfigurationSection section) {
         String displayName = section.getString("display-name", id);
+        String description = section.getString("description", displayName);
         Set<String> compatible = new LinkedHashSet<>();
         for (String raw : section.getStringList("compatible-types")) {
             if (raw != null && !raw.isBlank()) {
@@ -209,21 +220,19 @@ public final class EnchantManager {
             plugin.getLogger().warning(where + ": enchant '" + id + "' has no levels configured, skipping it entirely.");
             return null;
         }
-        return new EnchantDefinition(id, displayName, compatible, enabledWorlds, disabledWorlds, levels);
+        return new EnchantDefinition(id, displayName, description, compatible, enabledWorlds, disabledWorlds, levels);
     }
 
     private EnchantDefinition.Level readLevel(String where, String enchantId, int levelNumber, ConfigurationSection section) {
         Material material = readMaterial(where, "enchant '" + enchantId + "' level " + levelNumber,
                 section.getString("material"), Material.STONE);
         Integer customModelData = section.contains("custom-model-data") ? section.getInt("custom-model-data") : null;
-        String name = section.getString("name", enchantId + " " + levelNumber);
-        List<String> lore = section.getStringList("lore");
         boolean glow = section.getBoolean("glow", false);
         double procChance = clampPercent(section.getDouble("proc-chance", 0D));
         double successRate = clampPercent(section.getDouble("success-rate", 50D));
         double abilityValue = section.getDouble("ability-value", 0D);
-        return new EnchantDefinition.Level(levelNumber, material, customModelData, name, lore, glow, procChance,
-                successRate, abilityValue);
+        return new EnchantDefinition.Level(levelNumber, material, customModelData, glow, procChance, successRate,
+                abilityValue);
     }
 
     private void loadRunes() {
@@ -235,14 +244,7 @@ public final class EnchantManager {
 
         luckyGemCosmetic = readCosmetic("runes.yml", "lucky-gem",
                 config.getConfigurationSection("lucky-gem"), Material.EMERALD);
-
-        Map<RuneTier, Double> effectiveness = new EnumMap<>(RuneTier.class);
-        ConfigurationSection effSection = config.getConfigurationSection("lucky-gem-effectiveness");
-        for (RuneTier tier : RuneTier.values()) {
-            double value = effSection == null ? 0D : effSection.getDouble(tier.name(), 0D);
-            effectiveness.put(tier, Math.max(0D, value));
-        }
-        luckyGemEffectiveness = Map.copyOf(effectiveness);
+        luckyGemShopPrice = Math.max(0D, config.getDouble("lucky-gem.shop-price", 0D));
 
         Map<RuneTier, RuneCosmetic> cosmetics = new EnumMap<>(RuneTier.class);
         Map<RuneTier, Double> prices = new EnumMap<>(RuneTier.class);
@@ -298,14 +300,12 @@ public final class EnchantManager {
     private RuneCosmetic readCosmetic(String where, String path, ConfigurationSection section, Material fallback) {
         if (section == null) {
             plugin.getLogger().warning(where + ": " + path + " is missing, using a fallback icon.");
-            return new RuneCosmetic(fallback, null, path, List.of(), false);
+            return new RuneCosmetic(fallback, null, false);
         }
         Material material = readMaterial(where, path, section.getString("material"), fallback);
         Integer customModelData = section.contains("custom-model-data") ? section.getInt("custom-model-data") : null;
-        String name = section.getString("name", path);
-        List<String> lore = section.getStringList("lore");
         boolean glow = section.getBoolean("glow", false);
-        return new RuneCosmetic(material, customModelData, name, lore, glow);
+        return new RuneCosmetic(material, customModelData, glow);
     }
 
     private Material readMaterial(String where, String context, String raw, Material fallback) {
@@ -351,12 +351,12 @@ public final class EnchantManager {
         return tier == null ? RuneRollTable.of(List.of()) : rollTables.getOrDefault(tier, RuneRollTable.of(List.of()));
     }
 
-    public double luckyGemEffectiveness(RuneTier tier) {
-        return tier == null ? 0D : luckyGemEffectiveness.getOrDefault(tier, 0D);
-    }
-
     public double runeShopPrice(RuneTier tier) {
         return tier == null ? 0D : runeShopPrices.getOrDefault(tier, 0D);
+    }
+
+    public double luckyGemShopPrice() {
+        return luckyGemShopPrice;
     }
 
     private static String displayTier(RuneTier tier) {
@@ -384,13 +384,11 @@ public final class EnchantManager {
                     .withColor(org.bukkit.Color.BLACK, org.bukkit.Color.WHITE)
                     .build());
         }
-        MenuPlaceholders placeholders = MenuPlaceholders.of().put("tier", displayTier(tier));
-        meta.displayName(placeholders.render(cosmetic.name()).getFirst());
-        List<Component> lore = new ArrayList<>();
-        for (String line : cosmetic.lore()) {
-            lore.addAll(placeholders.render(line));
-        }
-        meta.lore(lore);
+        meta.displayName(RuneFormatting.plain(displayTier(tier) + " ʀᴜɴᴇ", RuneFormatting.tierColor(tier)));
+        meta.lore(List.of(
+                RuneFormatting.plain("ᴄᴜꜱᴛᴏᴍ ᴇɴᴄʜᴀɴᴛᴍᴇɴᴛ", NamedTextColor.DARK_GRAY),
+                RuneFormatting.plain("ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴛᴏ ɪᴅᴇɴᴛɪꜰʏ ᴀ ʀᴀɴᴅᴏᴍ ʀᴜɴᴇ", NamedTextColor.GRAY),
+                RuneFormatting.plain("ꜱᴛᴀᴄᴋᴀʙʟᴇ ᴜᴘ ᴛᴏ 64", NamedTextColor.DARK_GRAY)));
         if (cosmetic.customModelData() != null) {
             meta.setCustomModelData(cosmetic.customModelData());
         }
@@ -456,15 +454,6 @@ public final class EnchantManager {
         }
         ItemStack item = new ItemStack(levelConfig.material());
         ItemMeta meta = item.getItemMeta();
-        double rollChance = rollTable(originTier).chancePercent(enchantId, level);
-        MenuPlaceholders placeholders = levelPlaceholders(definition, levelConfig, rollChance)
-                .put("tier", displayTier(originTier));
-        meta.displayName(placeholders.render(levelConfig.name()).getFirst());
-        List<Component> lore = new ArrayList<>();
-        for (String line : levelConfig.lore()) {
-            lore.addAll(placeholders.render(line));
-        }
-        meta.lore(lore);
         if (levelConfig.customModelData() != null) {
             meta.setCustomModelData(levelConfig.customModelData());
         }
@@ -475,8 +464,43 @@ public final class EnchantManager {
         pdc.set(enchantItemIdKey, PersistentDataType.STRING, enchantId);
         pdc.set(enchantItemLevelKey, PersistentDataType.INTEGER, level);
         pdc.set(enchantItemOriginTierKey, PersistentDataType.STRING, originTier.name());
+        pdc.set(enchantItemSuccessKey, PersistentDataType.DOUBLE, levelConfig.successRate());
         item.setItemMeta(meta);
+        renderEnchantItem(item);
         return item;
+    }
+
+    /** Rebuilds the complete, standardized presentation from durable Rune data. */
+    private void renderEnchantItem(ItemStack item) {
+        EnchantItemInfo info = enchantItemInfo(item);
+        if (info == null || !item.hasItemMeta()) {
+            return;
+        }
+        EnchantDefinition definition = definitions.get(info.enchantId());
+        EnchantDefinition.Level level = definition == null ? null : definition.level(info.level());
+        if (definition == null || level == null) {
+            return;
+        }
+        double success = successChance(item);
+        List<Component> lore = new ArrayList<>();
+        lore.add(RuneFormatting.plain("ᴄᴜꜱᴛᴏᴍ ᴇɴᴄʜᴀɴᴛᴍᴇɴᴛ", NamedTextColor.DARK_GRAY));
+        lore.add(RuneFormatting.plain(RuneFormatting.smallCaps(definition.description()) + ": +"
+                + RuneFormatting.percent(level.abilityValue()), NamedTextColor.GRAY));
+        if (level.procChance() > 0D) {
+            lore.add(RuneFormatting.plain("ᴘʀᴏᴄ ᴄʜᴀɴᴄᴇ: " + RuneFormatting.percent(level.procChance()) + "%",
+                    NamedTextColor.GRAY));
+        }
+        lore.add(RuneFormatting.plain("ᴀᴘᴘʟɪᴄᴀᴛɪᴏɴ ꜱᴜᴄᴄᴇꜱꜱ: ", NamedTextColor.GRAY)
+                .append(RuneFormatting.plain(RuneFormatting.percent(success) + "%", NamedTextColor.GREEN))
+                .append(RuneFormatting.plain(" / ꜰᴀɪʟ: ", NamedTextColor.GRAY))
+                .append(RuneFormatting.plain(RuneFormatting.percent(100D - success) + "%", NamedTextColor.RED)));
+        lore.add(RuneFormatting.plain("ᴅʀᴀɢ ᴏɴᴛᴏ ᴄᴏᴍᴘᴀᴛɪʙʟᴇ ᴇǫᴜɪᴘᴍᴇɴᴛ ᴛᴏ ᴀᴘᴘʟʏ", NamedTextColor.DARK_GRAY));
+
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(RuneFormatting.title(definition.displayName(), info.level(),
+                RuneFormatting.tierColor(info.originTier()), info.level() == definition.maxLevel()));
+        meta.lore(lore);
+        item.setItemMeta(meta);
     }
 
     public boolean isEnchantItem(ItemStack item) {
@@ -510,13 +534,11 @@ public final class EnchantManager {
     public ItemStack createLuckyGem() {
         ItemStack item = new ItemStack(luckyGemCosmetic.material());
         ItemMeta meta = item.getItemMeta();
-        MenuPlaceholders placeholders = MenuPlaceholders.of();
-        meta.displayName(placeholders.render(luckyGemCosmetic.name()).getFirst());
-        List<Component> lore = new ArrayList<>();
-        for (String line : luckyGemCosmetic.lore()) {
-            lore.addAll(placeholders.render(line));
-        }
-        meta.lore(lore);
+        meta.displayName(RuneFormatting.plain("ʟᴜᴄᴋʏ ɢᴇᴍ", NamedTextColor.GREEN));
+        meta.lore(List.of(
+                RuneFormatting.plain("ᴄᴜꜱᴛᴏᴍ ᴇɴᴄʜᴀɴᴛᴍᴇɴᴛ", NamedTextColor.DARK_GRAY),
+                RuneFormatting.plain("ɪɴᴄʀᴇᴀꜱᴇꜱ ꜱᴜᴄᴄᴇꜱꜱ: +3.50%", NamedTextColor.GREEN),
+                RuneFormatting.plain("ᴅʀᴀɢ ᴏɴᴛᴏ ᴀ ʀᴜɴᴇ ᴛᴏ ᴀᴘᴘʟʏ", NamedTextColor.DARK_GRAY)));
         if (luckyGemCosmetic.customModelData() != null) {
             meta.setCustomModelData(luckyGemCosmetic.customModelData());
         }
@@ -537,7 +559,9 @@ public final class EnchantManager {
         if (item == null || !item.hasItemMeta()) {
             return false;
         }
-        return item.getItemMeta().getPersistentDataContainer().has(luckyGemKey, PersistentDataType.BYTE);
+        PersistentDataContainer pdc = item.getItemMeta().getPersistentDataContainer();
+        return pdc.has(luckyGemKey, PersistentDataType.BYTE)
+                || pdc.has(legacyArenaLuckyGemKey, PersistentDataType.BYTE);
     }
 
     // ------------------------------------------------------------------
@@ -545,14 +569,10 @@ public final class EnchantManager {
     // ------------------------------------------------------------------
 
     /**
-     * The current success chance a confirm would use right now: the
-     * enchant item's configured level success rate, plus this many Lucky
-     * Gems' per-tier boost (the ORIGIN tier of the enchant item, per
-     * section 18 read alongside {@code runes.yml}'s "Lucky Gem
-     * effectiveness per tier" -- not the target item, which has no tier of
-     * its own), capped at 100.
+     * The chance travels with the identified Rune. Older runes that used a
+     * stored gem count are converted logically at the new universal rate.
      */
-    public double effectiveChance(ItemStack enchantItem, int gemCount) {
+    public double successChance(ItemStack enchantItem) {
         EnchantItemInfo info = enchantItemInfo(enchantItem);
         if (info == null) {
             return 0D;
@@ -562,22 +582,48 @@ public final class EnchantManager {
         if (level == null) {
             return 0D;
         }
-        double perGem = luckyGemEffectiveness(info.originTier());
-        double chance = level.successRate() + perGem * Math.max(0, gemCount);
+        PersistentDataContainer pdc = enchantItem.getItemMeta().getPersistentDataContainer();
+        Double stored = pdc.get(enchantItemSuccessKey, PersistentDataType.DOUBLE);
+        if (stored != null) {
+            return clampPercent(stored);
+        }
+        Integer historicalGemCount = pdc.get(legacyDraggedGemCountKey, PersistentDataType.INTEGER);
+        double chance = level.successRate() + Math.max(0, historicalGemCount == null ? 0 : historicalGemCount)
+                * LUCKY_GEM_BONUS_PERCENT;
         return Math.max(0D, Math.min(100D, chance));
+    }
+
+    /** Returns an independently stack-safe, re-rendered upgraded Rune, or null at 100%. */
+    public ItemStack addLuckyGem(ItemStack enchantItem) {
+        if (!isEnchantItem(enchantItem)) {
+            return null;
+        }
+        double current = successChance(enchantItem);
+        if (current >= 100D) {
+            return null;
+        }
+        ItemStack upgraded = enchantItem.clone();
+        upgraded.setAmount(1);
+        ItemMeta meta = upgraded.getItemMeta();
+        meta.getPersistentDataContainer().set(enchantItemSuccessKey, PersistentDataType.DOUBLE,
+                clampPercent(current + LUCKY_GEM_BONUS_PERCENT));
+        meta.getPersistentDataContainer().remove(legacyDraggedGemCountKey);
+        upgraded.setItemMeta(meta);
+        renderEnchantItem(upgraded);
+        return upgraded;
     }
 
     /**
      * Applies one physical enchant item to a target item, per sections
      * 15-18: compatibility, then same-enchant level-replacement rules, then
-     * (only for a valid attempt) a success/failure roll boosted by Lucky
-     * Gems. A rejection never mutates {@code target} and never consumes
-     * anything; a valid attempt (success or failure) always consumes the
-     * enchant item and every placed Lucky Gem, win or lose.
+     * (only for a valid attempt) a success/failure roll using the chance
+     * already stored on the Rune. A rejection never mutates {@code target}
+     * and never consumes anything; a valid attempt (success or failure)
+     * consumes only the Rune.
      *
      * @param roll externally supplied, in {@code [0, 1)} -- see the class doc
      */
-    public ApplyOutcome applyEnchant(ItemStack target, ItemStack enchantItem, int gemCount, double roll) {
+    public ApplyOutcome applyEnchant(ItemStack target, ItemStack enchantItem, int ignoredLegacyGemCount, double roll) {
         if (target == null || target.getType().isAir() || !target.hasItemMeta()) {
             return ApplyOutcome.reject(ApplyResult.REJECT_INVALID, null, 0);
         }
@@ -602,13 +648,13 @@ public final class EnchantManager {
             return ApplyOutcome.reject(ApplyResult.REJECT_HIGHER_EXISTS, info.enchantId(), info.level());
         }
 
-        double chance = effectiveChance(enchantItem, gemCount);
+        double chance = successChance(enchantItem);
         boolean success = roll * 100D < chance;
         if (success) {
             applyEnchantAndRerender(target, info.enchantId(), info.level(), info.originTier());
             trackedItemIds.ensureInstanceId(target, ItemKind.ENCHANTED_ITEM);
         }
-        return new ApplyOutcome(success ? ApplyResult.SUCCESS : ApplyResult.FAILURE, true, gemCount > 0,
+        return new ApplyOutcome(success ? ApplyResult.SUCCESS : ApplyResult.FAILURE, true,
                 info.enchantId(), info.level(), chance);
     }
 
@@ -716,7 +762,8 @@ public final class EnchantManager {
         if (pdc.has(baseLoreKey, PersistentDataType.STRING)) {
             return;
         }
-        List<Component> currentLore = meta.hasLore() && meta.lore() != null ? meta.lore() : List.of();
+        List<Component> currentLore = stripArenaRuneLore(meta,
+                meta.hasLore() && meta.lore() != null ? meta.lore() : List.of());
         StringBuilder serialized = new StringBuilder();
         for (Component line : currentLore) {
             if (!serialized.isEmpty()) {
@@ -736,13 +783,7 @@ public final class EnchantManager {
         return List.of(LORE_LINE_SPLIT.split(raw, -1));
     }
 
-    /**
-     * Rebuilds an item's full lore from scratch: its pristine pre-enchant
-     * base lore, then one rendered block per active custom enchant, in the
-     * order they were first applied -- vanilla enchantments are never part
-     * of this list at all (they render above the lore box automatically,
-     * which is exactly section 21's required ordering, for free).
-     */
+    /** Rebuilds base lore plus one standardized line for each applied custom enchant. */
     private void rebuildFullLore(ItemStack item) {
         ItemMeta meta = item.getItemMeta();
         if (meta == null) {
@@ -751,9 +792,7 @@ public final class EnchantManager {
         List<String> baseLore = readBaseLore(meta);
         Map<String, Integer> enchants = parseEnchants(
                 meta.getPersistentDataContainer().get(enchantsKey, PersistentDataType.STRING));
-        Map<String, RuneTier> enchantTiers = parseEnchantTiers(
-                meta.getPersistentDataContainer().get(enchantTiersKey, PersistentDataType.STRING));
-
+        Map<String, RuneTier> enchantTiers = enchantTiersOf(item);
         List<Component> lore = new ArrayList<>();
         for (String line : baseLore) {
             lore.add(MessageFormatter.deserialize(line));
@@ -763,38 +802,96 @@ public final class EnchantManager {
             if (definition == null) {
                 continue;
             }
-            EnchantDefinition.Level level = definition.level(entry.getValue());
-            if (level == null) {
+            if (definition.level(entry.getValue()) == null) {
                 continue;
             }
-            lore.add(Component.text(definition.displayName(), tierColor(enchantTiers.getOrDefault(entry.getKey(), RuneTier.SIMPLE)))
-                    .append(Component.text(" " + level.level(), NamedTextColor.GRAY)));
-            MenuPlaceholders placeholders = levelPlaceholders(definition, level, 0D);
-            for (String line : level.lore()) {
-                lore.addAll(placeholders.render(line));
-            }
+            RuneTier tier = enchantTiers.getOrDefault(entry.getKey(), RuneTier.SIMPLE);
+            lore.add(RuneFormatting.appliedLine(definition.displayName(), entry.getValue(),
+                    RuneFormatting.tierColor(tier), entry.getValue() == definition.maxLevel()));
         }
+        lore.addAll(renderArenaRuneLines(meta));
         meta.lore(lore);
         item.setItemMeta(meta);
     }
 
-    private MenuPlaceholders levelPlaceholders(EnchantDefinition definition, EnchantDefinition.Level level,
-            double rollChancePercent) {
-        return MenuPlaceholders.of()
-                .put("enchant", definition.displayName())
-                .put("level", level.level())
-                .put("proc_chance", formatNumber(level.procChance()))
-                .put("success_rate", formatNumber(level.successRate()))
-                .put("failure_rate", formatNumber(level.failureRate()))
-                .put("ability_value", formatNumber(level.abilityValue()))
-                .put("roll_chance", formatNumber(rollChancePercent));
+    /** Keeps the two rune families visually composable when both are on one item. */
+    private List<Component> renderArenaRuneLines(ItemMeta meta) {
+        List<Component> lore = new ArrayList<>();
+        for (Map.Entry<ArenaRuneManager.Effect, Integer> entry : arenaRunesOf(meta).entrySet()) {
+            lore.add(RuneFormatting.appliedLine(entry.getKey().displayName(), entry.getValue(), NamedTextColor.BLUE,
+                    entry.getValue() == 20));
+        }
+        return lore;
     }
 
-    private static String formatNumber(double value) {
-        if (value == Math.rint(value) && !Double.isInfinite(value)) {
-            return String.valueOf((long) value);
+    private List<Component> stripArenaRuneLore(ItemMeta meta, List<Component> source) {
+        List<Component> lore = new ArrayList<>(source);
+        int header = -1;
+        for (int index = 0; index < lore.size(); index++) {
+            if ("Arena Runes".equals(PlainTextComponentSerializer.plainText().serialize(lore.get(index)))) {
+                header = index;
+            }
         }
-        return String.format(Locale.ROOT, "%.1f", value);
+        if (header >= 0) {
+            int start = header;
+            if (start > 0 && PlainTextComponentSerializer.plainText().serialize(lore.get(start - 1)).isEmpty()) {
+                start--;
+            }
+            lore = new ArrayList<>(lore.subList(0, start));
+        }
+        for (Map.Entry<ArenaRuneManager.Effect, Integer> entry : arenaRunesOf(meta).entrySet()) {
+            String expected = entry.getKey().displayName() + " " + roman(entry.getValue());
+            String standardized = RuneFormatting.smallCaps(entry.getKey().displayName()) + " "
+                    + RuneFormatting.roman(entry.getValue());
+            for (int index = lore.size() - 1; index >= 0; index--) {
+                String plain = PlainTextComponentSerializer.plainText().serialize(lore.get(index));
+                if (expected.equals(plain) || standardized.equals(plain)) {
+                    lore.remove(index);
+                    break;
+                }
+            }
+        }
+        return lore;
+    }
+
+    private Map<ArenaRuneManager.Effect, Integer> arenaRunesOf(ItemMeta meta) {
+        Map<ArenaRuneManager.Effect, Integer> result = new LinkedHashMap<>();
+        String raw = meta.getPersistentDataContainer().get(arenaAppliedKey, PersistentDataType.STRING);
+        if (raw == null || raw.isBlank()) {
+            return result;
+        }
+        for (String entry : raw.split(",")) {
+            String[] split = entry.split(":", 2);
+            if (split.length != 2) {
+                continue;
+            }
+            ArenaRuneManager.Effect effect = ArenaRuneManager.Effect.byId(split[0]);
+            try {
+                int level = Integer.parseInt(split[1]);
+                if (effect != null && level >= 1 && level <= 20) {
+                    result.put(effect, level);
+                }
+            } catch (NumberFormatException ignored) {
+                // Ignore malformed legacy PDC rather than losing valid lore.
+            }
+        }
+        return result;
+    }
+
+    private static String roman(int value) {
+        if (value < 1 || value > 3999) {
+            return String.valueOf(value);
+        }
+        int[] amounts = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};
+        String[] numerals = {"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"};
+        StringBuilder result = new StringBuilder();
+        for (int index = 0; index < amounts.length; index++) {
+            while (value >= amounts[index]) {
+                result.append(numerals[index]);
+                value -= amounts[index];
+            }
+        }
+        return result.toString();
     }
 
     // ------------------------------------------------------------------
@@ -886,12 +983,4 @@ public final class EnchantManager {
         item.setItemMeta(meta);
     }
 
-    private static NamedTextColor tierColor(RuneTier tier) {
-        return switch (tier) {
-            case SIMPLE -> NamedTextColor.GRAY;
-            case ELITE -> NamedTextColor.YELLOW;
-            case RARE -> NamedTextColor.LIGHT_PURPLE;
-            case LEGENDARY -> NamedTextColor.RED;
-        };
-    }
 }

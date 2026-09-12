@@ -18,8 +18,8 @@ The output is `target/vertex-1.0.0.jar`.
 
 - `config.yml`: core network and cannon settings.
 - `factions.yml`: faction claims, shields, and other faction-owned settings.
-- `runes.yml`: legacy Custom Enchant Rune tiers, prices, cosmetics, and roll tables.
-- `arena-runes.yml`: Haven/Riftlands Arena Runes, their currency, controls, and bonuses.
+- `runes.yml`: legacy Custom Enchant Rune tier materials/models, prices, roll tables, and the universal Lucky Gem price.
+- `arena-runes.yml`: Haven/Riftlands Arena Rune price/currency and effect controls; Lucky Gems use the shared rule in `runes.yml`.
 - `haven.yml` and `riftlands.yml`: each arena zone's configuration.
 - `boosters.yml`: common booster caps and category behavior.
 

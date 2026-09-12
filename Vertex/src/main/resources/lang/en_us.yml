@@ -1,7 +1,7 @@
 # Bumped whenever a bundled message changes. On startup Vertex replaces an
 # older on-disk copy of this file with the new bundled one, moving the
 # previous file into lang/backup/ first so customizations can be re-applied.
-lang-version: 30
+lang-version: 32
 
 general:
   no-permission: "<red>✖ You do not have access to that command."
@@ -436,11 +436,16 @@ rune:
   unknown-tier: "&5&lRUNES&r &7> <red>Unknown Rune tier. Valid tiers: simple, elite, rare, legendary."
   shop-title: "<light_purple>ʀᴜɴᴇꜱ"
   shop-price: "<yellow>Price: <white>{amount}"
-  shop-hint: "<gray>Click: <white>1 <dark_gray>| <gray>Shift-left: <white>64 <dark_gray>| <gray>Shift-right: <white>Maximum"
+  shop-hint: "<gray>Click: <white>1 <dark_gray>| <gray>Shift-left: <white>64 <dark_gray>| <gray>Shift-right: <white>Maximum <dark_gray>| <gray>Right-click: <white>Catalog"
+  gem-shop-hint: "<gray>Click: <white>1 <dark_gray>| <gray>Shift-left: <white>64 <dark_gray>| <gray>Shift-right: <white>Maximum"
   purchased: "&5&lRUNES&r &7> <green>✔ <gray>Purchased <white>{count}x {tier} Rune<gray> for <white>{amount}<gray>."
+  purchased-gem: "&5&lRUNES&r &7> <green>✔ <gray>Purchased <white>{count}x Lucky Gem<gray> for <white>{amount}<gray>."
   cannot-afford: "&5&lRUNES&r &7> <red>✖ <gray>You cannot afford <white>{amount}<gray>."
   no-economy: "&5&lRUNES&r &7> <red>✖ <gray>No economy plugin is available to charge for that purchase."
   inventory-full: "&5&lRUNES&r &7> <red>✖ <gray>You need free inventory space for that purchase."
+  identify-inventory-full: "&5&lRUNES&r &7> <yellow>Your inventory was full, so your identified rune was dropped at your feet."
+  gem-inventory-full: "&5&lRUNES&r &7> <red>✖ <gray>You need free inventory space to upgrade a stacked Rune."
+  success-capped: "&5&lRUNES&r &7> <yellow>This Rune already has <white>100% <yellow>application success."
   shop-unavailable: "&5&lRUNES&r &7> <red>✖ <gray>The Rune Shop is still starting. Try again in a moment."
   drag-apply: "&5&lRUNES&r &7> <gray>Drag this rune onto compatible equipment in your inventory."
   lucky-gem-added: "&5&lRUNES&r &7> <green>✔ <gray>Lucky Gem applied to this rune."
@@ -451,11 +456,21 @@ rune:
   bulk-confirm-hint: "<gray>Click to purchase these runes."
   bulk-cancel-button: "<red><bold>Cancel"
   bulk-cancel-hint: "<gray>Click to return to your inventory."
+  catalog-title: "<dark_purple>ʀᴜɴᴇ ᴄᴀᴛᴀʟᴏɢ"
+  catalog-tab-hint: "<gray>Right-click a shop category or click this tab to view it."
+  catalog-current-tab: "<green>Current category"
+  catalog-back: "<yellow>Back to Runes"
+  catalog-back-lore: "<gray>Return to the Rune Shop."
+  catalog-tier: "<gray>Tier: <white>{tier}"
+  catalog-levels: "<gray>Available level: <white>{levels} <gold>{maximum}"
+  catalog-compatible: "<gray>Compatible: <white>{items}"
+  catalog-restriction: "<dark_purple>Active only in Haven and Riftlands."
+  catalog-obtain: "<gray>Obtained from: <white>{source}"
 
 enchant:
   usage: "<red>Usage: /enchant give <player> rune <tier> [amount]|give <player> gem [amount]"
   given: "<green>✔ Gave <white>{amount}x {kind}<green> to <white>{player}<green>."
-  apply-missing-items: "<red>Place both your gear and an enchant item before confirming."
+  apply-invalid: "<red>Drag an identified Rune onto compatible equipment in your inventory."
   apply-success: "<green>✔ Applied <white>{enchant} {level}<green>!"
   apply-failure: "<red>The application failed. The enchant item is gone -- nothing changed on your gear."
   apply-incompatible: "<red>That enchant can't be applied to that item type."
@@ -1975,9 +1990,6 @@ rtp:
 
 arena-runes:
   revealed: "&5&lARENA RUNES&r &7> <light_purple>✦ <gray>Your rune revealed <light_purple>{enchant}<gray>."
-  drag-apply: "&5&lARENA RUNES&r &7> <gray>Drag this Arena Rune onto compatible equipment in your inventory."
-  success-capped: "&5&lARENA RUNES&r &7> <yellow>This Arena Rune already has <white>100% <yellow>success."
-  lucky-gem-added: "&5&lARENA RUNES&r &7> <green>✔ <gray>Lucky Gem applied to this Arena Rune."
   applied: "&5&lARENA RUNES&r &7> <green>✔ <gray>Applied <light_purple>{enchant} {level}<gray>."
   failed: "&5&lARENA RUNES&r &7> <red>✖ <gray>This Arena Rune failed and was destroyed."
   incompatible: "&5&lARENA RUNES&r &7> <red>✖ <gray>This Arena Rune cannot be applied to that item."

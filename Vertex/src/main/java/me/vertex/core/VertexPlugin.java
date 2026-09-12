@@ -606,8 +606,7 @@ combatManager.start();
                         me.vertex.core.event.EventsMenu.MENU_ID,
                         me.vertex.core.gc.GcMenu.MENU_ID,
                         me.vertex.core.claims.BaseClaimMenu.MENU_ID,
-                        me.vertex.core.chunkbuster.ChunkBusterMenu.MENU_ID,
-                        me.vertex.core.enchant.EnchantApplyGui.MENU_ID));
+                        me.vertex.core.chunkbuster.ChunkBusterMenu.MENU_ID));
         menuRegistry.load();
 
         // Base Claims / Raid Claims: Base Claim state is loaded fully into
@@ -786,10 +785,8 @@ combatManager.start();
         // /runes (and its aliases) provides the dedicated Rune catalog.
         enchantManager = new me.vertex.core.enchant.EnchantManager(this, trackedItemIds);
         enchantManager.load();
-        Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.enchant.RuneListener(enchantManager, messages, menuRegistry), this);
-        Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.enchant.EnchantApplyGuiListener(this, enchantManager, messages, menuRegistry), this);
+        me.vertex.core.enchant.RuneListener runeListener = new me.vertex.core.enchant.RuneListener(enchantManager, messages);
+        Bukkit.getPluginManager().registerEvents(runeListener, this);
         me.vertex.core.enchant.EnchantCommand enchantCommand =
                 new me.vertex.core.enchant.EnchantCommand(enchantManager, messages);
         getCommand("enchant").setExecutor(enchantCommand);
@@ -1032,7 +1029,8 @@ combatManager.start();
         me.vertex.core.enchant.ArenaRuneManager arenaRuneManager = new me.vertex.core.enchant.ArenaRuneManager(this, zoneManager);
         arenaRuneManager.load();
         me.vertex.core.enchant.RuneShopMenu.setArenaRunes(arenaRuneManager);
-        me.vertex.core.enchant.ArenaRuneListener arenaRuneListener = new me.vertex.core.enchant.ArenaRuneListener(this, arenaRuneManager, messages);
+        runeListener.setArenaRunes(arenaRuneManager);
+        me.vertex.core.enchant.ArenaRuneListener arenaRuneListener = new me.vertex.core.enchant.ArenaRuneListener(arenaRuneManager);
         Bukkit.getPluginManager().registerEvents(arenaRuneListener, this);
         boosterService.register(arenaRuneListener.boosterSource());
         me.vertex.core.zone.ArenaControlManager arenaControls = new me.vertex.core.zone.ArenaControlManager(

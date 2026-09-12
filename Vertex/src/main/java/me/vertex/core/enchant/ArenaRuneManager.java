@@ -5,6 +5,7 @@ import me.vertex.core.zone.ZoneManager;
 import me.vertex.core.zone.ZoneType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Color;
@@ -32,7 +33,7 @@ import java.util.concurrent.ThreadLocalRandom;
 /** Arena-only runes that intentionally remain separate from the legacy custom-enchant tables. */
 public final class ArenaRuneManager {
     public enum Currency { XP_LEVELS, MONEY }
-    public enum Purchase { RUNE, LUCKY_GEM }
+    public enum Purchase { RUNE }
     public enum ApplyResult { SUCCESS, FAILURE, INCOMPATIBLE, ALREADY_APPLIED, INVALID }
 
     public enum Effect {
@@ -63,7 +64,7 @@ public final class ArenaRuneManager {
     }
 
     public record RuneInfo(Effect effect, int level, double successRate) { }
-    public record ApplyOutcome(ApplyResult result, RuneInfo info, boolean consumeEnchant, boolean consumeGems) { }
+    public record ApplyOutcome(ApplyResult result, RuneInfo info, boolean consumeEnchant) { }
 
     private final Plugin plugin;
     private final ZoneManager zones;
@@ -71,11 +72,10 @@ public final class ArenaRuneManager {
     private final NamespacedKey enchantKey;
     private final NamespacedKey successKey;
     private final NamespacedKey luckyGemKey;
+    private final NamespacedKey universalLuckyGemKey;
     private final NamespacedKey appliedKey;
     private Currency currency = Currency.XP_LEVELS;
     private double runePrice = 100D;
-    private double luckyGemPrice = 10D;
-    private double gemBonus = 3.5D;
     private double detonationRadius = 5D;
 
     public ArenaRuneManager(Plugin plugin, ZoneManager zones) {
@@ -85,6 +85,7 @@ public final class ArenaRuneManager {
         enchantKey = new NamespacedKey(plugin, "arena_enchant");
         successKey = new NamespacedKey(plugin, "arena_enchant_success");
         luckyGemKey = new NamespacedKey(plugin, "arena_lucky_gem");
+        universalLuckyGemKey = new NamespacedKey(plugin, "lucky_gem");
         appliedKey = new NamespacedKey(plugin, "arena_enchants");
     }
 
@@ -95,8 +96,6 @@ public final class ArenaRuneManager {
         try { currency = Currency.valueOf(config.getString("shop.currency", "XP_LEVELS").trim().toUpperCase(Locale.ROOT)); }
         catch (IllegalArgumentException ignored) { currency = Currency.XP_LEVELS; }
         runePrice = Math.max(0D, config.getDouble("shop.arena-rune-price", 100D));
-        luckyGemPrice = Math.max(0D, config.getDouble("shop.lucky-gem-price", 10D));
-        gemBonus = Math.max(0D, config.getDouble("lucky-gem.success-bonus-percent", 3.5D));
         detonationRadius = Math.max(1D, config.getDouble("corrupted-detonation.radius", 5D));
     }
 
@@ -105,41 +104,14 @@ public final class ArenaRuneManager {
     public boolean inArena(Player player) { return player != null && (zones.isIn(player, ZoneType.HAVEN) || zones.isIn(player, ZoneType.RIFTLANDS)); }
     public boolean inArena(org.bukkit.Location location) { return location != null && zones.isInAnyZone(location); }
 
-    public ItemStack createShopRuneIcon() {
-        ItemStack item = createRune();
-        ItemMeta meta = item.getItemMeta();
-        List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
-        lore.add(Component.text("Price: " + priceText(Purchase.RUNE), NamedTextColor.YELLOW));
-        lore.add(Component.text("Click to purchase", NamedTextColor.GREEN));
-        meta.lore(lore); item.setItemMeta(meta); return item;
-    }
-
-    public ItemStack createShopLuckyGemIcon() {
-        ItemStack item = createLuckyGem();
-        ItemMeta meta = item.getItemMeta();
-        List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
-        lore.add(Component.text("Price: " + priceText(Purchase.LUCKY_GEM), NamedTextColor.YELLOW));
-        lore.add(Component.text("Click to purchase", NamedTextColor.GREEN));
-        meta.lore(lore); item.setItemMeta(meta); return item;
-    }
-
     public ItemStack createRune() {
-        ItemStack item = icon(Material.BLACK_CANDLE, Component.text("ᴍᴏʙ ᴀʀᴇɴᴀ ʀᴜɴᴇ", NamedTextColor.BLUE), List.of(
-                Component.text("Right-click to reveal a random Arena Rune.", NamedTextColor.GRAY),
-                Component.text("Levels I-XX. Stackable up to 64.", NamedTextColor.DARK_GRAY)));
+        ItemStack item = icon(Material.BLACK_CANDLE, RuneFormatting.plain("ᴍᴏʙ ᴀʀᴇɴᴀ ʀᴜɴᴇ", NamedTextColor.BLUE), List.of(
+                RuneFormatting.plain("ᴄᴜꜱᴛᴏᴍ ᴇɴᴄʜᴀɴᴛᴍᴇɴᴛ", NamedTextColor.DARK_GRAY),
+                RuneFormatting.plain("ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴛᴏ ɪᴅᴇɴᴛɪꜰʏ ᴀ ʀᴀɴᴅᴏᴍ ʀᴜɴᴇ", NamedTextColor.GRAY),
+                RuneFormatting.plain("ʟᴇᴠᴇʟꜱ ɪ-XX • ꜱᴛᴀᴄᴋᴀʙʟᴇ ᴜᴘ ᴛᴏ 64", NamedTextColor.DARK_GRAY)));
         item.getItemMeta().getPersistentDataContainer();
         ItemMeta meta = item.getItemMeta();
         meta.getPersistentDataContainer().set(baseRuneKey, PersistentDataType.BYTE, (byte) 1);
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    public ItemStack createLuckyGem() {
-        ItemStack item = icon(Material.GREEN_DYE, Component.text("ʟᴜᴄᴋʏ ɢᴇᴍ", NamedTextColor.GREEN), List.of(
-                Component.text("Adds +" + trim(gemBonus) + "% application success.", NamedTextColor.GRAY),
-                Component.text("Consumed only by a valid application attempt.", NamedTextColor.DARK_GRAY)));
-        ItemMeta meta = item.getItemMeta();
-        meta.getPersistentDataContainer().set(luckyGemKey, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
         return item;
     }
@@ -155,13 +127,21 @@ public final class ArenaRuneManager {
     }
 
     public ItemStack createEnchantItem(RuneInfo info) {
-        String chance = trim(info.successRate()) + "% success / " + trim(100D - info.successRate()) + "% fail";
+        List<Component> lore = new ArrayList<>();
+        lore.add(RuneFormatting.plain("ᴄᴜꜱᴛᴏᴍ ᴇɴᴄʜᴀɴᴛᴍᴇɴᴛ", NamedTextColor.DARK_GRAY));
+        lore.add(RuneFormatting.plain(RuneFormatting.smallCaps(info.effect().description()) + ": +"
+                + RuneFormatting.percent(info.effect().valueAt(info.level())) + "%", NamedTextColor.GRAY));
+        if (info.effect() == Effect.CORRUPTED_DETONATION) {
+            lore.add(RuneFormatting.plain("ᴘʀᴏᴄ ᴄʜᴀɴᴄᴇ: 30%", NamedTextColor.GRAY));
+        }
+        lore.add(RuneFormatting.plain("ᴀᴘᴘʟɪᴄᴀᴛɪᴏɴ ꜱᴜᴄᴄᴇꜱꜱ: ", NamedTextColor.GRAY)
+                .append(RuneFormatting.plain(RuneFormatting.percent(info.successRate()) + "%", NamedTextColor.GREEN))
+                .append(RuneFormatting.plain(" / ꜰᴀɪʟ: ", NamedTextColor.GRAY))
+                .append(RuneFormatting.plain(RuneFormatting.percent(100D - info.successRate()) + "%", NamedTextColor.RED)));
+        lore.add(RuneFormatting.plain("ᴀᴄᴛɪᴠᴇ ᴏɴʟʏ ɪɴ ʜᴀᴠᴇɴ ᴀɴᴅ ʀɪꜰᴛʟᴀɴᴅꜱ", NamedTextColor.DARK_PURPLE));
+        lore.add(RuneFormatting.plain("ᴅʀᴀɢ ᴏɴᴛᴏ ᴄᴏᴍᴘᴀᴛɪʙʟᴇ ᴇǫᴜɪᴘᴍᴇɴᴛ ᴛᴏ ᴀᴘᴘʟʏ", NamedTextColor.DARK_GRAY));
         ItemStack item = star(Color.BLACK, Color.WHITE,
-                Component.text(smallCaps(info.effect().displayName()) + " " + roman(info.level()), NamedTextColor.LIGHT_PURPLE), List.of(
-                Component.text(info.effect().description() + ": +" + trim(info.effect().valueAt(info.level())) + "%", NamedTextColor.GRAY),
-                Component.text(chance, NamedTextColor.YELLOW),
-                Component.text("Active only in Haven and Riftlands.", NamedTextColor.DARK_PURPLE),
-                Component.text("Right-click to open the application menu.", NamedTextColor.DARK_GRAY)));
+                RuneFormatting.title(info.effect().displayName(), info.level(), NamedTextColor.BLUE, info.level() == 20), lore);
         ItemMeta meta = item.getItemMeta();
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
         pdc.set(enchantKey, PersistentDataType.STRING, info.effect().id() + ":" + info.level());
@@ -171,7 +151,10 @@ public final class ArenaRuneManager {
     }
 
     public boolean isRune(ItemStack item) { return tagged(item, baseRuneKey); }
-    public boolean isLuckyGem(ItemStack item) { return tagged(item, luckyGemKey); }
+    /** Recognizes the retired Arena gem marker and the current universal marker. */
+    public boolean isLuckyGem(ItemStack item) {
+        return tagged(item, luckyGemKey) || tagged(item, universalLuckyGemKey);
+    }
     public boolean isEnchant(ItemStack item) { return info(item) != null; }
     private boolean tagged(ItemStack item, NamespacedKey key) {
         return item != null && item.hasItemMeta()
@@ -197,20 +180,21 @@ public final class ArenaRuneManager {
     public ItemStack addLuckyGem(ItemStack enchantItem) {
         RuneInfo info = info(enchantItem);
         if (info == null || info.successRate() >= 100D) return null;
-        return createEnchantItem(new RuneInfo(info.effect(), info.level(), Math.min(100D, info.successRate() + gemBonus)));
+        return createEnchantItem(new RuneInfo(info.effect(), info.level(),
+                Math.min(100D, info.successRate() + EnchantManager.LUCKY_GEM_BONUS_PERCENT)));
     }
 
-    public ApplyOutcome apply(ItemStack target, ItemStack enchantItem, int gems) {
+    public ApplyOutcome apply(ItemStack target, ItemStack enchantItem, int ignoredLegacyGemCount) {
         RuneInfo info = info(enchantItem);
-        if (info == null || target == null || target.getType().isAir()) return new ApplyOutcome(ApplyResult.INVALID, info, false, false);
-        if (!compatible(info.effect(), target.getType())) return new ApplyOutcome(ApplyResult.INCOMPATIBLE, info, false, false);
+        if (info == null || target == null || target.getType().isAir()) return new ApplyOutcome(ApplyResult.INVALID, info, false);
+        if (!compatible(info.effect(), target.getType())) return new ApplyOutcome(ApplyResult.INCOMPATIBLE, info, false);
         Map<Effect, Integer> current = applied(target);
-        if (current.containsKey(info.effect())) return new ApplyOutcome(ApplyResult.ALREADY_APPLIED, info, false, false);
-        double chance = Math.min(100D, info.successRate() + Math.max(0, gems) * gemBonus);
-        if (ThreadLocalRandom.current().nextDouble(100D) >= chance) return new ApplyOutcome(ApplyResult.FAILURE, info, true, gems > 0);
+        if (current.containsKey(info.effect())) return new ApplyOutcome(ApplyResult.ALREADY_APPLIED, info, false);
+        double chance = info.successRate();
+        if (ThreadLocalRandom.current().nextDouble(100D) >= chance) return new ApplyOutcome(ApplyResult.FAILURE, info, true);
         current.put(info.effect(), info.level());
         writeApplied(target, current);
-        return new ApplyOutcome(ApplyResult.SUCCESS, info, true, gems > 0);
+        return new ApplyOutcome(ApplyResult.SUCCESS, info, true);
     }
 
     public double equippedValue(Player player, Effect effect) {
@@ -261,19 +245,54 @@ public final class ArenaRuneManager {
 
     private void writeApplied(ItemStack item, Map<Effect, Integer> values) {
         ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        Map<Effect, Integer> previous = applied(item);
+        List<Component> lore = stripLegacyArenaLore(meta.lore() == null ? List.of() : meta.lore());
+        removeGeneratedArenaLines(lore, previous);
         String raw = values.entrySet().stream().map(entry -> entry.getKey().id() + ":" + entry.getValue())
                 .reduce((left, right) -> left + "," + right).orElse("");
         meta.getPersistentDataContainer().set(appliedKey, PersistentDataType.STRING, raw);
-        List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
-        lore.add(Component.empty());
-        lore.add(Component.text("Arena Runes", NamedTextColor.DARK_PURPLE));
         for (Map.Entry<Effect, Integer> entry : values.entrySet()) {
-            lore.add(Component.text(entry.getKey().displayName() + " " + roman(entry.getValue())
-                    + " +" + trim(entry.getKey().valueAt(entry.getValue())) + "%", NamedTextColor.LIGHT_PURPLE));
+            lore.add(RuneFormatting.appliedLine(entry.getKey().displayName(), entry.getValue(), NamedTextColor.BLUE,
+                    entry.getValue() == 20));
         }
-        lore.add(Component.text("Active only in Haven and Riftlands.", NamedTextColor.DARK_GRAY));
         meta.lore(lore);
         item.setItemMeta(meta);
+    }
+
+    private static List<Component> stripLegacyArenaLore(List<Component> source) {
+        List<Component> lore = new ArrayList<>(source);
+        int header = -1;
+        for (int index = 0; index < lore.size(); index++) {
+            if ("Arena Runes".equals(PlainTextComponentSerializer.plainText().serialize(lore.get(index)))) {
+                header = index;
+            }
+        }
+        if (header < 0) {
+            return lore;
+        }
+        int start = header;
+        if (start > 0 && PlainTextComponentSerializer.plainText().serialize(lore.get(start - 1)).isEmpty()) {
+            start--;
+        }
+        return new ArrayList<>(lore.subList(0, start));
+    }
+
+    private static void removeGeneratedArenaLines(List<Component> lore, Map<Effect, Integer> values) {
+        for (Map.Entry<Effect, Integer> entry : values.entrySet()) {
+            String expected = entry.getKey().displayName() + " " + roman(entry.getValue());
+            String standardized = RuneFormatting.smallCaps(entry.getKey().displayName()) + " "
+                    + RuneFormatting.roman(entry.getValue());
+            for (int index = lore.size() - 1; index >= 0; index--) {
+                String plain = PlainTextComponentSerializer.plainText().serialize(lore.get(index));
+                if (expected.equals(plain) || standardized.equals(plain)) {
+                    lore.remove(index);
+                    break;
+                }
+            }
+        }
     }
 
     public boolean requiresEconomy() {
@@ -316,7 +335,7 @@ public final class ArenaRuneManager {
     }
 
     private double price(Purchase purchase) {
-        return purchase == Purchase.RUNE ? runePrice : luckyGemPrice;
+        return runePrice;
     }
 
     private int levelCost(Purchase purchase) {
@@ -344,16 +363,6 @@ public final class ArenaRuneManager {
         ItemMeta meta = item.getItemMeta();
         meta.displayName(name); meta.lore(lore); item.setItemMeta(meta); return item;
     }
-    private static String smallCaps(String text) {
-        return text.toLowerCase(Locale.ROOT).replace("a", "ᴀ").replace("b", "ʙ").replace("c", "ᴄ")
-                .replace("d", "ᴅ").replace("e", "ᴇ").replace("f", "ꜰ").replace("g", "ɢ")
-                .replace("h", "ʜ").replace("i", "ɪ").replace("j", "ᴊ").replace("k", "ᴋ")
-                .replace("l", "ʟ").replace("m", "ᴍ").replace("n", "ɴ").replace("o", "ᴏ")
-                .replace("p", "ᴘ").replace("q", "ǫ").replace("r", "ʀ").replace("s", "ꜱ")
-                .replace("t", "ᴛ").replace("u", "ᴜ").replace("v", "ᴠ").replace("w", "ᴡ")
-                .replace("x", "x").replace("y", "ʏ").replace("z", "ᴢ");
-    }
     private static String roman(int value) { return switch (value) { case 1 -> "I"; case 2 -> "II"; case 3 -> "III"; case 4 -> "IV"; case 5 -> "V"; case 6 -> "VI"; case 7 -> "VII"; case 8 -> "VIII"; case 9 -> "IX"; case 10 -> "X"; case 11 -> "XI"; case 12 -> "XII"; case 13 -> "XIII"; case 14 -> "XIV"; case 15 -> "XV"; case 16 -> "XVI"; case 17 -> "XVII"; case 18 -> "XVIII"; case 19 -> "XIX"; default -> "XX"; }; }
     private static double clamp(double value, double min, double max) { return Math.max(min, Math.min(max, value)); }
-    private static String trim(double value) { return value == Math.rint(value) ? String.valueOf((long) value) : String.format(Locale.ROOT, "%.2f", value); }
 }

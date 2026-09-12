@@ -2,13 +2,13 @@ package me.vertex.core.enchant;
 
 import me.vertex.core.dupe.DupeManager;
 import me.vertex.core.dupe.DupeStorage;
-import me.vertex.core.item.ItemKind;
 import me.vertex.core.item.TrackedItemIds;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.storage.Database;
 import me.vertex.core.storage.SqlStorage;
 import me.vertex.core.user.UserManager;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Covers {@link EnchantManager}'s rolling, level-replacement, success/
  * failure consumption, Lucky Gem math, world-restriction suppression,
- * vanilla-transform persistence, and the {@code DupeManager} integration --
+ * vanilla-transform persistence, and stack-safe item identity behavior --
  * everything sections 12/16/17/18/24/23/26 require.
  *
  * <p>Uses a small hand-written {@code enchants.yml}/{@code runes.yml} (not
@@ -89,16 +89,20 @@ class EnchantManagerTest {
     }
 
     @Test
-    void rolledItemIsTaggedAsAnEnchantmentItemForDuplicationTracking() {
-        EnchantManager.RollOutcome outcome = manager.rollRune(RuneTier.SIMPLE, 0.0);
-        assertEquals(ItemKind.ENCHANTMENT_ITEM, trackedItemIds.kind(outcome.createdItem()).orElse(null));
-        assertTrue(trackedItemIds.instanceId(outcome.createdItem()).isPresent());
+    void identicalRolledItemsCanStackButDifferentStoredDataCannot() {
+        ItemStack first = manager.createEnchantItem("haste_pickaxe", 1, RuneTier.SIMPLE);
+        ItemStack identical = manager.createEnchantItem("haste_pickaxe", 1, RuneTier.SIMPLE);
+        ItemStack differentLevel = manager.createEnchantItem("haste_pickaxe", 2, RuneTier.SIMPLE);
+
+        assertTrue(first.isSimilar(identical));
+        assertFalse(first.isSimilar(differentLevel));
+        assertTrue(trackedItemIds.instanceId(first).isEmpty());
     }
 
     @Test
-    void aRuneIsTaggedAsARuneForDuplicationTracking() {
-        ItemStack rune = manager.createRune(RuneTier.SIMPLE);
-        assertEquals(ItemKind.RUNE, trackedItemIds.kind(rune).orElse(null));
+    void baseRunesAndLuckyGemsRemainStackable() {
+        assertTrue(manager.createRune(RuneTier.SIMPLE).isSimilar(manager.createRune(RuneTier.SIMPLE)));
+        assertTrue(manager.createLuckyGem().isSimilar(manager.createLuckyGem()));
     }
 
     @Test
@@ -200,26 +204,34 @@ class EnchantManagerTest {
     // ------------------------------------------------------------------
 
     @Test
-    void luckyGemsIncreaseTheEffectiveChanceByThePerTierAmount() {
-        ItemStack enchantItem = manager.createEnchantItem("haste_pickaxe", 1, RuneTier.SIMPLE); // base 80%, SIMPLE = +10/gem
-        assertEquals(80.0, manager.effectiveChance(enchantItem, 0), 0.0001);
-        assertEquals(90.0, manager.effectiveChance(enchantItem, 1), 0.0001);
+    void luckyGemsIncreaseStoredSuccessByTheUniversalAmount() {
+        ItemStack enchantItem = manager.createEnchantItem("haste_pickaxe", 1, RuneTier.SIMPLE);
+        ItemStack upgraded = manager.addLuckyGem(enchantItem);
+        assertNotNull(upgraded);
+        assertEquals(80.0, manager.successChance(enchantItem), 0.0001);
+        assertEquals(83.5, manager.successChance(upgraded), 0.0001);
+        assertFalse(enchantItem.isSimilar(upgraded), "different stored success values must not stack together");
     }
 
     @Test
     void luckyGemsNeverPushTheChanceAboveOneHundred() {
-        ItemStack enchantItem = manager.createEnchantItem("haste_pickaxe", 1, RuneTier.SIMPLE); // base 80%, +10/gem
-        assertEquals(100.0, manager.effectiveChance(enchantItem, 3), 0.0001, "80 + 3*10 = 110 must clamp to 100");
+        ItemStack enchantItem = manager.createEnchantItem("haste_pickaxe", 1, RuneTier.SIMPLE);
+        for (int index = 0; index < 6; index++) {
+            enchantItem = manager.addLuckyGem(enchantItem);
+            assertNotNull(enchantItem);
+        }
+        assertEquals(100.0, manager.successChance(enchantItem), 0.0001);
+        assertNull(manager.addLuckyGem(enchantItem), "a capped Rune must not consume another Lucky Gem");
     }
 
     @Test
-    void higherRuneTiersGetASmallerPerGemBoostThanLowerTiers() {
+    void everyRuneTierGetsTheSameUniversalPerGemBoost() {
         ItemStack fromSimple = manager.createEnchantItem("haste_pickaxe", 1, RuneTier.SIMPLE);
         ItemStack fromLegendary = manager.createEnchantItem("haste_pickaxe", 1, RuneTier.LEGENDARY);
-        double simpleBoost = manager.effectiveChance(fromSimple, 1) - manager.effectiveChance(fromSimple, 0);
-        double legendaryBoost = manager.effectiveChance(fromLegendary, 1) - manager.effectiveChance(fromLegendary, 0);
-        assertTrue(simpleBoost > legendaryBoost,
-                "SIMPLE (configured 10/gem) must boost more per gem than LEGENDARY (configured 1/gem)");
+        double simpleBoost = manager.successChance(manager.addLuckyGem(fromSimple)) - manager.successChance(fromSimple);
+        double legendaryBoost = manager.successChance(manager.addLuckyGem(fromLegendary)) - manager.successChance(fromLegendary);
+        assertEquals(3.5D, simpleBoost, 0.0001);
+        assertEquals(3.5D, legendaryBoost, 0.0001);
     }
 
     // ------------------------------------------------------------------
@@ -258,7 +270,11 @@ class EnchantManagerTest {
         assertEquals(3, after.getEnchantLevel(Enchantment.EFFICIENCY));
         assertTrue(after.lore().stream().anyMatch(EnchantManagerTest::isTrustyPickaxeLine),
                 "pre-existing lore must be preserved beneath the new custom-enchant lore");
-        assertTrue(after.lore().size() > 1, "the custom enchant's own lore lines must have been appended");
+        assertEquals(2, after.lore().size(), "only the base lore and one clean custom-enchant line should remain");
+        Component enchantLine = after.lore().get(1);
+        assertEquals("ʜᴀꜱᴛᴇ I", net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(enchantLine));
+        assertEquals(TextDecoration.State.FALSE, enchantLine.style().decoration(TextDecoration.ITALIC));
     }
 
     /**
@@ -335,11 +351,11 @@ class EnchantManagerTest {
     }
 
     // ------------------------------------------------------------------
-    // Duplication-tagging integration with DupeManager (section 26)
+    // Duplication-tagging integration with DupeManager (applied gear only)
     // ------------------------------------------------------------------
 
     @Test
-    void taggedRuneAndEnchantItemsReportThroughToDupeManager() throws Exception {
+    void onlyAppliedGearReportsThroughToDupeManager() throws Exception {
         Database database = new Database(new YamlConfiguration(), dataFolder.toFile());
         DupeStorage dupeStorage = new DupeStorage(database);
         dupeStorage.init();
@@ -350,12 +366,11 @@ class EnchantManagerTest {
         dupeManager.load();
         try {
             ItemStack rune = manager.createRune(RuneTier.SIMPLE);
-            String runeId = dupeManager.ensureIdentity(rune);
-            assertNotNull(runeId, "a Rune must be recognised as trackable via its TrackedItemIds kind marker");
+            assertNull(dupeManager.ensureIdentity(rune), "stackable base Runes must not receive an instance ID");
 
             ItemStack enchantItem = manager.rollRune(RuneTier.SIMPLE, 0.0).createdItem();
-            String enchantItemId = dupeManager.ensureIdentity(enchantItem);
-            assertNotNull(enchantItemId, "a physical enchant item must be recognised as trackable");
+            assertNull(dupeManager.ensureIdentity(enchantItem),
+                    "stackable rolled enchant items must not receive an instance ID");
 
             ItemStack pickaxe = new ItemStack(Material.DIAMOND_PICKAXE);
             manager.applyEnchant(pickaxe, manager.createEnchantItem("haste_pickaxe", 1, RuneTier.SIMPLE), 0, 0.0);
@@ -428,12 +443,6 @@ class EnchantManagerTest {
               name: "Lucky Gem"
               glow: false
               lore: ["Boost"]
-
-            lucky-gem-effectiveness:
-              SIMPLE: 10.0
-              ELITE: 5.0
-              RARE: 2.0
-              LEGENDARY: 1.0
 
             runes:
               SIMPLE:

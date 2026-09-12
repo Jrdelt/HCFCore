@@ -192,7 +192,7 @@ commands:
     description: Staff-only suspected-duplicate item case inspection and resolution.
     usage: /<command> inspect list [page]|inspect <id>|resolve <id> [reason]|dismiss <id> [reason]|confirm <id> [reason]
   enchant:
-    description: Browse the Custom Enchant Rune shop or give Runes/Lucky Gems.
+    description: Browse direct-apply Custom Enchant Runes, their catalog, or give Runes/Lucky Gems.
     usage: /<command>|give <player> rune <tier> [amount]|give <player> gem [amount]
     aliases: [ce, customenchants, runes]
   haven:

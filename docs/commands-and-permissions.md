@@ -264,15 +264,18 @@ success economics.
 ## Custom Enchantments
 
 Rolling a Rune is a direct right-click action with no GUI; applying a
-physical enchant item opens the Enchant Application GUI. Runes are
+physical enchant item is done by dragging it onto compatible gear in the
+player inventory. Right-click a Rune category in the shop to open its
+read-only catalog. Runes are
 purchased from `/runes` (also `/ce`, `/customenchants`, or `/enchant`), or given by staff. See
 [Custom Enchantments](custom-enchantments.md) for tiers, roll tables, the
 level-replacement rules, and Lucky Gems.
 
 | Command | Permission | Notes |
 |---|---|---|
-| Right-click a Rune | *(none)* | Rolls it immediately against its tier's table and gives you the resulting physical enchant item. Consumes one Rune. |
-| Right-click a physical enchant item | *(none)* | Opens the Enchant Application GUI with that item pre-placed. |
+| Right-click a Rune | *(none)* | Identifies it immediately against its tier's table. A full inventory drops the new identified Rune at the owner’s feet after consuming one base Rune. |
+| Drag a physical enchant item onto gear | *(none)* | Attempts to apply it to compatible gear in the player inventory. |
+| Drag a Lucky Gem onto an identified Rune | *(none)* | Adds the universal +3.50% success chance, capped at 100%. |
 | `/runes` / `/ce` / `/customenchants` / `/enchant` | Open to all | Opens the dedicated Rune shop. |
 | `/enchant give <player> rune <tier> [amount]` | `vertex.enchant.give` | Gives a Rune of the given tier (`simple`/`elite`/`rare`/`legendary`). |
 | `/enchant give <player> gem [amount]` | `vertex.enchant.give` | Gives Lucky Gems. |

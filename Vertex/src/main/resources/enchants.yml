@@ -19,127 +19,71 @@
 # Either way the enchant always stays visible on the item and its data is
 # never touched -- a restricted world just makes it provide no effect.
 #
-# Every level's lore supports {enchant} {level} {proc_chance} {success_rate}
-# {failure_rate} {ability_value} {roll_chance} placeholders. {roll_chance}
-# only resolves to a real percentage on the physical enchant item's own
-# lore (computed from whichever Rune tier actually rolled it); on an
-# already-applied item's lore it renders as 0, since the acquisition
-# context isn't carried on equipped gear.
+# `description` is the ability label shown on an identified Rune before its
+# configured level value. Vertex standardizes all identified Rune and applied
+# equipment lore; level `name` and `lore` fields from older configs are no
+# longer used.
 enchants:
   haste_pickaxe:
     display-name: "Haste"
+    description: "Mining Speed"
     compatible-types: [PICKAXE]
     enabled-worlds: []
     disabled-worlds: []
     levels:
       1:
         material: COAL
-        name: "<gray>Haste Rune I"
         glow: false
         proc-chance: 25.0
         success-rate: 70.0
         ability-value: 5.0
-        lore:
-          - "<dark_gray>Custom Enchantment"
-          - "<gray>Mining speed <green>+{ability_value}%"
-          - "<gray>Proc chance: <white>{proc_chance}%"
-          - "<gray>Roll chance: <white>{roll_chance}%"
-          - "<gray>Application success: <green>{success_rate}%<gray> / fail <red>{failure_rate}%"
       2:
         material: COAL_BLOCK
-        name: "<yellow>Haste Rune II"
         glow: false
         proc-chance: 20.0
         success-rate: 55.0
         ability-value: 10.0
-        lore:
-          - "<dark_gray>Custom Enchantment"
-          - "<gray>Mining speed <green>+{ability_value}%"
-          - "<gray>Proc chance: <white>{proc_chance}%"
-          - "<gray>Roll chance: <white>{roll_chance}%"
-          - "<gray>Application success: <green>{success_rate}%<gray> / fail <red>{failure_rate}%"
       3:
         material: DIAMOND
-        name: "<aqua>Haste Rune III"
         glow: true
         proc-chance: 15.0
         success-rate: 40.0
         ability-value: 15.0
-        lore:
-          - "<dark_gray>Custom Enchantment"
-          - "<gray>Mining speed <green>+{ability_value}%"
-          - "<gray>Proc chance: <white>{proc_chance}%"
-          - "<gray>Roll chance: <white>{roll_chance}%"
-          - "<gray>Application success: <green>{success_rate}%<gray> / fail <red>{failure_rate}%"
       4:
         material: NETHERITE_INGOT
-        name: "<gold><bold>Haste Rune IV"
         glow: true
         proc-chance: 10.0
         success-rate: 25.0
         ability-value: 20.0
-        lore:
-          - "<dark_gray>Custom Enchantment"
-          - "<gray>Mining speed <green>+{ability_value}%"
-          - "<gray>Proc chance: <white>{proc_chance}%"
-          - "<gray>Roll chance: <white>{roll_chance}%"
-          - "<gray>Application success: <green>{success_rate}%<gray> / fail <red>{failure_rate}%"
 
   sharpened_edge:
     display-name: "Sharpened Edge"
+    description: "Bonus Damage"
     compatible-types: [SWORD]
     enabled-worlds: []
     disabled-worlds: []
     levels:
       1:
         material: FLINT
-        name: "<gray>Sharpened Edge I"
         glow: false
         proc-chance: 25.0
         success-rate: 70.0
         ability-value: 1.0
-        lore:
-          - "<dark_gray>Custom Enchantment"
-          - "<gray>Bonus damage: <green>+{ability_value}"
-          - "<gray>Proc chance: <white>{proc_chance}%"
-          - "<gray>Roll chance: <white>{roll_chance}%"
-          - "<gray>Application success: <green>{success_rate}%<gray> / fail <red>{failure_rate}%"
       2:
         material: IRON_INGOT
-        name: "<yellow>Sharpened Edge II"
         glow: false
         proc-chance: 20.0
         success-rate: 55.0
         ability-value: 2.0
-        lore:
-          - "<dark_gray>Custom Enchantment"
-          - "<gray>Bonus damage: <green>+{ability_value}"
-          - "<gray>Proc chance: <white>{proc_chance}%"
-          - "<gray>Roll chance: <white>{roll_chance}%"
-          - "<gray>Application success: <green>{success_rate}%<gray> / fail <red>{failure_rate}%"
       3:
         material: DIAMOND
-        name: "<aqua>Sharpened Edge III"
         glow: true
         proc-chance: 15.0
         success-rate: 40.0
         ability-value: 3.0
-        lore:
-          - "<dark_gray>Custom Enchantment"
-          - "<gray>Bonus damage: <green>+{ability_value}"
-          - "<gray>Proc chance: <white>{proc_chance}%"
-          - "<gray>Roll chance: <white>{roll_chance}%"
-          - "<gray>Application success: <green>{success_rate}%<gray> / fail <red>{failure_rate}%"
       4:
         material: NETHERITE_INGOT
-        name: "<gold><bold>Sharpened Edge IV"
         glow: true
         proc-chance: 10.0
         success-rate: 25.0
         ability-value: 4.0
-        lore:
-          - "<dark_gray>Custom Enchantment"
-          - "<gray>Bonus damage: <green>+{ability_value}"
-          - "<gray>Proc chance: <white>{proc_chance}%"
-          - "<gray>Roll chance: <white>{roll_chance}%"
-          - "<gray>Application success: <green>{success_rate}%<gray> / fail <red>{failure_rate}%"

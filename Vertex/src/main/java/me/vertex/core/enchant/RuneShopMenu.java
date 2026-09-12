@@ -32,7 +32,7 @@ public final class RuneShopMenu {
         RARE(RuneTier.RARE, null),
         LEGENDARY(RuneTier.LEGENDARY, null),
         ARENA_RUNE(null, ArenaRuneManager.Purchase.RUNE),
-        ARENA_LUCKY_GEM(null, ArenaRuneManager.Purchase.LUCKY_GEM);
+        LUCKY_GEM(null, null);
 
         private final RuneTier tier;
         private final ArenaRuneManager.Purchase arenaPurchase;
@@ -45,6 +45,7 @@ public final class RuneShopMenu {
         public RuneTier tier() { return tier; }
         public ArenaRuneManager.Purchase arenaPurchase() { return arenaPurchase; }
         public boolean isArena() { return arenaPurchase != null; }
+        public boolean isLuckyGem() { return this == LUCKY_GEM; }
 
         static PurchaseProduct forTier(RuneTier tier) {
             return switch (tier) {
@@ -81,10 +82,10 @@ public final class RuneShopMenu {
         ArenaRuneManager arena = arenaRunes;
         if (arena != null) {
             holder.slotToProduct.put(13, PurchaseProduct.ARENA_RUNE);
-            holder.slotToProduct.put(22, PurchaseProduct.ARENA_LUCKY_GEM);
-            inventory.setItem(13, arena.createShopRuneIcon());
-            inventory.setItem(22, arena.createShopLuckyGemIcon());
+            inventory.setItem(13, buildArenaIcon(player, messages, arena));
         }
+        holder.slotToProduct.put(22, PurchaseProduct.LUCKY_GEM);
+        inventory.setItem(22, buildLuckyGemIcon(player, messages, manager));
         player.openInventory(inventory);
     }
 
@@ -93,6 +94,28 @@ public final class RuneShopMenu {
         ItemMeta meta = item.getItemMeta();
         List<Component> lore = new ArrayList<>(meta.hasLore() && meta.lore() != null ? meta.lore() : List.of());
         lore.add(messages.getGui(player, "rune.shop-price", "amount", EconomyHook.format(manager.runeShopPrice(tier))));
+        lore.add(messages.getGui(player, "rune.shop-hint"));
+        meta.lore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private static ItemStack buildLuckyGemIcon(Player player, Messages messages, EnchantManager manager) {
+        ItemStack item = manager.createLuckyGem();
+        ItemMeta meta = item.getItemMeta();
+        List<Component> lore = new ArrayList<>(meta.hasLore() && meta.lore() != null ? meta.lore() : List.of());
+        lore.add(messages.getGui(player, "rune.shop-price", "amount", EconomyHook.format(manager.luckyGemShopPrice())));
+        lore.add(messages.getGui(player, "rune.gem-shop-hint"));
+        meta.lore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private static ItemStack buildArenaIcon(Player player, Messages messages, ArenaRuneManager arena) {
+        ItemStack item = arena.createRune();
+        ItemMeta meta = item.getItemMeta();
+        List<Component> lore = new ArrayList<>(meta.hasLore() && meta.lore() != null ? meta.lore() : List.of());
+        lore.add(messages.getGui(player, "rune.shop-price", "amount", arena.priceText(ArenaRuneManager.Purchase.RUNE)));
         lore.add(messages.getGui(player, "rune.shop-hint"));
         meta.lore(lore);
         item.setItemMeta(meta);

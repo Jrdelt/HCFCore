@@ -28,7 +28,8 @@ public final class RuneShopMenuListener implements Listener {
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
         if (event.getInventory().getHolder() instanceof RuneShopMenu.Holder
-                || event.getInventory().getHolder() instanceof RuneShopMenu.ConfirmationHolder) {
+                || event.getInventory().getHolder() instanceof RuneShopMenu.ConfirmationHolder
+                || event.getInventory().getHolder() instanceof RuneCatalogMenu.Holder) {
             event.setCancelled(true);
         }
     }
@@ -39,6 +40,18 @@ public final class RuneShopMenuListener implements Listener {
             return;
         }
         if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        if (event.getInventory().getHolder() instanceof RuneCatalogMenu.Holder) {
+            event.setCancelled(true);
+            if (event.getClickedInventory().getHolder() instanceof RuneCatalogMenu.Holder) {
+                RuneCatalogMenu.Category category = RuneCatalogMenu.categoryAt(event.getSlot());
+                if (category != null) {
+                    RuneCatalogMenu.open(player, manager, RuneShopMenu.arenaRunes(), messages, category);
+                } else if (event.getSlot() == 49) {
+                    RuneShopMenu.open(player, manager, messages);
+                }
+            }
             return;
         }
         if (event.getClickedInventory().getHolder() instanceof RuneShopMenu.ConfirmationHolder confirmation) {
@@ -54,11 +67,16 @@ public final class RuneShopMenuListener implements Listener {
         if (product == null) {
             return;
         }
+        if (event.isRightClick() && !product.isLuckyGem()) {
+            RuneCatalogMenu.open(player, manager, RuneShopMenu.arenaRunes(), messages,
+                    RuneCatalogMenu.Category.from(product));
+            return;
+        }
         if (event.isShiftClick()) {
             openBulkConfirmation(player, product, event.isRightClick());
             return;
         }
-        completePurchase(player, product, 1);
+        completePurchase(player, product, 1, false);
     }
 
     private void handleConfirmation(InventoryClickEvent event, Player player,
@@ -70,7 +88,7 @@ public final class RuneShopMenuListener implements Listener {
         if (event.getSlot() != 11) {
             return;
         }
-        completePurchase(player, confirmation.product(), confirmation.quantity());
+        completePurchase(player, confirmation.product(), confirmation.quantity(), true);
     }
 
     private void openBulkConfirmation(Player player, RuneShopMenu.PurchaseProduct product, boolean buyMaximum) {
@@ -100,7 +118,8 @@ public final class RuneShopMenuListener implements Listener {
         RuneShopMenu.openConfirmation(player, messages, product, prototype, quantity, priceText(product, quantity));
     }
 
-    private void completePurchase(Player player, RuneShopMenu.PurchaseProduct product, int quantity) {
+    private void completePurchase(Player player, RuneShopMenu.PurchaseProduct product, int quantity,
+            boolean closeAfterSuccess) {
         if (quantity < 1) {
             return;
         }
@@ -122,11 +141,16 @@ public final class RuneShopMenuListener implements Listener {
             return;
         }
         give(player, prototype, quantity);
-        player.closeInventory();
+        if (closeAfterSuccess) {
+            player.closeInventory();
+        }
         if (product.isArena()) {
             player.sendMessage(messages.get(player, "arena-runes.purchased-bulk", "amount", String.valueOf(quantity),
-                    "item", product == RuneShopMenu.PurchaseProduct.ARENA_RUNE ? "Arena Rune" : "Lucky Gem",
+                    "item", "Arena Rune",
                     "cost", priceText(product, quantity)));
+        } else if (product.isLuckyGem()) {
+            player.sendMessage(messages.get(player, "rune.purchased-gem", "count", String.valueOf(quantity),
+                    "amount", priceText(product, quantity)));
         } else {
             player.sendMessage(messages.get(player, "rune.purchased", "tier", displayTier(product.tier()),
                     "count", String.valueOf(quantity), "amount", priceText(product, quantity)));
@@ -134,6 +158,9 @@ public final class RuneShopMenuListener implements Listener {
     }
 
     private ItemStack itemFor(RuneShopMenu.PurchaseProduct product) {
+        if (product.isLuckyGem()) {
+            return manager.createLuckyGem();
+        }
         if (!product.isArena()) {
             return manager.createRune(product.tier());
         }
@@ -141,7 +168,7 @@ public final class RuneShopMenuListener implements Listener {
         if (arena == null) {
             return null;
         }
-        return product.arenaPurchase() == ArenaRuneManager.Purchase.RUNE ? arena.createRune() : arena.createLuckyGem();
+        return arena.createRune();
     }
 
     private boolean hasCurrencyProvider(RuneShopMenu.PurchaseProduct product) {
@@ -153,6 +180,11 @@ public final class RuneShopMenuListener implements Listener {
     }
 
     private int affordableQuantity(Player player, RuneShopMenu.PurchaseProduct product) {
+        if (product.isLuckyGem()) {
+            double price = manager.luckyGemShopPrice();
+            return price <= 0D ? Integer.MAX_VALUE
+                    : (int) Math.floor(EconomyHook.getEconomy().getBalance(player) / price);
+        }
         if (product.isArena()) {
             ArenaRuneManager arena = RuneShopMenu.arenaRunes();
             return arena == null ? 0 : arena.affordableQuantity(player, product.arenaPurchase());
@@ -165,6 +197,10 @@ public final class RuneShopMenuListener implements Listener {
     }
 
     private boolean charge(Player player, RuneShopMenu.PurchaseProduct product, int quantity) {
+        if (product.isLuckyGem()) {
+            EconomyResponse response = EconomyHook.getEconomy().withdrawPlayer(player, manager.luckyGemShopPrice() * quantity);
+            return response != null && response.transactionSuccess();
+        }
         if (product.isArena()) {
             ArenaRuneManager arena = RuneShopMenu.arenaRunes();
             return arena != null && arena.charge(player, product.arenaPurchase(), quantity);
@@ -180,6 +216,9 @@ public final class RuneShopMenuListener implements Listener {
     }
 
     private String priceText(RuneShopMenu.PurchaseProduct product, int quantity) {
+        if (product.isLuckyGem()) {
+            return EconomyHook.format(manager.luckyGemShopPrice() * quantity);
+        }
         if (product.isArena()) {
             ArenaRuneManager arena = RuneShopMenu.arenaRunes();
             return arena == null ? "0" : arena.priceText(product.arenaPurchase(), quantity);

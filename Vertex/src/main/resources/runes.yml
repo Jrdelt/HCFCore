@@ -5,45 +5,27 @@
 # table below and gives you the resulting physical enchant item. See
 # enchants.yml for what each (enchant, level) combo referenced in a table
 # actually looks like and does -- this file only controls which combos are
-# reachable per tier, their relative weights, each tier's Rune cosmetics
-# and shop price, and Lucky Gem effectiveness.
+# reachable per tier, their relative weights, each tier's material/model/glow
+# cosmetic and shop price. Lucky Gems always add a universal +3.50% success chance.
+# Base Runes and Lucky Gems
+# stack to 64; rolled enchant items stack only when their stored data matches.
 #
-# Rune lore supports {tier} {roll_chance} {success_rate} {failure_rate}
-# {proc_chance} {ability_value} placeholders -- but since a Rune's own
-# cosmetics apply to the whole tier (not one specific combo), only {tier}
-# actually resolves to anything meaningful on the Rune item itself; the
-# rest are for enchants.yml's per-level lore instead.
+# Rune names and lore are standardized by Vertex so the item presentation
+# stays consistent. The configurable fields below affect material, optional
+# custom model data, glow, shop price, and the roll table.
 
 lucky-gem:
   material: GREEN_DYE
-  name: "<green>ʟᴜᴄᴋʏ ɢᴇᴍ"
+  # Presentation is standardized in code. These fields retain material/model
+  # cosmetics only; every current and legacy gem adds exactly +3.50%.
   glow: true
-  lore:
-    - "<gray>Boosts your next enchant application's"
-    - "<gray>success chance. Consumed when used."
-    - "<gray>Use as many as you like in the enchant"
-    - "<gray>menu -- chance never exceeds 100%."
-
-# Percent success-rate boost granted per Lucky Gem used, keyed by the
-# ORIGIN TIER of the physical enchant item being applied (not the target
-# item, which has no tier of its own). Higher tiers get a smaller per-gem
-# boost on purpose, so gems can meaningfully help a Simple application but
-# cannot gem a Legendary application up to a guaranteed success.
-lucky-gem-effectiveness:
-  SIMPLE: 8.0
-  ELITE: 5.0
-  RARE: 3.0
-  LEGENDARY: 1.5
+  shop-price: 10.0
 
 runes:
   SIMPLE:
     material: LIGHT_GRAY_CANDLE
-    name: "<gray>ꜱɪᴍᴘʟᴇ ʀᴜɴᴇ"
     glow: false
     shop-price: 250.0
-    lore:
-      - "<gray>Tier: <white>{tier}"
-      - "<gray>Right-click to roll a random enchantment."
     # Which (enchant, level) combos this tier's table can roll, and their
     # weights (need not sum to 100 -- normalised automatically). A higher
     # level intentionally has a smaller weight than a lower one of the same
@@ -56,12 +38,8 @@ runes:
 
   ELITE:
     material: YELLOW_CANDLE
-    name: "<yellow>ᴇʟɪᴛᴇ ʀᴜɴᴇ"
     glow: false
     shop-price: 900.0
-    lore:
-      - "<gray>Tier: <white>{tier}"
-      - "<gray>Right-click to roll a random enchantment."
     table:
       - { enchant: haste_pickaxe, level: 1, weight: 25 }
       - { enchant: haste_pickaxe, level: 2, weight: 45 }
@@ -72,12 +50,8 @@ runes:
 
   RARE:
     material: MAGENTA_CANDLE
-    name: "<light_purple>ʀᴀʀᴇ ʀᴜɴᴇ"
     glow: true
     shop-price: 2500.0
-    lore:
-      - "<gray>Tier: <white>{tier}"
-      - "<gray>Right-click to roll a random enchantment."
     table:
       - { enchant: haste_pickaxe, level: 2, weight: 30 }
       - { enchant: haste_pickaxe, level: 3, weight: 45 }
@@ -88,12 +62,8 @@ runes:
 
   LEGENDARY:
     material: PINK_CANDLE
-    name: "<red>ʟᴇɢᴇɴᴅᴀʀʏ ʀᴜɴᴇ"
     glow: true
     shop-price: 7500.0
-    lore:
-      - "<gray>Tier: <white>{tier}"
-      - "<gray>Right-click to roll a random enchantment."
     table:
       - { enchant: haste_pickaxe, level: 3, weight: 40 }
       - { enchant: haste_pickaxe, level: 4, weight: 35 }
