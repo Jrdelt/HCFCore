@@ -59,6 +59,6 @@ its ore table intact:
 ```
 
 Shift-left-click in `/runes` or `/ce` confirms a purchase of up to 64 runes.
-Shift-right-click is intended for the largest affordable purchase, but currently
-opens the catalog first (ISS-38); the shop also has an unresolved bottom-inventory
-shift-click safety issue (ISS-37). See [issues.md](../issues.md).
+Shift-right-click opens a confirmation for the largest affordable amount that
+fits in the player inventory. Shop, confirmation, and catalog menus reject
+bottom-inventory transfers so they remain read-only outside their own controls.

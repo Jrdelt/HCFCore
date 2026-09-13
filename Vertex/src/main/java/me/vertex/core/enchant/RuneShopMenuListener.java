@@ -36,12 +36,17 @@ public final class RuneShopMenuListener implements Listener {
 
     @EventHandler
     public void onClick(InventoryClickEvent event) {
-        if (event.getClickedInventory() == null) {
-            return;
-        }
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
+        var top = event.getView().getTopInventory();
+        if (top.getHolder() instanceof RuneShopMenu.Holder
+                || top.getHolder() instanceof RuneShopMenu.ConfirmationHolder
+                || top.getHolder() instanceof RuneCatalogMenu.Holder) {
+            // Menus own the whole view; bottom shift/collect/swap actions can mutate the top.
+            event.setCancelled(true);
+            if (event.getClickedInventory() != top) return;
+        } else return;
         if (event.getInventory().getHolder() instanceof RuneCatalogMenu.Holder) {
             event.setCancelled(true);
             if (event.getClickedInventory().getHolder() instanceof RuneCatalogMenu.Holder) {
@@ -67,7 +72,7 @@ public final class RuneShopMenuListener implements Listener {
         if (product == null) {
             return;
         }
-        if (event.isRightClick() && !product.isLuckyGem()) {
+        if (event.isRightClick() && !event.isShiftClick() && !product.isLuckyGem()) {
             RuneCatalogMenu.open(player, manager, RuneShopMenu.arenaRunes(), messages,
                     RuneCatalogMenu.Category.from(product));
             return;

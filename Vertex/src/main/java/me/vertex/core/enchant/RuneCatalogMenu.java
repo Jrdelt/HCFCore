@@ -12,9 +12,11 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /** Read-only reference menu for every configured Rune category. */
 public final class RuneCatalogMenu {
@@ -38,10 +40,12 @@ public final class RuneCatalogMenu {
 
     public static void open(Player player, EnchantManager manager, ArenaRuneManager arena, Messages messages,
             Category selected) {
+        if (selected == Category.ARENA && arena == null) selected = Category.SIMPLE;
         Holder holder = new Holder(selected);
         Inventory inventory = Bukkit.createInventory(holder, 54, messages.getGui(player, "rune.catalog-title"));
         holder.inventory = inventory;
         for (Map.Entry<Category, Integer> entry : TAB_SLOTS.entrySet()) {
+            if (entry.getKey() == Category.ARENA && arena == null) continue;
             inventory.setItem(entry.getValue(), tabIcon(entry.getKey(), manager, arena, messages, player,
                     entry.getKey() == selected));
         }
@@ -68,18 +72,43 @@ public final class RuneCatalogMenu {
             Player player) {
         RuneTier tier = RuneTier.valueOf(category.name());
         List<ItemStack> entries = new ArrayList<>();
+        Map<String, List<RuneRollTable.Entry>> byEnchant = new LinkedHashMap<>();
         for (RuneRollTable.Entry entry : manager.rollTable(tier).entries()) {
-            EnchantDefinition definition = manager.definition(entry.enchantId());
-            if (definition == null || definition.level(entry.level()) == null) continue;
-            ItemStack item = manager.createEnchantItem(entry.enchantId(), entry.level(), tier);
+            byEnchant.computeIfAbsent(entry.enchantId(), ignored -> new ArrayList<>()).add(entry);
+        }
+        for (Map.Entry<String, List<RuneRollTable.Entry>> grouped : byEnchant.entrySet()) {
+            EnchantDefinition definition = manager.definition(grouped.getKey());
+            List<RuneRollTable.Entry> levels = grouped.getValue().stream()
+                    .filter(entry -> definition != null && definition.level(entry.level()) != null)
+                    .sorted(Comparator.comparingInt(RuneRollTable.Entry::level)).toList();
+            if (definition == null || levels.isEmpty()) continue;
+            ItemStack item = manager.createEnchantItem(grouped.getKey(), levels.getFirst().level(), tier);
             ItemMeta meta = item.getItemMeta();
-            List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
+            meta.displayName(RuneFormatting.plain(RuneFormatting.smallCaps(definition.displayName()),
+                    RuneFormatting.tierColor(tier)));
+            List<Component> lore = new ArrayList<>();
+            lore.add(RuneFormatting.plain("ᴄᴜꜱᴛᴏᴍ ᴇɴᴄʜᴀɴᴛᴍᴇɴᴛ", NamedTextColor.DARK_GRAY));
+            lore.add(messages.getGui(player, "rune.catalog-description", "description",
+                    RuneFormatting.smallCaps(definition.description())));
             lore.add(Component.empty());
-            lore.add(messages.getGui(player, "rune.catalog-tier", "tier", category.name()));
-            lore.add(messages.getGui(player, "rune.catalog-levels", "levels", RuneFormatting.roman(entry.level()),
-                    "maximum", entry.level() == definition.maxLevel() ? "ᴍᴀx" : ""));
+            lore.add(messages.getGui(player, "rune.catalog-tier", "tier", RuneFormatting.smallCaps(category.name())));
+            lore.add(messages.getGui(player, "rune.catalog-levels", "levels", levels.stream()
+                    .map(entry -> RuneFormatting.roman(entry.level())).collect(Collectors.joining(", "))));
+            for (RuneRollTable.Entry entry : levels) {
+                EnchantDefinition.Level level = definition.level(entry.level());
+                lore.add(messages.getGui(player, "rune.catalog-level-detail",
+                        "level", RuneFormatting.roman(entry.level()),
+                        "maximum", entry.level() == definition.maxLevel() ? "ᴍᴀx" : "",
+                        "value", RuneFormatting.percent(level.abilityValue()),
+                        "success", RuneFormatting.percent(level.successRate()),
+                        "failure", RuneFormatting.percent(100D - level.successRate())));
+                if (level.procChance() > 0D) {
+                    lore.add(messages.getGui(player, "rune.catalog-proc-detail", "proc",
+                            RuneFormatting.percent(level.procChance())));
+                }
+            }
             lore.add(messages.getGui(player, "rune.catalog-compatible", "items",
-                    String.join(", ", definition.compatibleTypes())));
+                    RuneFormatting.smallCaps(String.join(", ", definition.compatibleTypes()))));
             lore.add(messages.getGui(player, "rune.catalog-obtain", "source", RuneFormatting.smallCaps(category.name()) + " ʀᴜɴᴇ"));
             meta.lore(lore);
             item.setItemMeta(meta);
@@ -93,10 +122,21 @@ public final class RuneCatalogMenu {
         for (ArenaRuneManager.Effect effect : ArenaRuneManager.Effect.values()) {
             ItemStack item = arena.createEnchantItem(new ArenaRuneManager.RuneInfo(effect, 1, 50D));
             ItemMeta meta = item.getItemMeta();
-            List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
+            meta.displayName(RuneFormatting.plain(RuneFormatting.smallCaps(effect.displayName()), NamedTextColor.BLUE));
+            List<Component> lore = new ArrayList<>();
+            lore.add(RuneFormatting.plain("ᴄᴜꜱᴛᴏᴍ ᴇɴᴄʜᴀɴᴛᴍᴇɴᴛ", NamedTextColor.DARK_GRAY));
+            lore.add(messages.getGui(player, "rune.catalog-description", "description",
+                    RuneFormatting.smallCaps(effect.description())));
             lore.add(Component.empty());
             lore.add(messages.getGui(player, "rune.catalog-tier", "tier", "ᴍᴏʙ ᴀʀᴇɴᴀ"));
-            lore.add(messages.getGui(player, "rune.catalog-levels", "levels", "ɪ–XX", "maximum", "XX ᴍᴀx"));
+            lore.add(messages.getGui(player, "rune.catalog-arena-levels", "levels", "ɪ–XX",
+                    "maximum", "XX ᴍᴀx"));
+            lore.add(messages.getGui(player, "rune.catalog-arena-value", "value",
+                    RuneFormatting.percent(effect.valueAt(1))));
+            lore.add(messages.getGui(player, "rune.catalog-arena-success"));
+            if (effect == ArenaRuneManager.Effect.CORRUPTED_DETONATION) {
+                lore.add(messages.getGui(player, "rune.catalog-proc-detail", "proc", "30"));
+            }
             lore.add(messages.getGui(player, "rune.catalog-compatible", "items",
                     effect.restrictedEquipment() ? "ᴄʜᴇꜱᴛᴘʟᴀᴛᴇ, ꜱᴡᴏʀᴅ, ᴀxᴇ" : "ᴅᴜʀᴀʙʟᴇ ɢᴇᴀʀ"));
             lore.add(messages.getGui(player, "rune.catalog-restriction"));

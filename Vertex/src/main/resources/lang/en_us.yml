@@ -1,7 +1,7 @@
 # Bumped whenever a bundled message changes. On startup Vertex replaces an
 # older on-disk copy of this file with the new bundled one, moving the
 # previous file into lang/backup/ first so customizations can be re-applied.
-lang-version: 32
+lang-version: 34
 
 general:
   no-permission: "<red>✖ You do not have access to that command."
@@ -462,7 +462,13 @@ rune:
   catalog-back: "<yellow>Back to Runes"
   catalog-back-lore: "<gray>Return to the Rune Shop."
   catalog-tier: "<gray>Tier: <white>{tier}"
-  catalog-levels: "<gray>Available level: <white>{levels} <gold>{maximum}"
+  catalog-description: "<gray>{description}"
+  catalog-levels: "<gray>Available levels: <white>{levels}"
+  catalog-arena-levels: "<gray>Available levels: <white>{levels} <gold>{maximum}"
+  catalog-level-detail: "<gray>{level} <gold>{maximum}<gray>: <white>+{value} <dark_gray>| <green>{success}% success <dark_gray>/ <red>{failure}% fail"
+  catalog-proc-detail: "<gray>Proc chance: <white>{proc}%"
+  catalog-arena-value: "<gray>Value per level: <white>+{value}%"
+  catalog-arena-success: "<gray>Roll success: <white>15%–85%"
   catalog-compatible: "<gray>Compatible: <white>{items}"
   catalog-restriction: "<dark_purple>Active only in Haven and Riftlands."
   catalog-obtain: "<gray>Obtained from: <white>{source}"

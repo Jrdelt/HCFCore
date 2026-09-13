@@ -272,7 +272,7 @@ success economics.
 
 Rolling a Rune is a direct right-click action with no GUI; applying an
 identified Rune is done by dragging it onto compatible gear in the
-player inventory. Right-click a Rune category in the shop to open its
+player inventory. Right-click a Rune category in the Rune Shop to open its
 read-only catalog. Runes are
 purchased from `/runes` (also `/ce`, `/customenchants`, or `/enchant`), or given by staff. See
 [Custom Enchantments](custom-enchantments.md) for tiers, roll tables, the

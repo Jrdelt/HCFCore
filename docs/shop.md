@@ -108,7 +108,8 @@ Custom product tiles are added in code to their existing categories:
 
 They do not consume a category-picker slot and use their feature-specific
 fixed prices. Runes are not a `/shop` product; `/runes`, `/ce`,
-`/customenchants`, and `/enchant` open their dedicated catalog.
+`/customenchants`, and `/enchant` open their dedicated Rune Shop and its
+read-only catalog.
 
 ## Other configuration (`shop.yml`)
 

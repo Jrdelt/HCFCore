@@ -46,17 +46,22 @@ stored value matches, including enchant, level, tier, and success chance.
 
 Right-click a Simple, Elite, Rare, Legendary, or Mob Arena Rune category in
 `/runes` to open its read-only catalog tab. The catalog provides tabs for all
-categories and lists available levels, maximum-level status, proc and success
-behavior, compatible equipment, restrictions, and source. Its back button
-returns to the Rune Shop. Catalog items cannot be bought, identified, or
-applied from that menu.
+categories and lists every level available from that category, maximum-level
+status, per-level value/proc/success behavior, compatible equipment,
+restrictions, and source. Its back button returns to the Rune Shop. Catalog
+items cannot be bought, identified, or applied from that menu.
 
 ## Shop and staff commands
 
 `/runes`, `/ce`, `/customenchants`, and `/enchant` open the Rune Shop.
-Clicking buys one Rune or Lucky Gem and keeps the shop open. Shift-clicking
-opens a bulk confirmation; a confirmed bulk purchase closes that confirmation
+Clicking buys one Rune or Lucky Gem and keeps the shop open. Shift-left opens
+a confirmation for up to 64; shift-right opens a confirmation for the maximum
+that fits and is affordable. A confirmed bulk purchase closes that confirmation
 and reports the exact quantity and total cost.
+
+Shop, confirmation and catalog views block bottom-inventory transfers as well
+as top clicks, so shift/collect actions cannot stash items in a temporary menu.
+The arena catalog tab is hidden when its module is unavailable.
 
 Staff with `vertex.enchant.give` can use:
 

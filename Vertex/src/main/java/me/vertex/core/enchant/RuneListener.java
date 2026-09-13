@@ -34,7 +34,7 @@ public final class RuneListener implements Listener {
         this.arenaRunes = arenaRunes;
     }
 
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInteract(PlayerInteractEvent event) {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK && event.getAction() != Action.RIGHT_CLICK_AIR) {
             return;
@@ -70,7 +70,7 @@ public final class RuneListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGH)
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)
                 || !(event.getClickedInventory() instanceof PlayerInventory inventory)) {
@@ -91,6 +91,9 @@ public final class RuneListener implements Listener {
                 return;
             }
         }
+        if (!isApplicationTarget(clicked, arena)) {
+            return;
+        }
         if (manager.isEnchantItem(cursor)) {
             event.setCancelled(true);
             applyLegacyRune(player, clicked, cursor, event::setCurrentItem, event::setCursor);
@@ -100,30 +103,42 @@ public final class RuneListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGH)
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onInventoryDrag(InventoryDragEvent event) {
         if (!(event.getWhoClicked() instanceof Player player) || event.getRawSlots().size() != 1) {
             return;
         }
         ArenaRuneManager arena = arenaRunes;
         ItemStack cursor = event.getOldCursor();
-        if (!isLuckyGem(cursor, arena)) {
-            return;
-        }
         int rawSlot = event.getRawSlots().iterator().next();
         if (!(event.getView().getInventory(rawSlot) instanceof PlayerInventory inventory)) {
             return;
         }
         int slot = event.getView().convertSlot(rawSlot);
         ItemStack clicked = inventory.getItem(slot);
-        if (manager.isEnchantItem(clicked)) {
+        if (isLuckyGem(cursor, arena)) {
+            if (manager.isEnchantItem(clicked)) {
+                event.setCancelled(true);
+                applyLegacyGem(player, clicked, cursor, upgraded -> inventory.setItem(slot, upgraded),
+                        player::setItemOnCursor, inventory);
+            } else if (arena != null && arena.isEnchant(clicked)) {
+                event.setCancelled(true);
+                applyArenaGem(player, clicked, cursor, upgraded -> inventory.setItem(slot, upgraded),
+                        player::setItemOnCursor, inventory, arena);
+            }
+            return;
+        }
+        if (!isApplicationTarget(clicked, arena)) {
+            return;
+        }
+        if (manager.isEnchantItem(cursor)) {
             event.setCancelled(true);
-            applyLegacyGem(player, clicked, cursor, upgraded -> inventory.setItem(slot, upgraded),
-                    player::setItemOnCursor, inventory);
-        } else if (arena != null && arena.isEnchant(clicked)) {
+            applyLegacyRune(player, clicked, cursor, upgraded -> inventory.setItem(slot, upgraded),
+                    player::setItemOnCursor);
+        } else if (arena != null && arena.isEnchant(cursor)) {
             event.setCancelled(true);
-            applyArenaGem(player, clicked, cursor, upgraded -> inventory.setItem(slot, upgraded),
-                    player::setItemOnCursor, inventory, arena);
+            applyArenaRune(player, clicked, cursor, upgraded -> inventory.setItem(slot, upgraded),
+                    player::setItemOnCursor, arena);
         }
     }
 
@@ -259,6 +274,20 @@ public final class RuneListener implements Listener {
 
     private boolean isLuckyGem(ItemStack item, ArenaRuneManager arena) {
         return manager.isLuckyGem(item) || arena != null && arena.isLuckyGem(item);
+    }
+
+    /**
+     * A direct application is deliberate only when a Rune is dropped on real
+     * gear/item content. Empty slots and other Rune-family items must retain
+     * normal inventory behavior so identical identified Runes can stack and
+     * players can move them around before applying one.
+     */
+    boolean isApplicationTarget(ItemStack item, ArenaRuneManager arena) {
+        if (item == null || item.getType().isAir()) {
+            return false;
+        }
+        return !manager.isRune(item) && !manager.isEnchantItem(item) && !manager.isLuckyGem(item)
+                && (arena == null || (!arena.isRune(item) && !arena.isEnchant(item) && !arena.isLuckyGem(item)));
     }
 
     private static void consumeHand(Player player, EquipmentSlot hand, ItemStack item) {

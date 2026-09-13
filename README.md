@@ -29,9 +29,9 @@
   chest or Chunk Collector through the same market one item at a time, and
   a self-hosted GC (Gift Card/Credit) currency with player-created,
   one-time withdrawal codes and staff-issued redeem codes.
-- **Custom Enchantments:** a Rune-tiered enchantment system (rolling,
-  Lucky Gems, level-replacement rules) with its own application GUI,
-  independent of the vanilla enchanting table.
+- **Custom Enchantments:** a Rune-tiered direct-inventory enchantment system
+  with rolling, universal Lucky Gems, level-replacement rules, and a read-only
+  Rune Catalog — independent of the vanilla enchanting table.
 - **Mining worlds:** two permanent worlds with server-controlled ore
   generation and regeneration, 24/7 capturable Mine KOTHs whose holder earns
   a growing ore bonus, and rotating Hot Zones that favour the rarer ores.
@@ -99,7 +99,7 @@ cd Vertex
 | [Grace and Faction Shield](docs/faction-shield.md) | Global Grace plus weekly Base-only Shield schedules, persistence, and overrides |
 | [Chunk Busters](docs/chunk-busters.md) | The 4 destructive area-clear items, batched processing, and current restart limitation |
 | [Source Buckets](docs/source-buckets.md) | Reusable, claim-boundary-respecting configured-block items |
-| [Custom Enchantments](docs/custom-enchantments.md) | Rune tiers, rolling, Lucky Gems, and the enchant application GUI |
+| [Custom Enchantments](docs/custom-enchantments.md) | Direct Rune rolling/application, the Rune Catalog, and universal Lucky Gems |
 | [GC (Gift Card / Credit)](docs/gc-currency.md) | The self-hosted third currency: wallet GUI, one-time withdrawal codes, redeem codes |
 | [Dupe investigation](docs/dupe-investigation.md) | The automatic duplicate-item scanner and staff case workflow |
 | [Spawners & Collectors](docs/spawners-and-collectors.md) | Spawners, daylight/lava behavior, mob stacks, and collectors |
