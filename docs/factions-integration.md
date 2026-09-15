@@ -39,8 +39,10 @@ empty, and direct/projectile player PvP on the server. Factionless players
 cannot build or use protected blocks in claims. Members need the relevant rank
 action; allies can place or break blocks only when
 `factions.protection.allies-can-build` is enabled and the claim's faction also
-allows it for allies in `/f permissions`. Friendly-fire and ally-PvP
-are controlled by `factions.pvp`.
+allows it for allies in `/f permissions`. When the server-wide switch is off,
+the ally Place Blocks / Break Blocks rows in `/f permissions` still show
+their saved state but turn gray with a hint that they're currently inactive.
+Friendly-fire and ally-PvP are controlled by `factions.pvp`.
 
 Claims are stored by world and chunk. Base Claims, Raid Claims, Chunk
 Collectors, Spawners, Sand Bots, Chunk Busters, Source Buckets, faction

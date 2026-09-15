@@ -841,6 +841,7 @@ combatManager.start();
         me.vertex.core.backpack.BackpackFilterManager backpackFilterManager = new me.vertex.core.backpack.BackpackFilterManager(
                 this);
         backpackFilterManager.load();
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.storage.DeliveryMarkerCleanupListener(this), this);
         me.vertex.core.backpack.BackpackInteractListener backpackInteractListener = new me.vertex.core.backpack.BackpackInteractListener(
                 backpackManager, messages);
         Bukkit.getPluginManager().registerEvents(backpackInteractListener, this);

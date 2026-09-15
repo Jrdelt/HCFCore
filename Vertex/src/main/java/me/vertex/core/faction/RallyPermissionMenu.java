@@ -118,12 +118,24 @@ public final class RallyPermissionMenu implements Listener {
         meta.getPersistentDataContainer().set(roleKey, PersistentDataType.STRING, role); item.setItemMeta(meta); return item;
     }
 
+    private static final List<String> ALLY_BUILD_ACTIONS = List.of("place-blocks", "break-blocks");
+
     private ItemStack actionItem(FactionData faction, String role, Action action) {
         boolean allowed = FactionsHook.service().actionAllowed(faction.id(), role, action.id());
-        ItemStack item = new ItemStack(allowed ? Material.GREEN_STAINED_GLASS_PANE : Material.RED_STAINED_GLASS_PANE);
+        // The server-wide switch gates these two ally rows regardless of what's
+        // saved here; show that instead of a plain allowed/denied state so an
+        // admin toggling this doesn't wonder why nothing changed in-game.
+        boolean serverDisabled = role.equals("ally") && ALLY_BUILD_ACTIONS.contains(action.id())
+                && !FactionsHook.service().alliesCanBuild();
+        ItemStack item = new ItemStack(serverDisabled ? Material.GRAY_STAINED_GLASS_PANE
+                : allowed ? Material.GREEN_STAINED_GLASS_PANE : Material.RED_STAINED_GLASS_PANE);
         ItemMeta meta = item.getItemMeta(); meta.displayName(messages.getGui(null, "faction-permissions.action-" + action.id()));
-        meta.lore(List.of(messages.getGui(null, allowed ? "faction-permissions.allowed" : "faction-permissions.denied"),
-                messages.getGui(null, "faction-permissions.click-hint")));
+        meta.lore(serverDisabled
+                ? List.of(messages.getGui(null, allowed ? "faction-permissions.allowed" : "faction-permissions.denied"),
+                        messages.getGui(null, "faction-permissions.ally-build-disabled"),
+                        messages.getGui(null, "faction-permissions.click-hint"))
+                : List.of(messages.getGui(null, allowed ? "faction-permissions.allowed" : "faction-permissions.denied"),
+                        messages.getGui(null, "faction-permissions.click-hint")));
         meta.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, action.id()); item.setItemMeta(meta); return item;
     }
 

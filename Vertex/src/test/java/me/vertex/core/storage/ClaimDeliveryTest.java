@@ -29,4 +29,21 @@ class ClaimDeliveryTest {
         for(var stack:player.getInventory().getStorageContents())assertEquals(Material.STONE,stack.getType());
         assertTrue(player.getWorld().getEntities().stream().noneMatch(org.bukkit.entity.Item.class::isInstance));
     }
+    @Test void stripMarkerRemovesOnlyTheDeliveryTag(){
+        var server=MockBukkit.mock();var plugin=MockBukkit.createMockPlugin();
+        var tagged=ClaimDelivery.tagged(plugin,"delivery","token","row",0,new ItemStack(Material.DIAMOND));
+        var item=tagged.item();
+        assertTrue(ClaimDelivery.isMarked(plugin,item));
+        ClaimDelivery.stripMarker(plugin,item);
+        assertFalse(ClaimDelivery.isMarked(plugin,item));
+        assertEquals(Material.DIAMOND,item.getType());
+    }
+    @Test void stripMarkerIgnoresUnmarkedAndEmptyItems(){
+        var server=MockBukkit.mock();var plugin=MockBukkit.createMockPlugin();
+        var plain=new ItemStack(Material.DIAMOND);
+        ClaimDelivery.stripMarker(plugin,plain);
+        assertFalse(ClaimDelivery.isMarked(plugin,plain));
+        ClaimDelivery.stripMarker(plugin,null);
+        ClaimDelivery.stripMarker(plugin,new ItemStack(Material.AIR));
+    }
 }

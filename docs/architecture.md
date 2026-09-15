@@ -164,7 +164,10 @@ lifecycle and wires listeners/commands together in `onEnable()`.
   items can be moved and used, and there is no periodic reconciliation
   sweep. Unfinished claims resume on the owning feature's own triggers —
   join and the delivery retry timer for the inbox, join for Trade, and the
-  claim menus for Auction and Coinflip.
+  claim menus for Auction and Coinflip. Dropping a marked item, or losing it
+  on death, clears its marker so it can never block a pickup (by the same
+  player or anyone else); an item still pending delivery is never touched
+  because it stays in inventory, not on the ground.
 - Valuable inventory overflow uses the shared persistent delivery inbox instead
   of ground drops. Before the asynchronous SQL insert begins, each batch is
   synchronously appended to `plugins/Vertex/delivery-wal.yml`; startup replays

@@ -1417,7 +1417,7 @@ dupe:
   pending-alert: "&c&lDUPE&r &7> <red>There are {count} open suspected-duplicate case(s). Run /dupe inspect list."
 
 delivery:
-  pending: "&c&lDELIVERY&r &7> <yellow>Your items are waiting for storage confirmation. Please wait before using or moving them."
+  pending: "&c&lDELIVERY&r &7> <yellow>Your items are waiting for storage confirmation."
   storage-unavailable: "&c&lDELIVERY&r &7> <red>Item storage is temporarily unavailable. Nothing was consumed; please try again."
 
 zones:
@@ -1844,6 +1844,7 @@ faction-permissions:
   allowed: "<green>Allowed"
   denied: "<red>Denied"
   click-hint: "<gray>Left-click: allow | Right-click: deny"
+  ally-build-disabled: "<dark_gray>Server-wide ally building is off (factions.protection.allies-can-build)"
   action-build: "<gold>Build / Break"
   action-place-blocks: "<gold>Place Blocks"
   action-break-blocks: "<gold>Break Blocks"

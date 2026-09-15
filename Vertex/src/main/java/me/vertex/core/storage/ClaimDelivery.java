@@ -167,6 +167,20 @@ public final class ClaimDelivery {
         }
     }
 
+    /**
+     * Removes the handoff marker from a single ItemStack in place (not tied
+     * to a player's inventory). Used when an item leaves inventory tracking
+     * entirely -- dropped on the ground or lost to death -- so a stale marker
+     * can never block whoever (or whatever future pickup) touches it next.
+     */
+    public static void stripMarker(Plugin plugin, ItemStack item) {
+        if (item == null || item.isEmpty() || !item.hasItemMeta()) return;
+        ItemMeta meta = item.getItemMeta();
+        if (!meta.getPersistentDataContainer().has(key(plugin), PersistentDataType.STRING)) return;
+        meta.getPersistentDataContainer().remove(key(plugin));
+        item.setItemMeta(meta);
+    }
+
     public static boolean isMarked(Plugin plugin, ItemStack item) {
         return item != null && item.hasItemMeta()
                 && item.getItemMeta().getPersistentDataContainer().has(key(plugin), PersistentDataType.STRING);
