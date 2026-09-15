@@ -90,10 +90,6 @@ public final class AuctionStorage {
                 status VARCHAR(16) NOT NULL,
                 cancelled_by CHAR(36) NULL
             )""";
-    private static final String CREATE_LOG_INDEX =
-            "CREATE INDEX IF NOT EXISTS idx_auction_log_resolved_at ON auction_log (resolved_at DESC)";
-    private static final String CREATE_CLAIMS_OWNER_INDEX =
-            "CREATE INDEX IF NOT EXISTS idx_auction_claims_owner ON auction_claims (owner_uuid)";
 
     private static final String CREATE_WATCHLIST_MYSQL = """
             CREATE TABLE IF NOT EXISTS auction_watchlist (
@@ -107,8 +103,6 @@ public final class AuctionStorage {
                 owner_uuid CHAR(36) NOT NULL,
                 listing_id INTEGER NOT NULL
             )""";
-    private static final String CREATE_WATCHLIST_INDEX =
-            "CREATE INDEX IF NOT EXISTS idx_auction_watchlist_owner ON auction_watchlist (owner_uuid)";
     private static final String CREATE_PAYOUTS = """
             CREATE TABLE IF NOT EXISTS auction_pending_payouts (
                 payout_key VARCHAR(64) NOT NULL PRIMARY KEY,
@@ -974,20 +968,6 @@ public final class AuctionStorage {
             }
         }
         return watches;
-    }
-
-    public List<Integer> loadWatchlist(UUID ownerUuid) throws SQLException {
-        List<Integer> listingIds = new ArrayList<>();
-        String sql = "SELECT listing_id FROM auction_watchlist WHERE owner_uuid = ?";
-        try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, ownerUuid.toString());
-            try (ResultSet results = statement.executeQuery()) {
-                while (results.next()) {
-                    listingIds.add(results.getInt("listing_id"));
-                }
-            }
-        }
-        return listingIds;
     }
 
     public void insertWatch(UUID ownerUuid, int listingId) throws SQLException {

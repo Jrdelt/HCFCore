@@ -49,10 +49,6 @@ public final class UserManager {
         }
     }
 
-    public void clearFailedLoad(UUID uuid) {
-        failedLoads.remove(uuid);
-    }
-
     public void unload(UUID uuid) {
         long generation = nextGeneration(uuid);
         users.remove(uuid);
@@ -66,10 +62,6 @@ public final class UserManager {
 
     public User get(UUID uuid) {
         return users.get(uuid);
-    }
-
-    public boolean hasFailedLoad(UUID uuid) {
-        return failedLoads.containsKey(uuid);
     }
 
     private long nextGeneration(UUID uuid) {

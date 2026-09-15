@@ -1256,16 +1256,6 @@ public final class CoinflipManager {
         return CompletableFuture.supplyAsync(() -> hasClaims(uuid));
     }
 
-    public void clearClaims(UUID uuid) {
-        track(CompletableFuture.runAsync(() -> {
-            try {
-                storage.deleteClaims(uuid);
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to clear Coinflip claims for " + uuid, e);
-            }
-        }));
-    }
-
     public record ClaimBatch(List<Integer> ids, List<ItemStack> items) {
         static ClaimBatch empty() {
             return new ClaimBatch(List.of(), List.of());
@@ -1425,21 +1415,6 @@ public final class CoinflipManager {
         track(take);
         take.whenComplete((ignored, error) -> claimsInProgress.remove(uuid));
         return take;
-    }
-
-    /** Restores a reserved claim if its player disconnected before main-thread delivery. */
-    public void restoreClaimBatch(UUID uuid, ClaimBatch batch) {
-        if (batch == null || batch.items().isEmpty()) {
-            return;
-        }
-        ItemStack[] items = batch.items().stream().map(ItemStack::clone).toArray(ItemStack[]::new);
-        track(CompletableFuture.runAsync(() -> {
-            try {
-                storage.insertClaim(uuid, items, System.currentTimeMillis());
-            } catch (Exception error) {
-                plugin.getLogger().log(Level.SEVERE, "Failed to restore undelivered Coinflip claims for " + uuid, error);
-            }
-        }));
     }
 
     private void queueClaim(UUID winnerUuid, ItemStack[] items) {

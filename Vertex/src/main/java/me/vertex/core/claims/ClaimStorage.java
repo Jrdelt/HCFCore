@@ -276,16 +276,6 @@ public final class ClaimStorage {
         }
     }
 
-    public void deleteBaseClaim(int factionId, int slotIndex) throws SQLException {
-        try (Connection connection = database.getConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "DELETE FROM base_claims WHERE faction_id = ? AND slot_index = ?")) {
-            statement.setInt(1, factionId);
-            statement.setInt(2, slotIndex);
-            statement.executeUpdate();
-        }
-    }
-
     // ---- Base claim connected-region membership ----
 
     public record RegionChunk(int factionId, int slotIndex, String world, int chunkX, int chunkZ) { }
@@ -364,41 +354,6 @@ public final class ClaimStorage {
         statement.setString(3, world);
         statement.setInt(4, chunkX);
         statement.setInt(5, chunkZ);
-    }
-
-    public void deleteRegionChunks(int factionId, int slotIndex) throws SQLException {
-        try (Connection connection = database.getConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "DELETE FROM base_claim_region_chunks WHERE faction_id = ? AND slot_index = ?")) {
-            statement.setInt(1, factionId);
-            statement.setInt(2, slotIndex);
-            statement.executeUpdate();
-        }
-    }
-
-    /** Removes an anchor and all of its membership without a resurrection window. */
-    public void deleteBaseClaimRegion(int factionId, int slotIndex) throws SQLException {
-        try (Connection connection = database.getConnection()) {
-            boolean autoCommit = connection.getAutoCommit();
-            connection.setAutoCommit(false);
-            try (PreparedStatement members = connection.prepareStatement(
-                    "DELETE FROM base_claim_region_chunks WHERE faction_id = ? AND slot_index = ?");
-                 PreparedStatement anchor = connection.prepareStatement(
-                    "DELETE FROM base_claims WHERE faction_id = ? AND slot_index = ?")) {
-                members.setInt(1, factionId);
-                members.setInt(2, slotIndex);
-                members.executeUpdate();
-                anchor.setInt(1, factionId);
-                anchor.setInt(2, slotIndex);
-                anchor.executeUpdate();
-                connection.commit();
-            } catch (SQLException error) {
-                connection.rollback();
-                throw error;
-            } finally {
-                connection.setAutoCommit(autoCommit);
-            }
-        }
     }
 
     /**

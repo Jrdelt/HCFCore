@@ -8,7 +8,6 @@ import me.vertex.core.storage.ClaimDelivery;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -16,7 +15,6 @@ import org.bukkit.plugin.Plugin;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -73,7 +71,6 @@ public final class TradeManager {
     public Material dividerMaterial() { return divider; } public Material fillerMaterial() { return filler; } public Material confirmMaterial() { return confirm; } public Material lockedMaterial() { return locked; }
     public double maxDistance() { return maxDistance; }
     public boolean isProgrammaticClose(UUID id) { return programmaticClose.remove(id); }
-    public boolean isInSession(UUID id) { return sessions.containsKey(id); }
     public TradeSession session(UUID id) { return sessions.get(id); }
 
     public Result request(Player sender, Player target) {

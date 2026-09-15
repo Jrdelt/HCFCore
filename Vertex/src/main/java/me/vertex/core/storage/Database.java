@@ -150,10 +150,6 @@ public final class Database {
         return new ExclusiveLease(this, stamp);
     }
 
-    public boolean maintenanceActive() {
-        return maintenanceRequested.get();
-    }
-
     private Connection guardedConnection(Connection delegate, long stamp) {
         AtomicBoolean released = new AtomicBoolean();
         return (Connection) Proxy.newProxyInstance(

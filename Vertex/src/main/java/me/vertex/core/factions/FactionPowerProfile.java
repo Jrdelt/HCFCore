@@ -20,10 +20,6 @@ public record FactionPowerProfile(UUID playerUuid, double current, double maximu
         return new FactionPowerProfile(playerUuid, current, value, nextRegenerationAtMillis);
     }
 
-    public FactionPowerProfile resetCurrentToMaximum(long nextRegenerationAt) {
-        return new FactionPowerProfile(playerUuid, maximum, maximum, nextRegenerationAt);
-    }
-
     private static double finiteNonNegative(double value) {
         return Double.isFinite(value) ? Math.max(0D, value) : 0D;
     }

@@ -129,16 +129,6 @@ public final class ShieldManager {
         }
     }
 
-    public boolean isEligible(int factionId) {
-        ShieldStorage.ActivationRow row = activations.get(factionId);
-        return row == null || System.currentTimeMillis() >= row.eligibleAt();
-    }
-
-    public long eligibleAtMillis(int factionId) {
-        ShieldStorage.ActivationRow row = activations.get(factionId);
-        return row == null ? 0 : row.eligibleAt();
-    }
-
     public enum ActivateResult { OK, ALREADY_ACTIVE, COOLDOWN, NOT_ELIGIBLE, NO_PERMISSION, STORAGE_ERROR }
 
     public synchronized ActivateResult activate(int factionId, UUID actorUuid) {
@@ -197,9 +187,6 @@ public final class ShieldManager {
         int factionId = FactionsHook.getClaimFactionId(location);
         return factionId != FactionsHook.NO_FACTION && baseClaims.isBaseClaim(location) && isShieldActive(factionId);
     }
-
-    /** Shield intentionally protects Base Claims only; Raid Claims remain vulnerable. */
-    public boolean isBaseClaimProtected(Location location) { return isClaimProtected(location); }
 
     public long secondsUntilDeactivation(int factionId) {
         ShieldStorage.OverrideRow override = overrides.get(factionId);
@@ -292,18 +279,6 @@ public final class ShieldManager {
             plugin.getLogger().log(Level.SEVERE, "Failed to persist Shield schedule.", error);
             return ScheduleResult.STORAGE_ERROR;
         }
-    }
-
-    public synchronized ScheduleResult editSchedule(int factionId, int day, int startMinute,
-            int durationMinutes, Boolean pvp, UUID actor, boolean adminBypass) {
-        if (day < 0 || day > 6 || startMinute < 0 || startMinute >= 1_440
-                || durationMinutes < 0 || durationMinutes > maximumDailyMinutes) {
-            return ScheduleResult.INVALID;
-        }
-        ShieldSchedule base = editableSchedule(factionId);
-        ShieldSchedule changed = base.withDay(day, new ShieldSchedule.Window(startMinute, durationMinutes));
-        if (pvp != null) changed = changed.withPvpProtected(pvp);
-        return replaceSchedule(factionId, changed, actor, adminBypass);
     }
 
     public boolean isPvpProtected(Location location) {

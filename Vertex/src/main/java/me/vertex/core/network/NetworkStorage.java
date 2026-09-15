@@ -324,16 +324,6 @@ public final class NetworkStorage {
         }
     }
 
-    public void cancelQueuesFor(String shard) throws SQLException {
-        try (Connection connection = database.getConnection()) {
-            boolean previous=connection.getAutoCommit();connection.setAutoCommit(false);
-            try(PreparedStatement locks=connection.prepareStatement("DELETE FROM vertex_transfer_locks WHERE transfer_kind='QUEUE' AND player_uuid IN (SELECT player_uuid FROM vertex_queued_transfers WHERE destination_shard=?)");PreparedStatement statement = connection.prepareStatement(
-                    "DELETE FROM vertex_queued_transfers WHERE destination_shard=?")) {
-                locks.setString(1,shard);locks.executeUpdate();statement.setString(1, shard); statement.executeUpdate();connection.commit();
-            }catch(SQLException error){connection.rollback();throw error;}finally{connection.setAutoCommit(previous);}
-        }
-    }
-
     public void saveLocation(String type, String name, NetworkLocation location, String description) throws SQLException {
         String sql = upsert("vertex_global_locations", "location_type,location_name,shard_id,world,x,y,z,yaw,pitch,description,revision",
                 "?,?,?,?,?,?,?,?,?,?,?", "shard_id,world,x,y,z,yaw,pitch,description,revision");
@@ -387,14 +377,6 @@ public final class NetworkStorage {
         try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, player.toString()); statement.setString(2, normalize(type));
             statement.setLong(3, availableAt); statement.executeUpdate();
-        }
-    }
-
-    public void clearSeasonCooldowns() throws SQLException {
-        try (Connection connection = database.getConnection(); Statement statement = connection.createStatement()) {
-            statement.executeUpdate("DELETE FROM vertex_teleport_cooldowns");
-            statement.executeUpdate("DELETE FROM vertex_queued_transfers");
-            statement.executeUpdate("DELETE FROM vertex_transfer_locks WHERE transfer_kind='QUEUE'");
         }
     }
 

@@ -61,14 +61,6 @@ public final class ZoneMenu implements Listener {
         player.openInventory(inventory);
     }
 
-    public void openProgress(Player player) {
-        Inventory inventory = Bukkit.createInventory(new Holder(Kind.PROGRESS, null, false, 0), 27, messages.getGui(player, "zones.progress-title"));
-        inventory.setItem(11, progressItem(player, ZoneType.HAVEN, Material.EMERALD));
-        inventory.setItem(15, progressItem(player, ZoneType.RIFTLANDS, Material.CRYING_OBSIDIAN));
-        inventory.setItem(13, eventItem(player));
-        player.openInventory(inventory);
-    }
-
     public void openLoot(Player player, ZoneType type, boolean admin) {
         openLoot(player, type, admin, 0);
     }
@@ -198,19 +190,6 @@ public final class ZoneMenu implements Listener {
         if (event.getPlayer() instanceof Player player) player.sendMessage(zones.message(player, "zones.loot-saved"));
     }
 
-    private ItemStack progressItem(Player player, ZoneType type, Material material) {
-        long kills = zones.kills(player, type); long next = zones.nextMilestone(player, type);
-        List<Component> lore = new ArrayList<>(); lore.add(messages.getGui(player,"zones.progress-kills","kills",String.valueOf(kills))); lore.add(messages.getGui(player,"zones.progress-amplification","amount",String.valueOf(zones.progressionBoost(player,type))));
-        lore.add(messages.getGui(player,next==0?"zones.progress-maximum":"zones.progress-next","next",String.valueOf(next),"remaining",String.valueOf(Math.max(0,next-kills))));
-        return item(material, messages.getGui(player,type==ZoneType.HAVEN?"zones.progress-haven":"zones.progress-riftlands","zone",type.displayName()), lore);
-    }
-    private ItemStack eventItem(Player player) {
-        List<ZoneManager.Score> top = zones.topScoresForDisplay(); List<Component> lore = new ArrayList<>();
-        lore.add(messages.getGui(player,zones.eventRemainingSeconds()>0?"zones.event-time":"zones.event-inactive","seconds",String.valueOf(zones.eventRemainingSeconds())));
-        for (int i=0;i<top.size();i++) lore.add(messages.getGui(player,"zones.event-score","place",String.valueOf(i+1),"player",top.get(i).name(),"score",String.valueOf(top.get(i).score())));
-        lore.add(messages.getGui(player,"zones.event-player-boost","amount",String.valueOf(zones.winnerBoost(player))));
-        return item(Material.NETHER_STAR,messages.getGui(player,"zones.event-item-name"),lore);
-    }
     private void queueEditorRefresh(Player player, Inventory inventory, Holder holder) {
         Bukkit.getScheduler().runTask(plugin, () -> {
             cleanEditorItemsFromPlayer(player, holder.type);

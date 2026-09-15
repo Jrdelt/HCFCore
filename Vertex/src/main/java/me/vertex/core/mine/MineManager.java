@@ -426,10 +426,6 @@ public final class MineManager {
                 System.currentTimeMillis() + region.regenDelaySeconds() * 1000L);
     }
 
-    public int queuedRegenerations() {
-        return regenQueue.size();
-    }
-
     /**
      * Seeds every base block in the region from the ore table.
      *
@@ -532,17 +528,6 @@ public final class MineManager {
             return hours + "h " + minutes + "m";
         }
         return minutes > 0 ? minutes + "m " + (seconds % 60) + "s" : seconds + "s";
-    }
-
-    public boolean isFilling(String mineId) {
-        synchronized (fillJobs) {
-            for (FillJob job : fillJobs) {
-                if (job.mineId.equals(mineId)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     /** Advances the current fill by one bounded batch. */

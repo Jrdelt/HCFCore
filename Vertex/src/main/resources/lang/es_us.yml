@@ -36,11 +36,9 @@ admin:
 sandbot:
   usage: '<red>Uso: /sandbot give <player>|stop [player]'
   given: '<green>Le diste un Sand Bot a {player}.'
-  invalid-surface: '<red>Los Sand Bots deben colocarse sobre andesita, arenisca, arenisca roja o concreto.'
   not-own-claim: '<red>Los Sand Bots solo se pueden colocar en el claim de tu propia facción.'
   spawn-failed: '<red>No se pudo crear el Sand Bot -- ¿FancyNPCs está instalado y activado?'
   spawned: '<green>Sand Bot desplegado.'
-  out-of-funds: '<red>Tu Sand Bot se quedó sin fondos y desapareció.'
   stopped: '<green>Se detuvieron {amount} de tus Sand Bot(s) activos.'
   stopped-other: '<green>Se detuvieron {amount} Sand Bot(s) activos de {player}.'
   gui:
@@ -77,7 +75,6 @@ tags:
   unequipped: '<dark_red><bold>SIN EQUIPAR'
   click-select: '<gray>Haz clic para seleccionar este tag.'
   click-unselect: '<gray>Haz clic para quitar este tag.'
-  selected: '<green>Tag seleccionado: {tag}'
   info-created: '<gray>Creado: <white>{date}'
   info-owners: '<gray>Duenos: <white>{count}'
   sort-heading: '<aqua>Ordenando por: {sort}'
@@ -122,7 +119,6 @@ cooldowns:
   item-on-cooldown: '<red>✖ <gray>{item} <gray>está en enfriamiento durante otros <red>{seconds}s<gray>.'
 
 language:
-  usage: '<red>Uso: /language <codigo>'
   current: '<gray>Idioma actual: <white>{locale}'
   available: '<gray>Disponibles: <white>{locales}'
   unknown: '<red>Idioma desconocido ''{code}''. Disponibles: {locales}'
@@ -182,7 +178,6 @@ combat:
   loot-protected: '<red>✖ <gray>Only the killer can pick up this loot right now.'
 
 ghost-players:
-  spawned: '<yellow>Tu jugador fantasma permanece en el mundo hasta que sea derrotado o regreses.'
   restored: '<green>Tu jugador fantasma fue eliminado y tu inventario fue restaurado.'
   killed-on-login: '<red>Tu jugador fantasma fue derrotado mientras estabas desconectado.'
 
@@ -223,7 +218,6 @@ ability:
   mage-spell-cast: '<light_purple>Mage spell cast.'
   pearl-stunned: '<red>You cannot use pearls for another {seconds}s.'
   pearl-stunner-hit: '<green>Pearl stunner hit.'
-  rabbits-feed-used: '<green>Rabbit''s feed gave you speed v for {seconds}s.'
   ninja-star-no-target: '&e&lABILITES&r &7> <red>No has sido golpeado por un jugador recientemente.'
   ninja-star-not-in-combat: '&e&lABILITES&r &7> <red>Tu y tu objetivo deben estar en combate.'
   ninja-star-activated: '&e&lABILITES&r &7> <light_purple>Teletransportando hacia {player} en {seconds}s.'
@@ -244,7 +238,6 @@ reboot:
   not-scheduled: '<light_purple>★ <red>No hay ningun reinicio programado.'
 
 factions:
-  leader-cannot-leave: '<red>No puedes abandonar tu faccion como lider. Usa /f disband para disolverla.'
   must-be-in-faction: '<red>Debes estar en una faccion para establecer un punto de encuentro.'
   rally-usage: '<red>Uso: /f rally [set|clear]'
   permissions-leader-only: '<red>Solo Lider, Colider o Admin pueden cambiar los permisos de la faccion.'
@@ -357,7 +350,6 @@ staff:
   death-lore-left: '<yellow>Clic izquierdo: Restaurar a tu inventario'
   death-lore-right: '<yellow>Clic derecho: Ver contenido'
   restore-success: '<green>Se restauraron {added} objetos a tu inventario'
-  restore-overflow: '<yellow>{dropped} objetos cayeron al suelo (inventario lleno)'
   vanish-enabled: '&c&lSTAFF&r &7> <green>Vanish activado. Ahora estas oculto para los jugadores.'
   vanish-disabled: '&c&lSTAFF&r &7> <red>Vanish desactivado. Ahora eres visible para los jugadores.'
   staffchat-enabled: '&c&lSTAFF&r &7> <green>Chat de staff activado. Tus mensajes ahora solo van al staff.'
@@ -390,7 +382,6 @@ spawner:
   withdraw-one: '<green>Withdraw 1'
   withdraw-all: '<green>Withdraw All'
   withdrew: '<green>Withdrew {amount}x spawner(s).'
-  shop-title: 'Spawner Shop'
   shop-price: '<gray>Price: <white>{amount}'
   shop-hint: '<gray>Click to buy.'
   no-economy: '<red>✖ <gray>No economy plugin is installed. Contact staff.'
@@ -413,13 +404,7 @@ collector:
   stored-lore: '<gray>Stored: <yellow>{stored}'
   withdraw-amount-lore: '<gray>Left-click: <white>Choose amount'
   withdraw-shift-lore: '<gray>Shift-click: <white>Withdraw {amount}'
-  withdraw-title: 'Withdraw {item}'
   withdraw-chat-prompt: '&a&lCOLLECTOR&r &7> <yellow>Escribe en el chat cuantos <white>{item}<yellow> retirar <gray>(<white>{available}<gray> almacenados). <gray>Acepta <white>100k<gray>/<white>1.5m<gray>/<white>1b<gray>, o escribe <white>cancel<gray>.'
-  withdraw-prompt: 'Type amount'
-  withdraw-confirm: '<green>Withdraw {amount}'
-  withdraw-confirm-empty: '<gray>Type an amount'
-  withdraw-format-hint: '<gray>Acepta abreviaturas: <white>100k<gray>, <white>1.5m<gray>, <white>1b'
-  withdraw-invalid: '<red>Enter a whole number greater than zero.'
   withdraw-too-many: '<red>Only {available} of that item are stored.'
   upgrade-title: '<gold>Upgrade Storage'
   upgrade-maxed-title: '<gold>Max Tier'
@@ -479,7 +464,6 @@ blueprint:
   activate-enable-lore: '<gray>Starts building here immediately.'
   activate-cancel-title: '<red>Cancel'
   activate-cancel-lore: '<gray>Keeps your Blueprint item.'
-  menu-title: 'Blueprint Progress'
   menu-progress: '<gray>Placed: <yellow>{done} <gray>/ <yellow>{total}'
   menu-remaining: '<gray>Time left: <yellow>{seconds}s'
   menu-paused: '<yellow>Paused after server restart.'
@@ -488,8 +472,6 @@ blueprint:
   hologram-progress: '&7Progress: &e{progress}'
   hologram-paused: '&ePaused — right-click to resume'
   hologram-owner: '&7Owner: &b[{faction}] &f{owner}'
-  hologram-complete: '&aComplete'
-  hologram-aborted: '&cAborted -- land no longer claimed'
   repair-started: '<green>Repair initiated for {missing} missing blocks.'
   repair-not-needed: '<green>This Blueprint does not need repairs.'
   height-limit-exceeded: '<red>The structure exceeds the world build height limit!'
@@ -499,14 +481,6 @@ blueprint:
   holo-completed-damaged: '&cBlueprint incomplete (<missing> missing)'
   holo-completed-manage: '&7Right-click beacon to manage'
   holo-repair-progress: '<progress> (repairing)'
-  gui-confirm-title: '&8Confirm Blueprint'
-  gui-manage-title: '&8Blueprint: <template>'
-  gui-enable-button: '&a&lEnable Blueprint'
-  gui-enable-lore: '&7Click to start building this structure.'
-  gui-cancel-lore: '&7Click to tear down and refund.'
-  gui-repair-lore:
-    - '&7Missing blocks: &c<missing>'
-    - '&eClick to start repairs.'
 
 backpack:
   gui-title: '<dark_gray>Upgrade Your Backpack'
@@ -531,15 +505,12 @@ backpack:
   unknown-tier: '&e&lBACKPACKS &7> <red>No Backpack tier by that name.'
   invalid-item-type: '&e&lBACKPACKS &7> <red>That Backpack tier has an invalid item type.'
   invalid-level: '&e&lBACKPACKS &7> <red>Level must be a whole number.'
-  invalid-level-range: '&e&lBACKPACKS &7> <red>Level must be between 1 and {max}.'
   gave: '&e&lBACKPACKS &7> <green>Gave {player} a level {level} {tier}.'
   upgraded: '&e&lBACKPACKS &7> <green>Your backpack is now level {level}.'
   upgrade-maxed: '&e&lBACKPACKS &7> <gray>Your backpack is already at its max level ({level}).'
   cannot-afford: '&e&lBACKPACKS &7> <red>You can''t afford this upgrade ({amount}).'
   disabled: '&e&lBACKPACKS &7> <red>Backpacks are currently disabled.'
   must-be-single: '&e&lBACKPACKS &7> <red>Split this Backpack into a single item before opening it.'
-  cannot-store-backpack: '&e&lBACKPACKS &7> <red>You cannot store a Backpack inside a Backpack.'
-  capacity-reached: '&e&lBACKPACKS &7> <red>Tu Backpack esta lleno. Los objetos sobrantes fueron devueltos.'
   debug-enabled: '&e&lBACKPACKS &7> <green>Depuracion de Backpack activada. Repite la accion y envia la salida.'
   debug-disabled: '&e&lBACKPACKS &7> <gray>Depuracion de Backpack desactivada.'
   debug-trace: '&e&lBACKPACKS &7> <gray>DEBUG: {detail}'
@@ -702,7 +673,6 @@ coinflip:
   claim-all-claimed: "&6&lCOINFLIP&r &7> <green>Claimed everything in your stash."
   you-won: "&6&lCOINFLIP&r &7> <green><bold>You won the coinflip!"
   you-lost: "&6&lCOINFLIP&r &7> <red>You lost the coinflip."
-  pending-exp-applied: "&6&lCOINFLIP&r &7> <green>You were credited {levels} levels from a coinflip while you were offline."
   logs-empty: "&6&lCOINFLIP&r &7> <gray>No log entries found."
   logs-header: "&6&lCOINFLIP&r &7> <gray>Audit log, page {page}:"
   logs-line: "<gray>#{id} <white>{host}<gray> vs <white>{opponent} <gray>[{type}] {summary} -> winner: <yellow>{winner}<gray> ({status})"
@@ -711,7 +681,6 @@ shop:
   gui-title: "<dark_gray>ꜱʜᴏᴘ"
   category-gui-title: "<dark_gray>ꜱʜᴏᴘ ➜ {category}"
   category-title: "<yellow>{category}"
-  spawners-category-title: "<yellow>Generadores"
   category-open-lore: "<green>✔ Click to Open ✔"
   back-button: "<red>← Back to Categories"
   balance-title: "<gold><bold>ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ"
@@ -766,8 +735,6 @@ trade:
   wait-final: "&b&lTRADE&r &7> <gray>Waiting for final acceptance."
   inventory-full: "&b&lTRADE&r &7> <red>An inventory is full; trade cancelled."
   item-blocked: "&b&lTRADE&r &7> <red>That item cannot be traded."
-  toggle-on: "&b&lTRADE&r &7> <yellow>Incoming trades blocked."
-  toggle-off: "&b&lTRADE&r &7> <green>Incoming trades enabled."
   history-title: "<dark_gray>trade history • {player}"
   history-entry: "<yellow>trade #{id} • {player}"
   history-status: "<gray>status: <white>{status}"
@@ -791,10 +758,6 @@ auction:
   listing-shift-click-cancel: "<red>→ Shift-Click: Cancel"
   listing-right-click-watch: "<aqua>→ Right-Click: Add to Watchlist"
   listing-right-click-unwatch: "<aqua>→ Right-Click: Remove from Watchlist"
-  claim-button-empty: "<gray><bold>ʀᴇᴛᴜʀɴᴇᴅ ɪᴛᴇᴍꜱ"
-  claim-button-empty-lore: "<red>✖ Nothing to claim right now."
-  claim-button-has-items: "<green><bold>ʀᴇᴛᴜʀɴᴇᴅ ɪᴛᴇᴍꜱ"
-  claim-button-has-items-lore: "<green>✔ You have items waiting to be claimed! Click to open. ✔"
   claim-all-button: "<green><bold>ᴄʟᴀɪᴍ ᴀʟʟ"
   claim-all-lore: "<green>Click to claim every returned item."
   claim-all-empty-lore: "<gray>Nothing to claim right now."
@@ -803,7 +766,6 @@ auction:
   back-button: "<red>← Back"
   sort-title: "<yellow>Sorting by: {mode} ({direction})"
   sort-date-posted: "Date Posted"
-  sort-alphabetical: "Alphabetical"
   sort-price: "Price"
   sort-ascending: "Oldest/Lowest First"
   sort-descending: "Newest/Highest First"

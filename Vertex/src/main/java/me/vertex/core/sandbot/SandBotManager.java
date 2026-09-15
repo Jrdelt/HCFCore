@@ -146,10 +146,6 @@ public final class SandBotManager {
         return enabled;
     }
 
-    public static boolean isTriggerMaterial(Material material) {
-        return outputFor(material) != null;
-    }
-
     private static Material outputFor(Material trigger) {
         return switch (trigger) {
             case ANDESITE -> Material.GRAVEL;

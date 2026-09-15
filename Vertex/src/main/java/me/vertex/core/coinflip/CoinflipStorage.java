@@ -170,13 +170,6 @@ public final class CoinflipStorage {
                 status VARCHAR(16) NOT NULL,
                 cancelled_by CHAR(36) NULL
             )""";
-    private static final String CREATE_LOG_INDEX =
-            "CREATE INDEX IF NOT EXISTS idx_coinflip_log_resolved_at ON coinflip_log (resolved_at DESC)";
-    private static final String CREATE_CLAIMS_OWNER_INDEX =
-            "CREATE INDEX IF NOT EXISTS idx_coinflip_claims_winner ON coinflip_claims (winner_uuid)";
-    private static final String CREATE_NOTIFICATION_RECIPIENT_INDEX =
-            "CREATE INDEX IF NOT EXISTS idx_coinflip_result_notifications_recipient "
-                    + "ON coinflip_result_notifications (recipient_uuid)";
 
     private final Database database;
     private final String createCoinflips;
@@ -932,22 +925,6 @@ public final class CoinflipStorage {
         ClaimReservation reservation = reserveClaims(winnerUuid);
         if (!reservation.claims().isEmpty()) completeReservation(winnerUuid, reservation.token());
         return reservation.claims();
-    }
-
-    /** Deletes only the rendered claim rows, never claims created after a GUI opened. */
-    public void deleteClaimsById(List<Integer> ids) throws SQLException {
-        if (ids.isEmpty()) {
-            return;
-        }
-        String placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
-        try (Connection connection = database.getConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "DELETE FROM coinflip_claims WHERE id IN (" + placeholders + ")")) {
-            for (int index = 0; index < ids.size(); index++) {
-                statement.setInt(index + 1, ids.get(index));
-            }
-            statement.executeUpdate();
-        }
     }
 
     // ---- Self-bans ----

@@ -573,14 +573,6 @@ public final class FactionStorage {
         try (Connection connection = database.getConnection()) { saveFaction(connection, faction); }
     }
 
-    public boolean updateOpen(int factionId, boolean open) throws SQLException {
-        return updateFactionField(factionId, "open_join", statement -> statement.setBoolean(1, open));
-    }
-
-    public boolean updateDescription(int factionId, String description) throws SQLException {
-        return updateFactionField(factionId, "description", statement -> statement.setString(1, description));
-    }
-
     public FactionFieldWriteResult updateOpenChecked(UUID actor, int factionId,
             FactionRole expectedRole, boolean open) throws SQLException {
         return updateFactionFieldChecked(actor, factionId, expectedRole, "open", true,
@@ -702,12 +694,6 @@ public final class FactionStorage {
                 connection.setAutoCommit(previous);
             }
         }
-    }
-
-    /** Atomic rename/cooldown decision used by every shard. */
-    public RenameWriteResult renameFaction(int factionId, String nextTag, long now,
-            long availableAt) throws SQLException {
-        return renameFactionInternal(null, null, factionId, nextTag, now, availableAt);
     }
 
     public RenameWriteResult renameFactionChecked(UUID actor, FactionRole expectedRole,
@@ -864,51 +850,6 @@ public final class FactionStorage {
                 return DisbandWriteResult.OK;
             } catch (SQLException error) { connection.rollback(); throw error; }
             finally { connection.setAutoCommit(true); }
-        }
-    }
-
-    /** Rename and its next-allowed deadline cannot be committed independently. */
-    public void saveFactionAndRenameCooldown(FactionData faction, long availableAt) throws SQLException {
-        try (Connection connection = database.getConnection()) {
-            boolean previous = connection.getAutoCommit();
-            connection.setAutoCommit(false);
-            try {
-                saveFaction(connection, faction);
-                String sql = database.dialect() == Database.Dialect.SQLITE
-                        ? "INSERT INTO vertex_faction_cooldowns(faction_id,rename_available_at) VALUES(?,?) ON CONFLICT(faction_id) DO UPDATE SET rename_available_at=excluded.rename_available_at"
-                        : "INSERT INTO vertex_faction_cooldowns(faction_id,rename_available_at) VALUES(?,?) ON DUPLICATE KEY UPDATE rename_available_at=VALUES(rename_available_at)";
-                try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                    statement.setInt(1, faction.id());
-                    statement.setLong(2, availableAt);
-                    statement.executeUpdate();
-                }
-                connection.commit();
-            } catch (SQLException error) {
-                connection.rollback();
-                throw error;
-            } finally {
-                connection.setAutoCommit(previous);
-            }
-        }
-    }
-
-    /** Removes a departing leader, promotes a successor, and updates power atomically. */
-    public void removeLeaderAndTransfer(UUID formerLeader, FactionMember successor,
-            FactionData changedFaction) throws SQLException {
-        try (Connection connection = database.getConnection()) {
-            boolean previous = connection.getAutoCommit();
-            connection.setAutoCommit(false);
-            try {
-                deleteMember(connection, formerLeader);
-                saveMember(connection, successor);
-                saveFaction(connection, changedFaction);
-                connection.commit();
-            } catch (SQLException error) {
-                connection.rollback();
-                throw error;
-            } finally {
-                connection.setAutoCommit(previous);
-            }
         }
     }
 
@@ -1478,24 +1419,6 @@ public final class FactionStorage {
         }
     }
 
-    /** Saves personal power and its derived faction totals in one SQL commit. */
-    public void savePowerAndFaction(FactionPowerProfile profile, FactionData faction) throws SQLException {
-        try (Connection connection = database.getConnection()) {
-            boolean previous = connection.getAutoCommit();
-            connection.setAutoCommit(false);
-            try {
-                savePower(connection, profile);
-                if (faction != null) saveFaction(connection, faction);
-                connection.commit();
-            } catch (SQLException error) {
-                connection.rollback();
-                throw error;
-            } finally {
-                connection.setAutoCommit(previous);
-            }
-        }
-    }
-
     /**
      * Saves personal power and derives faction totals from durable membership.
      * This avoids writing an entire stale cached faction row from one shard.
@@ -1549,48 +1472,11 @@ public final class FactionStorage {
     private static boolean tableExists(Connection connection, String table) throws SQLException {
         return SqlSchema.tableExists(connection, table);
     }
-    public void deleteClaimsForFaction(int factionId) throws SQLException {
-        try (Connection connection = database.getConnection();
-             PreparedStatement statement = connection.prepareStatement("DELETE FROM vertex_faction_claims WHERE faction_id=?")) {
-            statement.setInt(1, factionId);
-            statement.executeUpdate();
-        }
-    }
     private void saveFaction(Connection connection, FactionData faction) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("UPDATE vertex_factions SET tag=?,tag_key=?,description=?,open_join=?,power=?,power_max=?,home_shard=?,home_world=?,home_x=?,home_y=?,home_z=?,home_yaw=?,home_pitch=? WHERE id=?")) {
             statement.setString(1, faction.tag()); statement.setString(2, normalize(faction.tag())); statement.setString(3, faction.description()); statement.setBoolean(4, faction.open()); statement.setDouble(5, faction.power()); statement.setDouble(6, faction.powerMax());
             FactionData.Home home = faction.home(); if (home == null) { statement.setNull(7, java.sql.Types.VARCHAR); statement.setNull(8, java.sql.Types.VARCHAR); statement.setNull(9, java.sql.Types.DOUBLE); statement.setNull(10, java.sql.Types.DOUBLE); statement.setNull(11, java.sql.Types.DOUBLE); statement.setNull(12, java.sql.Types.FLOAT); statement.setNull(13, java.sql.Types.FLOAT); } else { statement.setString(7, home.shardId()); statement.setString(8, home.world()); statement.setDouble(9, home.x()); statement.setDouble(10, home.y()); statement.setDouble(11, home.z()); statement.setFloat(12, home.yaw()); statement.setFloat(13, home.pitch()); }
             statement.setInt(14, faction.id()); statement.executeUpdate();
-        }
-    }
-
-    private boolean updateFactionField(int factionId, String column, SqlBinder binder) throws SQLException {
-        try (Connection connection = database.getConnection()) {
-            boolean previous = connection.getAutoCommit();
-            connection.setAutoCommit(false);
-            try {
-                FactionCapacity faction = lockFaction(connection, factionId);
-                if (faction == null || faction.system()) {
-                    connection.rollback();
-                    return false;
-                }
-                try (PreparedStatement statement = connection.prepareStatement(
-                        "UPDATE vertex_factions SET " + column + "=? WHERE id=?")) {
-                    binder.bind(statement);
-                    statement.setInt(2, factionId);
-                    if (statement.executeUpdate() != 1) {
-                        connection.rollback();
-                        return false;
-                    }
-                }
-                connection.commit();
-                return true;
-            } catch (SQLException error) {
-                connection.rollback();
-                throw error;
-            } finally {
-                connection.setAutoCommit(previous);
-            }
         }
     }
 

@@ -397,7 +397,6 @@ public final class ZoneManager {
     public boolean isIn(Player player, ZoneType type) { ZoneRegion region = regionAt(player.getLocation()); return region != null && region.type() == type; }
     public boolean isInAnyZone(Location location) { return regionAt(location) != null; }
     public boolean isFlying(UUID uuid) { return flights.containsKey(uuid); }
-    public boolean isEntering(UUID uuid) { return entries.containsKey(uuid); }
 
     // ---- admin selection -------------------------------------------------
     public ItemStack selectorItem() {
@@ -647,8 +646,6 @@ me.vertex.core.util.FlightEffects.renewSlowFall(player);
     }
     public void releaseFlightFromHit(Player player){if(flights.containsKey(player.getUniqueId()))releaseFlight(player.getUniqueId(),true);}
     public void recordFlightDisconnect(Player player) { Flight flight=flights.get(player.getUniqueId());if(flight==null||combat.isTagged(player.getUniqueId()))return;ZoneRegion region=region(flight.regionId);if(region==null)return;Location current=player.getLocation().clone();Location safe=findSafeGround(region,current);Location stored=safe==null?current:safe;releaseFlight(player.getUniqueId(),false);ZoneStorage.FlightReturn row=new ZoneStorage.FlightReturn(region.id(),stored.getWorld().getName(),stored.getX(),stored.getY(),stored.getZ());pendingFlightReturns.put(player.getUniqueId(),row);persist("flight-return:"+player.getUniqueId(),()->storage.saveFlightReturn(player.getUniqueId(),region.id(),stored.getWorld().getName(),stored.getX(),stored.getY(),stored.getZ())); }
-    /** Compatibility alias retained for older listeners; performs no JDBC. */
-    public void returnAfterFlightDisconnect(Player player) { completePlayerJoin(player); }
 
     // ---- mobs, loot, progression, sessions ------------------------------
     public void handleZoneDeath(LivingEntity entity, Player killer, List<ItemStack> vanillaDrops) {
@@ -846,7 +843,6 @@ me.vertex.core.util.FlightEffects.renewSlowFall(player);
         return (int) Math.min(config.maxLocalMobs(), (long) config.baseLocalMobs()
                 + (long) config.additionalPerPlayer() * (players - 1L));
     }
-    private int countZoneMobs(ZoneRegion region,World world){int count=0;Set<UUID> ids=zoneMobsByRegion.get(region.id());if(ids==null)return 0;for(UUID id:ids){Entity entity=Bukkit.getEntity(id);if(entity!=null&&entity.isValid()&&entity.getWorld().equals(world)&&region.contains(entity.getLocation()))count++;}return count;}
     private void despawnFarZoneMobs(ZoneRegion region,List<Player> active,double radius){Set<UUID> ids=zoneMobsByRegion.get(region.id());if(ids==null)return;double radiusSquared=radius*radius;for(UUID id:List.copyOf(ids)){Entity entity=Bukkit.getEntity(id);if(!(entity instanceof LivingEntity living)||!isZoneMob(entity)){ids.remove(id);continue;}boolean nearby=active.stream().anyMatch(player->player.getWorld().equals(entity.getWorld())&&player.getLocation().distanceSquared(entity.getLocation())<=radiusSquared);if(!nearby){entity.remove();ids.remove(id);}}}
     private boolean prepareMobWorld(World world,ZoneConfig config){if(world.getDifficulty()!=Difficulty.PEACEFUL){peacefulWorldWarnings.remove(world.getName());return true;}if(!config.forceNormalDifficulty()){if(peacefulWorldWarnings.add(world.getName()))plugin.getLogger().warning("Zone mobs cannot spawn in peaceful world '"+world.getName()+"'. Set mob-spawning.force-normal-difficulty to true or change the world's difficulty.");return false;}world.setDifficulty(Difficulty.NORMAL);peacefulWorldWarnings.remove(world.getName());plugin.getLogger().info("Changed zone world '"+world.getName()+"' from PEACEFUL to NORMAL so configured hostile zone mobs can spawn.");return true;}
     private List<List<Player>> clusters(List<Player> active,double radius){List<List<Player>> result=new ArrayList<>();Set<UUID> used=new HashSet<>();double radiusSquared=radius*radius;for(Player root:active){if(!used.add(root.getUniqueId()))continue;List<Player> cluster=new ArrayList<>();java.util.ArrayDeque<Player> queue=new java.util.ArrayDeque<>();cluster.add(root);queue.add(root);while(!queue.isEmpty()){Player current=queue.removeFirst();for(Player other:active){if(used.contains(other.getUniqueId())||!current.getWorld().equals(other.getWorld())||current.getLocation().distanceSquared(other.getLocation())>radiusSquared)continue;used.add(other.getUniqueId());cluster.add(other);queue.addLast(other);}}result.add(cluster);}return result;}
@@ -1095,7 +1091,6 @@ me.vertex.core.util.FlightEffects.renewSlowFall(player);
         setLootChance(clean, chance);
         return clean;
     }
-    public List<Score> topScoresForDisplay(){return topScores();}
     public String eventTopName(int place) { List<Score> top=topScores(); return place >= 1 && place <= top.size() ? top.get(place-1).name() : "-"; }
     public double eventTopScore(int place) { List<Score> top=topScores(); return place >= 1 && place <= top.size() ? top.get(place-1).score() : 0D; }
     public boolean eventActive() { return isEventActive(); }

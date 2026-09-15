@@ -639,17 +639,6 @@ public final class BlueprintManager {
         activeBuilds.remove(build.id());
     }
 
-    public int persistNew(Location anchor, BlueprintTemplate template, UUID ownerUuid, int ownerFactionId,
-            long startedAt) {
-        try {
-            return storage.insert(anchor, template.name(), ownerUuid.toString(), String.valueOf(ownerFactionId),
-                    startedAt);
-        } catch (Exception e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to persist a new blueprint build.", e);
-            return -1;
-        }
-    }
-
     /**
      * Database insert for a newly requested build; callers must return to the main
      * thread before touching Bukkit.

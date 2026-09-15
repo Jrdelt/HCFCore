@@ -900,14 +900,6 @@ public final class AuctionManager {
         });
     }
 
-    /** Restores a claim batch that could not be handed over (disconnect/full inventory). */
-    public void restoreClaims(UUID ownerUuid, List<ItemStack> items) {
-        if (items == null) return;
-        for (ItemStack item : items) {
-            if (item != null && !item.isEmpty()) queueClaim(ownerUuid, item.clone());
-        }
-    }
-
     private void queueClaim(UUID ownerUuid, ItemStack item) {
         long createdAt = System.currentTimeMillis();
         track(CompletableFuture.runAsync(() -> {

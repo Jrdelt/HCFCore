@@ -68,9 +68,6 @@ public final class RebootManager {
         return schedule(defaultDelayMinutes);
     }
     
-    public int getDefaultDelayMinutes() {
-        return defaultDelayMinutes;
-    }
 
     public boolean schedule(int delayMinutes) {
         if (rebootAt > System.currentTimeMillis()) {

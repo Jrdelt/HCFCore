@@ -170,19 +170,6 @@ public final class DupeManager {
         });
     }
 
-    /** Complete same-tick inventory snapshot; only simultaneous copies open a case. */
-    public void scanOnlineInventories() {
-        if (!enabled) {
-            return;
-        }
-        Map<String, List<Evidence>> observed = new LinkedHashMap<>();
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            scanInventory(player.getInventory(), player.getUniqueId().toString(), player.getName(), "inventory", observed);
-            scanInventory(player.getEnderChest(), player.getUniqueId().toString(), player.getName(), "ender-chest", observed);
-        }
-        inspectObserved(observed);
-    }
-
     /** Include an opened container in the next authoritative snapshot. */
     public void scanInventorySoon(Inventory inventory, String source) {
         if (!enabled || inventory == null) {

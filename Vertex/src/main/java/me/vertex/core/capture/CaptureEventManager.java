@@ -475,11 +475,6 @@ public final class CaptureEventManager implements Listener {
                 && capture.definition.contains(location));
     }
 
-    /** Public integration seam for the forthcoming shop: active boosts multiply rather than replace each other. */
-    public void grantFactionXpBooster(int factionId, double multiplier, long durationSeconds) {
-        xpBoosters.grant(factionId, multiplier, durationSeconds);
-    }
-
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
     public void onWandInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {

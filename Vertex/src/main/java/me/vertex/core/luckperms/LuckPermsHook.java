@@ -97,37 +97,6 @@ public final class LuckPermsHook {
     }
 
     /**
-     * The player's primary group's id, display name, and weight, resolved
-     * in one LuckPerms lookup -- for callers (the grouped tab list) that
-     * need all three together every render tick, rather than paying for
-     * {@link #getPrimaryGroupDisplayName} and a separate weight lookup
-     * each. Null under the same conditions as {@link #getPrimaryGroupDisplayName}:
-     * LuckPerms missing, no loaded user, or the group is LuckPerms' own
-     * unconfigured "default" base group.
-     */
-    public record GroupInfo(String id, String displayName, int weight) {
-    }
-
-    public static GroupInfo getPrimaryGroupInfo(Player player) {
-        if (!isAvailable()) {
-            return null;
-        }
-        LuckPerms api = LuckPermsProvider.get();
-        User user = api.getUserManager().getUser(player.getUniqueId());
-        if (user == null) {
-            return null;
-        }
-        Group group = highestWeightGroup(api, user);
-        String groupId = group == null ? user.getPrimaryGroup() : group.getName();
-        if ("default".equalsIgnoreCase(groupId)) {
-            return null;
-        }
-        String displayName = group == null ? null : group.getDisplayName();
-        int weight = group == null ? 0 : group.getWeight().orElse(0);
-        return new GroupInfo(groupId, displayName == null ? groupId : displayName, weight);
-    }
-
-    /**
      * LuckPerms' primary group is administrator-selectable and need not be
      * the rank that should win a visual sort. Vertex consistently uses the
      * highest inherited group weight for tab ordering and rank display.

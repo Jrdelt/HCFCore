@@ -266,13 +266,6 @@ public final class RaidClaimManager {
         }
     }
 
-    /** Stops tracking every raid-claim row belonging to a faction before /f unclaimall or disband. */
-    public synchronized void untrackFaction(int factionId) {
-        for (Map.Entry<ChunkKey, Entry> entry : List.copyOf(tracked.entrySet())) {
-            if (entry.getValue().factionId() == factionId) untrack(entry.getKey());
-        }
-    }
-
     public boolean isTracked(ChunkKey chunk) {
         return tracked.containsKey(chunk);
     }

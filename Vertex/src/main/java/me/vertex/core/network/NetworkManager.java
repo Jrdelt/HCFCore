@@ -559,10 +559,6 @@ public final class NetworkManager implements Listener {
         return result;
     }
 
-    private void transitionLocal(ShardState next, long etaMillis, String actor) {
-        setState(next, etaMillis, actor);
-    }
-
     /** Never starts evacuation until the shared shard state is durably closed to new arrivals. */
     private void transitionAndEvacuate(ShardState next, long etaMillis, long generation) {
         writeState(next, etaMillis, "planned-restart").thenAccept(saved ->

@@ -47,11 +47,6 @@ public final class FactionsHook {
                 .map(member -> member.role().displayName()).orElse("None");
     }
 
-    public static boolean isLeader(Player player) {
-        return player != null && optional().map(current -> current.member(player.getUniqueId()))
-                .map(member -> member.role() == FactionRole.LEADER).orElse(false);
-    }
-
     public static boolean isSameFaction(Player left, Player right) {
         if (left == null || right == null) return false;
         int first = getFactionId(left);
@@ -105,13 +100,6 @@ public final class FactionsHook {
     public static String getFactionName(int factionId) { return getFactionById(factionId).map(FactionData::tag).orElse("Neutral"); }
     public static int getFactionIdByTag(String tag) { return getFactionByTag(tag).map(FactionData::id).orElse(NO_FACTION); }
     public static boolean isAllyFaction(int first, int second) { return first != NO_FACTION && second != NO_FACTION && first != second && optional().map(current -> current.isAlly(first, second)).orElse(false); }
-    public static boolean isEnemyFaction(int first, int second) { return first != NO_FACTION && second != NO_FACTION && first != second && optional().map(current -> current.isEnemy(first, second)).orElse(false); }
-
-    public static int getFactionRank(int factionId) {
-        if (factionId == NO_FACTION) return -1;
-        return getFactionTopRanks().entrySet().stream().filter(entry -> entry.getKey() == factionId)
-                .map(Map.Entry::getValue).mapToInt(Integer::parseInt).findFirst().orElse(-1);
-    }
 
     public static String getClaimFactionTag(Location location) { return optional().map(current -> current.factionTagAt(location)).orElse(null); }
     public static int getClaimFactionId(Location location) { return optional().map(current -> current.factionIdAt(location)).orElse(NO_FACTION); }

@@ -36,11 +36,9 @@ admin:
 sandbot:
   usage: '<red>Uso: /sandbot give <player>|stop [player]'
   given: '<green>Você deu um Sand Bot para {player}.'
-  invalid-surface: '<red>Sand Bots devem ser colocados sobre andesito, arenito, arenito vermelho ou concreto.'
   not-own-claim: '<red>Sand Bots só podem ser colocados no claim da sua própria facção.'
   spawn-failed: '<red>Falha ao criar o Sand Bot -- FancyNPCs está instalado e ativado?'
   spawned: '<green>Sand Bot implantado.'
-  out-of-funds: '<red>Seu Sand Bot ficou sem fundos e desapareceu.'
   stopped: '<green>{amount} do(s) seu(s) Sand Bot(s) ativo(s) foram parados.'
   stopped-other: '<green>{amount} Sand Bot(s) ativo(s) de {player} foram parados.'
   gui:
@@ -77,7 +75,6 @@ tags:
   unequipped: '<dark_red><bold>NAO EQUIPADA'
   click-select: '<gray>Clique para selecionar esta tag.'
   click-unselect: '<gray>Clique para remover esta tag.'
-  selected: '<green>Tag selecionada: {tag}'
   info-created: '<gray>Criada: <white>{date}'
   info-owners: '<gray>Donos: <white>{count}'
   sort-heading: '<aqua>Ordenando por: {sort}'
@@ -122,7 +119,6 @@ cooldowns:
   item-on-cooldown: '<red>✖ <gray>{item} <gray>está em recarga por mais <red>{seconds}s<gray>.'
 
 language:
-  usage: '<red>Uso: /language <codigo>'
   current: '<gray>Idioma atual: <white>{locale}'
   available: '<gray>Disponiveis: <white>{locales}'
   unknown: '<red>Idioma desconhecido ''{code}''. Disponiveis: {locales}'
@@ -182,7 +178,6 @@ combat:
   loot-protected: '<red>✖ <gray>Only the killer can pick up this loot right now.'
 
 ghost-players:
-  spawned: '<yellow>Seu jogador fantasma fica no mundo ate ser derrotado ou voce voltar.'
   restored: '<green>Seu jogador fantasma foi removido e seu inventario foi restaurado.'
   killed-on-login: '<red>Seu jogador fantasma foi derrotado enquanto voce estava desconectado.'
 
@@ -223,7 +218,6 @@ ability:
   mage-spell-cast: '<light_purple>Mage spell cast.'
   pearl-stunned: '<red>You cannot use pearls for another {seconds}s.'
   pearl-stunner-hit: '<green>Pearl stunner hit.'
-  rabbits-feed-used: '<green>Rabbit''s feed gave you speed v for {seconds}s.'
   ninja-star-no-target: '&e&lABILITES&r &7> <red>Voce nao foi atingido por um jogador recentemente.'
   ninja-star-not-in-combat: '&e&lABILITES&r &7> <red>Voce e seu alvo precisam estar em combate.'
   ninja-star-activated: '&e&lABILITES&r &7> <light_purple>Teletransportando para {player} em {seconds}s.'
@@ -244,7 +238,6 @@ reboot:
   not-scheduled: '<light_purple>★ <red>Nenhum reinicio esta programado.'
 
 factions:
-  leader-cannot-leave: '<red>Voce nao pode sair da sua faccao como lider. Use /f disband para dissolve-la.'
   must-be-in-faction: '<red>Voce precisa estar em uma faccao para definir um ponto de encontro.'
   rally-usage: '<red>Uso: /f rally [set|clear]'
   permissions-leader-only: '<red>Apenas Lider, Colider ou Admin podem alterar as permissoes da faccao.'
@@ -357,7 +350,6 @@ staff:
   death-lore-left: '<yellow>Clique esquerdo: Restaurar ao seu inventario'
   death-lore-right: '<yellow>Clique direito: Ver conteudo'
   restore-success: '<green>{added} itens restaurados ao seu inventario'
-  restore-overflow: '<yellow>{dropped} itens foram derrubados no chao (inventario cheio)'
   vanish-enabled: '&c&lSTAFF&r &7> <green>Vanish ativado. Voce esta invisivel para os jogadores agora.'
   vanish-disabled: '&c&lSTAFF&r &7> <red>Vanish desativado. Voce esta visivel para os jogadores agora.'
   staffchat-enabled: '&c&lSTAFF&r &7> <green>Chat da staff ativado. Suas mensagens agora vao somente para a staff.'
@@ -390,7 +382,6 @@ spawner:
   withdraw-one: '<green>Withdraw 1'
   withdraw-all: '<green>Withdraw All'
   withdrew: '<green>Withdrew {amount}x spawner(s).'
-  shop-title: 'Spawner Shop'
   shop-price: '<gray>Price: <white>{amount}'
   shop-hint: '<gray>Click to buy.'
   no-economy: '<red>✖ <gray>No economy plugin is installed. Contact staff.'
@@ -413,13 +404,7 @@ collector:
   stored-lore: '<gray>Stored: <yellow>{stored}'
   withdraw-amount-lore: '<gray>Left-click: <white>Choose amount'
   withdraw-shift-lore: '<gray>Shift-click: <white>Withdraw {amount}'
-  withdraw-title: 'Withdraw {item}'
   withdraw-chat-prompt: '&a&lCOLLECTOR&r &7> <yellow>Digite no chat quantos <white>{item}<yellow> retirar <gray>(<white>{available}<gray> armazenados). <gray>Aceita <white>100k<gray>/<white>1.5m<gray>/<white>1b<gray>, ou digite <white>cancel<gray>.'
-  withdraw-prompt: 'Type amount'
-  withdraw-confirm: '<green>Withdraw {amount}'
-  withdraw-confirm-empty: '<gray>Type an amount'
-  withdraw-format-hint: '<gray>Aceita abreviacoes: <white>100k<gray>, <white>1.5m<gray>, <white>1b'
-  withdraw-invalid: '<red>Enter a whole number greater than zero.'
   withdraw-too-many: '<red>Only {available} of that item are stored.'
   upgrade-title: '<gold>Upgrade Storage'
   upgrade-maxed-title: '<gold>Max Tier'
@@ -479,7 +464,6 @@ blueprint:
   activate-enable-lore: '<gray>Starts building here immediately.'
   activate-cancel-title: '<red>Cancel'
   activate-cancel-lore: '<gray>Keeps your Blueprint item.'
-  menu-title: 'Blueprint Progress'
   menu-progress: '<gray>Placed: <yellow>{done} <gray>/ <yellow>{total}'
   menu-remaining: '<gray>Time left: <yellow>{seconds}s'
   menu-paused: '<yellow>Paused after server restart.'
@@ -488,8 +472,6 @@ blueprint:
   hologram-progress: '&7Progress: &e{progress}'
   hologram-paused: '&ePaused — right-click to resume'
   hologram-owner: '&7Owner: &b[{faction}] &f{owner}'
-  hologram-complete: '&aComplete'
-  hologram-aborted: '&cAborted -- land no longer claimed'
   repair-started: '<green>Repair initiated for {missing} missing blocks.'
   repair-not-needed: '<green>This Blueprint does not need repairs.'
   height-limit-exceeded: '<red>The structure exceeds the world build height limit!'
@@ -499,14 +481,6 @@ blueprint:
   holo-completed-damaged: '&cBlueprint incomplete (<missing> missing)'
   holo-completed-manage: '&7Right-click beacon to manage'
   holo-repair-progress: '<progress> (repairing)'
-  gui-confirm-title: '&8Confirm Blueprint'
-  gui-manage-title: '&8Blueprint: <template>'
-  gui-enable-button: '&a&lEnable Blueprint'
-  gui-enable-lore: '&7Click to start building this structure.'
-  gui-cancel-lore: '&7Click to tear down and refund.'
-  gui-repair-lore:
-    - '&7Missing blocks: &c<missing>'
-    - '&eClick to start repairs.'
 
 backpack:
   gui-title: '<dark_gray>Upgrade Your Backpack'
@@ -531,15 +505,12 @@ backpack:
   unknown-tier: '&e&lBACKPACKS &7> <red>No Backpack tier by that name.'
   invalid-item-type: '&e&lBACKPACKS &7> <red>That Backpack tier has an invalid item type.'
   invalid-level: '&e&lBACKPACKS &7> <red>Level must be a whole number.'
-  invalid-level-range: '&e&lBACKPACKS &7> <red>Level must be between 1 and {max}.'
   gave: '&e&lBACKPACKS &7> <green>Gave {player} a level {level} {tier}.'
   upgraded: '&e&lBACKPACKS &7> <green>Your backpack is now level {level}.'
   upgrade-maxed: '&e&lBACKPACKS &7> <gray>Your backpack is already at its max level ({level}).'
   cannot-afford: '&e&lBACKPACKS &7> <red>You can''t afford this upgrade ({amount}).'
   disabled: '&e&lBACKPACKS &7> <red>Backpacks are currently disabled.'
   must-be-single: '&e&lBACKPACKS &7> <red>Split this Backpack into a single item before opening it.'
-  cannot-store-backpack: '&e&lBACKPACKS &7> <red>You cannot store a Backpack inside a Backpack.'
-  capacity-reached: '&e&lBACKPACKS &7> <red>Sua Backpack esta cheia. Os itens excedentes foram devolvidos.'
   debug-enabled: '&e&lBACKPACKS &7> <green>Depuracao da Backpack ativada. Repita a acao e envie a saida.'
   debug-disabled: '&e&lBACKPACKS &7> <gray>Depuracao da Backpack desativada.'
   debug-trace: '&e&lBACKPACKS &7> <gray>DEBUG: {detail}'
@@ -702,7 +673,6 @@ coinflip:
   claim-all-claimed: "&6&lCOINFLIP&r &7> <green>Claimed everything in your stash."
   you-won: "&6&lCOINFLIP&r &7> <green><bold>You won the coinflip!"
   you-lost: "&6&lCOINFLIP&r &7> <red>You lost the coinflip."
-  pending-exp-applied: "&6&lCOINFLIP&r &7> <green>You were credited {levels} levels from a coinflip while you were offline."
   logs-empty: "&6&lCOINFLIP&r &7> <gray>No log entries found."
   logs-header: "&6&lCOINFLIP&r &7> <gray>Audit log, page {page}:"
   logs-line: "<gray>#{id} <white>{host}<gray> vs <white>{opponent} <gray>[{type}] {summary} -> winner: <yellow>{winner}<gray> ({status})"
@@ -711,7 +681,6 @@ shop:
   gui-title: "<dark_gray>ꜱʜᴏᴘ"
   category-gui-title: "<dark_gray>ꜱʜᴏᴘ ➜ {category}"
   category-title: "<yellow>{category}"
-  spawners-category-title: "<yellow>Spawners"
   category-open-lore: "<green>✔ Click to Open ✔"
   back-button: "<red>← Back to Categories"
   balance-title: "<gold><bold>ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ"
@@ -766,8 +735,6 @@ trade:
   wait-final: "&b&lTRADE&r &7> <gray>Waiting for final acceptance."
   inventory-full: "&b&lTRADE&r &7> <red>An inventory is full; trade cancelled."
   item-blocked: "&b&lTRADE&r &7> <red>That item cannot be traded."
-  toggle-on: "&b&lTRADE&r &7> <yellow>Incoming trades blocked."
-  toggle-off: "&b&lTRADE&r &7> <green>Incoming trades enabled."
   history-title: "<dark_gray>trade history • {player}"
   history-entry: "<yellow>trade #{id} • {player}"
   history-status: "<gray>status: <white>{status}"
@@ -791,10 +758,6 @@ auction:
   listing-shift-click-cancel: "<red>→ Shift-Click: Cancel"
   listing-right-click-watch: "<aqua>→ Right-Click: Add to Watchlist"
   listing-right-click-unwatch: "<aqua>→ Right-Click: Remove from Watchlist"
-  claim-button-empty: "<gray><bold>ʀᴇᴛᴜʀɴᴇᴅ ɪᴛᴇᴍꜱ"
-  claim-button-empty-lore: "<red>✖ Nothing to claim right now."
-  claim-button-has-items: "<green><bold>ʀᴇᴛᴜʀɴᴇᴅ ɪᴛᴇᴍꜱ"
-  claim-button-has-items-lore: "<green>✔ You have items waiting to be claimed! Click to open. ✔"
   claim-all-button: "<green><bold>ᴄʟᴀɪᴍ ᴀʟʟ"
   claim-all-lore: "<green>Click to claim every returned item."
   claim-all-empty-lore: "<gray>Nothing to claim right now."
@@ -803,7 +766,6 @@ auction:
   back-button: "<red>← Back"
   sort-title: "<yellow>Sorting by: {mode} ({direction})"
   sort-date-posted: "Date Posted"
-  sort-alphabetical: "Alphabetical"
   sort-price: "Price"
   sort-ascending: "Oldest/Lowest First"
   sort-descending: "Newest/Highest First"

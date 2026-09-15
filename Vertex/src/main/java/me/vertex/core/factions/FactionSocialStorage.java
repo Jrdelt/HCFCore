@@ -71,10 +71,6 @@ public final class FactionSocialStorage {
         try (Connection connection = database.getConnection()) { saveRequest(connection, request); }
     }
 
-    public void deleteRequest(int requester, int target, FactionRelation relation) throws SQLException {
-        try(Connection c=database.getConnection();PreparedStatement s=c.prepareStatement("DELETE FROM vertex_faction_relation_requests WHERE requester_id=? AND target_id=? AND relation=?")){s.setInt(1,requester);s.setInt(2,target);s.setString(3,relation.name());s.executeUpdate();}
-    }
-
     public void saveBan(Ban ban) throws SQLException {
         String sql=database.dialect()==Database.Dialect.SQLITE?"INSERT INTO vertex_faction_bans(faction_id,player_uuid,player_name,banned_by,banned_at) VALUES(?,?,?,?,?) ON CONFLICT(faction_id,player_uuid) DO UPDATE SET player_name=excluded.player_name,banned_by=excluded.banned_by,banned_at=excluded.banned_at":"INSERT INTO vertex_faction_bans(faction_id,player_uuid,player_name,banned_by,banned_at) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE player_name=VALUES(player_name),banned_by=VALUES(banned_by),banned_at=VALUES(banned_at)";
         try(Connection c=database.getConnection();PreparedStatement s=c.prepareStatement(sql)){s.setInt(1,ban.factionId());s.setString(2,ban.playerUuid().toString());s.setString(3,ban.playerName());s.setString(4,string(ban.bannedBy()));s.setLong(5,ban.bannedAt());s.executeUpdate();}

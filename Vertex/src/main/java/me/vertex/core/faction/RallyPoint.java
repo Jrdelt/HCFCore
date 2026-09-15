@@ -32,13 +32,4 @@ public final class RallyPoint {
         return playerLoc.distance(location);
     }
 
-    public float getYawTowards(Player player) {
-        Location from = player.getLocation();
-        if (from == null) return 0;
-        double dx = location.getX() - from.getX();
-        double dz = location.getZ() - from.getZ();
-        float yaw = (float) Math.atan2(-dx, dz);
-        yaw = (float) Math.toDegrees(yaw);
-        return yaw;
-    }
 }

@@ -834,20 +834,12 @@ public final class FactionService {
         }
     }
 
-    public synchronized void invalidateInvite(int factionId, UUID player) {
-        try {
-            storage.deleteInvite(factionId, player);
-            invites.remove(new FactionStorage.InviteKey(factionId, player));
-        } catch (SQLException error) {
-            log("Could not invalidate faction invite", error);
-        }
-    }
     /** Cache-only companion for callers that deleted the invite in their own SQL transaction. */
     synchronized void invalidateInviteCache(int factionId, UUID player) {
         invites.remove(new FactionStorage.InviteKey(factionId, player));
     }
     public FactionRelation relation(int left,int right) { if(left==NO_FACTION||right==NO_FACTION||left==right)return FactionRelation.NEUTRAL;FactionRelation a=relations.getOrDefault(new FactionStorage.RelationKey(left,right),FactionRelation.NEUTRAL);FactionRelation b=relations.getOrDefault(new FactionStorage.RelationKey(right,left),FactionRelation.NEUTRAL);if(a==FactionRelation.ENEMY||b==FactionRelation.ENEMY)return FactionRelation.ENEMY;if(a==FactionRelation.ALLY&&b==FactionRelation.ALLY)return FactionRelation.ALLY;return FactionRelation.NEUTRAL; }
-    public boolean isAlly(int left,int right){return relation(left,right)==FactionRelation.ALLY;} public boolean isEnemy(int left,int right){return relation(left,right)==FactionRelation.ENEMY;}
+    public boolean isAlly(int left,int right){return relation(left,right)==FactionRelation.ALLY;} 
 
     public synchronized Result setHome(Player player, Location location) {
         FactionMember member=player==null?null:members.get(player.getUniqueId());
@@ -909,7 +901,6 @@ public final class FactionService {
     private Result savePermission(UUID actor,int factionId,String bucket,String action,boolean allowed){String safe=normalizeAction(action);try{FactionStorage.PermissionWriteResult saved=storage.savePermissionChecked(actor,factionId,bucket,safe,allowed);if(saved==FactionStorage.PermissionWriteResult.NOT_AUTHORIZED)return Result.NO_PERMISSION;if(saved!=FactionStorage.PermissionWriteResult.OK)return Result.NO_FACTION;permissions.put(new FactionStorage.PermissionKey(factionId,bucket,safe),allowed);return Result.OK;}catch(SQLException error){log("Could not save faction permission",error);return Result.DATABASE_ERROR;}}
     public boolean actionAllowed(int factionId,String role,String action){if(role!=null&&role.equalsIgnoreCase("ally")){String safe=normalizeAction(action);return permissions.getOrDefault(new FactionStorage.PermissionKey(factionId,"ally",safe),false);}return hasAction(factionId,FactionRole.parse(role,FactionRole.MEMBER),action);}
 
-    public boolean canBuild(Player player,Location location){return canPlace(player,location)&&canBreak(player,location);}
     public boolean canPlace(Player player,Location location){return territoryAction(player,location,"place-blocks","place-blocks");}
     public boolean canBreak(Player player,Location location){return territoryAction(player,location,"break-blocks","break-blocks");}
     private boolean territoryAction(Player player,Location location,String memberAction,String allyAction){if(player==null||location==null)return false;if(player.hasPermission("vertex.factions.bypass"))return true;int owner=factionIdAt(location);if(owner==NO_FACTION)return true;FactionMember member=members.get(player.getUniqueId());if(member==null)return false;if(member.factionId()==owner)return hasAction(member,memberAction);return alliesCanBuild&&isAlly(member.factionId(),owner)&&actionAllowed(owner,"ally",allyAction);}
@@ -1000,7 +991,6 @@ public final class FactionService {
     public long renameAvailableInMillis(int factionId) {
         return Math.max(0L, renameCooldowns.getOrDefault(factionId, 0L) - System.currentTimeMillis());
     }
-    public double powerCap(int factionId) { return faction(factionId).map(FactionData::powerMax).orElse(0D); }
 
     private boolean persistPersonalPower(FactionPowerProfile profile) {
         try {
@@ -1046,7 +1036,7 @@ public final class FactionService {
         }
     }
     public FactionStorage.PlayerSettings settings(UUID uuid){return playerSettings.getOrDefault(uuid,FactionStorage.PlayerSettings.DEFAULT);} public synchronized FactionStorage.PlayerSettings setSettings(UUID uuid,FactionStorage.PlayerSettings value){try{storage.savePlayerSettings(uuid,value);playerSettings.put(uuid,value);return value;}catch(SQLException error){log("Could not save faction player settings",error);return settings(uuid);}}
-    public boolean toggleAutoclaim(UUID uuid){FactionStorage.PlayerSettings old=settings(uuid);return setSettings(uuid,new FactionStorage.PlayerSettings(old.chatMode(),!old.autoclaim(),old.mapEnabled())).autoclaim();} public boolean toggleMap(UUID uuid){FactionStorage.PlayerSettings old=settings(uuid);return setSettings(uuid,new FactionStorage.PlayerSettings(old.chatMode(),old.autoclaim(),!old.mapEnabled())).mapEnabled();} public void setMap(UUID uuid,boolean enabled){FactionStorage.PlayerSettings old=settings(uuid);setSettings(uuid,new FactionStorage.PlayerSettings(old.chatMode(),old.autoclaim(),enabled));} public String setChat(UUID uuid,boolean faction){return setChatMode(uuid,faction?"FACTION":"PUBLIC");} public String setChatMode(UUID uuid,String mode){FactionStorage.PlayerSettings old=settings(uuid);String normalized="ALLY".equalsIgnoreCase(mode)?"ALLY":"FACTION".equalsIgnoreCase(mode)?"FACTION":"PUBLIC";return setSettings(uuid,new FactionStorage.PlayerSettings(normalized,old.autoclaim(),old.mapEnabled())).chatMode();} public String toggleChat(UUID uuid){return setChat(uuid,!settings(uuid).chatMode().equals("FACTION"));}
+    public boolean toggleAutoclaim(UUID uuid){FactionStorage.PlayerSettings old=settings(uuid);return setSettings(uuid,new FactionStorage.PlayerSettings(old.chatMode(),!old.autoclaim(),old.mapEnabled())).autoclaim();} public void setMap(UUID uuid,boolean enabled){FactionStorage.PlayerSettings old=settings(uuid);setSettings(uuid,new FactionStorage.PlayerSettings(old.chatMode(),old.autoclaim(),enabled));} public String setChat(UUID uuid,boolean faction){return setChatMode(uuid,faction?"FACTION":"PUBLIC");} public String setChatMode(UUID uuid,String mode){FactionStorage.PlayerSettings old=settings(uuid);String normalized="ALLY".equalsIgnoreCase(mode)?"ALLY":"FACTION".equalsIgnoreCase(mode)?"FACTION":"PUBLIC";return setSettings(uuid,new FactionStorage.PlayerSettings(normalized,old.autoclaim(),old.mapEnabled())).chatMode();} public String toggleChat(UUID uuid){return setChat(uuid,!settings(uuid).chatMode().equals("FACTION"));}
     public void sendFactionChat(Player sender,String message){FactionMember member=sender==null?null:members.get(sender.getUniqueId());if(member==null||messages==null)return;for(Player online:Bukkit.getOnlinePlayers())if(factionId(online)==member.factionId())online.sendMessage(messages.get(online,"native-factions.chat-format","faction",faction(member.factionId()).map(FactionData::tag).orElse("Faction"),"player",sender.getName(),"message",message));}
     public void sendAllyChat(Player sender,String message){FactionMember member=sender==null?null:members.get(sender.getUniqueId());if(member==null||messages==null)return;String tag=faction(member.factionId()).map(FactionData::tag).orElse("Faction");for(Player online:Bukkit.getOnlinePlayers()){int target=factionId(online);if(target==member.factionId()||isAlly(member.factionId(),target))online.sendMessage(messages.get(online,"native-factions.ally-chat-format","faction",tag,"player",sender.getName(),"message",message));}}
     public Component map(Player viewer) {
@@ -1146,7 +1136,6 @@ public final class FactionService {
     public boolean configuredActionDefaultFor(FactionRole role, String action) {
         return role != null && configuredActionDefault(role, action);
     }
-    private double defaultPower(){return powerStartingPerMember;} private double defaultPowerMax(){return powerMaxPerMember;}
     private static int bounded(int value,int min,int max){return Math.max(min,Math.min(max,value));}
     private static double positive(double value,double fallback){return Double.isFinite(value)&&value>=0D?value:fallback;}
     private static long safeAddMillis(long left, long right) {

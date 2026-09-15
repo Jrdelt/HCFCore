@@ -9,7 +9,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Durable storage for current Shield activations, cooldown/eligibility
@@ -209,16 +208,6 @@ public final class ShieldStorage {
             statement.setString(6, row.activatedByUuid());
             statement.executeUpdate();
         }
-    }
-
-    public void deleteActivation(int factionId) throws SQLException {
-        withFactionLock(factionId, connection -> {
-            try (PreparedStatement statement = connection.prepareStatement(
-                    "DELETE FROM faction_shield_activations WHERE faction_id = ?")) {
-                statement.setInt(1, factionId);
-                statement.executeUpdate();
-            }
-        });
     }
 
     public record WeeklyRow(int factionId,String currentSchedule,boolean currentPvp,String pendingSchedule,
@@ -443,61 +432,6 @@ public final class ShieldStorage {
         return results.wasNull() ? null : value;
     }
 
-    public void upsertRow(ShieldRow row) throws SQLException {
-        boolean sqlite = database.dialect() == Database.Dialect.SQLITE;
-        String sql = sqlite
-                ? "INSERT INTO faction_shields (faction_id, schedule_start_minute, schedule_duration_minutes, "
-                + "pending_start_minute, pending_duration_minutes, pending_activates_at, frozen_resume_until, new_faction_eligible_at) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(faction_id) DO UPDATE SET "
-                + "schedule_start_minute = excluded.schedule_start_minute, "
-                + "schedule_duration_minutes = excluded.schedule_duration_minutes, "
-                + "pending_start_minute = excluded.pending_start_minute, "
-                + "pending_duration_minutes = excluded.pending_duration_minutes, "
-                + "pending_activates_at = excluded.pending_activates_at, "
-                + "frozen_resume_until = excluded.frozen_resume_until, "
-                + "new_faction_eligible_at = excluded.new_faction_eligible_at"
-                : "INSERT INTO faction_shields (faction_id, schedule_start_minute, schedule_duration_minutes, "
-                + "pending_start_minute, pending_duration_minutes, pending_activates_at, frozen_resume_until, new_faction_eligible_at) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE "
-                + "schedule_start_minute = VALUES(schedule_start_minute), "
-                + "schedule_duration_minutes = VALUES(schedule_duration_minutes), "
-                + "pending_start_minute = VALUES(pending_start_minute), "
-                + "pending_duration_minutes = VALUES(pending_duration_minutes), "
-                + "pending_activates_at = VALUES(pending_activates_at), "
-                + "frozen_resume_until = VALUES(frozen_resume_until), "
-                + "new_faction_eligible_at = VALUES(new_faction_eligible_at)";
-        withFactionLock(row.factionId(), connection -> {
-            try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setInt(1, row.factionId());
-                setNullableInt(statement, 2, row.scheduleStartMinute());
-                setNullableInt(statement, 3, row.scheduleDurationMinutes());
-                setNullableInt(statement, 4, row.pendingStartMinute());
-                setNullableInt(statement, 5, row.pendingDurationMinutes());
-                setNullableLong(statement, 6, row.pendingActivatesAt());
-                setNullableLong(statement, 7, row.frozenResumeUntil());
-                statement.setLong(8, row.newFactionEligibleAt());
-                statement.executeUpdate();
-            }
-        });
-    }
-
-    public void deleteRow(int factionId) throws SQLException {
-        try (Connection connection = database.getConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "DELETE FROM faction_shields WHERE faction_id = ?")) {
-            statement.setInt(1, factionId);
-            statement.executeUpdate();
-        }
-    }
-
-    private static void setNullableInt(PreparedStatement statement, int index, Integer value) throws SQLException {
-        if (value == null) {
-            statement.setNull(index, java.sql.Types.INTEGER);
-        } else {
-            statement.setInt(index, value);
-        }
-    }
-
     private static void setNullableLong(PreparedStatement statement, int index, Long value) throws SQLException {
         if (value == null) {
             statement.setNull(index, java.sql.Types.BIGINT);
@@ -509,22 +443,6 @@ public final class ShieldStorage {
     // ---- Overrides ----
 
     public record OverrideRow(int factionId, String forcedState, Long frozenRemainingMillis, String setByUuid, long setAt) { }
-
-    public Optional<OverrideRow> loadOverride(int factionId) throws SQLException {
-        try (Connection connection = database.getConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "SELECT faction_id, forced_state, frozen_remaining_millis, set_by_uuid, set_at "
-                             + "FROM faction_shield_overrides WHERE faction_id = ?")) {
-            statement.setInt(1, factionId);
-            try (ResultSet results = statement.executeQuery()) {
-                if (!results.next()) {
-                    return Optional.empty();
-                }
-                return Optional.of(new OverrideRow(results.getInt(1), results.getString(2),
-                        nullableLong(results, "frozen_remaining_millis"), results.getString(4), results.getLong(5)));
-            }
-        }
-    }
 
     public List<OverrideRow> loadAllOverrides() throws SQLException {
         List<OverrideRow> rows = new ArrayList<>();

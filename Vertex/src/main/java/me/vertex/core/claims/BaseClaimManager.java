@@ -163,14 +163,6 @@ public final class BaseClaimManager {
         return region != null && FactionsHook.getClaimFactionId(location) == region.factionId() ? region : null;
     }
 
-    public boolean isAnchor(int factionId, ChunkKey chunk) {
-        Map<Integer, Region> regions = regionsByFaction.get(factionId);
-        if (regions == null) {
-            return false;
-        }
-        return regions.values().stream().anyMatch(region -> region.anchor.equals(chunk));
-    }
-
     public int unlockedSlots(int factionId) {
         int legacy = 1 + purchasedSlots.getOrDefault(factionId, Set.of()).size();
         return Math.max(1, Math.min(MAX_SLOTS, Math.max(legacy, upgradeSlotProvider.applyAsInt(factionId))));
@@ -182,10 +174,6 @@ public final class BaseClaimManager {
 
     public int maxChunksPerRegion() {
         return maxChunksPerRegion;
-    }
-
-    public List<Region> regionsOf(int factionId) {
-        return List.copyOf(regionsByFaction.getOrDefault(factionId, Map.of()).values());
     }
 
     public Region region(int factionId, int slotIndex) {

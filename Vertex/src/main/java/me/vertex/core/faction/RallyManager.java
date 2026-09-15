@@ -6,8 +6,6 @@ import me.vertex.core.lang.Messages;
 import me.vertex.core.lang.MessageFormatter;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -87,10 +85,6 @@ public final class RallyManager implements Listener {
                     "y", String.valueOf(location.getBlockY()), "z", String.valueOf(location.getBlockZ()),
                     "world", location.getWorld().getName()));
         }
-    }
-
-    public void setRallyExpiry(int factionId) {
-        rallyExpires.put(factionId, System.currentTimeMillis() + RALLY_DURATION_MILLIS);
     }
 
     public void clearRally(int factionId) {

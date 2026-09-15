@@ -41,10 +41,6 @@ public final class EnchantDefinition {
             effectSettings = effectSettings == null ? Map.of() : Map.copyOf(effectSettings);
         }
 
-        public double failureRate() {
-            return Math.max(0D, Math.min(100D, 100D - successRate));
-        }
-
         /** Returns one optional numeric setting without tying the config to Java fields. */
         public double setting(String key, double fallback) {
             if (key == null || key.isBlank()) {

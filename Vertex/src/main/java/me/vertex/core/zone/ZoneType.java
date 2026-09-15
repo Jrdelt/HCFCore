@@ -19,10 +19,6 @@ public enum ZoneType {
         return displayName;
     }
 
-    public boolean pvpEnabled() {
-        return pvp;
-    }
-
     public String configKey() {
         return name().toLowerCase(Locale.ROOT);
     }
