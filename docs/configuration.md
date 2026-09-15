@@ -251,26 +251,33 @@ config shape. A quick summary of what lives here:
 
 ```yaml
 factions:
+  lifecycle: {create-after-disband-cooldown-seconds: 60, rename-cooldown-seconds: 21600}
   tag-pattern: '[A-Za-z0-9_]{3,16}'
   prevent-leader-leave: true
   open-join-enabled: true
   invite-expiry-seconds: 300
-  limits: {members: 30, claims: 250, claim-radius: 5, warps: 5}
-  claims: {require-connected: false, power-per-chunk: 0.0, allow-overclaim: false,
-    overclaim-power-ratio: 1.0}
+  power: {default-current: 100.0, default-max: 100.0, absolute-player-cap: 5000.0,
+    death-loss: 1.0, regeneration-per-interval: 1.0, regeneration-interval-seconds: 120}
+  limits: {members: 16, claims: 250, claim-radius: 5, warps: 5}
+  claims: {require-connected: false, overclaiming: {enabled: false}}
+  relations: {ally-limit: 1, request-expiry-seconds: 7200}
+  focus: {duration-seconds: 900, concurrent-targets: 2}
   map: {width: 41, height: 20} # Fills expanded chat; limits are 41x21.
-  power: {starting-per-member: 10.0, max-per-member: 10.0, death-loss: 2.0,
-    regeneration-per-interval: 0.1, regeneration-interval-seconds: 60}
   pvp: {friendly-fire: false, allies-can-pvp: false}
   protection: {allies-can-build: false}
   system-claims: {safezone-tag: SafeZone, warzone-tag: WarZone, no-pvp-tags: [SafeZone], max-chunks-per-tick: 64}
 ```
 
-- **`prevent-leader-leave`** — when true, a faction leader's `/f leave`
-  (or any alias in `command-aliases`) is cancelled with an explanatory
-  message instead of going through. This stops a leader from
-  accidentally (or exploit-ably) leaving their own faction without
-  transferring leadership first.
+- **`prevent-leader-leave`** — when true (the default), a faction leader's
+  `/f leave` is refused with a message telling them to transfer leadership
+  with `/f leader <player>` first. When false, the leader leaves and
+  leadership passes to the highest-ranked remaining member automatically.
+  Either way, a leader who is the faction's only member must disband instead.
+- **`protection.allies-can-build`** — server-wide switch for ally building.
+  When false (the default), allies can never place or break blocks in your
+  claims, even if the faction allows it in `/f permissions`. When true, each
+  faction's ally place/break permissions apply. Ally container, door and
+  sethome permissions are not affected.
 - **`tag-pattern`** — Java regular expression accepted by `/f create` and
   `/f rename`; an invalid expression safely uses the default.
 - **`open-join-enabled`**, **`invite-expiry-seconds`**, **`limits`**,

@@ -14,7 +14,7 @@ through `/f permissions`; only command-level visibility is shown below.
 |---|---|---|
 | `/f create <tag>` | Follows faction-state rules; open command surface is always available | Create a faction. Tags follow `factions.tag-pattern`. |
 | `/f invite <player>` / `/f join <faction>` | Role-/state-gated (see `/f permissions` and invite flow) | Invite and join factions. Invites expire after the configured time. |
-| `/f leave`, `/f kick <player>`, `/f promote <player>`, `/f demote <player>`, `/f leader <player>` | Role-gated (`Leader` and `Admin` controls most role changes) | Manage membership and roles. Leaders must transfer leadership before leaving when `prevent-leader-leave` is enabled. |
+| `/f leave`, `/f kick <player>`, `/f promote <player>`, `/f demote <player>`, `/f leader <player>` | Role-gated (`Leader` and `Admin` controls most role changes) | Manage membership and roles. Leaders must transfer leadership before leaving when `prevent-leader-leave` is enabled (the default); otherwise leadership passes automatically. |
 | `/f claim [radius]`, `/f unclaim`, `/f unclaimall`, `/f autoclaim` | Open to members by claim-role checks in `/f permissions` | Manage chunk claims. Radius is bounded by configuration. |
 | `/f who [faction or player]`, `/f list` | Open to all players | Inspect factions and members. |
 | `/f ally`, `/f neutral`, `/f enemy <faction>` | Relation actions follow faction role permission model | Manage the three supported relations. Ally and Enemy-to-Neutral require request/acceptance; Enemy is unilateral and either faction can unally to Neutral. |
@@ -37,8 +37,9 @@ remain available under the native root.
 Vertex validates build/break, container access, doors/switches, bucket fill and
 empty, and direct/projectile player PvP on the server. Factionless players
 cannot build or use protected blocks in claims. Members need the relevant rank
-action; allies can build only when
-`factions.protection.allies-can-build` is enabled. Friendly-fire and ally-PvP
+action; allies can place or break blocks only when
+`factions.protection.allies-can-build` is enabled and the claim's faction also
+allows it for allies in `/f permissions`. Friendly-fire and ally-PvP
 are controlled by `factions.pvp`.
 
 Claims are stored by world and chunk. Base Claims, Raid Claims, Chunk

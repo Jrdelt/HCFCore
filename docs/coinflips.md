@@ -204,8 +204,7 @@ Vault/EXP credit, because those external APIs cannot accept an idempotency key.
 | `gui-refresh-interval-ticks` | How often the open Active Coinflips browser re-renders in place for everyone viewing it; 1 tick (the fastest a server can meaningfully update) by default |
 | `log-retention-days` | How long resolved/cancelled log entries are kept; 0 = forever |
 
-`broadcast-results` (server-wide chat announcement of who won what) is
-also configurable, on by default.
+Results are not announced server-wide; only new listings are announced.
 
 After changing this file, run `/vertex reload` or restart the server.
 

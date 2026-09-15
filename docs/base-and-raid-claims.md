@@ -152,8 +152,8 @@ already bought; it is not written by current gameplay.
 | Command | Permission | Notes |
 |---|---|---|
 | `/f baseclaim` | `vertex.baseclaim.view` | Opens the info/removal GUI if standing on an existing Base Claim; otherwise attempts to create one. |
-| `/f baseclaim` (create) | `vertex.baseclaim.create` | Leader/Co-Leader only. |
-| Remove confirm (GUI) | `vertex.baseclaim.remove` | Leader/Co-Leader only. |
+| `/f baseclaim` (create) | `vertex.baseclaim.view` | Leader/Co-Leader only; no separate permission. |
+| Remove confirm (GUI) | `vertex.baseclaim.view` | Leader/Co-Leader only; no separate permission. |
 Slots #2/#3 are purchased from `/f upgrades`; there is no `/f baseclaim buy`
 command or separate slot-purchase permission.
 

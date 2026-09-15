@@ -286,12 +286,6 @@ permissions:
   vertex.baseclaim.view:
     description: View a faction's Base Claim info via /f baseclaim.
     default: true
-  vertex.baseclaim.create:
-    description: Create a new Base Claim anchor via /f baseclaim.
-    default: true
-  vertex.baseclaim.remove:
-    description: Remove an existing Base Claim via /f baseclaim.
-    default: true
   vertex.chunkbuster.give:
     description: Give configured Chunk Buster items with /chunkbusters give.
     default: op
@@ -360,9 +354,6 @@ permissions:
     default: op
   vertex.trade.payouts:
     description: Inspect and reconcile uncertain legacy Trade money/EXP payouts.
-    default: op
-  vertex.trade.staff.alerts:
-    description: Receive suspicious player-trade alerts.
     default: op
   vertex.koth.admin:
     description: Create, edit, start, stop, and delete KOTH events.

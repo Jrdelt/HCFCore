@@ -363,6 +363,24 @@ pvp:
         amplifier: 0
         duration-seconds: 300
 
+  # ---- ARCHER CLASS ----
+  # Archers mark victims with arrows. Each stack increases arrow damage and gives
+  # the archer's faction a melee bonus against the marked player.
+  archer-tag:
+    # How long a mark lasts (refreshed by each new arrow)
+    duration-seconds: 8
+    # Maximum number of stacks from multiple archers
+    max-stacks: 3
+    # Arrow damage multiplier per stack (0.10 = +10% per stack)
+    arrow-damage-bonus-per-stack: 0.02175
+    # Melee damage bonus for the archer's faction only
+    faction-melee-bonus-per-stack: 0.025
+    # Chat messages when a mark is applied (MiniMessage). Placeholders:
+    # {player}, {percent} (arrow bonus), {melee} (faction melee bonus),
+    # {seconds} (mark duration).
+    message-attacker: '&c&lKITS&r &7> <gold>Tagged {player} <gray>(+{percent}%, {seconds}s)'
+    message-victim: '&c&lKITS&r &7> <red>Tagged by {player} <gray>(+{percent}%, {seconds}s)'
+
 # ============================================
 rally:
   # Live player position/yaw interval for the faction-rally direction bar.
@@ -536,21 +554,3 @@ reboot:
     - 10
     - 5
     - 1
-
-  # ---- ARCHER CLASS ----
-  # Archers mark victims with arrows. Each stack increases arrow damage and gives
-  # the archer's faction a melee bonus against the marked player.
-  archer-tag:
-    # How long a mark lasts (refreshed by each new arrow)
-    duration-seconds: 8
-    # Maximum number of stacks from multiple archers
-    max-stacks: 3
-    # Arrow damage multiplier per stack (0.10 = +10% per stack)
-    arrow-damage-bonus-per-stack: 0.02175
-    # Melee damage bonus for the archer's faction only
-    faction-melee-bonus-per-stack: 0.025
-    # Chat messages when a mark is applied (MiniMessage). Placeholders:
-    # {player}, {percent} (arrow bonus), {melee} (faction melee bonus),
-    # {seconds} (mark duration).
-    message-attacker: '&c&lKITS&r &7> <gold>Tagged {player} <gray>(+{percent}%, {seconds}s)'
-    message-victim: '&c&lKITS&r &7> <red>Tagged by {player} <gray>(+{percent}%, {seconds}s)'

@@ -192,7 +192,7 @@ their arrows hit.
   bonus, including themselves — there's no faction to grant it to.
 - Both the archer and the target get a chat message on every hit
   (`archer-tag.message-attacker` / `message-victim`, MiniMessage,
-  configured in `config.yml` rather than `lang/*.yml` since it's a single
+  configured under `pvp.archer-tag` in `config.yml` rather than `lang/*.yml` since it's a single
   admin-authored template, not a per-locale message) naming the other
   player, the current arrow/melee percentages, and seconds left.
 - Archers can't mark their own faction members. A mark clears on death

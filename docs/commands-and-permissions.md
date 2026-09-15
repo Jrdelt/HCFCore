@@ -233,7 +233,7 @@ dynamic prices. Runes are deliberately separate from `/shop`; use `/runes`,
 | `/tntunfill [radius] [bank]` | `vertex.tntunfill.use` (default: everyone) | Returns TNT from dispensers within the optional radius (default: configured maximum, hard-capped at 100) in your own faction claims to the faction TNT bank only. `bank` is an optional explicit destination; inventory is never accepted. The operation stops at the current upgrade-derived bank capacity. |
 | `/f top` | Open to all | Vertex's claimed, individually-aged spawner-value leaderboard, separate from native faction power. See [Faction Leaderboards](faction-leaderboards.md#f-top-claimed-spawner-value). |
 | `/ftopforcecheck` | `vertex.ftop.forcecheck` | Immediately recalculates F Top for every faction without moving the regular scheduled deadline. |
-| `/f baseclaim` (or any `factions.command-aliases` alias) | `vertex.baseclaim.view` | Opens the Base Claim info/removal GUI if standing on one; otherwise attempts to create one (Leader/Co-Leader + `vertex.baseclaim.create` only). Confirming removal in that GUI additionally requires `vertex.baseclaim.remove` (default: true). See [Base and Raid Claims](base-and-raid-claims.md). |
+| `/f baseclaim` (or any `factions.command-aliases` alias) | `vertex.baseclaim.view` | Opens the Base Claim info/removal GUI if standing on one; otherwise attempts to create one. Creating and removing are limited to the faction's Leader/Co-Leader; there are no separate create/remove permissions. See [Base and Raid Claims](base-and-raid-claims.md). |
 | `/pvptop` | Open to all | Dedicated faction leaderboard ranked by persisted KOTH/Outpost capture points, independent of F Top. See [Faction Leaderboards](faction-leaderboards.md#pvp-top-objective-points). |
 | `/f grace` | Open to all | Shows whether global faction Grace is active and its remaining time. |
 | `/fa grace on <duration>` / `/fa grace off` | `vertex.fa.grace` | Enables or disables persistent global explosion protection with an audit record. Example duration: `2d12h`. |
@@ -406,7 +406,6 @@ miss when auditing permissions against the command list.
 
 | Permission | Who holds it receives | Default |
 |---|---|---|
-| `vertex.trade.staff.alerts` | Suspicious player-trade alerts — see [Player Trading](trading.md) | op |
 | `vertex.sandbot.debug` | Sand Bot placement diagnostics in chat — see [Sand Bots](sandbots.md) | op |
 | `vertex.dupe.alert` | A live message when a new suspected-duplicate case opens, plus a join-time summary of any still-open cases — see [Dupe investigation](dupe-investigation.md) | op |
 | `vertex.transaction.audit` | Alerts for successful GC transactions above `transaction-audit.minimum-gc` — see [GC](gc-currency.md#large-gc-transaction-audit) | op |

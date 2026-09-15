@@ -49,7 +49,7 @@ public final class FactionService {
         OK, NO_FACTION, ALREADY_IN_FACTION, NOT_LEADER, NOT_MEMBER, NOT_FOUND,
         INVALID_NAME, NAME_TAKEN, NOT_INVITED, BANNED, CLOSED, NO_PERMISSION, ALREADY_CLAIMED,
         CLAIM_LIMIT, INSUFFICIENT_POWER, NOT_CONNECTED, NOT_OWNER, SYSTEM_FACTION, INVALID_LOCATION,
-        LIMIT_REACHED, COOLDOWN, LAST_LEADER, DATABASE_ERROR
+        LIMIT_REACHED, COOLDOWN, LAST_LEADER, LEADER_MUST_TRANSFER, DATABASE_ERROR
     }
 
     private final Plugin plugin;
@@ -81,6 +81,10 @@ public final class FactionService {
     private volatile int systemClaimChunksPerTick = 64;
     private volatile long inviteMillis = 300_000L;
     private volatile boolean openJoin = true;
+    /** When true, a leader must hand off leadership before /f leave; otherwise it transfers automatically. */
+    private volatile boolean preventLeaderLeave = true;
+    /** Server-wide gate on top of each faction's ally place/break permissions. */
+    private volatile boolean alliesCanBuild;
     private volatile double powerStartingPerMember = 100D;
     private volatile double powerMaxPerMember = 100D;
     private volatile double absolutePlayerPowerCap = 5_000D;
@@ -222,6 +226,8 @@ public final class FactionService {
                 "factions.system-claims.max-chunks-per-tick", 64), 1, 512);
         inviteMillis = Math.max(10_000L, plugin.getConfig().getLong("factions.invite-expiry-seconds", 300L) * 1_000L);
         openJoin = plugin.getConfig().getBoolean("factions.open-join-enabled", true);
+        preventLeaderLeave = plugin.getConfig().getBoolean("factions.prevent-leader-leave", true);
+        alliesCanBuild = plugin.getConfig().getBoolean("factions.protection.allies-can-build", false);
         powerMaxPerMember = positive(plugin.getConfig().getDouble("factions.power.default-max", 100D), 100D);
         powerStartingPerMember = Math.min(powerMaxPerMember, positive(plugin.getConfig().getDouble(
                 "factions.power.default-current", powerMaxPerMember), powerMaxPerMember));
@@ -518,6 +524,11 @@ public final class FactionService {
         FactionMember member = player == null ? null : members.get(player.getUniqueId());
         if (member == null) return Result.NO_FACTION;
         if (member.role() != FactionRole.LEADER) return removeMember(member.playerUuid());
+        if (preventLeaderLeave) {
+            boolean alone = members.values().stream()
+                    .noneMatch(other -> other.factionId() == member.factionId() && !other.playerUuid().equals(member.playerUuid()));
+            return alone ? Result.LAST_LEADER : Result.LEADER_MUST_TRANSFER;
+        }
         try {
             FactionStorage.LeaderDepartureOutcome outcome = storage.removeLeaderAndTransferChecked(
                     member.playerUuid(), member.factionId());
@@ -901,7 +912,7 @@ public final class FactionService {
     public boolean canBuild(Player player,Location location){return canPlace(player,location)&&canBreak(player,location);}
     public boolean canPlace(Player player,Location location){return territoryAction(player,location,"place-blocks","place-blocks");}
     public boolean canBreak(Player player,Location location){return territoryAction(player,location,"break-blocks","break-blocks");}
-    private boolean territoryAction(Player player,Location location,String memberAction,String allyAction){if(player==null||location==null)return false;if(player.hasPermission("vertex.factions.bypass"))return true;int owner=factionIdAt(location);if(owner==NO_FACTION)return true;FactionMember member=members.get(player.getUniqueId());if(member==null)return false;if(member.factionId()==owner)return hasAction(member,memberAction);return isAlly(member.factionId(),owner)&&actionAllowed(owner,"ally",allyAction);}
+    private boolean territoryAction(Player player,Location location,String memberAction,String allyAction){if(player==null||location==null)return false;if(player.hasPermission("vertex.factions.bypass"))return true;int owner=factionIdAt(location);if(owner==NO_FACTION)return true;FactionMember member=members.get(player.getUniqueId());if(member==null)return false;if(member.factionId()==owner)return hasAction(member,memberAction);return alliesCanBuild&&isAlly(member.factionId(),owner)&&actionAllowed(owner,"ally",allyAction);}
     public boolean canUseContainers(Player player,Location location){if(player==null||location==null)return false;if(player.hasPermission("vertex.factions.bypass"))return true;int owner=factionIdAt(location);if(owner==NO_FACTION)return true;FactionMember member=members.get(player.getUniqueId());if(member==null)return false;return member.factionId()==owner?hasAction(member,"containers"):isAlly(member.factionId(),owner)&&actionAllowed(owner,"ally","containers");}
     public boolean canUseDoors(Player player,Location location){if(player==null||location==null)return false;if(player.hasPermission("vertex.factions.bypass"))return true;int owner=factionIdAt(location);if(owner==NO_FACTION)return true;FactionMember member=members.get(player.getUniqueId());if(member==null)return false;if(member.factionId()==owner)return hasAction(member,"doors");if(!isAlly(member.factionId(),owner))return false;Material type=location.getBlock().getType();String action=type.name().endsWith("_BUTTON")?"buttons":type==Material.LEVER?"levers":"doors";return actionAllowed(owner,"ally",action);}
     public boolean canPvp(Player attacker,Player victim){

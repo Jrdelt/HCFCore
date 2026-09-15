@@ -1775,6 +1775,7 @@ native-factions:
     limit-reached: "&6&lFACTIONS&r &7> <red>That faction has reached its limit."
     cooldown: "&6&lFACTIONS&r &7> <red>That faction action is still on cooldown."
     last-leader: "&6&lFACTIONS&r &7> <red>You cannot leave as the faction's only member. Transfer leadership or disband."
+    leader-must-transfer: "&6&lFACTIONS&r &7> <red>Transfer leadership with /f leader <player> before leaving."
     database-error: "&6&lFACTIONS&r &7> <red>The faction data could not be saved; nothing changed."
     ok: "&6&lFACTIONS&r &7> <green>Done."
 

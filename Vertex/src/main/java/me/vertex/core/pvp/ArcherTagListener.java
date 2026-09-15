@@ -41,13 +41,17 @@ public final class ArcherTagListener implements Listener {
     }
 
     public void reloadConfig() {
-        cachedDurationSeconds = plugin.getConfig().getInt("pvp.archer-tag.duration-seconds", 10);
-        cachedMaxStacks = plugin.getConfig().getInt("pvp.archer-tag.max-stacks", 4);
-        cachedArrowBonusPerStack = Math.max(0, plugin.getConfig().getDouble("pvp.archer-tag.arrow-damage-bonus-per-stack", 0.10));
-        cachedMeleeBonusPerStack = Math.max(0, plugin.getConfig().getDouble("pvp.archer-tag.faction-melee-bonus-per-stack", 0.05));
-        cachedMessageAttacker = plugin.getConfig().getString("pvp.archer-tag.message-attacker",
+        org.bukkit.configuration.file.FileConfiguration config = plugin.getConfig();
+        // Older configs shipped this block under reboot:, where it was never read.
+        String base = config.contains("pvp.archer-tag", true) || !config.contains("reboot.archer-tag", true)
+                ? "pvp.archer-tag." : "reboot.archer-tag.";
+        cachedDurationSeconds = config.getInt(base + "duration-seconds", 8);
+        cachedMaxStacks = config.getInt(base + "max-stacks", 3);
+        cachedArrowBonusPerStack = Math.max(0, config.getDouble(base + "arrow-damage-bonus-per-stack", 0.02175));
+        cachedMeleeBonusPerStack = Math.max(0, config.getDouble(base + "faction-melee-bonus-per-stack", 0.025));
+        cachedMessageAttacker = config.getString(base + "message-attacker",
                 "&c&lKITS&r &7> <gold>Tagged {player} <gray>(+{percent}%, {seconds}s)");
-        cachedMessageVictim = plugin.getConfig().getString("pvp.archer-tag.message-victim",
+        cachedMessageVictim = config.getString(base + "message-victim",
                 "&c&lKITS&r &7> <red>Tagged by {player} <gray>(+{percent}%, {seconds}s)");
     }
 
