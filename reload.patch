@@ -1,0 +1,37 @@
+--- Vertex/src/main/java/me/vertex/core/resetvault/ResetVaultManager.java
++++ Vertex/src/main/java/me/vertex/core/resetvault/ResetVaultManager.java
+@@ -83,6 +83,7 @@
+     private final Set<String> activeMutations = ConcurrentHashMap.newKeySet();
+     private final Set<String> pendingWrites = ConcurrentHashMap.newKeySet();
+ 
++    private boolean enabled = true;
+     private Material blockMaterial = Material.BLUE_SHULKER_BOX;
+     private Map<String, Integer> rankBaseSlots = Map.of("default", 1, "vip", 2, "hero", 3, "legend", 4, "titan", 5);
+     private Set<String> giveAllowlist = Set.of();
+@@ -174,6 +175,8 @@
+     }
+ 
+     public void reloadConfig() {
++        this.enabled = plugin.getConfig().getBoolean("reset-vault.enabled", true);
++        
+         String configuredMat = plugin.getConfig().getString("reset-vault.block-material", "BLUE_SHULKER_BOX");
+         Material mat = Material.matchMaterial(configuredMat == null ? "" : configuredMat);
+         if (mat != null && !mat.isAir()) {
+@@ -216,6 +219,16 @@
+         }
+         this.removeEnchantIds = Set.copyOf(enchants);
+ 
+         this.sotwMilestoneName = plugin.getConfig().getString("reset-vault.sotw-milestone", "reset-vault-open");
++        
++        if (storage != null) {
++            try {
++                blacklist.clear();
++                blacklist.addAll(storage.loadBlacklist());
++            } catch (Exception e) {
++                plugin.getLogger().log(Level.SEVERE, "Failed to reload blacklist", e);
++            }
++            Bukkit.getScheduler().runTask(plugin, this::refreshAllHolograms);
++        }
+     }
+ 
+     // ------------------------------------------------------------------

@@ -12,13 +12,13 @@ import java.util.Map;
  * purpose: an immutable weighted-{@link Entry} list, {@link #pick(double)}
  * taking externally-injected randomness (so the distribution is
  * unit-testable without relying on chance), and weights normalised
- * internally so an admin editing one entry's weight in {@code runes.yml}
+ * internally so an admin editing one entry's weight in {@code customEnchants/runes.yml}
  * never has to rebalance the rest of that tier's table to keep it valid.
  *
  * <p>Deliberately a single flat weighted list of (enchant, level) pairs --
  * not a two-stage "pick the enchant, then pick the level" roll -- both
  * because that is what mirrors {@code MineOreTable} literally, and because
- * it is what {@code runes.yml} is specified to hold ("which enchant+level
+ * it is what {@code customEnchants/runes.yml} is specified to hold ("which enchant+level
  * combos are on each tier's table and their weights"). A higher level
  * intentionally rolling less often than a lower one of the same enchant is
  * simply that combo's entry having a smaller configured weight within the

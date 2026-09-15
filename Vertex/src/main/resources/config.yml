@@ -554,3 +554,23 @@ reboot:
     - 10
     - 5
     - 1
+
+# ============================================
+# RESET VAULT
+# ============================================
+binds:
+  # One global delay applied between every queued ability attempt -- not configurable per bind/preset.
+  ability-delay-seconds: 2
+  # How long the Bind HUD's BossBars stay visible if no bind key is selected.
+  hud-lifetime-seconds: 5
+  # Detection window for the Double-Tap F activation opener.
+  double-tap-window-ms: 400
+
+incineration:
+  # Each incinerated rune (or stack) rolls its own independent percentage
+  # in this range, applied against its origin tier's shop price -- never
+  # exceeding 100% of that base value regardless of a misconfigured range.
+  return-percentage:
+    min: 10
+    max: 30
+

@@ -417,9 +417,9 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
                 send(player, "system-claim-usage");
                 return;
             }
-            if (radius < 0 || radius > factions.serviceClaimRadiusLimit()) {
+            if (radius < 0 || radius > factions.systemClaimRadiusLimit()) {
                 send(player, "system-claim-radius-invalid", "maximum",
-                        String.valueOf(factions.serviceClaimRadiusLimit()));
+                        String.valueOf(factions.systemClaimRadiusLimit()));
                 return;
             }
         }

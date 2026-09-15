@@ -202,6 +202,14 @@ public final class StorageMigrator {
         TABLES.put("vertex_teleport_cooldowns", List.of("player_uuid", "cooldown_type", "available_at"));
         TABLES.put("vertex_network_state_history", List.of("snapshot_id", "player_uuid", "shard_id", "reason", "snapshot", "created_at"));
         TABLES.put("vertex_rtp_requests", List.of("request_id", "player_uuid", "source_shard", "destination_shard", "destination_world", "world_size", "claim_buffer", "attempts", "state", "result_x", "result_y", "result_z", "created_at", "updated_at", "error"));
+        TABLES.put("rv_player_data", List.of("uuid", "last_ign", "bonus_slots", "items", "updated_at"));
+        TABLES.put("rv_access_blocks", List.of("id", "world", "x", "y", "z", "hologram_id"));
+        TABLES.put("rv_backups", List.of("id", "timestamp", "map_label", "initiator", "vault_count", "compressed_size", "checksum", "status", "created_at"));
+        TABLES.put("rv_backup_data", List.of("backup_id", "data"));
+        TABLES.put("rv_restore_history", List.of("id", "backup_id", "restored_at", "restored_by"));
+        TABLES.put("rv_audit_log", List.of("id", "timestamp", "action", "actor", "target_uuid", "detail"));
+        TABLES.put("rv_phase", List.of("id", "phase"));
+        TABLES.put("rv_blacklist", List.of("id", "entry_type", "entry_key", "rejection_key"));
     }
 
     private StorageMigrator() {
@@ -331,6 +339,11 @@ public final class StorageMigrator {
                 MessageDigest rowDigest = sha256();
                 for (int i = 1; i <= columns.size(); i++) {
                     Object value = results.getObject(i);
+                    if (value instanceof Blob blob) {
+                        value = blob.getBytes(1L, Math.toIntExact(blob.length()));
+                    } else if (value instanceof Clob clob) {
+                        value = clob.getSubString(1L, Math.toIntExact(clob.length()));
+                    }
                     write.setObject(i, value);
                     updateDigest(rowDigest, value);
                 }
@@ -446,6 +459,7 @@ public final class StorageMigrator {
         new me.vertex.core.network.NetworkStorage(database).init();
         new me.vertex.core.teleport.RtpStorage(database).init();
         new PlayerStatsStorage(database).init();
+        new me.vertex.core.resetvault.ResetVaultStorage(database).init();
     }
 
     /**

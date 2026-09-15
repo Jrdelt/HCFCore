@@ -198,6 +198,12 @@ public final class NetworkManager implements Listener {
     public void registerInvalidation(String topic, Runnable handler) {
         if (topic != null && handler != null) invalidationHandlers.put(normalize(topic), handler);
     }
+    
+    private final Map<String, java.util.function.Consumer<String>> invalidationHandlersWithPayload = new ConcurrentHashMap<>();
+
+    public void registerInvalidation(String topic, java.util.function.Consumer<String> handler) {
+        if (topic != null && handler != null) invalidationHandlersWithPayload.put(normalize(topic), handler);
+    }
 
     public void registerDestinationValidator(String reason, java.util.function.Predicate<NetworkLocation> validator) {
         if (reason != null && validator != null) destinationValidators.put(safeReason(reason), validator);
@@ -689,6 +695,9 @@ public final class NetworkManager implements Listener {
             if (event.sourceShard().equals(shardId)) continue;
             Runnable handler = invalidationHandlers.get(normalize(event.topic()));
             if (handler != null) Bukkit.getScheduler().runTask(plugin, handler);
+            
+            java.util.function.Consumer<String> payloadHandler = invalidationHandlersWithPayload.get(normalize(event.topic()));
+            if (payloadHandler != null) Bukkit.getScheduler().runTask(plugin, () -> payloadHandler.accept(event.payload()));
             // Queue owners are notified by processQueues on their source shard.
         }
     }

@@ -1,0 +1,24 @@
+--- Vertex/src/main/java/me/vertex/core/resetvault/ResetVaultManager.java
++++ Vertex/src/main/java/me/vertex/core/resetvault/ResetVaultManager.java
+@@ -522,6 +522,18 @@
+                 return new CheckResult(EligibilityResult.REJECTED_NONEMPTY_BACKPACK, "reset-vault.rejected.nonempty-backpack");
+             }
+         }
++        
++        // Container check (Shulker boxes, bundles)
++        String matName = item.getType().name();
++        if (matName.endsWith("SHULKER_BOX")) {
++            if (item.getItemMeta() instanceof org.bukkit.inventory.meta.BlockStateMeta bsm) {
++                if (bsm.getBlockState() instanceof org.bukkit.block.ShulkerBox shulker) {
++                    if (!shulker.getInventory().isEmpty()) {
++                        return new CheckResult(EligibilityResult.REJECTED_NONEMPTY_BACKPACK, "reset-vault.rejected.nonempty-backpack");
++                    }
++                }
++            }
++        } else if (matName.equals("BUNDLE")) {
++            if (item.getItemMeta() instanceof org.bukkit.inventory.meta.BundleMeta bundle) {
++                if (bundle.hasItems()) {
++                    return new CheckResult(EligibilityResult.REJECTED_NONEMPTY_BACKPACK, "reset-vault.rejected.nonempty-backpack");
++                }
++            }
++        }

@@ -864,6 +864,10 @@ public final class CaptureEventManager implements Listener {
 
     private void updateDirections() {
         for (Player player : Bukkit.getOnlinePlayers()) {
+            if (me.vertex.core.enchant.binds.BossBarSuppression.isSuppressed(player.getUniqueId())) {
+                hideFocusBossBar(player);
+                continue;
+            }
             ActiveCapture focused = focusedCapture(player);
             if (focused != null) {
                 updateDirectionBossBar(player, focused, true);

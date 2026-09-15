@@ -1,0 +1,44 @@
+--- Vertex/src/main/java/me/vertex/core/resetvault/ResetVaultManager.java
++++ Vertex/src/main/java/me/vertex/core/resetvault/ResetVaultManager.java
+@@ -485,6 +485,7 @@
+             try {
+                 SqlRetry.run(plugin, "save reset vault token redemption", () -> storage.savePlayerData(updated));
+                 Bukkit.getScheduler().runTask(plugin, () -> {
++                    ((me.vertex.core.VertexPlugin) plugin).networkManager().publishInvalidation("reset-vault", uuid.toString());
+                     updateCache(updated);
+                     Player p = Bukkit.getPlayer(uuid);
+                     if (p != null && p.isOnline()) {
+@@ -718,6 +719,7 @@
+             try {
+                 SqlRetry.run(plugin, "persist reset vault deposit", () -> storage.savePlayerData(updated));
+                 Bukkit.getScheduler().runTask(plugin, () -> {
++                    ((me.vertex.core.VertexPlugin) plugin).networkManager().publishInvalidation("reset-vault", uuid.toString());
+                     try {
+                         updateCache(updated);
+                         Player p = Bukkit.getPlayer(uuid);
+@@ -805,6 +807,7 @@
+             try {
+                 SqlRetry.run(plugin, "persist reset vault withdrawal", () -> storage.savePlayerData(updated));
+                 Bukkit.getScheduler().runTask(plugin, () -> {
++                    ((me.vertex.core.VertexPlugin) plugin).networkManager().publishInvalidation("reset-vault", uuid.toString());
+                     try {
+                         updateCache(updated);
+                         Player p = Bukkit.getPlayer(uuid);
+@@ -837,6 +840,7 @@
+                 SqlRetry.run(plugin, "admin reset vault insert", () -> {
+                     storage.savePlayerData(updated);
+                     storage.appendAuditLog(System.currentTimeMillis(), "ADMIN_INSERT", adminName, targetUuid.toString(),
+                             "Slot " + logicalIndex + ": " + nameResolver.resolve(rawItem) + " x" + rawItem.getAmount());
+                 });
++                ((me.vertex.core.VertexPlugin) plugin).networkManager().publishInvalidation("reset-vault", targetUuid.toString());
+             } catch (Exception e) {
+                 plugin.getLogger().log(Level.SEVERE, "Failed to persist admin insert for " + targetUuid, e);
+             }
+@@ -859,6 +863,7 @@
+                     storage.appendAuditLog(System.currentTimeMillis(), "ADMIN_REMOVE", adminName, targetUuid.toString(),
+                             "Slot " + logicalIndex + ": " + nameResolver.resolve(removed));
+                 });
++                ((me.vertex.core.VertexPlugin) plugin).networkManager().publishInvalidation("reset-vault", targetUuid.toString());
+             } catch (Exception e) {
+                 plugin.getLogger().log(Level.SEVERE, "Failed to persist admin remove for " + targetUuid, e);
+             }

@@ -168,6 +168,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.booster.BoosterService boosterService;
     private me.vertex.core.wand.WandManager wandManager;
     private me.vertex.core.mine.MineManager mineManager;
+    private me.vertex.core.enchant.WarChestListener warChestListener;
     private me.vertex.core.mine.MineKothManager mineKothManager;
     private me.vertex.core.mine.HotZoneManager hotZoneManager;
     private me.vertex.core.menu.MenuRegistry menuRegistry;
@@ -186,6 +187,16 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.trade.TradeStorage tradeStorage;
     private me.vertex.core.trade.TradeManager tradeManager;
     private me.vertex.core.preferences.AnnouncementPreferenceStorage announcementPreferenceStorage;
+    private me.vertex.core.enchant.RunePreferenceStorage runePreferenceStorage;
+    private me.vertex.core.enchant.RunePreferenceManager runePreferenceManager;
+    private me.vertex.core.enchant.binds.BindStorage bindStorage;
+    private me.vertex.core.enchant.binds.BindManager bindManager;
+    private me.vertex.core.enchant.binds.BindQueue bindQueue;
+    private me.vertex.core.enchant.binds.BindHudService bindHudService;
+    private me.vertex.core.enchant.IncinerationStorage incinerationStorage;
+    private me.vertex.core.enchant.IncinerationService incinerationService;
+    private me.vertex.core.enchant.AutoIncineration autoIncineration;
+    private me.vertex.core.enchant.AutoIncinerationNotifier autoIncinerationNotifier;
     private me.vertex.core.preferences.AnnouncementPreferenceManager announcementPreferenceManager;
     private GhostPlayerManager ghostPlayerManager;
     private me.vertex.core.gc.GcStorage gcStorage;
@@ -196,6 +207,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.dupe.DupeManager dupeManager;
     private me.vertex.core.item.TrackedItemIds trackedItemIds;
     private me.vertex.core.enchant.EnchantManager enchantManager;
+    private me.vertex.core.enchant.RuneCooldownStore runeCooldownStore;
     private me.vertex.core.performance.PerformanceManager performanceManager;
     private me.vertex.core.zone.ZoneManager zoneManager;
     private me.vertex.core.portal.PortalManager portalManager;
@@ -207,6 +219,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.teleport.RtpManager rtpManager;
     private me.vertex.core.stats.PlayerStatsManager playerStatsManager;
     private me.vertex.core.season.SeasonResetManager seasonResetManager;
+    private me.vertex.core.resetvault.ResetVaultStorage resetVaultStorage;
+    private me.vertex.core.resetvault.ResetVaultManager resetVaultManager;
     private Difficulty defaultWorldDifficulty = Difficulty.NORMAL;
 
     @Override
@@ -277,6 +291,12 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             tradeStorage.init();
             announcementPreferenceStorage = new me.vertex.core.preferences.AnnouncementPreferenceStorage(database);
             announcementPreferenceStorage.init();
+            runePreferenceStorage = new me.vertex.core.enchant.RunePreferenceStorage(database);
+            runePreferenceStorage.init();
+            bindStorage = new me.vertex.core.enchant.binds.BindStorage(database);
+            bindStorage.init();
+            incinerationStorage = new me.vertex.core.enchant.IncinerationStorage(database);
+            incinerationStorage.init();
             gcStorage = new me.vertex.core.gc.GcStorage(database);
             gcStorage.init();
             dupeStorage = new me.vertex.core.dupe.DupeStorage(database);
@@ -287,6 +307,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             graceStorage.init();
             chunkBusterStorage = new me.vertex.core.chunkbuster.ChunkBusterStorage(database);
             chunkBusterStorage.init();
+            resetVaultStorage = new me.vertex.core.resetvault.ResetVaultStorage(database);
+            resetVaultStorage.init();
             me.vertex.core.stats.PlayerStatsStorage playerStatsStorage = new me.vertex.core.stats.PlayerStatsStorage(database);
             playerStatsManager = new me.vertex.core.stats.PlayerStatsManager(this, playerStatsStorage);
             playerStatsManager.init();
@@ -385,6 +407,8 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
                 getConfig().getString("pvp.actionbar.vs-player", ""),
                 getConfig().getString("pvp.actionbar.vs-unknown", ""));
 combatManager.start();
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.factions.SafezoneGuardListener(this, factionService, combatManager, messages), this);
         try {
             // Claim the process identity before NetworkManager can publish a
             // heartbeat under it. A rejected duplicate must not mark the real
@@ -819,14 +843,68 @@ combatManager.start();
         // /runes (and its aliases) provides the dedicated Rune catalog.
         enchantManager = new me.vertex.core.enchant.EnchantManager(this, trackedItemIds);
         enchantManager.load();
-        me.vertex.core.enchant.RuneListener runeListener = new me.vertex.core.enchant.RuneListener(enchantManager, messages);
-        Bukkit.getPluginManager().registerEvents(runeListener, this);
+        runeCooldownStore = new me.vertex.core.enchant.RuneCooldownStore(this, storage);
+        runePreferenceManager = new me.vertex.core.enchant.RunePreferenceManager(this, runePreferenceStorage);
+        Bukkit.getPluginManager().registerEvents(runePreferenceManager, this);
+        autoIncineration = new me.vertex.core.enchant.AutoIncineration(runePreferenceManager);
+        incinerationService = new me.vertex.core.enchant.IncinerationService(this, enchantManager, incinerationStorage, runePreferenceManager);
+        incinerationService.reconcileOnStartup();
+        autoIncinerationNotifier = new me.vertex.core.enchant.AutoIncinerationNotifier(this, runePreferenceManager, messages);
+        Bukkit.getPluginManager().registerEvents(autoIncinerationNotifier, this);
         Bukkit.getPluginManager().registerEvents(
-                new me.vertex.core.enchant.RuneEffectListener(enchantManager, combatManager), this);
-        me.vertex.core.enchant.EnchantCommand enchantCommand =
-                new me.vertex.core.enchant.EnchantCommand(enchantManager, messages);
+                new me.vertex.core.enchant.AutoIncinerationListener(enchantManager, autoIncineration, incinerationService, autoIncinerationNotifier), this);
+        me.vertex.core.enchant.listener.RuneListener runeListener = new me.vertex.core.enchant.listener.RuneListener(
+                enchantManager, autoIncineration, incinerationService, autoIncinerationNotifier, messages);
+        Bukkit.getPluginManager().registerEvents(runeListener, this);
+        me.vertex.core.enchant.listener.RuneEffectListener runeEffectListener =
+                new me.vertex.core.enchant.listener.RuneEffectListener(enchantManager, combatManager, userManager, runeCooldownStore);
+        runeEffectListener.setMessages(messages);
+        runeEffectListener.setAnnouncementPreferences(announcementPreferenceManager);
+        Bukkit.getPluginManager().registerEvents(runeEffectListener, this);
+        me.vertex.core.enchant.EnchantCommand enchantCommand = new me.vertex.core.enchant.EnchantCommand(
+                enchantManager, runePreferenceManager, autoIncineration, incinerationService, messages);
         getCommand("enchant").setExecutor(enchantCommand);
         getCommand("enchant").setTabCompleter(enchantCommand);
+        me.vertex.core.enchant.SeasonalItemCatalog seasonalItemCatalog =
+                new me.vertex.core.enchant.SeasonalItemCatalog(this);
+        seasonalItemCatalog.load();
+        enchantManager.setSeasonalCatalog(seasonalItemCatalog);
+        me.vertex.core.enchant.SeasonalCommand seasonalCommand =
+                new me.vertex.core.enchant.SeasonalCommand(enchantManager, messages, seasonalItemCatalog, backpackManager);
+        getCommand("seasonal").setExecutor(seasonalCommand);
+        getCommand("seasonal").setTabCompleter(seasonalCommand);
+        me.vertex.core.enchant.RuneInfoCommand runeInfoCommand =
+                new me.vertex.core.enchant.RuneInfoCommand(enchantManager, runeCooldownStore, userManager, messages);
+        getCommand("runeinfo").setExecutor(runeInfoCommand);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.enchant.menu.RuneInfoMenuListener(enchantManager, runeCooldownStore, userManager, messages), this);
+        me.vertex.core.enchant.RunePrefCommand runePrefCommand = new me.vertex.core.enchant.RunePrefCommand(
+                enchantManager, announcementPreferenceManager, runePreferenceManager, autoIncinerationNotifier, messages);
+        getCommand("runepref").setExecutor(runePrefCommand);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.enchant.menu.IncineratorMenuListener(
+                enchantManager, runePreferenceManager, incinerationService, autoIncineration, messages), this);
+
+        // /binds -- depends on the Rune Registry/Pipeline (enchantManager,
+        // runeEffectListener), persisted cooldowns, and rune preferences
+        // (the activation opener choice) all wired just above.
+        bindManager = new me.vertex.core.enchant.binds.BindManager(this, bindStorage, enchantManager, runePreferenceManager);
+        bindManager.setDefaultDoubleTapWindowMillis(getConfig().getLong("binds.double-tap-window-ms", 400L));
+        Bukkit.getPluginManager().registerEvents(bindManager, this);
+        bindQueue = new me.vertex.core.enchant.binds.BindQueue(this, enchantManager, runeEffectListener, runeCooldownStore,
+                userManager, announcementPreferenceManager, messages);
+        bindQueue.setDelaySeconds(getConfig().getDouble("binds.ability-delay-seconds", 2D));
+        bindQueue.start();
+        bindHudService = new me.vertex.core.enchant.binds.BindHudService(this, enchantManager, bindManager,
+                runeCooldownStore, userManager, bindQueue, messages);
+        bindHudService.setLifetimeSeconds(getConfig().getDouble("binds.hud-lifetime-seconds", 5D));
+        me.vertex.core.enchant.binds.BindActivationListener bindActivationListener =
+                new me.vertex.core.enchant.binds.BindActivationListener(enchantManager, bindManager, bindHudService, bindQueue);
+        Bukkit.getPluginManager().registerEvents(bindActivationListener, this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.enchant.binds.menu.BindsMenuListener(enchantManager, bindManager, messages), this);
+        me.vertex.core.enchant.binds.BindsCommand bindsCommand =
+                new me.vertex.core.enchant.binds.BindsCommand(enchantManager, bindManager, messages);
+        getCommand("binds").setExecutor(bindsCommand);
 
         boosterService = new me.vertex.core.booster.BoosterService(this);
         boosterService.reloadConfig();
@@ -859,6 +937,51 @@ combatManager.start();
                 backpackFilterManager, messages);
         getCommand("filter").setExecutor(backpackFilterCommand);
         getCommand("filter").setTabCompleter(backpackFilterCommand);
+
+        resetVaultManager = new me.vertex.core.resetvault.ResetVaultManager(
+                this, resetVaultStorage, messages, announcementPreferenceManager,
+                backpackManager, enchantManager);
+        try {
+            resetVaultManager.load();
+        } catch (Exception e) {
+            getLogger().log(Level.SEVERE, "Failed to load Reset Vault manager", e);
+        }
+        if (seasonResetManager != null) {
+            seasonResetManager.setResetVaultManager(resetVaultManager);
+        }
+        me.vertex.core.resetvault.ResetVaultBlockListener resetVaultBlockListener =
+                new me.vertex.core.resetvault.ResetVaultBlockListener(resetVaultManager, messages);
+        Bukkit.getPluginManager().registerEvents(resetVaultBlockListener, this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.resetvault.ResetVaultMenuListener(resetVaultManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.resetvault.ResetVaultTokenListener(resetVaultManager), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.resetvault.SotwMilestoneSubscriber(resetVaultManager), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.resetvault.ResetVaultPlayerListener(resetVaultManager), this);
+        me.vertex.core.resetvault.ResetVaultCommand resetVaultCommand =
+                new me.vertex.core.resetvault.ResetVaultCommand(resetVaultManager, messages, resetVaultBlockListener);
+        if (getCommand("rv") != null) {
+            getCommand("rv").setExecutor(resetVaultCommand);
+            getCommand("rv").setTabCompleter(resetVaultCommand);
+        }
+        
+        networkManager.registerInvalidation("reset-vault", (payload) -> {
+            try {
+                java.util.UUID uuid = java.util.UUID.fromString(payload);
+                Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+                    try {
+                        me.vertex.core.resetvault.ResetVaultData data = resetVaultStorage.loadPlayerData(uuid);
+                        if (data != null) {
+                            Bukkit.getScheduler().runTask(this, () -> resetVaultManager.updateCache(data));
+                        }
+                    } catch (java.sql.SQLException e) {
+                        getLogger().log(java.util.logging.Level.WARNING, "Failed to refresh Reset Vault data for " + uuid, e);
+                    }
+                });
+            } catch (Exception ignored) {}
+        });
 
         coinflipManager = new me.vertex.core.coinflip.CoinflipManager(this, coinflipStorage, messages, combatManager,
                 announcementPreferenceManager);
@@ -905,10 +1028,17 @@ combatManager.start();
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.bucket.SourceBucketListener(
                 sourceBucketManager, messages), this);
         // The dedicated /runes purchase GUI is independent from /shop.
-        Bukkit.getPluginManager().registerEvents(new me.vertex.core.enchant.RuneShopMenuListener(
-                enchantManager, messages), this);
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.enchant.menu.RuneShopMenuListener(
+                enchantManager, runePreferenceManager, backpackManager, messages), this);
         mineManager = new me.vertex.core.mine.MineManager(this, messages);
         mineManager.load();
+        // War Chest (seasonal) is a passive backpack-tier proc, not a gear
+        // enchant -- wired here once its two arena-eligibility sources
+        // (MineManager just above, ZoneManager once it exists below) are
+        // both available.
+        warChestListener = new me.vertex.core.enchant.WarChestListener(enchantManager, backpackManager, messages);
+        warChestListener.setMineManager(mineManager);
+        Bukkit.getPluginManager().registerEvents(warChestListener, this);
         me.vertex.core.mine.MineTeleportManager mineTeleportManager =
                 new me.vertex.core.mine.MineTeleportManager(this, mineManager, combatManager, messages);
         Bukkit.getPluginManager().registerEvents(mineTeleportManager, this);
@@ -1070,13 +1200,13 @@ combatManager.start();
             spawnCommand.setZoneExitDispatch(uuid -> zoneManager.consumeSpawnDispatchBypass(uuid));
         }
         boosterService.register(new me.vertex.core.zone.ZoneBoosterSource(zoneManager));
-        me.vertex.core.enchant.ArenaRuneManager arenaRuneManager = new me.vertex.core.enchant.ArenaRuneManager(this, zoneManager);
-        arenaRuneManager.load();
-        me.vertex.core.enchant.RuneShopMenu.setArenaRunes(arenaRuneManager);
-        runeListener.setArenaRunes(arenaRuneManager);
-        me.vertex.core.enchant.ArenaRuneListener arenaRuneListener = new me.vertex.core.enchant.ArenaRuneListener(arenaRuneManager);
-        Bukkit.getPluginManager().registerEvents(arenaRuneListener, this);
-        boosterService.register(arenaRuneListener.boosterSource());
+        // Arena Runes are just the ARENA RuneTier now (see customEnchants/runes.yml);
+        // the only Arena-specific wiring left is handing the effect listener a
+        // ZoneManager so Haven/Riftlands-restricted runes can gate on it.
+        runeEffectListener.setZoneManager(zoneManager);
+        bindQueue.setZoneManager(zoneManager);
+        warChestListener.setZoneManager(zoneManager);
+        boosterService.register(runeEffectListener.boosterSource());
         me.vertex.core.zone.ArenaControlManager arenaControls = new me.vertex.core.zone.ArenaControlManager(
                 this, database, zoneManager, pvpTopManager, messages);
         try {
@@ -1297,6 +1427,18 @@ combatManager.start();
 
     @Override
     public void onDisable() {
+        // Discards any in-progress Bind HUD/queue state -- nothing about it
+        // is ever persisted, so stopping these tasks is the whole story;
+        // saved binds/presets/preferences live only in bindManager's storage.
+        if (bindHudService != null) {
+            bindHudService.stop();
+        }
+        if (bindQueue != null) {
+            bindQueue.stop();
+        }
+        if (autoIncinerationNotifier != null) {
+            autoIncinerationNotifier.stop();
+        }
         if (networkManager != null) {
             networkManager.shutdown();
         }
@@ -1425,6 +1567,9 @@ combatManager.start();
         if (baseClaimManager != null) {
             baseClaimManager.awaitWrites();
         }
+        if (resetVaultManager != null) {
+            resetVaultManager.shutdown();
+        }
         FakePearlListener.clearAll();
         if (storage != null) {
             storage.close();
@@ -1531,6 +1676,7 @@ combatManager.start();
 
     public me.vertex.core.storage.DeliveryManager deliveryManager(){return deliveryManager;}
     public me.vertex.core.network.NetworkManager networkManager(){return networkManager;}
+    public me.vertex.core.resetvault.ResetVaultManager resetVaultManager(){return resetVaultManager;}
 
     public void reload() {
         reloadConfig();
@@ -1706,6 +1852,9 @@ combatManager.start();
         if (tagManager != null) {
             tagManager.load();
         }
+        if (resetVaultManager != null) {
+            resetVaultManager.reloadConfig();
+        }
 
         if (combatManager != null) {
             combatManager.reconfigure(
@@ -1836,6 +1985,14 @@ combatManager.start();
             dupeManager.awaitWrites();
         if (deliveryManager != null)
             deliveryManager.drainWrites();
+        if (resetVaultManager != null)
+            resetVaultManager.awaitWrites();
+        if (runeCooldownStore != null)
+            runeCooldownStore.awaitWrites();
+        if (runePreferenceManager != null)
+            runePreferenceManager.awaitWrites();
+        if (bindManager != null)
+            bindManager.awaitWrites();
     }
 
     public void finishStorageMigration() {

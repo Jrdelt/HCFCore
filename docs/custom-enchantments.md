@@ -90,19 +90,98 @@ Staff with `vertex.enchant.give` can use:
 /enchant give <player> gem [amount]
 ```
 
+## Identified Rune material
+
+An identified, non-seasonal Rune's physical item is always a dye-colored
+candle matching its tier -- Simple gray, Elite yellow, Rare magenta,
+Legendary red, Mob Arena blue -- regardless of whatever `material` that
+enchant's level configures. Tier alone decides the candle color, never the
+individual enchant. Seasonal Runes are exempt and keep whatever material
+their own config (or a linked catalog item, see below) specifies.
+
+Because of this, the Incinerator (and Auto-Incineration) only ever accepts
+an **identified** Rune. A still-sealed Rune box is never eligible, no matter
+its protection settings -- incinerating an unopened box would destroy value
+the player hasn't even seen yet.
+
+## Seasonal admin distribution (`/seasonal`)
+
+Seasonal Runes are never rolled by a player; they're admin/event-distributed
+only, via `/seasonal` (shares the `vertex.enchant.give` permission with
+`/enchant give`):
+
+```
+/seasonal give <id> [level] [amount]
+/seasonal item <material> <customModelData> [name]
+/seasonal catalog save <id>
+/seasonal catalog remove <id>
+/seasonal catalog list
+/seasonal roll item <enchant-id> [amount]
+```
+
+`/seasonal give <id> [level] [amount]` is the one command that covers every
+kind of seasonal reward, checking three id spaces in order: a
+`backpacks.yml` tier id (e.g. `fallen_crate`, built fresh every time since
+each backpack needs its own instance id -- `[level]` is its starting level),
+a seasonal Rune id from `customEnchants/runes.yml` (an identified copy at
+`[level]`, default 1, `[amount]` copies), then a saved catalog item.
+
+`/seasonal item` stamps a plain item with a material and custom model data
+(and optional name) for quickly staging a crate reward's display/win item --
+no lore or enchants, independent of everything else here.
+
+### The seasonal item catalog
+
+`/seasonal catalog save <id>` snapshots whatever's in the sender's hand --
+enchantments, lore, custom model data, any other plugin's PDC, all of it --
+exactly as-is into `seasonal-items.yml`, via Bukkit's native `ItemStack`
+serialization. `/seasonal give <id>` then reproduces that exact item
+forever after, both for handing to players and for re-dropping into a crate
+plugin's reward-item slot when a season rolls over. `catalog remove`/`list`
+round it out.
+
+### Tying a seasonal ability directly to a real item
+
+A seasonal level may set `catalog-item: <id>` in `runes.yml` to reference a
+catalog entry. When set, `EnchantManager.createEnchantItem` bakes that
+ability directly onto a clone of the catalog's saved item (its real
+material, custom model data, lore, vanilla enchants all preserved) instead
+of a generic placeholder icon -- the item is wearable and active immediately,
+no separate apply step. This applies everywhere a seasonal item is created
+(`/seasonal give`, `/seasonal roll item`, `/enchant give ... seasonalset`,
+and the `/ce` Seasonal Set preview menu), automatically, once the referenced
+catalog id has been saved. Until it has, that level logs a startup warning
+and falls back to the placeholder icon so nothing is ever silently missing.
+
+Enchants may also be grouped under `sets: <set-name>: enchants:` (instead of
+loose in the flat `enchants:` block) purely to keep one season's whole set
+together in the file. A `sets: <set-name>:` block may itself set a default
+`material`/`custom-model-data`/`catalog-item` that every nested level
+inherits unless it configures its own. The set name is config-organizational
+only -- it's never part of an enchant's id and never shows up in a rune's
+in-game name.
+
 ## Configuration
 
-- `runes.yml` sets base Rune materials, model data, tier shop prices, roll
-  tables, and the universal Lucky Gem’s material/model/price. Its former
-  per-tier Lucky Gem effectiveness section is retired.
-- `enchants.yml` sets each valid enchant, compatible equipment, levels,
-  effect values, proc chance, success rate, item icon, and live-effect
-  behaviour. Each definition may set `effect`, `priority`, and
-  `blocked-in-combat`; each level may set numeric `effect-settings` such as
-  movement velocity or cooldown. Changes take effect after the normal Vertex
-  reload.
-- `arena-runes.yml` sets Mob Arena Rune price/currency and Arena effect
-  behavior. It no longer has a separate Lucky Gem price or bonus.
+Every rune on the server -- SIMPLE/ELITE/RARE/LEGENDARY and ARENA alike --
+lives in one file: `customEnchants/runes.yml`. Its top-level `runes:` keys
+are the five `RuneTier`s; each tier sets its base Rune material, model data,
+shop price/currency, and an `enchants:` block of every enchant it can roll
+(compatible equipment, levels, effect values, proc chance, success rate,
+item icon, roll `weight`, and live-effect behaviour). Each definition may set
+`effect`, `priority`, `blocked-in-combat`, `enabled-zones`/`disabled-zones`,
+`damage-source`/`target-filter`, and `tags`; each level may set numeric
+`effect-settings` such as movement velocity or cooldown. The universal Lucky
+Gem's material/model/price lives at the file's top level. A `legacy:` block
+holds enchant IDs retained only so already-applied items keep rendering --
+they carry no roll weight and can never be rolled again. Arena's enchants use
+`per-level-value` + the tier's `level-count`/`level-buckets` to generate their
+levels instead of hand-authoring twenty near-identical blocks, and the tier's
+`random-success-range` re-rolls a fresh success chance on every identify.
+Changes take effect after the normal Vertex reload.
+
+KOTH/Outpost capture settings, which are unrelated to runes, live in their
+own `zone-controls.yml` instead.
 
 The item PDC is the persistent record for identified Runes and equipment
 enchants, so normal moves, trading, storage, and restarts retain the data.

@@ -91,3 +91,28 @@ tiers:
     custom-model-data: 10003
     drop-bonus-base-percent: 25.0
     drop-bonus-per-level-percent: 13.97
+
+  # War Chest (seasonal, black-and-gold/eagle set): I-V only, given via
+  # `/backpack give <player> war_chest` then upgraded to the desired level.
+  # Its normal auto-store drop bonus stays at 0 -- all of its value comes
+  # from the separate owner-only proc system configured under `war-chest:`
+  # in customEnchants/runes.yml (me.vertex.core.enchant.WarChestListener),
+  # not from this tier's own bonus fields.
+  war_chest:
+    display-name: '<gold>War Chest'
+    item-type: LEATHER
+    custom-model-data: 10004
+    drop-bonus-base-percent: 0.0
+    drop-bonus-per-level-percent: 0.0
+
+  # Fallen Backpack (seasonal crate-exclusive, black-and-gold/Fallen set):
+  # given via `/backpack give <player> fallen_crate [level]` or
+  # `/seasonal give fallen_crate [level]`. Drop-bonus curve mirrors
+  # t3_corrupted (the top standard tier) -- tune here if it should sit
+  # somewhere else in the power curve.
+  fallen_crate:
+    display-name: '<gradient:#D4AF37:#937025>Fallen Backpack</gradient>'
+    item-type: PAPER
+    custom-model-data: 840401280
+    drop-bonus-base-percent: 25.0
+    drop-bonus-per-level-percent: 13.97

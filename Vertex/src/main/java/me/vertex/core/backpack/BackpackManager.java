@@ -151,6 +151,23 @@ public final class BackpackManager {
         return id == null ? null : tiers.get(id.toLowerCase(Locale.ROOT));
     }
 
+    /** Whether {@code id} names a configured backpack tier -- for callers outside this package that can't hold a {@link BackpackTier} reference. */
+    public boolean isTier(String id) {
+        return getTier(id) != null;
+    }
+
+    /** {@link #createBackpackItem(BackpackTier, int)} by tier id, for callers outside this package. Null if {@code id} isn't a configured tier. */
+    public ItemStack createBackpackItem(String tierId, int level) {
+        BackpackTier tier = getTier(tierId);
+        return tier == null ? null : createBackpackItem(tier, level);
+    }
+
+    /** {@link #displayName(BackpackTier)} by tier id, for callers outside this package. Null if {@code id} isn't a configured tier. */
+    public String tierDisplayName(String tierId) {
+        BackpackTier tier = getTier(tierId);
+        return tier == null ? null : displayName(tier);
+    }
+
     public Set<String> tierIds() {
         return Set.copyOf(tiers.keySet());
     }
@@ -561,6 +578,39 @@ public final class BackpackManager {
         BackpackData data = new BackpackData(tier.id(), clampedLevel, new ItemStack[0]);
         writeData(item, data);
         return item;
+    }
+
+    /**
+     * Authoritatively resets an empty backpack to level 1, clearing contents,
+     * resetting real capacity and drop bonus benefits to level 1, while preserving
+     * its tier and cosmetic identity.
+     */
+    public boolean resetToLevelOne(ItemStack item) {
+        if (!isBackpack(item)) {
+            return false;
+        }
+        BackpackData data = readData(item);
+        if (data == null) {
+            return false;
+        }
+        writeData(item, new BackpackData(data.tierId(), 1, new ItemStack[0]));
+        return true;
+    }
+
+    public boolean isBackpackEmpty(ItemStack item) {
+        if (!isBackpack(item)) {
+            return true;
+        }
+        BackpackData data = readData(item);
+        return data == null || storedItemCount(data.contents()) == 0;
+    }
+
+    public String backpackTierId(ItemStack item) {
+        if (!isBackpack(item)) {
+            return null;
+        }
+        BackpackData data = readData(item);
+        return data == null ? null : data.tierId();
     }
 
     private List<Component> buildLore(BackpackTier tier, BackpackData data) {

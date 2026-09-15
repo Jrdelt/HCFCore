@@ -24,6 +24,8 @@ import java.util.UUID;
  */
 public final class CoinflipCommand implements CommandExecutor, TabCompleter {
 
+    private static final List<String> COMMON_WAGER_AMOUNTS = List.of("100", "500", "1000", "5000", "10000");
+
     private final CoinflipManager manager;
     private final Messages messages;
 
@@ -451,6 +453,18 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
                     matches.add(option);
                 }
             }
+            // Most players open this command to type a raw wager amount, not one of the
+            // keywords above. Without at least one suggestion that starts with what they've
+            // typed, the client renders that first argument as an unrecognized/invalid token
+            // while they type it. Offering a few example amounts keeps a real match on the
+            // table for the common numeric case.
+            if (args[0].isEmpty() || isNumericPartial(args[0])) {
+                for (String amount : COMMON_WAGER_AMOUNTS) {
+                    if (amount.startsWith(partial)) {
+                        matches.add(amount);
+                    }
+                }
+            }
             return matches;
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("payouts")
@@ -546,6 +560,16 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
 
     private static boolean isNumeric(String value) {
         return Numbers.parsePositive(value) != null;
+    }
+
+    private static boolean isNumericPartial(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (!Character.isDigit(c) && c != '.') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isExperienceCurrency(String value) {

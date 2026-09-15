@@ -145,6 +145,10 @@ public final class RallyManager implements Listener {
 
     private void updateRallyDisplay() {
         for (Player player : Bukkit.getOnlinePlayers()) {
+            if (me.vertex.core.enchant.binds.BossBarSuppression.isSuppressed(player.getUniqueId())) {
+                hideBossBarForPlayer(player);
+                continue;
+            }
             if (externalDirectionFocus.test(player)) {
                 hideBossBarForPlayer(player);
                 continue;

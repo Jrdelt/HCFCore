@@ -1,0 +1,73 @@
+--- Vertex/src/main/java/me/vertex/core/resetvault/ResetVaultManager.java
++++ Vertex/src/main/java/me/vertex/core/resetvault/ResetVaultManager.java
+@@ -83,6 +83,7 @@
+     private final Set<String> activeMutations = ConcurrentHashMap.newKeySet();
+     private final Set<String> pendingWrites = ConcurrentHashMap.newKeySet();
+ 
++    private org.bukkit.configuration.file.YamlConfiguration config;
+     private boolean enabled = true;
+     private Material blockMaterial = Material.BLUE_SHULKER_BOX;
+     private Map<String, Integer> rankBaseSlots = Map.of("default", 1, "vip", 2, "hero", 3, "legend", 4, "titan", 5);
+@@ -176,8 +177,15 @@
+     }
+ 
+     public void reloadConfig() {
+-        String configuredMat = plugin.getConfig().getString("reset-vault.block-material", "BLUE_SHULKER_BOX");
+-        Material mat = Material.matchMaterial(configuredMat == null ? "" : configuredMat);
++        java.io.File file = new java.io.File(plugin.getDataFolder(), "resetvault.yml");
++        if (!file.exists()) {
++            plugin.saveResource("resetvault.yml", false);
++        }
++        config = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
++
++        this.enabled = config.getBoolean("enabled", true);
++        String configuredMat = config.getString("block-material", "BLUE_SHULKER_BOX");
++        Material mat = Material.matchMaterial(configuredMat == null ? "" : configuredMat);
+         if (mat != null && !mat.isAir()) {
+             this.blockMaterial = mat;
+         } else {
+@@ -185,7 +193,7 @@
+         }
+ 
+         Map<String, Integer> ranks = new LinkedHashMap<>();
+-        ConfigurationSection ranksSection = plugin.getConfig().getConfigurationSection("reset-vault.rank-base-slots");
++        ConfigurationSection ranksSection = config.getConfigurationSection("rank-base-slots");
+         if (ranksSection != null) {
+             for (String key : ranksSection.getKeys(false)) {
+                 ranks.put(key.toLowerCase(Locale.ROOT), Math.max(0, ranksSection.getInt(key, 0)));
+@@ -201,7 +209,7 @@
+         this.rankBaseSlots = Map.copyOf(ranks);
+ 
+         Set<String> allowlist = new HashSet<>();
+-        for (String name : plugin.getConfig().getStringList("reset-vault.give-allowlist")) {
++        for (String name : config.getStringList("give-allowlist")) {
+             if (name != null && !name.isBlank()) {
+                 allowlist.add(name.trim().toLowerCase(Locale.ROOT));
+             }
+@@ -209,14 +217,23 @@
+         this.giveAllowlist = Set.copyOf(allowlist);
+ 
+         Set<String> enchants = new HashSet<>();
+-        for (String eId : plugin.getConfig().getStringList("reset-vault.remove-enchant")) {
++        for (String eId : config.getStringList("remove-enchant")) {
+             if (eId != null && !eId.isBlank()) {
+                 enchants.add(eId.trim().toLowerCase(Locale.ROOT));
+             }
+         }
+         this.removeEnchantIds = Set.copyOf(enchants);
+ 
+-        this.sotwMilestoneName = plugin.getConfig().getString("reset-vault.sotw-milestone", "reset-vault-open");
++        this.sotwMilestoneName = config.getString("sotw-milestone", "reset-vault-open");
++        
++        if (storage != null) {
++            try {
++                blacklist.clear();
++                blacklist.addAll(storage.loadBlacklist());
++            } catch (Exception e) {
++                plugin.getLogger().log(Level.SEVERE, "Failed to reload blacklist", e);
++            }
++            Bukkit.getScheduler().runTask(plugin, this::refreshAllHolograms);
++        }
+     }
+ 
+     // ------------------------------------------------------------------

@@ -73,7 +73,8 @@ public final class FactionService {
     private volatile int maxMembers = 16;
     private volatile int maxClaims = 250;
     private volatile int maxWarps = 5;
-    private volatile int maxClaimRadius = 5;
+    private volatile int maxClaimRadius = 10;
+    private volatile int maxSystemClaimRadius = 50;
     private volatile boolean claimsMustConnect;
     private volatile boolean claimsMayOverclaim;
     private volatile int mapWidth = 41;
@@ -215,7 +216,8 @@ public final class FactionService {
         maxMembers = bounded(plugin.getConfig().getInt("factions.limits.members", 16), 1, 500);
         maxClaims = bounded(plugin.getConfig().getInt("factions.limits.claims", 250), 1, 50_000);
         maxWarps = bounded(plugin.getConfig().getInt("factions.limits.warps", 5), 0, 100);
-        maxClaimRadius = bounded(plugin.getConfig().getInt("factions.limits.claim-radius", 5), 0, 25);
+        maxClaimRadius = bounded(plugin.getConfig().getInt("factions.limits.claim-radius", 10), 0, 25);
+        maxSystemClaimRadius = bounded(plugin.getConfig().getInt("factions.limits.system-claim-radius", 50), 0, 200);
         claimsMustConnect = plugin.getConfig().getBoolean("factions.claims.require-connected", false);
         claimsMayOverclaim = plugin.getConfig().getBoolean("factions.claims.overclaiming.enabled",
                 plugin.getConfig().getBoolean("factions.claims.allow-overclaim", false));
@@ -257,6 +259,12 @@ public final class FactionService {
     public int factionIdAt(Location location) { return location == null || location.getWorld() == null ? NO_FACTION : claims.getOrDefault(ChunkKey.of(location), NO_FACTION); }
     public int factionIdAt(ChunkKey chunk) { return chunk == null ? NO_FACTION : claims.getOrDefault(chunk, NO_FACTION); }
     public String factionTagAt(Location location) { return faction(factionIdAt(location)).map(FactionData::tag).orElse(null); }
+    /** Whether {@code location} sits inside a claim tagged as one of the configured PvP-disabled system zones (e.g. SafeZone). */
+    public boolean isSystemProtectedZone(Location location) {
+        String tag = factionTagAt(location);
+        return tag != null && plugin.getConfig().getStringList("factions.system-claims.no-pvp-tags").stream()
+                .anyMatch(value -> value.equalsIgnoreCase(tag));
+    }
     public Collection<FactionData> factions() { return factions.values().stream().sorted(Comparator.comparing(FactionData::tag, String.CASE_INSENSITIVE_ORDER)).toList(); }
     public List<FactionMember> members(int factionId) { return members.values().stream().filter(member -> member.factionId() == factionId).sorted(Comparator.comparing(FactionMember::role, Comparator.comparingInt(FactionRole::weight).reversed()).thenComparing(FactionMember::lastName, String.CASE_INSENSITIVE_ORDER)).toList(); }
     public List<ChunkKey> claims(int factionId) { return claims.entrySet().stream().filter(entry -> entry.getValue() == factionId).map(Map.Entry::getKey).sorted(Comparator.comparing(ChunkKey::world).thenComparingInt(ChunkKey::x).thenComparingInt(ChunkKey::z)).toList(); }
@@ -284,6 +292,8 @@ public final class FactionService {
         return result;
     }
     public int serviceClaimRadiusLimit() { return maxClaimRadius; }
+    /** {@code /f claim <SafeZone|WarZone> [radius]}'s own, independently configured ceiling -- system land is typically much larger than a player claim. */
+    public int systemClaimRadiusLimit() { return maxSystemClaimRadius; }
     public boolean claimsMayOverclaim() { return claimsMayOverclaim; }
     public int mapWidth() { return mapWidth; }
     public int mapHeight() { return mapHeight; }
@@ -305,6 +315,11 @@ public final class FactionService {
     }
     public ShieldDisplay shieldDisplay(int factionId) { return shieldDisplayProvider.apply(factionId); }
     public String systemTag(String type) { String safe = type == null ? "" : type.toLowerCase(Locale.ROOT); return plugin.getConfig().getString("factions.system-claims." + safe + "-tag", safe.equals("safezone") ? "SafeZone" : "WarZone"); }
+    /** Whether {@code factionId} is the system faction configured under {@code factions.system-claims.<type>-tag} (e.g. "safezone"/"warzone"), for the F map's color-coding. */
+    private boolean isSystemClaimTagged(int factionId, String type) {
+        FactionData faction = factions.get(factionId);
+        return faction != null && faction.system() && faction.tag().equalsIgnoreCase(systemTag(type));
+    }
     public void setWarpBonusProvider(java.util.function.IntUnaryOperator provider) { warpBonusProvider = provider == null ? ignored -> 0 : provider; }
     public int warpLimit(int factionId) { return Math.max(0, Math.min(100, maxWarps + Math.max(0, warpBonusProvider.applyAsInt(factionId)))); }
 
@@ -1061,9 +1076,22 @@ public final class FactionService {
                 boolean current = x == centre.x() && z == centre.z();
                 String symbol = current ? "✚" : owner == NO_FACTION ? "-"
                         : owner == viewerFaction ? "+" : isAlly(viewerFaction, owner) ? "A" : "E";
-                NamedTextColor color = current ? NamedTextColor.GREEN : owner == NO_FACTION ? NamedTextColor.DARK_GRAY
-                        : owner == viewerFaction ? NamedTextColor.GREEN
-                        : isAlly(viewerFaction, owner) ? NamedTextColor.AQUA : NamedTextColor.RED;
+                NamedTextColor color;
+                if (current) {
+                    color = NamedTextColor.GREEN;
+                } else if (owner == NO_FACTION) {
+                    color = NamedTextColor.DARK_GRAY;
+                } else if (isSystemClaimTagged(owner, "safezone")) {
+                    color = NamedTextColor.GREEN;
+                } else if (isSystemClaimTagged(owner, "warzone")) {
+                    color = NamedTextColor.RED;
+                } else if (owner == viewerFaction) {
+                    color = NamedTextColor.GREEN;
+                } else if (isAlly(viewerFaction, owner)) {
+                    color = NamedTextColor.AQUA;
+                } else {
+                    color = NamedTextColor.RED;
+                }
                 Component cell = Component.text(symbol, color);
                 if (owner != NO_FACTION) cell = cell.hoverEvent(HoverEvent.showText(claimHover(viewer, owner, chunk)));
                 output = output.append(cell);

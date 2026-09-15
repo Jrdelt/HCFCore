@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(Paper-Server/src/**)",
+      "Read(**/.gradle/**)",
+      "Read(**/build/**)",
+      "Read(**/*.jar)",
+      "Grep(Paper-Server/src/**)",
+      "Grep(**/.gradle/**)",
+      "Grep(**/build/**)"
+    ]
+  }
+}

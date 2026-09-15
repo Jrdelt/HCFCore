@@ -21,11 +21,16 @@ public final class SeasonResetManager {
     private final Database database;
     private final NetworkManager network;
     private final AtomicBoolean running = new AtomicBoolean();
+    private me.vertex.core.resetvault.ResetVaultManager resetVaultManager;
 
     public SeasonResetManager(Plugin plugin, Database database, NetworkManager network) {
         this.plugin = plugin;
         this.database = database;
         this.network = network;
+    }
+
+    public void setResetVaultManager(me.vertex.core.resetvault.ResetVaultManager resetVaultManager) {
+        this.resetVaultManager = resetVaultManager;
     }
 
     /** A reset is intentionally console-only in practice: every gameplay shard must be empty first. */
@@ -50,6 +55,9 @@ public final class SeasonResetManager {
             running.set(false);
             return CompletableFuture.completedFuture(new Result(false, Map.of(), "players-online"));
         }
+        if (resetVaultManager != null) {
+            resetVaultManager.onSeasonReset();
+        }
         return CompletableFuture.supplyAsync(() -> {
             try {
                 Map<String, Integer> changed = resetTransaction();
@@ -64,7 +72,7 @@ public final class SeasonResetManager {
         });
     }
 
-    private Map<String, Integer> resetTransaction() throws SQLException {
+    Map<String, Integer> resetTransaction() throws SQLException {
         Map<String, Integer> changed = new LinkedHashMap<>();
         try (Connection connection = database.getConnection()) {
             boolean oldAutoCommit = connection.getAutoCommit();
@@ -80,6 +88,7 @@ public final class SeasonResetManager {
                 }
                 // Faction identity, membership, permanent max-power boosts, global Spawn/warps,
                 // network topology, configuration and investigation/audit records deliberately survive.
+                // Reset Vault persistent player vaults, backups, and audit logs also survive.
                 for (String table : SEASON_TABLES) {
                     try (Statement statement = connection.createStatement()) {
                         changed.put(table, statement.executeUpdate("DELETE FROM " + table));
@@ -90,6 +99,9 @@ public final class SeasonResetManager {
                             "UPDATE vertex_factions SET home_shard=NULL,home_world=NULL,home_x=NULL,home_y=NULL,home_z=NULL,home_yaw=NULL,home_pitch=NULL"));
                     changed.put("zone_players", statement.executeUpdate(
                             "UPDATE zone_players SET haven_kills=0,riftlands_kills=0,haven_cooldown_until=0,riftlands_cooldown_until=0,rift_session_id=NULL,winner_boost=0,winner_cycle=0"));
+                    changed.put("rv_phase", statement.executeUpdate(database.dialect() == Database.Dialect.SQLITE
+                            ? "INSERT INTO rv_phase (id, phase) VALUES (1, 'CLOSED') ON CONFLICT(id) DO UPDATE SET phase = 'CLOSED'"
+                            : "INSERT INTO rv_phase (id, phase) VALUES (1, 'CLOSED') ON DUPLICATE KEY UPDATE phase = 'CLOSED'"));
                 }
                 connection.commit();
             } catch (SQLException error) {
@@ -105,7 +117,7 @@ public final class SeasonResetManager {
     private static final List<String> SEASON_TABLES = List.of(
             "vertex_faction_claims", "base_claim_region_chunks", "base_claims",
             "base_claim_slot_purchases", "raid_claim_expirations", "vertex_faction_warps",
-                    "vertex_faction_logs", "vertex_faction_archives", "vertex_faction_player_cooldowns", "vertex_faction_cooldowns",
+            "vertex_faction_logs", "vertex_faction_archives", "vertex_faction_player_cooldowns", "vertex_faction_cooldowns",
             "vertex_teleport_cooldowns", "kit_cooldowns", "ability_cooldowns", "blueprint_cooldowns",
             "faction_upgrade_levels", "faction_banks", "vertex_faction_vaults",
             "faction_shield_activations", "faction_shield_overrides", "faction_shields",
@@ -113,7 +125,8 @@ public final class SeasonResetManager {
             "spawners", "chunk_collectors", "mine_koths", "mine_hot_zones", "shop_stock",
             "zone_event_scores", "zone_event_state", "zone_event_runs", "zone_event_score_ops",
             "zone_event_winners", "vertex_player_stats",
-            "chunk_buster_operations", "chunk_buster_log");
+            "chunk_buster_operations", "chunk_buster_log",
+            "rv_access_blocks");
 
     public record Result(boolean success, Map<String, Integer> affectedRows, String error) {
         public int totalAffectedRows() { return affectedRows.values().stream().mapToInt(Integer::intValue).sum(); }

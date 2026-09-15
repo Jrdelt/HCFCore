@@ -480,8 +480,13 @@ me.vertex.core.util.FlightEffects.renewSlowFall(player);
         }
         org.bukkit.util.Vector direction = target.toVector().subtract(current.toVector()).normalize().multiply(step);
         Location next = current.add(direction);
-        next.setYaw(target.getYaw());
-        next.setPitch(target.getPitch());
+        // Only position is server-guided -- forcing yaw/pitch to the
+        // waypoint's authored facing every tick fought the player's own
+        // mouse input for the whole flight, leaving their camera unable to
+        // turn until the flight ended. The player keeps looking wherever
+        // they want while being carried.
+        next.setYaw(current.getYaw());
+        next.setPitch(current.getPitch());
         if (!player.teleport(next)) {
             releaseFlight(player.getUniqueId(), false);
         }

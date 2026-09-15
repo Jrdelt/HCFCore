@@ -510,6 +510,17 @@ public final class MineManager {
                 "percent", String.format("%.1f", job.fraction() * 100D),
                 "eta", eta < 0 ? "?" : formatEta(eta),
                 "placed", String.format("%,d", job.placed))));
+        for (UUID watcher : job.watchers) {
+            Player player = Bukkit.getPlayer(watcher);
+            if (player == null) {
+                continue;
+            }
+            if (me.vertex.core.enchant.binds.BossBarSuppression.isSuppressed(watcher)) {
+                player.hideBossBar(job.bar);
+            } else {
+                player.showBossBar(job.bar);
+            }
+        }
     }
 
     private void hideBar(FillJob job) {

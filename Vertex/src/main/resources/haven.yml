@@ -17,6 +17,16 @@ commands:
     - home
     - sethome
     - back
+rune-tags:
+  # A rune whose tags include any of blocked-tags never procs in this zone,
+  # even if allowed-tags would otherwise permit it (blocked always wins).
+  # allowed-tags, if non-empty, is a whitelist: a rune must have at least one
+  # matching tag to be active here. Both empty (the default) means every
+  # rune's zone gating is left entirely to its own enabled-zones/
+  # disabled-zones config -- this is an additional, opt-in restriction on
+  # top of that, not a replacement for it.
+  blocked-tags: []
+  allowed-tags: []
 entry-gui:
   # Every presentation value is editable without code changes.
   title: '<dark_gray>Enter Haven'

@@ -3,6 +3,7 @@ package me.vertex.core.enchant;
 import me.vertex.core.item.ItemKind;
 import me.vertex.core.item.TrackedItemIds;
 import me.vertex.core.lang.MessageFormatter;
+import me.vertex.core.zone.ZoneType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -10,6 +11,7 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
@@ -20,12 +22,14 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
 /**
@@ -98,7 +102,21 @@ public final class EnchantManager {
     public record EnchantItemInfo(String enchantId, int level, RuneTier originTier) {
     }
 
+    /** A tier's rune-shop currency -- MONEY charges through Vault, XP_LEVELS removes whole XP levels. */
+    public enum Currency {
+        MONEY, XP_LEVELS
+    }
+
     private record RuneCosmetic(Material material, Integer customModelData, boolean glow) {
+    }
+
+    /** One weighted band of levels (inclusive) used to synthesize a tier's roll table without hand-listing every level. */
+    private record LevelBucket(int from, int to, double weight) {
+    }
+
+    /** When present on a tier, every roll on that tier's table re-randomizes success in this range instead of using the level's configured rate. */
+    /** When a tier has one configured, every roll re-randomizes success within it instead of using a fixed per-level rate. */
+    public record SuccessRange(double min, double max) {
     }
 
     private final Plugin plugin;
@@ -117,12 +135,30 @@ public final class EnchantManager {
     private final NamespacedKey baseLoreKey;
     private final NamespacedKey arenaAppliedKey;
 
+    // Legacy Arena Rune PDC keys, kept only so items already in the wild from
+    // before Arena Runes were unified into this registry keep working -- see
+    // the compatibility reads on tierOf/enchantItemInfo below. Never written
+    // by new code; every new item is written in the unified format.
+    private final NamespacedKey legacyArenaRuneKey;
+    private final NamespacedKey legacyArenaEnchantKey;
+    private final NamespacedKey legacyArenaEnchantSuccessKey;
+
+    // Set once, after plugin startup wires both objects together -- see
+    // setSeasonalCatalog. Null-safe everywhere it's read: a server that
+    // hasn't wired one yet (or a level with no catalog-item configured)
+    // just gets the old generic placeholder icon.
+    private volatile SeasonalItemCatalog seasonalCatalog;
+
     private volatile Map<String, EnchantDefinition> definitions = Map.of();
     private volatile Map<RuneTier, RuneRollTable> rollTables = Map.of();
     private volatile Map<RuneTier, RuneCosmetic> runeCosmetics = Map.of();
     private volatile Map<RuneTier, Double> runeShopPrices = Map.of();
+    private volatile Map<RuneTier, Currency> runeShopCurrencies = Map.of();
+    private volatile Map<RuneTier, SuccessRange> randomSuccessRanges = Map.of();
+    private volatile java.util.function.Consumer<String> onNoLongerBindable;
     private volatile double luckyGemShopPrice;
     private volatile RuneCosmetic luckyGemCosmetic = new RuneCosmetic(Material.EMERALD, null, true);
+    private volatile double successRateJitterPercent = 10D;
 
     /** One fixed, shared bonus for every current and legacy Lucky Gem. */
     public static final double LUCKY_GEM_BONUS_PERCENT = 3.5D;
@@ -142,43 +178,339 @@ public final class EnchantManager {
         this.enchantTiersKey = new NamespacedKey(plugin, "custom_enchant_tiers");
         this.baseLoreKey = new NamespacedKey(plugin, "custom_enchants_base_lore");
         this.arenaAppliedKey = new NamespacedKey(plugin, "arena_enchants");
+        this.legacyArenaRuneKey = new NamespacedKey(plugin, "arena_rune");
+        this.legacyArenaEnchantKey = new NamespacedKey(plugin, "arena_enchant");
+        this.legacyArenaEnchantSuccessKey = new NamespacedKey(plugin, "arena_enchant_success");
     }
 
-    Plugin plugin() { return plugin; }
+    public Plugin plugin() { return plugin; }
+
+    /** Wires the catalog a seasonal level's {@code catalog-item} config refers to. See {@link #seasonalCatalog}. */
+    public void setSeasonalCatalog(SeasonalItemCatalog catalog) {
+        this.seasonalCatalog = catalog;
+    }
 
     // ------------------------------------------------------------------
     // Config loading
     // ------------------------------------------------------------------
 
+    private static final String RUNES_CONFIG_PATH = "customEnchants/runes.yml";
+
     public void load() {
-        loadEnchants();
-        loadRunes(); // depends on `definitions` above, to validate table references
+        loadRunes();
     }
 
-    private void loadEnchants() {
-        File file = new File(plugin.getDataFolder(), "enchants.yml");
+    /** One definition plus the roll-table rows it contributes to its tier -- kept together since both come from the same config block. */
+    private record LoadedEnchant(EnchantDefinition definition, List<RuneRollTable.Entry> rollEntries) {
+    }
+
+    private void loadRunes() {
+        File file = new File(plugin.getDataFolder(), RUNES_CONFIG_PATH);
         if (!file.exists()) {
-            plugin.saveResource("enchants.yml", false);
+            plugin.saveResource(RUNES_CONFIG_PATH, false);
         }
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-        Map<String, EnchantDefinition> loaded = new LinkedHashMap<>();
-        ConfigurationSection root = config.getConfigurationSection("enchants");
-        if (root != null) {
-            for (String id : root.getKeys(false)) {
-                ConfigurationSection section = root.getConfigurationSection(id);
+
+        luckyGemCosmetic = readCosmetic(RUNES_CONFIG_PATH, "lucky-gem",
+                config.getConfigurationSection("lucky-gem"), Material.EMERALD);
+        luckyGemShopPrice = Math.max(0D, config.getDouble("lucky-gem.shop-price", 0D));
+        successRateJitterPercent = Math.max(0D, config.getDouble("success-rate-jitter-percent", 10D));
+
+        Map<String, EnchantDefinition> loadedDefinitions = new LinkedHashMap<>();
+        Map<RuneTier, RuneCosmetic> cosmetics = new EnumMap<>(RuneTier.class);
+        Map<RuneTier, Double> prices = new EnumMap<>(RuneTier.class);
+        Map<RuneTier, Currency> currencies = new EnumMap<>(RuneTier.class);
+        Map<RuneTier, SuccessRange> successRanges = new EnumMap<>(RuneTier.class);
+        Map<RuneTier, RuneRollTable> tables = new EnumMap<>(RuneTier.class);
+
+        ConfigurationSection runesSection = config.getConfigurationSection("runes");
+        for (RuneTier tier : RuneTier.values()) {
+            String tierKey = tier.name().toLowerCase(Locale.ROOT);
+            ConfigurationSection tierSection = runesSection == null ? null : runesSection.getConfigurationSection(tierKey);
+            cosmetics.put(tier, readCosmetic(RUNES_CONFIG_PATH, "runes." + tierKey, tierSection, Material.AMETHYST_SHARD));
+            prices.put(tier, tierSection == null ? 0D : Math.max(0D, tierSection.getDouble("shop-price", 0D)));
+            currencies.put(tier, readCurrency(tierSection));
+            SuccessRange successRange = readSuccessRange(tierSection);
+            if (successRange != null) {
+                successRanges.put(tier, successRange);
+            }
+
+            List<RuneRollTable.Entry> entries = new ArrayList<>();
+            if (tierSection != null) {
+                List<LevelBucket> buckets = readLevelBuckets(tierSection.getMapList("level-buckets"));
+                int levelCount = tierSection.getInt("level-count", 0);
+                ConfigurationSection enchantsSection = tierSection.getConfigurationSection("enchants");
+                if (enchantsSection != null) {
+                    for (String id : enchantsSection.getKeys(false)) {
+                        ConfigurationSection enchantSection = enchantsSection.getConfigurationSection(id);
+                        if (enchantSection == null) {
+                            continue;
+                        }
+                        LoadedEnchant loaded = readEnchant(RUNES_CONFIG_PATH + " (" + tierKey + ")", id, enchantSection,
+                                buckets, levelCount);
+                        if (loaded == null) {
+                            continue;
+                        }
+                        loadedDefinitions.put(id, loaded.definition());
+                        entries.addAll(loaded.rollEntries());
+                    }
+                }
+                // Purely organizational grouping (e.g. every Fall-set piece
+                // nested under `sets: fall:` instead of loose in the flat
+                // `enchants:` list above) -- each enchant still needs its
+                // own top-level id and never inherits the set name into it,
+                // so grouping never changes a rune's id or in-game name.
+                // See EnchantDefinition#seasonalSet.
+                ConfigurationSection setsSection = tierSection.getConfigurationSection("sets");
+                if (setsSection != null) {
+                    for (String setName : setsSection.getKeys(false)) {
+                        ConfigurationSection setSection = setsSection.getConfigurationSection(setName);
+                        ConfigurationSection setEnchants = setSection == null ? null
+                                : setSection.getConfigurationSection("enchants");
+                        if (setEnchants == null) {
+                            continue;
+                        }
+                        // The set's own material/custom-model-data/catalog-item
+                        // (if any) become every nested level's default icon,
+                        // overridable per level same as before.
+                        Material setMaterial = setSection.contains("material")
+                                ? readMaterial(RUNES_CONFIG_PATH, "seasonal set '" + setName + "'",
+                                        setSection.getString("material"), null)
+                                : null;
+                        Integer setCustomModelData = setSection.contains("custom-model-data")
+                                ? setSection.getInt("custom-model-data") : null;
+                        String setCatalogItem = setSection.getString("catalog-item");
+                        LevelIconDefaults setIconDefaults = new LevelIconDefaults(setMaterial, setCustomModelData,
+                                setCatalogItem != null && setCatalogItem.isBlank() ? null : setCatalogItem);
+                        for (String id : setEnchants.getKeys(false)) {
+                            ConfigurationSection enchantSection = setEnchants.getConfigurationSection(id);
+                            if (enchantSection == null) {
+                                continue;
+                            }
+                            LoadedEnchant loaded = readEnchant(
+                                    RUNES_CONFIG_PATH + " (" + tierKey + ".sets." + setName + ")", id, enchantSection,
+                                    buckets, levelCount, setName, setIconDefaults);
+                            if (loaded == null) {
+                                continue;
+                            }
+                            loadedDefinitions.put(id, loaded.definition());
+                            entries.addAll(loaded.rollEntries());
+                        }
+                    }
+                }
+            }
+            tables.put(tier, RuneRollTable.of(entries));
+        }
+
+        // Definitions retained only so items already rolled/applied from a
+        // now-removed pool keep rendering correctly -- deliberately outside
+        // every tier's `enchants:` block and every roll table.
+        ConfigurationSection legacySection = config.getConfigurationSection("legacy");
+        if (legacySection != null) {
+            for (String id : legacySection.getKeys(false)) {
+                ConfigurationSection section = legacySection.getConfigurationSection(id);
                 if (section == null) {
                     continue;
                 }
-                EnchantDefinition definition = readEnchant("enchants.yml", id, section);
-                if (definition != null) {
-                    loaded.put(id, definition);
+                LoadedEnchant loaded = readEnchant(RUNES_CONFIG_PATH + " (legacy)", id, section, List.of(), 0);
+                if (loaded != null) {
+                    loadedDefinitions.put(id, loaded.definition());
                 }
             }
         }
-        definitions = Map.copyOf(loaded);
+
+        Map<String, EnchantDefinition> previousDefinitions = definitions;
+        definitions = Map.copyOf(loadedDefinitions);
+        runeCosmetics = Map.copyOf(cosmetics);
+        runeShopPrices = Map.copyOf(prices);
+        runeShopCurrencies = Map.copyOf(currencies);
+        randomSuccessRanges = Map.copyOf(successRanges);
+        rollTables = Map.copyOf(tables);
+        loadWarChest(config);
+        notifyNoLongerBindable(previousDefinitions);
     }
 
-    private EnchantDefinition readEnchant(String where, String id, ConfigurationSection section) {
+    /**
+     * War Chest (seasonal) isn't a gear-applied enchant -- it's a backpack
+     * tier (see {@code me.vertex.core.backpack}, id {@code war_chest}) --
+     * so its config lives in this same file's sibling {@code war-chest:}
+     * block instead of under any tier's {@code enchants:} section, and is
+     * parsed here directly rather than through {@link #readEnchant}.
+     */
+    public record WarChestLevel(double procChancePercent, double cooldownSeconds) {
+    }
+
+    public record WarChestBooster(String id, boolean enabled, double weight, int potionLevel, double durationSeconds,
+            double oreDropBonusPercent, double mobDropBonusPercent) {
+    }
+
+    private volatile Map<Integer, WarChestLevel> warChestLevels = Map.of();
+    private volatile List<WarChestBooster> warChestBoosters = List.of();
+
+    private void loadWarChest(YamlConfiguration config) {
+        ConfigurationSection section = config.getConfigurationSection("war-chest");
+        Map<Integer, WarChestLevel> levels = new java.util.LinkedHashMap<>();
+        List<WarChestBooster> boosters = new ArrayList<>();
+        if (section != null) {
+            ConfigurationSection levelsSection = section.getConfigurationSection("levels");
+            if (levelsSection != null) {
+                for (String key : levelsSection.getKeys(false)) {
+                    try {
+                        int level = Integer.parseInt(key);
+                        ConfigurationSection levelSection = levelsSection.getConfigurationSection(key);
+                        if (levelSection == null) {
+                            continue;
+                        }
+                        levels.put(level, new WarChestLevel(
+                                clampPercent(levelSection.getDouble("proc-chance-percent", 0D)),
+                                Math.max(0D, levelSection.getDouble("cooldown-seconds", 10D))));
+                    } catch (NumberFormatException ignored) {
+                        plugin.getLogger().warning(RUNES_CONFIG_PATH + " (war-chest): non-numeric level key '" + key + "', ignoring it.");
+                    }
+                }
+            }
+            ConfigurationSection boostersSection = section.getConfigurationSection("boosters");
+            if (boostersSection != null) {
+                for (String id : boostersSection.getKeys(false)) {
+                    ConfigurationSection boosterSection = boostersSection.getConfigurationSection(id);
+                    if (boosterSection == null) {
+                        continue;
+                    }
+                    boosters.add(new WarChestBooster(id, boosterSection.getBoolean("enabled", true),
+                            Math.max(0D, boosterSection.getDouble("weight", 1D)),
+                            boosterSection.getInt("potion-level", 1),
+                            Math.max(0D, boosterSection.getDouble("duration-seconds", 5D)),
+                            Math.max(0D, boosterSection.getDouble("ore-drop-bonus-percent", 0D)),
+                            Math.max(0D, boosterSection.getDouble("mob-drop-bonus-percent", 0D))));
+                }
+            }
+        }
+        warChestLevels = Map.copyOf(levels);
+        warChestBoosters = List.copyOf(boosters);
+    }
+
+    public WarChestLevel warChestLevel(int level) {
+        WarChestLevel exact = warChestLevels.get(level);
+        if (exact != null) {
+            return exact;
+        }
+        // No per-tier level cap exists in the shared backpack-upgrade system
+        // (see backpacks.yml's own comment on this) -- a War Chest upgraded
+        // past its configured range simply keeps its highest configured
+        // level's potency rather than silently granting nothing.
+        return warChestLevels.entrySet().stream()
+                .max(Map.Entry.comparingByKey())
+                .map(Map.Entry::getValue)
+                .orElse(new WarChestLevel(0D, 10D));
+    }
+
+    public List<WarChestBooster> warChestBoosters() {
+        return warChestBoosters;
+    }
+
+    /**
+     * Fired after every reload (including startup) with every enchant id
+     * that either no longer exists, or flipped {@code bindable: true} to
+     * {@code false}, in this reload. {@code /binds} is the only current
+     * subscriber -- see {@code BindManager#pruneRune} -- but this stays
+     * generic (not a hard dependency on the binds package) since
+     * `EnchantManager` must not know about `/binds` at all.
+     */
+    public void setOnNoLongerBindable(java.util.function.Consumer<String> listener) {
+        this.onNoLongerBindable = listener;
+    }
+
+    private void notifyNoLongerBindable(Map<String, EnchantDefinition> previousDefinitions) {
+        if (onNoLongerBindable == null || previousDefinitions.isEmpty()) {
+            return;
+        }
+        for (EnchantDefinition previous : previousDefinitions.values()) {
+            if (!previous.isBindable()) {
+                continue;
+            }
+            EnchantDefinition current = definitions.get(previous.id());
+            if (current == null || !current.isBindable()) {
+                onNoLongerBindable.accept(previous.id());
+            }
+        }
+    }
+
+    private Currency readCurrency(ConfigurationSection tierSection) {
+        if (tierSection == null) {
+            return Currency.MONEY;
+        }
+        try {
+            return Currency.valueOf(tierSection.getString("currency", "MONEY").trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return Currency.MONEY;
+        }
+    }
+
+    private SuccessRange readSuccessRange(ConfigurationSection tierSection) {
+        ConfigurationSection section = tierSection == null ? null : tierSection.getConfigurationSection("random-success-range");
+        if (section == null) {
+            return null;
+        }
+        double min = clampPercent(section.getDouble("min", 0D));
+        double max = clampPercent(section.getDouble("max", 100D));
+        return new SuccessRange(Math.min(min, max), Math.max(min, max));
+    }
+
+    private List<LevelBucket> readLevelBuckets(List<Map<?, ?>> raw) {
+        List<LevelBucket> buckets = new ArrayList<>();
+        for (Map<?, ?> entry : raw) {
+            Object fromObj = entry.get("from");
+            Object toObj = entry.get("to");
+            Object weightObj = entry.get("weight");
+            if (fromObj == null || toObj == null || weightObj == null) {
+                continue;
+            }
+            try {
+                int from = Integer.parseInt(String.valueOf(fromObj));
+                int to = Integer.parseInt(String.valueOf(toObj));
+                double weight = Double.parseDouble(String.valueOf(weightObj));
+                if (from >= 1 && to >= from && weight > 0D) {
+                    buckets.add(new LevelBucket(from, to, weight));
+                }
+            } catch (NumberFormatException ignored) {
+                // Skip a malformed bucket rather than failing the whole tier.
+            }
+        }
+        return buckets;
+    }
+
+    /** Spreads a bucket's total weight evenly across every level it covers, so the sum stays proportional to the original odds. */
+    private static double weightForLevel(List<LevelBucket> buckets, int level) {
+        for (LevelBucket bucket : buckets) {
+            if (level >= bucket.from() && level <= bucket.to()) {
+                return bucket.weight() / (bucket.to() - bucket.from() + 1);
+            }
+        }
+        return 0D;
+    }
+
+    /**
+     * A {@code sets: <name>:} subsection's own {@code material}/{@code
+     * custom-model-data}/{@code catalog-item} act as that set's shared
+     * default icon -- every level of every enchant nested under it inherits
+     * these unless the level configures its own, so a set whose every piece
+     * happens to share one icon (or one catalog item, in the rare case a
+     * whole set is a single physical item) doesn't need it repeated on
+     * every single level. Flat (non-set) enchants get {@link #NONE}, which
+     * preserves the exact old hardcoded {@code Material.STONE}/null/null
+     * fallback.
+     */
+    private record LevelIconDefaults(Material material, Integer customModelData, String catalogItem) {
+        static final LevelIconDefaults NONE = new LevelIconDefaults(null, null, null);
+    }
+
+    private LoadedEnchant readEnchant(String where, String id, ConfigurationSection section,
+            List<LevelBucket> tierBuckets, int tierLevelCount) {
+        return readEnchant(where, id, section, tierBuckets, tierLevelCount, null, LevelIconDefaults.NONE);
+    }
+
+    private LoadedEnchant readEnchant(String where, String id, ConfigurationSection section,
+            List<LevelBucket> tierBuckets, int tierLevelCount, String seasonalSet, LevelIconDefaults iconDefaults) {
         String displayName = section.getString("display-name", id);
         String description = section.getString("description", displayName);
         Set<String> compatible = new LinkedHashSet<>();
@@ -193,129 +525,172 @@ public final class EnchantManager {
         }
         Set<String> enabledWorlds = lowercasedSet(section.getStringList("enabled-worlds"));
         Set<String> disabledWorlds = lowercasedSet(section.getStringList("disabled-worlds"));
+        Set<ZoneType> enabledZones = readZones(where, id, section.getStringList("enabled-zones"));
+        Set<ZoneType> disabledZones = readZones(where, id, section.getStringList("disabled-zones"));
         String effect = section.getString("effect", "NONE");
+        EnchantDefinition.EffectScope damageSource = readEffectScope(section.getString("damage-source"));
+        EnchantDefinition.EffectScope targetFilter = readEffectScope(section.getString("target-filter"));
         int priority = section.getInt("priority", 0);
         boolean blockedInCombat = section.getBoolean("blocked-in-combat", false);
+        boolean seasonal = section.getBoolean("seasonal", false);
+        boolean bindable = section.getBoolean("bindable", false);
+        Set<RuneTag> tags = readTags(where, id, section.getStringList("tags"));
 
-        List<EnchantDefinition.Level> levels = new ArrayList<>();
-        ConfigurationSection levelsSection = section.getConfigurationSection("levels");
-        if (levelsSection != null) {
-            List<Integer> levelNumbers = new ArrayList<>();
-            for (String key : levelsSection.getKeys(false)) {
-                try {
-                    levelNumbers.add(Integer.parseInt(key));
-                } catch (NumberFormatException e) {
-                    plugin.getLogger().warning(where + ": enchant '" + id + "' has a non-numeric level key '"
-                            + key + "', ignoring it.");
-                }
-            }
-            Collections.sort(levelNumbers);
-            for (int levelNumber : levelNumbers) {
-                ConfigurationSection levelSection = levelsSection.getConfigurationSection(String.valueOf(levelNumber));
-                if (levelSection == null) {
-                    continue;
-                }
-                levels.add(readLevel(where, id, levelNumber, levelSection));
-            }
+        List<EnchantDefinition.Level> levels;
+        List<RuneRollTable.Entry> rollEntries = new ArrayList<>();
+        if (section.contains("per-level-value") && tierLevelCount > 0) {
+            levels = generateLevels(section, id, tierLevelCount, tierBuckets, rollEntries);
+        } else {
+            levels = readExplicitLevels(where, id, section, rollEntries, iconDefaults);
         }
         if (levels.isEmpty()) {
             plugin.getLogger().warning(where + ": enchant '" + id + "' has no levels configured, skipping it entirely.");
             return null;
         }
-        return new EnchantDefinition(id, displayName, description, compatible, enabledWorlds, disabledWorlds,
-                effect, priority, blockedInCombat, levels);
+        EnchantDefinition definition = new EnchantDefinition(id, displayName, description, compatible,
+                enabledWorlds, disabledWorlds, enabledZones, disabledZones, effect, damageSource, targetFilter,
+                priority, blockedInCombat, seasonal, bindable, tags, levels, seasonalSet);
+        return new LoadedEnchant(definition, rollEntries);
     }
 
-    private EnchantDefinition.Level readLevel(String where, String enchantId, int levelNumber, ConfigurationSection section) {
+    /** Legacy, hand-authored `levels: { 1: {...}, 2: {...} }` shape -- each level may carry its own roll `weight`. */
+    private List<EnchantDefinition.Level> readExplicitLevels(String where, String id, ConfigurationSection section,
+            List<RuneRollTable.Entry> rollEntries, LevelIconDefaults iconDefaults) {
+        List<EnchantDefinition.Level> levels = new ArrayList<>();
+        ConfigurationSection levelsSection = section.getConfigurationSection("levels");
+        if (levelsSection == null) {
+            return levels;
+        }
+        List<Integer> levelNumbers = new ArrayList<>();
+        for (String key : levelsSection.getKeys(false)) {
+            try {
+                levelNumbers.add(Integer.parseInt(key));
+            } catch (NumberFormatException e) {
+                plugin.getLogger().warning(where + ": enchant '" + id + "' has a non-numeric level key '"
+                        + key + "', ignoring it.");
+            }
+        }
+        Collections.sort(levelNumbers);
+        for (int levelNumber : levelNumbers) {
+            ConfigurationSection levelSection = levelsSection.getConfigurationSection(String.valueOf(levelNumber));
+            if (levelSection == null) {
+                continue;
+            }
+            levels.add(readLevel(where, id, levelNumber, levelSection, iconDefaults));
+            double weight = levelSection.getDouble("weight", 0D);
+            if (weight > 0D) {
+                rollEntries.add(new RuneRollTable.Entry(id, levelNumber, weight));
+            }
+        }
+        return levels;
+    }
+
+    /**
+     * Generated levels for a `per-level-value` enchant (today, only the
+     * Arena tier uses this): {@code tierLevelCount} levels are synthesized
+     * with a linearly-scaling ability value and a shared icon/proc-chance,
+     * instead of hand-authoring dozens of near-identical level blocks. Roll
+     * weight per level comes from the tier's {@code level-buckets}.
+     */
+    private List<EnchantDefinition.Level> generateLevels(ConfigurationSection section, String id, int tierLevelCount,
+            List<LevelBucket> tierBuckets, List<RuneRollTable.Entry> rollEntries) {
+        double perLevelValue = section.getDouble("per-level-value", 0D);
+        double procChance = clampPercent(section.getDouble("proc-chance", 100D));
+        Map<String, Double> effectSettings = readEffectSettings(RUNES_CONFIG_PATH, id, 0, section.getConfigurationSection("effect-settings"));
+        List<EnchantDefinition.Level> levels = new ArrayList<>(tierLevelCount);
+        for (int level = 1; level <= tierLevelCount; level++) {
+            levels.add(new EnchantDefinition.Level(level, Material.FIREWORK_STAR, null, level == tierLevelCount,
+                    procChance, 50D, perLevelValue * level, effectSettings));
+            double weight = weightForLevel(tierBuckets, level);
+            if (weight > 0D) {
+                rollEntries.add(new RuneRollTable.Entry(id, level, weight));
+            }
+        }
+        return levels;
+    }
+
+    private Set<ZoneType> readZones(String where, String id, List<String> raw) {
+        Set<ZoneType> zones = EnumSet.noneOf(ZoneType.class);
+        for (String value : raw) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            try {
+                zones.add(ZoneType.valueOf(value.trim().toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException e) {
+                plugin.getLogger().warning(where + ": enchant '" + id + "' has an unknown zone '" + value + "', ignoring it.");
+            }
+        }
+        return zones;
+    }
+
+    private EnchantDefinition.EffectScope readEffectScope(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return EnchantDefinition.EffectScope.ANY;
+        }
+        try {
+            return EnchantDefinition.EffectScope.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return EnchantDefinition.EffectScope.ANY;
+        }
+    }
+
+    private Set<RuneTag> readTags(String where, String id, List<String> raw) {
+        Set<RuneTag> tags = EnumSet.noneOf(RuneTag.class);
+        for (String value : raw) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            try {
+                tags.add(RuneTag.valueOf(value.trim().toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException e) {
+                plugin.getLogger().warning(where + ": enchant '" + id + "' has an unknown tag '" + value + "', ignoring it.");
+            }
+        }
+        return tags;
+    }
+
+    private EnchantDefinition.Level readLevel(String where, String enchantId, int levelNumber,
+            ConfigurationSection section, LevelIconDefaults iconDefaults) {
+        Material materialFallback = iconDefaults.material() != null ? iconDefaults.material() : Material.STONE;
         Material material = readMaterial(where, "enchant '" + enchantId + "' level " + levelNumber,
-                section.getString("material"), Material.STONE);
-        Integer customModelData = section.contains("custom-model-data") ? section.getInt("custom-model-data") : null;
+                section.getString("material"), materialFallback);
+        Integer customModelData = section.contains("custom-model-data")
+                ? Integer.valueOf(section.getInt("custom-model-data")) : iconDefaults.customModelData();
         boolean glow = section.getBoolean("glow", false);
         double procChance = clampPercent(section.getDouble("proc-chance", 0D));
         double successRate = clampPercent(section.getDouble("success-rate", 50D));
         double abilityValue = section.getDouble("ability-value", 0D);
-        Map<String, Double> effectSettings = new LinkedHashMap<>();
-        ConfigurationSection settings = section.getConfigurationSection("effect-settings");
-        if (settings != null) {
-            for (String key : settings.getKeys(false)) {
-                Object raw = settings.get(key);
-                if (!(raw instanceof Number) && !(raw instanceof String)) {
-                    plugin.getLogger().warning(where + ": enchant '" + enchantId + "' level " + levelNumber
-                            + " has a non-numeric effect setting '" + key + "', ignoring it.");
-                    continue;
-                }
-                try {
-                    effectSettings.put(key.toLowerCase(Locale.ROOT), Double.parseDouble(String.valueOf(raw)));
-                } catch (NumberFormatException error) {
-                    plugin.getLogger().warning(where + ": enchant '" + enchantId + "' level " + levelNumber
-                            + " has a non-numeric effect setting '" + key + "', ignoring it.");
-                }
-            }
+        Map<String, Double> effectSettings = readEffectSettings(where, enchantId, levelNumber,
+                section.getConfigurationSection("effect-settings"));
+        String catalogItem = section.getString("catalog-item");
+        if (catalogItem == null || catalogItem.isBlank()) {
+            catalogItem = iconDefaults.catalogItem();
         }
         return new EnchantDefinition.Level(levelNumber, material, customModelData, glow, procChance, successRate,
-                abilityValue, effectSettings);
+                abilityValue, effectSettings, catalogItem);
     }
 
-    private void loadRunes() {
-        File file = new File(plugin.getDataFolder(), "runes.yml");
-        if (!file.exists()) {
-            plugin.saveResource("runes.yml", false);
+    private Map<String, Double> readEffectSettings(String where, String enchantId, int levelNumber, ConfigurationSection settings) {
+        Map<String, Double> effectSettings = new LinkedHashMap<>();
+        if (settings == null) {
+            return effectSettings;
         }
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-
-        luckyGemCosmetic = readCosmetic("runes.yml", "lucky-gem",
-                config.getConfigurationSection("lucky-gem"), Material.EMERALD);
-        luckyGemShopPrice = Math.max(0D, config.getDouble("lucky-gem.shop-price", 0D));
-
-        Map<RuneTier, RuneCosmetic> cosmetics = new EnumMap<>(RuneTier.class);
-        Map<RuneTier, Double> prices = new EnumMap<>(RuneTier.class);
-        Map<RuneTier, RuneRollTable> tables = new EnumMap<>(RuneTier.class);
-        ConfigurationSection runesSection = config.getConfigurationSection("runes");
-        for (RuneTier tier : RuneTier.values()) {
-            ConfigurationSection tierSection = runesSection == null ? null
-                    : runesSection.getConfigurationSection(tier.name());
-            cosmetics.put(tier, readCosmetic("runes.yml", "runes." + tier.name(), tierSection, Material.AMETHYST_SHARD));
-            prices.put(tier, tierSection == null ? 0D : Math.max(0D, tierSection.getDouble("shop-price", 0D)));
-            tables.put(tier, readRollTable("runes.yml", tier, tierSection));
-        }
-        runeCosmetics = Map.copyOf(cosmetics);
-        runeShopPrices = Map.copyOf(prices);
-        rollTables = Map.copyOf(tables);
-    }
-
-    private RuneRollTable readRollTable(String where, RuneTier tier, ConfigurationSection tierSection) {
-        List<RuneRollTable.Entry> entries = new ArrayList<>();
-        if (tierSection != null) {
-            for (Map<?, ?> raw : tierSection.getMapList("table")) {
-                Object enchantObj = raw.get("enchant");
-                Object levelObj = raw.get("level");
-                Object weightObj = raw.get("weight");
-                if (enchantObj == null || levelObj == null || weightObj == null) {
-                    plugin.getLogger().warning(where + ": runes." + tier.name()
-                            + ".table has an incomplete entry, skipping it.");
-                    continue;
-                }
-                String enchantId = String.valueOf(enchantObj);
-                int level;
-                double weight;
-                try {
-                    level = Integer.parseInt(String.valueOf(levelObj));
-                    weight = Double.parseDouble(String.valueOf(weightObj));
-                } catch (NumberFormatException e) {
-                    plugin.getLogger().warning(where + ": runes." + tier.name()
-                            + ".table has a non-numeric level/weight, skipping it.");
-                    continue;
-                }
-                EnchantDefinition definition = definitions.get(enchantId);
-                if (definition == null || definition.level(level) == null) {
-                    plugin.getLogger().warning(where + ": runes." + tier.name() + ".table references unknown enchant/level '"
-                            + enchantId + "' level " + level + ", skipping it.");
-                    continue;
-                }
-                entries.add(new RuneRollTable.Entry(enchantId, level, weight));
+        for (String key : settings.getKeys(false)) {
+            Object raw = settings.get(key);
+            if (!(raw instanceof Number) && !(raw instanceof String)) {
+                plugin.getLogger().warning(where + ": enchant '" + enchantId + "' level " + levelNumber
+                        + " has a non-numeric effect setting '" + key + "', ignoring it.");
+                continue;
+            }
+            try {
+                effectSettings.put(key.toLowerCase(Locale.ROOT), Double.parseDouble(String.valueOf(raw)));
+            } catch (NumberFormatException error) {
+                plugin.getLogger().warning(where + ": enchant '" + enchantId + "' level " + levelNumber
+                        + " has a non-numeric effect setting '" + key + "', ignoring it.");
             }
         }
-        return RuneRollTable.of(entries);
+        return effectSettings;
     }
 
     private RuneCosmetic readCosmetic(String where, String path, ConfigurationSection section, Material fallback) {
@@ -364,6 +739,63 @@ public final class EnchantManager {
         return id == null ? null : definitions.get(id);
     }
 
+    public boolean isSeasonal(String id) {
+        if (id == null) {
+            return false;
+        }
+        EnchantDefinition def = definitions.get(id);
+        return def != null && def.isSeasonal();
+    }
+
+    /** Every currently registered {@code seasonal: true} enchant id -- e.g. for admin give-command tab completion. */
+    public Set<String> seasonalIds() {
+        Set<String> ids = new java.util.LinkedHashSet<>();
+        for (EnchantDefinition definition : definitions.values()) {
+            if (definition.isSeasonal()) {
+                ids.add(definition.id());
+            }
+        }
+        return ids;
+    }
+
+    /**
+     * Authoritatively filters custom enchants on an item according to a predicate.
+     * Enchants matching shouldRemove are stripped, while un-matched ones are preserved.
+     * Rebuilds PDC tags and lore.
+     */
+    public boolean filterCustomEnchants(ItemStack item, java.util.function.Predicate<String> shouldRemove) {
+        if (item == null || !item.hasItemMeta()) {
+            return false;
+        }
+        Map<String, Integer> current = enchantsOf(item);
+        if (current.isEmpty()) {
+            return false;
+        }
+        Map<String, Integer> next = new LinkedHashMap<>();
+        Map<String, RuneTier> nextTiers = new LinkedHashMap<>();
+        Map<String, RuneTier> currentTiers = enchantTiersOf(item);
+        boolean changed = false;
+        for (Map.Entry<String, Integer> entry : current.entrySet()) {
+            String enchantId = entry.getKey();
+            if (shouldRemove.test(enchantId)) {
+                changed = true;
+            } else {
+                next.put(enchantId, entry.getValue());
+                RuneTier tier = currentTiers.get(enchantId);
+                if (tier != null) {
+                    nextTiers.put(enchantId, tier);
+                }
+            }
+        }
+        if (!changed) {
+            return false;
+        }
+        writeEnchants(item, next);
+        writeEnchantTiers(item, nextTiers);
+        rebuildFullLore(item);
+        return true;
+    }
+
     public RuneRollTable rollTable(RuneTier tier) {
         return tier == null ? RuneRollTable.of(List.of()) : rollTables.getOrDefault(tier, RuneRollTable.of(List.of()));
     }
@@ -372,8 +804,66 @@ public final class EnchantManager {
         return tier == null ? 0D : runeShopPrices.getOrDefault(tier, 0D);
     }
 
+    /** MONEY (Vault) for every legacy tier by default; a tier may opt into XP_LEVELS via config (Arena does). */
+    public Currency runeShopCurrency(RuneTier tier) {
+        return tier == null ? Currency.MONEY : runeShopCurrencies.getOrDefault(tier, Currency.MONEY);
+    }
+
     public double luckyGemShopPrice() {
         return luckyGemShopPrice;
+    }
+
+    /** Non-null only for a tier configured with `random-success-range` (Arena today), used by the catalog to show a range instead of a fixed rate. */
+    public SuccessRange randomSuccessRange(RuneTier tier) {
+        return tier == null ? null : randomSuccessRanges.get(tier);
+    }
+
+    /**
+     * Sums the ability value of every currently-active copy of {@code
+     * effect} across the player's equipped items -- e.g. what backs a
+     * mob-drop-boost {@link me.vertex.core.booster.BoosterSource}. Mirrors
+     * {@link #enchantsOf}/{@link #isEffectActive} rather than a separate
+     * per-effect bookkeeping map.
+     */
+    public double equippedAbilityValue(Player player, String effect, ZoneType currentZone) {
+        if (player == null || effect == null) {
+            return 0D;
+        }
+        String normalized = effect.trim().toUpperCase(Locale.ROOT);
+        double total = 0D;
+        for (ItemStack item : equippedItems(player)) {
+            for (Map.Entry<String, Integer> entry : enchantsOf(item).entrySet()) {
+                EnchantDefinition definition = definitions.get(entry.getKey());
+                if (definition == null || !normalized.equals(definition.effect())
+                        || !isEffectActive(item, entry.getKey(), player.getWorld().getName())
+                        || !definition.isZoneActive(currentZone)) {
+                    continue;
+                }
+                EnchantDefinition.Level level = definition.level(entry.getValue());
+                if (level != null) {
+                    total += level.abilityValue();
+                }
+            }
+        }
+        return total;
+    }
+
+    private static List<ItemStack> equippedItems(Player player) {
+        List<ItemStack> items = new ArrayList<>();
+        for (ItemStack item : player.getInventory().getArmorContents()) {
+            if (item != null && !item.getType().isAir()) {
+                items.add(item);
+            }
+        }
+        ItemStack main = player.getInventory().getItemInMainHand();
+        ItemStack off = player.getInventory().getItemInOffHand();
+        if (main != null && !main.getType().isAir()) {
+            items.add(main);
+        }
+        if (off != null && !off.getType().isAir()) {
+            items.add(off);
+        }
+        return items;
     }
 
     private static String displayTier(RuneTier tier) {
@@ -385,6 +875,8 @@ public final class EnchantManager {
             case ELITE -> "ᴇʟɪᴛᴇ";
             case RARE -> "ʀᴀʀᴇ";
             case LEGENDARY -> "ʟᴇɢᴇɴᴅᴀʀʏ";
+            case ARENA -> "ᴀʀᴇɴᴀ";
+            case SEASONAL -> "ꜱᴇᴀꜱᴏɴᴀʟ";
         };
     }
 
@@ -425,15 +917,17 @@ public final class EnchantManager {
         if (item == null || !item.hasItemMeta()) {
             return null;
         }
-        String raw = item.getItemMeta().getPersistentDataContainer().get(runeTierKey, PersistentDataType.STRING);
-        if (raw == null) {
-            return null;
+        PersistentDataContainer pdc = item.getItemMeta().getPersistentDataContainer();
+        String raw = pdc.get(runeTierKey, PersistentDataType.STRING);
+        if (raw != null) {
+            try {
+                return RuneTier.valueOf(raw);
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
         }
-        try {
-            return RuneTier.valueOf(raw);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
+        // Pre-unification base Arena Rune items only ever carried this byte marker.
+        return pdc.has(legacyArenaRuneKey, PersistentDataType.BYTE) ? RuneTier.ARENA : null;
     }
 
     /**
@@ -456,6 +950,26 @@ public final class EnchantManager {
         if (created == null) {
             return RollOutcome.empty();
         }
+        SuccessRange range = randomSuccessRanges.get(tier);
+        double randomized;
+        if (range != null) {
+            randomized = range.min() + ThreadLocalRandom.current().nextDouble() * (range.max() - range.min());
+        } else {
+            // Jitter each individual roll around its level's configured base
+            // rate instead of every same-level item sharing one fixed value.
+            // Besides giving each rolled item its own identity, this keeps
+            // otherwise-identical same-level items from silently merging
+            // into one ambiguous inventory stack (their PersistentDataContainer
+            // now almost always differs), without touching the deliberate
+            // per-level/per-tier success curve the jitter is centered on.
+            EnchantDefinition.Level levelConfig = definitions.get(selection.enchantId()).level(selection.level());
+            double jitter = (ThreadLocalRandom.current().nextDouble() * 2D - 1D) * successRateJitterPercent;
+            randomized = levelConfig.successRate() + jitter;
+        }
+        ItemMeta meta = created.getItemMeta();
+        meta.getPersistentDataContainer().set(enchantItemSuccessKey, PersistentDataType.DOUBLE, clampPercent(randomized));
+        created.setItemMeta(meta);
+        renderEnchantItem(created);
         return new RollOutcome(RollResult.OK, created, selection.enchantId(), selection.level());
     }
 
@@ -469,9 +983,19 @@ public final class EnchantManager {
         if (definition == null || levelConfig == null) {
             return null;
         }
-        ItemStack item = new ItemStack(levelConfig.material());
+        if (originTier == RuneTier.SEASONAL && levelConfig.catalogItem() != null) {
+            ItemStack baked = createCatalogedSeasonalItem(enchantId, level, levelConfig.catalogItem());
+            if (baked != null) {
+                return baked;
+            }
+            // Configured but not (yet) saved to the catalog -- fall through
+            // to the generic placeholder rather than handing out nothing.
+        }
+        Material material = originTier == RuneTier.SEASONAL
+                ? levelConfig.material() : RuneFormatting.tierCandle(originTier);
+        ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        if (levelConfig.customModelData() != null) {
+        if (originTier == RuneTier.SEASONAL && levelConfig.customModelData() != null) {
             meta.setCustomModelData(levelConfig.customModelData());
         }
         if (levelConfig.glow()) {
@@ -485,6 +1009,30 @@ public final class EnchantManager {
         item.setItemMeta(meta);
         renderEnchantItem(item);
         return item;
+    }
+
+    /**
+     * The config-driven "tie an ability directly to a real item" path: a
+     * clone of the catalog's saved ItemStack (real material/custom model
+     * data/lore/vanilla enchants/any other plugin's PDC, untouched) with
+     * this ability baked onto it via {@link #bakeEnchantOnto} -- the exact
+     * item worn, already active, no separate rune-application step. Null
+     * when either no catalog is wired yet or {@code catalogItemId} isn't
+     * (yet) saved in it, so the caller can fall back to the generic icon.
+     */
+    private ItemStack createCatalogedSeasonalItem(String enchantId, int level, String catalogItemId) {
+        SeasonalItemCatalog catalog = seasonalCatalog;
+        if (catalog == null) {
+            return null;
+        }
+        ItemStack base = catalog.get(catalogItemId);
+        if (base == null) {
+            plugin.getLogger().warning(RUNES_CONFIG_PATH + ": seasonal enchant '" + enchantId + "' level " + level
+                    + " references catalog-item '" + catalogItemId + "', which hasn't been saved yet "
+                    + "(/seasonal catalog save " + catalogItemId + "); using the placeholder icon instead.");
+            return null;
+        }
+        return bakeEnchantOnto(base, enchantId, level, RuneTier.SEASONAL);
     }
 
     /** Rebuilds the complete, standardized presentation from durable Rune data. */
@@ -511,11 +1059,13 @@ public final class EnchantManager {
                 .append(RuneFormatting.plain(RuneFormatting.percent(success) + "%", NamedTextColor.GREEN))
                 .append(RuneFormatting.plain(" / ꜰᴀɪʟ: ", NamedTextColor.GRAY))
                 .append(RuneFormatting.plain(RuneFormatting.percent(100D - success) + "%", NamedTextColor.RED)));
-        lore.add(RuneFormatting.plain("ᴅʀᴀɢ ᴏɴᴛᴏ ᴄᴏᴍᴘᴀᴛɪʙʟᴇ ᴇǫᴜɪᴘᴍᴇɴᴛ ᴛᴏ ᴀᴘᴘʟʏ", NamedTextColor.DARK_GRAY));
+        lore.add(RuneFormatting.plain("ᴀᴘᴘʟɪᴇꜱ ᴛᴏ: ", NamedTextColor.GRAY)
+                .append(RuneFormatting.plain(RuneFormatting.smallCaps(String.join(", ", definition.compatibleTypes())),
+                        NamedTextColor.GREEN)));
 
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(RuneFormatting.title(definition.displayName(), info.level(),
-                RuneFormatting.tierColor(info.originTier()), info.level() == definition.maxLevel()));
+        meta.displayName(RuneFormatting.titleFor(info.originTier(), definition.displayName(), info.level(),
+                info.level() == definition.maxLevel()));
         meta.lore(lore);
         item.setItemMeta(meta);
     }
@@ -532,16 +1082,32 @@ public final class EnchantManager {
         String enchantId = pdc.get(enchantItemIdKey, PersistentDataType.STRING);
         Integer level = pdc.get(enchantItemLevelKey, PersistentDataType.INTEGER);
         String tierRaw = pdc.get(enchantItemOriginTierKey, PersistentDataType.STRING);
-        if (enchantId == null || level == null || tierRaw == null) {
+        if (enchantId != null && level != null && tierRaw != null) {
+            RuneTier tier;
+            try {
+                tier = RuneTier.valueOf(tierRaw);
+            } catch (IllegalArgumentException e) {
+                tier = RuneTier.SIMPLE;
+            }
+            return new EnchantItemInfo(enchantId, level, tier);
+        }
+        // Pre-unification Arena Runes stored "effect-id:level" (kebab-case,
+        // e.g. "void-shield:12") under a different key entirely -- items
+        // already rolled from before Arena joined this registry keep reading
+        // correctly here instead of needing a forced migration pass.
+        String legacyRaw = pdc.get(legacyArenaEnchantKey, PersistentDataType.STRING);
+        if (legacyRaw == null) {
             return null;
         }
-        RuneTier tier;
-        try {
-            tier = RuneTier.valueOf(tierRaw);
-        } catch (IllegalArgumentException e) {
-            tier = RuneTier.SIMPLE;
+        String[] split = legacyRaw.split(":", 2);
+        if (split.length != 2) {
+            return null;
         }
-        return new EnchantItemInfo(enchantId, level, tier);
+        try {
+            return new EnchantItemInfo(split[0].replace('-', '_'), Integer.parseInt(split[1]), RuneTier.ARENA);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -603,6 +1169,10 @@ public final class EnchantManager {
         Double stored = pdc.get(enchantItemSuccessKey, PersistentDataType.DOUBLE);
         if (stored != null) {
             return clampPercent(stored);
+        }
+        Double legacyArenaStored = pdc.get(legacyArenaEnchantSuccessKey, PersistentDataType.DOUBLE);
+        if (legacyArenaStored != null) {
+            return clampPercent(legacyArenaStored);
         }
         Integer historicalGemCount = pdc.get(legacyDraggedGemCountKey, PersistentDataType.INTEGER);
         double chance = level.successRate() + Math.max(0, historicalGemCount == null ? 0 : historicalGemCount)
@@ -673,6 +1243,25 @@ public final class EnchantManager {
         }
         return new ApplyOutcome(success ? ApplyResult.SUCCESS : ApplyResult.FAILURE, true,
                 info.enchantId(), info.level(), chance);
+    }
+
+    /**
+     * Bakes {@code enchantId} at {@code level} directly onto {@code item}
+     * (mutated in place and returned) -- for admin-distributed seasonal
+     * gear that <em>is</em> the target item (a real, cosmetic piece with
+     * its own material/custom model data/lore/vanilla enchants), not a
+     * standalone Rune meant to be applied onto arbitrary compatible gear
+     * later. Skips every runtime {@link #applyEnchant} gate (compatible
+     * type, existing level, roll chance) since there's no player-facing
+     * apply action here -- the item is simply created already carrying the
+     * ability, active the moment it's worn.
+     */
+    public ItemStack bakeEnchantOnto(ItemStack item, String enchantId, int level, RuneTier originTier) {
+        if (item == null || item.getType().isAir() || !definitions.containsKey(enchantId)) {
+            return item;
+        }
+        applyEnchantAndRerender(item, enchantId, level, originTier);
+        return item;
     }
 
     // ------------------------------------------------------------------
@@ -814,6 +1403,12 @@ public final class EnchantManager {
         for (String line : baseLore) {
             lore.add(MessageFormatter.deserialize(line));
         }
+        // Seasonal always renders last, regardless of application order --
+        // it's a distinct, later-added visual category (gold gradient, see
+        // RuneFormatting#seasonalTitle) meant to stand apart from the tier
+        // enchants above it, not interleaved with them.
+        List<Component> normalLines = new ArrayList<>();
+        List<Component> seasonalLines = new ArrayList<>();
         for (Map.Entry<String, Integer> entry : enchants.entrySet()) {
             EnchantDefinition definition = definitions.get(entry.getKey());
             if (definition == null) {
@@ -823,20 +1418,29 @@ public final class EnchantManager {
                 continue;
             }
             RuneTier tier = enchantTiers.getOrDefault(entry.getKey(), RuneTier.SIMPLE);
-            lore.add(RuneFormatting.appliedLine(definition.displayName(), entry.getValue(),
-                    RuneFormatting.tierColor(tier), entry.getValue() == definition.maxLevel()));
+            Component line = RuneFormatting.titleFor(tier, definition.displayName(), entry.getValue(),
+                    entry.getValue() == definition.maxLevel());
+            (tier == RuneTier.SEASONAL ? seasonalLines : normalLines).add(line);
         }
+        lore.addAll(normalLines);
         lore.addAll(renderArenaRuneLines(meta));
+        lore.addAll(seasonalLines);
         meta.lore(lore);
         item.setItemMeta(meta);
     }
 
-    /** Keeps the two rune families visually composable when both are on one item. */
+    /**
+     * Renders lore for the pre-unification "arena_enchants" applied-effects
+     * PDC format -- items enchanted through the old {@code ArenaRuneManager}
+     * before Arena Runes joined this registry. New applications always go
+     * through {@link #applyEnchantAndRerender} instead, so this is a
+     * read-only compatibility path, not a second application mechanism.
+     */
     private List<Component> renderArenaRuneLines(ItemMeta meta) {
         List<Component> lore = new ArrayList<>();
-        for (Map.Entry<ArenaRuneManager.Effect, Integer> entry : arenaRunesOf(meta).entrySet()) {
-            lore.add(RuneFormatting.appliedLine(entry.getKey().displayName(), entry.getValue(), NamedTextColor.BLUE,
-                    entry.getValue() == 20));
+        for (Map.Entry<String, Integer> entry : legacyArenaRunesOf(meta).entrySet()) {
+            lore.add(RuneFormatting.appliedLine(legacyArenaDisplayName(entry.getKey()), entry.getValue(),
+                    NamedTextColor.BLUE, entry.getValue() == 20));
         }
         return lore;
     }
@@ -856,10 +1460,10 @@ public final class EnchantManager {
             }
             lore = new ArrayList<>(lore.subList(0, start));
         }
-        for (Map.Entry<ArenaRuneManager.Effect, Integer> entry : arenaRunesOf(meta).entrySet()) {
-            String expected = entry.getKey().displayName() + " " + roman(entry.getValue());
-            String standardized = RuneFormatting.smallCaps(entry.getKey().displayName()) + " "
-                    + RuneFormatting.roman(entry.getValue());
+        for (Map.Entry<String, Integer> entry : legacyArenaRunesOf(meta).entrySet()) {
+            String displayName = legacyArenaDisplayName(entry.getKey());
+            String expected = displayName + " " + roman(entry.getValue());
+            String standardized = RuneFormatting.smallCaps(displayName) + " " + RuneFormatting.roman(entry.getValue());
             for (int index = lore.size() - 1; index >= 0; index--) {
                 String plain = PlainTextComponentSerializer.plainText().serialize(lore.get(index));
                 if (expected.equals(plain) || standardized.equals(plain)) {
@@ -871,8 +1475,9 @@ public final class EnchantManager {
         return lore;
     }
 
-    private Map<ArenaRuneManager.Effect, Integer> arenaRunesOf(ItemMeta meta) {
-        Map<ArenaRuneManager.Effect, Integer> result = new LinkedHashMap<>();
+    /** @return legacy kebab-case effect id (e.g. {@code "void-shield"}) to applied level. */
+    private Map<String, Integer> legacyArenaRunesOf(ItemMeta meta) {
+        Map<String, Integer> result = new LinkedHashMap<>();
         String raw = meta.getPersistentDataContainer().get(arenaAppliedKey, PersistentDataType.STRING);
         if (raw == null || raw.isBlank()) {
             return result;
@@ -882,17 +1487,21 @@ public final class EnchantManager {
             if (split.length != 2) {
                 continue;
             }
-            ArenaRuneManager.Effect effect = ArenaRuneManager.Effect.byId(split[0]);
             try {
                 int level = Integer.parseInt(split[1]);
-                if (effect != null && level >= 1 && level <= 20) {
-                    result.put(effect, level);
+                if (level >= 1 && level <= 20) {
+                    result.put(split[0], level);
                 }
             } catch (NumberFormatException ignored) {
                 // Ignore malformed legacy PDC rather than losing valid lore.
             }
         }
         return result;
+    }
+
+    private String legacyArenaDisplayName(String legacyEffectId) {
+        EnchantDefinition definition = definitions.get(legacyEffectId.replace('-', '_'));
+        return definition != null ? definition.displayName() : legacyEffectId;
     }
 
     private static String roman(int value) {

@@ -1,0 +1,36 @@
+# Haven/Riftlands KOTH and Outpost capture-point settings. Not rune data --
+# see customEnchants/runes.yml for every rune on the server, Arena included.
+
+controls:
+  # One faction fills 0-100 in this many seconds when uncontested.
+  capture-seconds: 180
+  multiple-members-speed-up: true
+  additional-member-speed: 0.25
+  max-counted-members: 5
+  max-speed-multiplier: 2.0
+  booster-reset-threshold: 50.0
+
+  # A KOTH resets to neutral after this hold duration. Outposts do not expire.
+  koth-hold-seconds: 10800
+
+  # Every value applies only to controller-faction members inside the same
+  # Haven/Riftlands zone. Sell and buy modifiers are applied to live dynamic
+  # market prices, and appear in both /boosters and the /shop item lore.
+  defaults:
+    koth:
+      sell-percent: 10.0
+      buy-discount-percent: 5.0
+      xp-percent: 25.0
+      mob-drop-percent: 0.0
+    outpost:
+      sell-percent: 10.0
+      buy-discount-percent: 5.0
+      xp-percent: 0.0
+      # Keeps Outposts distinct from KOTHs while KOTH supplies XP.
+      mob-drop-percent: 50.0
+
+  # Override any individual point using its generated id:
+  #   haven-koth-<name>, haven-outpost-<name>, riftlands-koth-<name>, or
+  #   riftlands-outpost-<name>. Unlisted values inherit that point type's
+  #   defaults above.
+  point-overrides: {}

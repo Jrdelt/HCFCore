@@ -17,11 +17,19 @@ their data is saved (for example, after opening and closing them).
 
 There's no in-game shop for these yet: `/backpack give <player> <tier>
 [level]` (`vertex.backpack.give`) hands one out directly, starting at
-`level` (default 1) -- values below 1 become level 1, with no
-upper level cap. Tiers are defined in `backpacks.yml`
+`level` (default 1, capped to 1-10). Tiers are defined in `backpacks.yml`
 (see [Configuration](configuration.md) for the full key reference) —
 each has an item type, custom model value, and its own
 drop-bonus stat.
+
+`fallen_crate` is the seasonal, crate-exclusive tier for the Fallen set
+(PAPER item, its own custom model data, gold-gradient name). It behaves
+like any other tier -- normal auto-store drop bonus, same 1-10 level cap --
+just skinned differently. It's also reachable through `/seasonal give
+fallen_crate [level]` (see [Custom Enchantments and
+Runes](custom-enchantments.md)), which resolves any id that matches a
+`backpacks.yml` tier before checking seasonal Runes or the seasonal item
+catalog.
 
 ## The GUI
 

@@ -69,7 +69,12 @@ factions:
   limits:
     members: 16
     claims: 250
-    claim-radius: 5
+    # /f claim [radius] -- a normal player/faction claim.
+    claim-radius: 10
+    # /f claim <SafeZone|WarZone> [radius] -- staff-only system land, sized
+    # independently from the player limit above since a SafeZone/WarZone is
+    # typically a much larger, server-defined area.
+    system-claim-radius: 50
     warps: 5
   claims:
     # One current faction power allows one claimed chunk.

@@ -1,0 +1,8 @@
+@@ -83,6 +83,7 @@
+     private final Set<String> activeMutations = ConcurrentHashMap.newKeySet();
+     private final Set<String> pendingWrites = ConcurrentHashMap.newKeySet();
+ 
++    private boolean enabled = true;
+     private Material blockMaterial = Material.BLUE_SHULKER_BOX;
+     private Map<String, Integer> rankBaseSlots = Map.of("default", 1, "vip", 2, "hero", 3, "legend", 4, "titan", 5);
+     private Set<String> giveAllowlist = Set.of();

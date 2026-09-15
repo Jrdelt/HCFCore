@@ -116,6 +116,8 @@ public final class ZoneManager {
     private final Map<String, Set<UUID>> zoneMobsByRegion = new ConcurrentHashMap<>();
     private final Map<ZoneType, ZoneConfig> configs = new EnumMap<>(ZoneType.class);
     private final Map<ZoneType, List<String>> blockedCommands = new EnumMap<>(ZoneType.class);
+    private final Map<ZoneType, Set<String>> blockedRuneTagNames = new EnumMap<>(ZoneType.class);
+    private final Map<ZoneType, Set<String>> allowedRuneTagNames = new EnumMap<>(ZoneType.class);
     private final Map<ZoneType, Double> mobDespawnRadii = new EnumMap<>(ZoneType.class);
     private final Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
     private final Map<String, PendingWrite> dirtyWrites = new ConcurrentHashMap<>();
@@ -171,6 +173,8 @@ public final class ZoneManager {
             configs.put(type, readConfig(type));
             blockedCommands.put(type, readBlockedCommands(type));
             mobDespawnRadii.put(type, readMobDespawnRadius(type));
+            blockedRuneTagNames.put(type, readRuneTagNames(type, "rune-tags.blocked-tags"));
+            allowedRuneTagNames.put(type, readRuneTagNames(type, "rune-tags.allowed-tags"));
         }
         YamlConfiguration eventConfig = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), "haven.yml"));
         eventRefreshMillis = Math.max(1L, Math.min(60L, eventConfig.getLong("kill-event.shared-refresh-seconds", 2L))) * 1_000L;
@@ -188,6 +192,34 @@ public final class ZoneManager {
                 .map(value -> value == null ? "" : value.trim().toLowerCase(Locale.ROOT))
                 .filter(value -> !value.isBlank())
                 .toList();
+    }
+
+    /**
+     * Raw tag names, not {@code me.vertex.core.enchant.RuneTag} -- this
+     * package has no dependency on the enchant package (which already
+     * depends on this one, via {@code RuneEffectListener}'s {@code
+     * ZoneManager}), so parsing these into real tags is the caller's job,
+     * exactly like {@link #blockedCommands} returns raw strings rather than
+     * a parsed command type.
+     */
+    public Set<String> blockedRuneTagNames(ZoneType type) {
+        return Set.copyOf(blockedRuneTagNames.getOrDefault(type, Set.of()));
+    }
+
+    public Set<String> allowedRuneTagNames(ZoneType type) {
+        return Set.copyOf(allowedRuneTagNames.getOrDefault(type, Set.of()));
+    }
+
+    private Set<String> readRuneTagNames(ZoneType type, String path) {
+        File file = new File(plugin.getDataFolder(), type.configKey() + ".yml");
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        Set<String> names = new java.util.LinkedHashSet<>();
+        for (String value : yaml.getStringList(path)) {
+            if (value != null && !value.isBlank()) {
+                names.add(value.trim().toUpperCase(Locale.ROOT));
+            }
+        }
+        return names;
     }
 
     private double readMobDespawnRadius(ZoneType type) {
@@ -978,8 +1010,13 @@ me.vertex.core.util.FlightEffects.renewSlowFall(player);
         eventBar.setTitle(text);
         eventBar.setProgress(Math.max(0D, Math.min(1D, (end - now) / (double) Math.max(1L, end - start))));
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (isIn(player, ZoneType.HAVEN) || isIn(player, ZoneType.RIFTLANDS)) eventBar.addPlayer(player);
-            else eventBar.removePlayer(player);
+            if (me.vertex.core.enchant.binds.BossBarSuppression.isSuppressed(player.getUniqueId())) {
+                eventBar.removePlayer(player);
+            } else if (isIn(player, ZoneType.HAVEN) || isIn(player, ZoneType.RIFTLANDS)) {
+                eventBar.addPlayer(player);
+            } else {
+                eventBar.removePlayer(player);
+            }
         }
     }
 

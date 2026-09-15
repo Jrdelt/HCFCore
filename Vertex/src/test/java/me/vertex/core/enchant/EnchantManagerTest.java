@@ -2,10 +2,12 @@ package me.vertex.core.enchant;
 
 import me.vertex.core.dupe.DupeManager;
 import me.vertex.core.dupe.DupeStorage;
+import me.vertex.core.enchant.listener.RuneEffectListener;
 import me.vertex.core.item.TrackedItemIds;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.storage.Database;
 import me.vertex.core.storage.SqlStorage;
+import me.vertex.core.user.User;
 import me.vertex.core.user.UserManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -42,10 +44,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * vanilla-transform persistence, and stack-safe item identity behavior --
  * everything sections 12/16/17/18/24/23/26 require.
  *
- * <p>Uses a small hand-written {@code enchants.yml}/{@code runes.yml} (not
- * the shipped defaults) written into the mock plugin's data folder before
+ * <p>Uses a small hand-written {@code customEnchants/runes.yml} (not the
+ * shipped defaults) written into the mock plugin's data folder before
  * {@link EnchantManager#load()} runs, so every test's odds/levels stay
- * fixed regardless of how the shipped resource files are tuned later.
+ * fixed regardless of how the shipped resource file is tuned later.
  */
 class EnchantManagerTest {
 
@@ -60,8 +62,7 @@ class EnchantManagerTest {
     void setUp() throws Exception {
         MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        writeConfig(plugin.getDataFolder().toPath().resolve("enchants.yml"), ENCHANTS_YML);
-        writeConfig(plugin.getDataFolder().toPath().resolve("runes.yml"), RUNES_YML);
+        writeConfig(plugin.getDataFolder().toPath().resolve("customEnchants/runes.yml"), RUNES_YML);
 
         trackedItemIds = new TrackedItemIds(plugin);
         manager = new EnchantManager(plugin, trackedItemIds);
@@ -116,6 +117,24 @@ class EnchantManagerTest {
     }
 
     @Test
+    void rollingJittersSuccessAroundTheLevelsConfiguredRateAndVariesPerRoll() {
+        // haste_pickaxe level 1's configured success-rate is 80%; the default
+        // jitter is +/-10, so every roll must land in [70, 90] and, across
+        // enough rolls, actually vary instead of always landing on 80 exactly.
+        boolean sawDifferentValue = false;
+        double first = manager.rollRune(RuneTier.SIMPLE, 0.0).createdItem() == null ? -1
+                : manager.successChance(manager.rollRune(RuneTier.SIMPLE, 0.0).createdItem());
+        for (int i = 0; i < 25; i++) {
+            double success = manager.successChance(manager.rollRune(RuneTier.SIMPLE, 0.0).createdItem());
+            assertTrue(success >= 70.0 && success <= 90.0, "success " + success + " must stay within the jitter band");
+            if (Math.abs(success - first) > 0.0001) {
+                sawDifferentValue = true;
+            }
+        }
+        assertTrue(sawDifferentValue, "repeated rolls of the same enchant+level must not all land on the exact same success value");
+    }
+
+    @Test
     void skyStepperRunsBeforeDasherWhenBothMovementRunesAreReady() {
         PlayerMock player = MockBukkit.getMock().addPlayer();
         player.setOnGround(false);
@@ -130,12 +149,59 @@ class EnchantManagerTest {
                 manager.applyEnchant(boots, manager.createEnchantItem("dasher", 1, RuneTier.ELITE), 0, 0D).result());
         player.getInventory().setBoots(boots);
 
-        new RuneEffectListener(manager, null).onSneak(new PlayerToggleSneakEvent(player, true));
+        // No User is ever loaded for this UUID, so RuneEffectListener treats the
+        // player as never on cooldown -- exactly what this priority-ordering test needs.
+        UserManager users = new UserManager(plugin, null);
+        new RuneEffectListener(manager, null, users, new RuneCooldownStore(plugin, null))
+                .onSneak(new PlayerToggleSneakEvent(player, true));
 
         assertEquals(1D, player.getVelocity().getY(), 0.0001,
                 "Sky Stepper's upward launch proves it won over Dasher's small hop");
         assertEquals(0.2D, player.getVelocity().getZ(), 0.0001,
                 "the first ready movement Rune must supply the full velocity");
+    }
+
+    @Test
+    void crouchingAgainWhileBothMovementRunesAreCoolingDownSendsTheExactCountdown() throws Exception {
+        PlayerMock player = MockBukkit.getMock().addPlayer();
+        player.setOnGround(false);
+        player.setInWater(false);
+        player.setFlying(false);
+        player.setVelocity(new Vector());
+
+        ItemStack boots = new ItemStack(Material.DIAMOND_BOOTS);
+        manager.applyEnchant(boots, manager.createEnchantItem("sky_stepper", 1, RuneTier.ELITE), 0, 0D);
+        manager.applyEnchant(boots, manager.createEnchantItem("dasher", 1, RuneTier.ELITE), 0, 0D);
+        player.getInventory().setBoots(boots);
+
+        Database database = new Database(new YamlConfiguration(), dataFolder.toFile());
+        SqlStorage storage = new SqlStorage(database);
+        storage.init();
+        UserManager userManager = new UserManager(plugin, storage);
+        userManager.load(player.getUniqueId());
+        RuneCooldownStore cooldownStore = new RuneCooldownStore(plugin, storage);
+        Messages messages = new Messages(plugin, new UserManager(plugin, null));
+        messages.load();
+
+        RuneEffectListener listener = new RuneEffectListener(manager, null, userManager, cooldownStore);
+        listener.setMessages(messages);
+
+        // Seed both runes' cooldowns directly -- only the higher-priority
+        // rune ever actually fires per crouch, so reaching "both on
+        // cooldown" by crouching twice would never happen naturally; this
+        // simulates the player having used each of them recently.
+        User user = userManager.get(player.getUniqueId());
+        cooldownStore.start(player, user, "sky_stepper", 17_000L);
+        cooldownStore.start(player, user, "dasher", 17_000L);
+
+        listener.onSneak(new PlayerToggleSneakEvent(player, true));
+
+        assertEquals(new Vector(), player.getVelocity(), "a rune fully on cooldown must not move the player at all");
+        String sent = player.nextMessage();
+        assertNotNull(sent, "a cooldown message must be sent");
+        assertTrue(sent.contains("Sky Stepper"), "the message must name the rune that's on cooldown: " + sent);
+        assertTrue(sent.matches(".*\\d+\\.\\d+s.*"), "the message must include an exact numeric countdown: " + sent);
+        database.close();
     }
 
     // ------------------------------------------------------------------
@@ -415,117 +481,74 @@ class EnchantManagerTest {
     // Test fixtures
     // ------------------------------------------------------------------
 
-    private static final String ENCHANTS_YML = """
-            enchants:
-              haste_pickaxe:
-                display-name: "Haste"
-                compatible-types: [PICKAXE]
-                enabled-worlds: []
-                disabled-worlds: []
-                levels:
-                  1:
-                    material: COAL
-                    name: "Haste I"
-                    lore: ["Level {level}", "Success {success_rate}"]
-                    glow: false
-                    proc-chance: 25.0
-                    success-rate: 80.0
-                    ability-value: 5.0
-                  2:
-                    material: COAL_BLOCK
-                    name: "Haste II"
-                    lore: ["Level {level}"]
-                    glow: false
-                    proc-chance: 20.0
-                    success-rate: 60.0
-                    ability-value: 10.0
-                  3:
-                    material: DIAMOND
-                    name: "Haste III"
-                    lore: ["Level {level}"]
-                    glow: true
-                    proc-chance: 15.0
-                    success-rate: 40.0
-                    ability-value: 15.0
-              frozen_step:
-                display-name: "Frozen Step"
-                compatible-types: [BOOTS]
-                enabled-worlds: []
-                disabled-worlds: ["nether_test_world"]
-                levels:
-                  1:
-                    material: ICE
-                    name: "Frozen Step I"
-                    lore: ["Level {level}"]
-                    glow: false
-                    proc-chance: 30.0
-                    success-rate: 90.0
-                    ability-value: 1.0
-              sky_stepper:
-                display-name: "Sky Stepper"
-                compatible-types: [BOOTS]
-                effect: SKY_STEPPER
-                priority: 200
-                levels:
-                  1:
-                    material: DIAMOND
-                    proc-chance: 100.0
-                    success-rate: 100.0
-                    ability-value: 1.0
-                    effect-settings: { upward-velocity: 1.0, forward-velocity: 0.2, cooldown-seconds: 17 }
-              dasher:
-                display-name: "Dasher"
-                compatible-types: [BOOTS]
-                effect: DASHER
-                priority: 100
-                levels:
-                  1:
-                    material: GOLD_INGOT
-                    proc-chance: 100.0
-                    success-rate: 100.0
-                    ability-value: 2.0
-                    effect-settings: { upward-velocity: 0.1, forward-velocity: 2.0, cooldown-seconds: 17 }
-            """;
-
     private static final String RUNES_YML = """
             lucky-gem:
               material: EMERALD
-              name: "Lucky Gem"
               glow: false
-              lore: ["Boost"]
 
             runes:
-              SIMPLE:
+              simple:
                 material: AMETHYST_SHARD
-                name: "Simple Rune"
                 glow: false
                 shop-price: 100.0
-                lore: ["Tier {tier}"]
-                table:
-                  - { enchant: haste_pickaxe, level: 1, weight: 100 }
-              ELITE:
+                enchants:
+                  haste_pickaxe:
+                    display-name: "Haste"
+                    compatible-types: [PICKAXE]
+                    enabled-worlds: []
+                    disabled-worlds: []
+                    levels:
+                      1: { material: COAL, glow: false, proc-chance: 25.0, success-rate: 80.0, ability-value: 5.0, weight: 100 }
+                      2: { material: COAL_BLOCK, glow: false, proc-chance: 20.0, success-rate: 60.0, ability-value: 10.0 }
+                      3: { material: DIAMOND, glow: true, proc-chance: 15.0, success-rate: 40.0, ability-value: 15.0 }
+                  frozen_step:
+                    display-name: "Frozen Step"
+                    compatible-types: [BOOTS]
+                    enabled-worlds: []
+                    disabled-worlds: ["nether_test_world"]
+                    levels:
+                      1: { material: ICE, glow: false, proc-chance: 30.0, success-rate: 90.0, ability-value: 1.0 }
+              elite:
                 material: QUARTZ
-                name: "Elite Rune"
                 glow: false
                 shop-price: 200.0
-                lore: []
-                table:
-                  - { enchant: haste_pickaxe, level: 2, weight: 100 }
-              RARE:
+                enchants:
+                  sky_stepper:
+                    display-name: "Sky Stepper"
+                    compatible-types: [BOOTS]
+                    effect: SKY_STEPPER
+                    priority: 200
+                    levels:
+                      1:
+                        material: DIAMOND
+                        proc-chance: 100.0
+                        success-rate: 100.0
+                        ability-value: 1.0
+                        effect-settings: { upward-velocity: 1.0, forward-velocity: 0.2, cooldown-seconds: 17 }
+                  dasher:
+                    display-name: "Dasher"
+                    compatible-types: [BOOTS]
+                    effect: DASHER
+                    priority: 100
+                    levels:
+                      1:
+                        material: GOLD_INGOT
+                        proc-chance: 100.0
+                        success-rate: 100.0
+                        ability-value: 2.0
+                        effect-settings: { upward-velocity: 0.1, forward-velocity: 2.0, cooldown-seconds: 17 }
+              rare:
                 material: AMETHYST_CLUSTER
-                name: "Rare Rune"
                 glow: false
                 shop-price: 300.0
-                lore: []
-                table:
-                  - { enchant: haste_pickaxe, level: 3, weight: 100 }
-              LEGENDARY:
+              legendary:
                 material: NETHER_STAR
-                name: "Legendary Rune"
-                glow: false
+                glow: true
                 shop-price: 400.0
-                lore: []
-                table:
-                  - { enchant: haste_pickaxe, level: 3, weight: 100 }
+              arena:
+                material: BLACK_CANDLE
+                glow: false
+                shop-price: 100
+                currency: XP_LEVELS
             """;
 }

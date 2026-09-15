@@ -17,6 +17,11 @@ import me.vertex.core.spawner.SpawnerStorage;
 import org.bukkit.Location;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.EntityType;
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+import me.vertex.core.resetvault.ResetVaultData;
+import me.vertex.core.resetvault.ResetVaultPhase;
+import me.vertex.core.resetvault.ResetVaultStorage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,8 +42,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -322,6 +329,62 @@ class StorageMigratorTest {
                     + "(player_uuid,transfer_kind,reference_id,created_at) VALUES(?,?,?,?)",
                     player.toString(), "HANDOFF", transferId, 1_004L);
         }
+    }
+
+    @Test
+    void migratesResetVaultDataAcrossDatabases() throws SQLException {
+        ResetVaultStorage sourceStorage = new ResetVaultStorage(source);
+        sourceStorage.init();
+        ResetVaultStorage targetStorage = new ResetVaultStorage(target);
+        targetStorage.init();
+
+        UUID playerUuid = UUID.randomUUID();
+        ItemStack diamondSword = new ItemStack(Material.DIAMOND_SWORD);
+        sourceStorage.savePlayerData(new ResetVaultData(playerUuid, "VortexPlayer", 5, List.of(diamondSword)));
+        sourceStorage.savePhase(ResetVaultPhase.WITHDRAW);
+        int accessBlockId = sourceStorage.saveAccessBlock("world", 100, 64, -200, "rv_block_1");
+        int backupId = sourceStorage.saveBackup(5_000L, "Season 1", "Console", 1, 4L, "checksum123", "COMPLETE", new byte[] {1, 2, 3, 4});
+        sourceStorage.saveRestoreHistory(backupId, "Admin", 6_000L);
+        sourceStorage.appendAuditLog(7_000L, "ADMIN_INSERT", "Admin", playerUuid.toString(), "Inserted Diamond Sword");
+        int blacklistId = sourceStorage.addBlacklistEntry("MATERIAL", "BEDROCK", "rejected.blacklisted");
+
+        // Seed target with older data to verify reverse-order wipe runs cleanly without FK issues
+        targetStorage.saveAccessBlock("world", 50, 70, 50, "rv_target_old");
+        targetStorage.saveBackup(1_000L, "Old Map", "Console", 0, 0L, "oldsum", "COMPLETE", new byte[] {9, 9});
+
+        StorageMigrator.Result result = StorageMigrator.migrate(source, target);
+
+        assertEquals(1, result.rowsPerTable().get("rv_player_data"));
+        assertEquals(1, result.rowsPerTable().get("rv_access_blocks"));
+        assertEquals(1, result.rowsPerTable().get("rv_backups"));
+        assertEquals(1, result.rowsPerTable().get("rv_backup_data"));
+        assertEquals(1, result.rowsPerTable().get("rv_restore_history"));
+        assertEquals(1, result.rowsPerTable().get("rv_audit_log"));
+        assertEquals(1, result.rowsPerTable().get("rv_phase"));
+        assertEquals(1, result.rowsPerTable().get("rv_blacklist"));
+
+        // Verify target content
+        assertEquals(ResetVaultPhase.WITHDRAW, targetStorage.loadPhase());
+        ResetVaultData migratedData = targetStorage.loadPlayerData(playerUuid);
+        assertNotNull(migratedData);
+        assertEquals("VortexPlayer", migratedData.lastKnownIgn());
+        assertEquals(5, migratedData.permanentBonusSlots());
+        assertEquals(1, migratedData.itemCount());
+        assertEquals(Material.DIAMOND_SWORD, migratedData.items().get(0).getType());
+
+        assertArrayEquals(new byte[] {1, 2, 3, 4}, targetStorage.loadBackupData(backupId));
+        ResetVaultStorage.BackupRecord backupRecord = targetStorage.loadBackupRecord(backupId);
+        assertNotNull(backupRecord);
+        assertEquals("checksum123", backupRecord.checksum());
+        assertEquals("Season 1", backupRecord.mapLabel());
+
+        List<ResetVaultStorage.AccessBlockRow> blocks = targetStorage.loadAccessBlocks();
+        assertEquals(1, blocks.size());
+        assertEquals(100, blocks.get(0).x());
+
+        List<ResetVaultStorage.BlacklistEntry> blacklist = targetStorage.loadBlacklist();
+        assertEquals(1, blacklist.size());
+        assertEquals("BEDROCK", blacklist.get(0).entryKey());
     }
 
     private static void execute(Connection connection, String sql, Object... values) throws SQLException {

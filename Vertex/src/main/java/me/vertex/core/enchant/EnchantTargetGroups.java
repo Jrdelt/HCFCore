@@ -50,6 +50,7 @@ final class EnchantTargetGroups {
             case "ARMOR", "ARMOUR" -> name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE")
                     || name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS")
                     || material == Material.TURTLE_HELMET || material == Material.ELYTRA;
+            case "DURABLE" -> material.getMaxDurability() > 0;
             default -> matchesExplicitMaterial(token, material);
         };
     }

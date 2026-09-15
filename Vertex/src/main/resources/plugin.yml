@@ -192,9 +192,21 @@ commands:
     description: Staff-only suspected-duplicate item case inspection and resolution.
     usage: /<command> inspect list [page]|inspect <id>|resolve <id> [reason]|dismiss <id> [reason]|confirm <id> [reason]
   enchant:
-    description: Browse direct-apply Custom Enchant Runes, their catalog, or give Runes/Lucky Gems.
-    usage: /<command>|give <player> rune <tier> [amount]|give <player> gem [amount]
+    description: Browse direct-apply Custom Enchant Runes, their catalog, Incinerator, or give Runes/Lucky Gems.
+    usage: /<command>|give <player> rune <tier> [amount]|give <player> gem [amount]|give <player> item <enchant-id> <level> [amount] [customModelData]|give <player> seasonalset [customModelData]|auto
     aliases: [ce, customenchants, runes]
+  seasonal:
+    description: Admin-only seasonal Rune distribution -- a random-level roll of one specific item.
+    usage: /<command> give <id> [level] [amount]|item <material> <customModelData> [name]|catalog save/remove/list <id>|roll item <enchant-id> [amount]
+  runeinfo:
+    description: Inspect every custom Rune applied to your main-hand item.
+    usage: /<command>
+  runepref:
+    description: Configure your rune activation/cooldown messages, sounds, and particles.
+    usage: /<command>|volume <0-100>|rune <id> <message|cooldown-message|sound|particle> <on|off>|rune <id> reset|notify <individual|summary|off>
+  binds:
+    description: Manage your bindable rune abilities, activation method, and presets.
+    usage: /<command>
   haven:
     description: Enter Haven or manage Haven zones as staff.
     usage: /<command> [create <name>|list|lootpool|portal create|spawnpoints|koth|outpost]
@@ -202,6 +214,10 @@ commands:
     description: Enter Riftlands or manage Riftlands zones as staff.
     usage: /<command> [create <name>|list|lootpool|portal create|spawnpoints|koth|outpost]
     aliases: [rift]
+  rv:
+    description: Open your persistent Reset Vault or manage Reset Vaults.
+    usage: /<command> [give <player>|token give <player> [amount]|open <player>|setphase <phase>|backup [status]|restore|undo|blacklist|status]
+    aliases: [resetvault]
 
 permissions:
   vertex.fa.*:
@@ -492,4 +508,22 @@ permissions:
     default: true
   vertex.portals.admin:
     description: Create, delete, inspect, and preview physical entry portals and arrival routes.
+    default: op
+  vertex.developer:
+    description: Access to developer administrative actions like /rv give.
+    default: op
+  vertex.reset.use:
+    description: Open your own Reset Vault.
+    default: true
+  vertex.reset.admin:
+    description: Access Reset Vault administrator commands.
+    default: op
+  vertex.reset.admin.edit:
+    description: Open and raw-edit any player's Reset Vault.
+    default: op
+  vertex.reset.block.break:
+    description: Break physical Reset Vault access blocks in Creative mode.
+    default: op
+  vertex.reset.recover:
+    description: Dedicated highest authority recovery commands (/rv restore, /rv undo).
     default: op

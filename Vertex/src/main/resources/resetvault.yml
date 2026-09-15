@@ -1,0 +1,14 @@
+enabled: true
+block-material: BLUE_SHULKER_BOX
+map-label: "Season 1"
+sotw-milestone: "reset-vault-open"
+give-allowlist:
+  - "cesardeltorojr"
+rank-base-slots:
+  default: 1
+  vip: 2
+  hero: 3
+  legend: 4
+  titan: 5
+remove-enchant:
+  - "temporary_enchant"

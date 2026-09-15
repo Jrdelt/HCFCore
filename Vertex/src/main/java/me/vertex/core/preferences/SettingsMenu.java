@@ -26,7 +26,12 @@ public final class SettingsMenu {
             new Entry(21, AnnouncementCategory.KOTH, Material.NETHER_STAR, "settings.koth", null),
             new Entry(22, AnnouncementCategory.OUTPOST, Material.CAMPFIRE, "settings.outpost", null),
             new Entry(23, AnnouncementCategory.MINING, Material.DIAMOND_PICKAXE, "settings.mining", null),
-            new Entry(24, AnnouncementCategory.SERVER, Material.REDSTONE_TORCH, "settings.server", null));
+            new Entry(24, AnnouncementCategory.SERVER, Material.REDSTONE_TORCH, "settings.server", null),
+            new Entry(25, AnnouncementCategory.RESET_VAULT, Material.ENDER_CHEST, "settings.reset-vault", null),
+            new Entry(28, AnnouncementCategory.RUNE_ACTIVATION_MESSAGES, Material.NAME_TAG, "settings.rune-activation-messages", null),
+            new Entry(29, AnnouncementCategory.RUNE_COOLDOWN_MESSAGES, Material.CLOCK, "settings.rune-cooldown-messages", null),
+            new Entry(30, AnnouncementCategory.RUNE_SOUNDS, Material.JUKEBOX, "settings.rune-sounds", null),
+            new Entry(31, AnnouncementCategory.RUNE_PARTICLES, Material.FIREWORK_ROCKET, "settings.rune-particles", null));
 
     private SettingsMenu() {
     }

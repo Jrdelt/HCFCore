@@ -80,14 +80,10 @@ public final class FactionProtectionListener implements Listener {
     public void onPvp(EntityDamageByEntityEvent event) {
         Player attacker = attacker(event);
         if (attacker == null || !(event.getEntity() instanceof Player victim)) return;
-        if (!factions.canPvp(attacker, victim) || protectedPvpZone(attacker.getLocation()) || protectedPvpZone(victim.getLocation())) {
+        if (!factions.canPvp(attacker, victim) || factions.isSystemProtectedZone(attacker.getLocation())
+                || factions.isSystemProtectedZone(victim.getLocation())) {
             event.setCancelled(true); attacker.sendActionBar(messages.get(attacker, "native-factions.pvp-disabled"));
         }
-    }
-
-    private boolean protectedPvpZone(org.bukkit.Location location) {
-        String tag = factions.factionTagAt(location);
-        return tag != null && plugin.getConfig().getStringList("factions.system-claims.no-pvp-tags").stream().anyMatch(value -> value.equalsIgnoreCase(tag));
     }
 
     private static Player attacker(EntityDamageByEntityEvent event) {

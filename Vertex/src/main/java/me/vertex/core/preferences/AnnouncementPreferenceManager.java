@@ -92,7 +92,7 @@ public final class AnnouncementPreferenceManager implements Listener {
     private static boolean isOptionalAnnouncement(AnnouncementCategory category) {
         return category == AnnouncementCategory.COINFLIPS || category == AnnouncementCategory.KOTH
                 || category == AnnouncementCategory.OUTPOST || category == AnnouncementCategory.MINING
-                || category == AnnouncementCategory.SERVER;
+                || category == AnnouncementCategory.SERVER || category == AnnouncementCategory.RESET_VAULT;
     }
 
     /** Changes the runtime value first so a click immediately affects the next broadcast. */

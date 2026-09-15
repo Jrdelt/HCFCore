@@ -10,5 +10,8 @@ public enum RuneTier {
     SIMPLE,
     ELITE,
     RARE,
-    LEGENDARY
+    LEGENDARY,
+    ARENA,
+    /** Admin/event-distributed only -- never appears in any tier's roll table (see {@code seasonal:} in runes.yml). */
+    SEASONAL
 }

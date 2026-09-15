@@ -86,8 +86,8 @@ public final class ArenaControlManager implements Listener {
         wandKey = new NamespacedKey(plugin, "arena_control_wand");
     }
     public void load() throws SQLException {
-        File file = new File(plugin.getDataFolder(), "arena-runes.yml");
-        if (!file.exists()) plugin.saveResource("arena-runes.yml", false);
+        File file = new File(plugin.getDataFolder(), "zone-controls.yml");
+        if (!file.exists()) plugin.saveResource("zone-controls.yml", false);
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         settings = new MineKothControl.Settings(Math.max(1D, config.getDouble("controls.capture-seconds", 180D)),
                 config.getBoolean("controls.multiple-members-speed-up", true), Math.max(0D, config.getDouble("controls.additional-member-speed", .25D)),
