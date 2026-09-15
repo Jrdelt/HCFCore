@@ -65,6 +65,20 @@ class GcRedemptionSafetyTest {
         return created.code();
     }
 
+    @Test
+    void runningShardRefreshLearnsForeignFormatWithoutLosingOldFormats() throws Exception {
+        GcManager other = newManager();
+        configure("redeem-code-length", 19);
+        var notices = new java.util.concurrent.atomic.AtomicInteger();
+        manager.setCodeFormatPublisher(notices::incrementAndGet);
+        String code = code(10,1);
+        assertFalse(other.isRedeemCodeCandidate(code));
+        other.refreshCodeFormatsAsync().get(5, TimeUnit.SECONDS);
+        assertTrue(other.isRedeemCodeCandidate(code));
+        assertTrue(other.recognizedCodeLengths().contains(12));
+        assertEquals(1,notices.get());
+    }
+
     private GcManager.RedeemOutcome claim(UUID uuid, String code) throws Exception {
         return manager.redeem(uuid, code).get(5, TimeUnit.SECONDS);
     }

@@ -2,6 +2,7 @@ package me.vertex.core.backpack;
 
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.storage.InventoryAccess;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.entity.Player;
@@ -41,6 +42,9 @@ public final class BackpackMenuListener implements Listener {
             return;
         }
         event.setCancelled(true);
+        if (!InventoryAccess.ready(manager.plugin(), player)) {
+            return;
+        }
         if (event.getRawSlot() == BackpackMenu.EMPTY_SLOT) {
             empty(player, holder);
         } else if (event.getRawSlot() == BackpackMenu.UPGRADE_SLOT) {

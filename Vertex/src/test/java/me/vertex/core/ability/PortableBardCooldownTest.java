@@ -1,7 +1,6 @@
 package me.vertex.core.ability;
 
 import me.vertex.core.storage.Storage;
-import org.bukkit.potion.PotionEffectType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +51,7 @@ class PortableBardCooldownTest {
             Ability buff = abilityManager.get(buffId);
             assertNotNull(buff, "abilities.yml should define " + buffId);
             assertEquals(7, buff.getCooldownSeconds(), buffId + " should have its own 7s cooldown");
-            assertNotNull(PotionEffectType.getByName(buff.getString("effect-type", "")),
+            assertNotNull(AbilityEffectTypes.find(buff.getString("effect-type", "")),
                     buffId + " should have a valid effect-type");
         }
     }

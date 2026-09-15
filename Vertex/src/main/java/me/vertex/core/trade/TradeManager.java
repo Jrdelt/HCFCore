@@ -42,6 +42,7 @@ public final class TradeManager {
     private final Map<UUID, CompletableFuture<Void>> escrowChains = new ConcurrentHashMap<>();
     private final Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
     private final Set<UUID> claimDeliveries = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> deferredClaims = ConcurrentHashMap.newKeySet();
     private final Set<String> pendingPayoutsInProgress = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean shuttingDown = new AtomicBoolean();
     private final AtomicBoolean renewingOwnership = new AtomicBoolean();
@@ -143,6 +144,10 @@ public final class TradeManager {
     public void touch(TradeSession session) { if (session == null || session.finishing || sessions.get(session.requester) != session) return; session.lastActivity = System.currentTimeMillis(); Player a = Bukkit.getPlayer(session.requester), b = Bukkit.getPlayer(session.target); TradeMenu.render(session, Bukkit.getOfflinePlayer(session.requester), Bukkit.getOfflinePlayer(session.target), this, messages); if (a != null && b != null) { Player other = a; other.playSound(other.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING, .2f, 1.7f); } persistEscrow(session); }
     public void sweep() {
         if (shuttingDown.get()) return;
+        for (UUID id : List.copyOf(deferredClaims)) {
+            Player player=Bukkit.getPlayer(id);
+            if(me.vertex.core.storage.InventoryAccess.readyForHandoff(plugin,player)&&deferredClaims.remove(id))applyClaims(id);
+        }
         long monotonic = System.nanoTime();
         if ((lastOwnershipRenew == 0 || monotonic - lastOwnershipRenew >= TimeUnit.SECONDS.toNanos(10))
                 && renewingOwnership.compareAndSet(false, true)) {
@@ -280,7 +285,8 @@ public final class TradeManager {
         }).thenAccept(batch ->
             Bukkit.getScheduler().runTask(plugin, () -> {
                 Player player = Bukkit.getPlayer(playerId);
-                if (player == null || !player.isOnline()) {
+                if (!me.vertex.core.storage.InventoryAccess.readyForHandoff(plugin, player)) {
+                    deferredClaims.add(playerId);
                     releaseFreshClaim(playerId, batch).whenComplete((ignored, error) ->
                             claimDeliveries.remove(playerId));
                     return;
@@ -303,7 +309,7 @@ public final class TradeManager {
 
     private void deliverTradeReservation(Player player, TradeClaimBatch batch, int index) {
         List<TradeStorage.ClaimReservation> reservations = batch.reservations();
-        if (index >= reservations.size() || !player.isOnline()) {
+        if (index >= reservations.size() || !me.vertex.core.storage.InventoryAccess.readyForHandoff(plugin, player)) {
             claimDeliveries.remove(player.getUniqueId());
             return;
         }
@@ -317,6 +323,7 @@ public final class TradeManager {
                     claimDeliveries.remove(player.getUniqueId()));
             return;
         }
+        ClaimDelivery.checkpoint(player);
         CompletableFuture<Integer> complete = CompletableFuture.supplyAsync(() -> {
             try { return storage.completeReservation(player.getUniqueId(), reservation.token()); }
             catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
@@ -329,6 +336,7 @@ public final class TradeManager {
                 claimDeliveries.remove(player.getUniqueId());
                 return;
             }
+            if (!me.vertex.core.storage.InventoryAccess.readyForHandoff(plugin, player)) { deferredClaims.add(player.getUniqueId()); claimDeliveries.remove(player.getUniqueId()); return; }
             ClaimDelivery.clearMarkers(player, plugin, "trade", reservation.token());
             deliverTradeReservation(player, batch, index + 1);
         }));
@@ -415,6 +423,9 @@ public final class TradeManager {
         boolean definitelyNotDelivered = false;
         try {
             if (payout.currency() == TradeStorage.PayoutCurrency.EXP) {
+                if(!me.vertex.core.storage.InventoryAccess.ready(plugin,player)){
+                    finishPendingPayout(payout.key(),false);return;
+                }
                 if (payout.amount() != Math.rint(payout.amount()) || payout.amount() > Integer.MAX_VALUE) {
                     plugin.getLogger().severe("Trade payout " + payout.key() + " has an invalid EXP amount; "
                             + "it remains uncertain for staff review.");

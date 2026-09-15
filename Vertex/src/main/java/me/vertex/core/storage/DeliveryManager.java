@@ -130,6 +130,7 @@ public final class DeliveryManager implements Listener {
     }
 
     public void deliver(Player player){
+        if (!InventoryAccess.readyForHandoff(plugin, player)) { retryOwners.add(player.getUniqueId()); return; }
         UUID owner=player.getUniqueId();if(!active.add(owner))return;
         CompletableFuture<Batch> load=CompletableFuture.supplyAsync(()->{try{List<DeliveryStorage.Reservation> rows=new ArrayList<>(storage.delivering(owner));DeliveryStorage.Reservation fresh=storage.reserve(owner);if(!fresh.rows().isEmpty())rows.add(fresh);return new Batch(rows,fresh.rows().isEmpty()?null:fresh.token());}catch(Exception error){throw new java.util.concurrent.CompletionException(error);}});track(load);
         load.whenComplete((batch,error)->Bukkit.getScheduler().runTask(plugin,()->{
@@ -144,7 +145,7 @@ public final class DeliveryManager implements Listener {
     }
 
     private void deliverAt(Player player,Batch batch,int index){
-        if(!player.isOnline()){releaseFresh(player.getUniqueId(),batch);active.remove(player.getUniqueId());return;}
+        if(!InventoryAccess.readyForHandoff(plugin, player)){releaseFresh(player.getUniqueId(),batch);retryOwners.add(player.getUniqueId());active.remove(player.getUniqueId());return;}
         if(index>=batch.reservations().size()){
             ClaimDelivery.clearSourceMarkers(player,plugin,"delivery");active.remove(player.getUniqueId());
             return;
@@ -158,9 +159,11 @@ public final class DeliveryManager implements Listener {
             retryOwners.add(player.getUniqueId());active.remove(player.getUniqueId());
             return;
         }
+        ClaimDelivery.checkpoint(player);
         CompletableFuture<Integer> complete=CompletableFuture.supplyAsync(()->{try{return storage.complete(player.getUniqueId(),reservation.token(),reservation.rows().getFirst().id());}catch(Exception error){throw new java.util.concurrent.CompletionException(error);}});track(complete);
         complete.whenComplete((changed,error)->Bukkit.getScheduler().runTask(plugin,()->{
             if(error!=null||changed==null||changed!=reservation.rows().size()){plugin.getLogger().log(Level.SEVERE,"Could not acknowledge item delivery "+reservation.token(),error);retryOwners.add(player.getUniqueId());active.remove(player.getUniqueId());return;}
+            if (!InventoryAccess.readyForHandoff(plugin, player)) { retryOwners.add(player.getUniqueId()); active.remove(player.getUniqueId()); return; }
             ClaimDelivery.clearMarker(player,plugin,expected.getFirst().marker());deliverAt(player,batch,index+1);
         }));
     }

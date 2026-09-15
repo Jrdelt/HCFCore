@@ -4,6 +4,7 @@ import org.bukkit.Material;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -27,18 +28,29 @@ public final class EnchantDefinition {
      * @param material        the physical enchant item's icon
      * @param customModelData optional resource-pack model override
      * @param glow            whether the physical enchant item should glint
-     * @param procChance      percent chance (0-100) this level's effect activates when it's live -- exposed
-     *                        for a future gameplay-effect listener to consult; this phase stores and renders
-     *                        it but does not itself fire any enchant-specific gameplay effect
+     * @param procChance      percent chance (0-100) this level's configured live effect activates
      * @param successRate     percent chance (0-100) a valid application attempt at this level succeeds;
      *                        failure is simply the inverse, per spec -- never stored separately
-     * @param abilityValue    a generic per-level numeric strength/effect value, purely for lore/config use
+     * @param abilityValue    the primary player-facing strength value for this level
+     * @param effectSettings  effect-specific numeric settings, configured per level
      */
     public record Level(int level, Material material, Integer customModelData, boolean glow,
-            double procChance, double successRate, double abilityValue) {
+            double procChance, double successRate, double abilityValue, Map<String, Double> effectSettings) {
+
+        public Level {
+            effectSettings = effectSettings == null ? Map.of() : Map.copyOf(effectSettings);
+        }
 
         public double failureRate() {
             return Math.max(0D, Math.min(100D, 100D - successRate));
+        }
+
+        /** Returns one optional numeric setting without tying the config to Java fields. */
+        public double setting(String key, double fallback) {
+            if (key == null || key.isBlank()) {
+                return fallback;
+            }
+            return effectSettings.getOrDefault(key.toLowerCase(Locale.ROOT), fallback);
         }
     }
 
@@ -48,16 +60,23 @@ public final class EnchantDefinition {
     private final Set<String> compatibleTypes;
     private final Set<String> enabledWorlds;
     private final Set<String> disabledWorlds;
+    private final String effect;
+    private final int priority;
+    private final boolean blockedInCombat;
     private final List<Level> levels;
 
     public EnchantDefinition(String id, String displayName, String description, Set<String> compatibleTypes,
-            Set<String> enabledWorlds, Set<String> disabledWorlds, List<Level> levels) {
+            Set<String> enabledWorlds, Set<String> disabledWorlds, String effect, int priority,
+            boolean blockedInCombat, List<Level> levels) {
         this.id = id;
         this.displayName = displayName;
         this.description = description;
         this.compatibleTypes = Set.copyOf(compatibleTypes);
         this.enabledWorlds = Set.copyOf(enabledWorlds);
         this.disabledWorlds = Set.copyOf(disabledWorlds);
+        this.effect = effect == null || effect.isBlank() ? "NONE" : effect.trim().toUpperCase(Locale.ROOT);
+        this.priority = priority;
+        this.blockedInCombat = blockedInCombat;
         this.levels = List.copyOf(levels);
     }
 
@@ -84,6 +103,21 @@ public final class EnchantDefinition {
 
     public Set<String> compatibleTypes() {
         return compatibleTypes;
+    }
+
+    /** Configurable gameplay effect type, consumed by {@link RuneEffectListener}. */
+    public String effect() {
+        return effect;
+    }
+
+    /** Higher priority effects run first when they share the same trigger. */
+    public int priority() {
+        return priority;
+    }
+
+    /** Whether this active effect may not fire while the wearer is combat-tagged. */
+    public boolean blockedInCombat() {
+        return blockedInCombat;
     }
 
     /** @return the given level's config, or null when it doesn't exist on this enchant. */

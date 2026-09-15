@@ -130,11 +130,21 @@ public final class ChunkCollectorManager {
         return plugin;
     }
 
-    /** Rebuilds the in-memory location index from the database on startup. */
+    /**
+     * Rebuilds the in-memory location index from the database on startup.
+     *
+     * <p>{@code stored.world()} is shard-qualified (ISS-15): a shared MySQL
+     * table can hold another shard's row for a world of the same bare name
+     * at the same coordinates, and that row must never be indexed,
+     * reconciled, or overwritten as if it were local.
+     */
     public void loadIndexFromDatabase() {
         try {
             for (ChunkCollectorStorage.StoredCollector stored : storage.loadAll()) {
-                World world = plugin.getServer().getWorld(stored.world());
+                if (!me.vertex.core.storage.ShardScope.isLocalShard(stored.world())) {
+                    continue;
+                }
+                World world = plugin.getServer().getWorld(me.vertex.core.storage.ShardScope.localWorld(stored.world()));
                 if (world == null) {
                     continue;
                 }

@@ -1,8 +1,12 @@
 package me.vertex.core.wand;
 
+import me.vertex.core.collector.ChunkCollectorManager;
 import me.vertex.core.lang.MessageFormatter;
+import org.bukkit.Chunk;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
@@ -14,10 +18,14 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 
 /**
  * Loads {@code wands.yml} and owns everything about a wand item.
@@ -43,11 +51,26 @@ public final class WandManager {
     private volatile Set<Material> neverSell = EnumSet.noneOf(Material.class);
     private volatile Map<String, WandTier> tiers = Map.of();
 
+    private final WandDebitWal debitWal;
+    /**
+     * Locations with a journaled TNT Wand source debit not yet confirmed
+     * removed from their container, keyed by location with the version that
+     * entry was written at. Cleared -- along with the journal entry -- only
+     * once {@link #reconcileChunk} confirms the container either had the
+     * owed materials removed just now, or no longer has them (meaning the
+     * removal already happened before the crash). See {@link #journalDebit}.
+     */
+    private final Map<String, PendingWandDebit> pendingDebits = new ConcurrentHashMap<>();
+    private final AtomicLong nextDebitVersion = new AtomicLong();
+    private record PendingWandDebit(long version, int gunpowder, int sand) {
+    }
+
     public WandManager(Plugin plugin) {
         this.plugin = plugin;
         this.harmlessMarkers = java.util.Set.of(new NamespacedKey(plugin, "mob_drop"));
         this.tierKey = new NamespacedKey(plugin, "wand_tier");
         this.usesKey = new NamespacedKey(plugin, "wand_uses");
+        this.debitWal = new WandDebitWal(plugin.getDataFolder());
     }
 
     Plugin plugin(){return plugin;}
@@ -254,5 +277,133 @@ public final class WandManager {
         applyDisplay(meta, tier, remaining);
         item.setItemMeta(meta);
         return remaining <= 0;
+    }
+
+    /**
+     * Durably records that {@code location} still owes {@code gunpowder}/
+     * {@code sand} to a TNT conversion whose bank credit was just committed
+     * to SQL -- and is therefore irrevocable -- before either is actually
+     * removed from the container there.
+     *
+     * @return the version this entry was journaled at; pass it to
+     *         {@link #clearDebitIfCurrent} once the removal is confirmed, so
+     *         a later withdrawal at the same location can never have its
+     *         still-pending entry wrongly cleared by this one.
+     */
+    long journalDebit(Location location, int gunpowder, int sand) {
+        String locationKey = key(location);
+        long version = nextDebitVersion.incrementAndGet();
+        try {
+            debitWal.put(new WandDebitWal.Entry(locationKey, version, gunpowder, sand));
+            pendingDebits.put(locationKey, new PendingWandDebit(version, gunpowder, sand));
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not journal the TNT Wand source debit at " + locationKey
+                    + " before applying it. Its bank credit cannot be undone at this point, so a crash before "
+                    + "the source materials are actually removed could create TNT for free.", e);
+        }
+        return version;
+    }
+
+    /** Called once a journaled debit at {@code version} is confirmed reconciled; a no-op if superseded. */
+    void clearDebitIfCurrent(Location location, long version) {
+        String locationKey = key(location);
+        boolean[] current = {false};
+        pendingDebits.computeIfPresent(locationKey, (key, pending) -> {
+            if (pending.version() != version) {
+                return pending;
+            }
+            current[0] = true;
+            return null;
+        });
+        if (!current[0]) {
+            return;
+        }
+        try {
+            debitWal.removeIfVersion(locationKey, version);
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Could not clear the reconciled TNT Wand debit journal entry at "
+                    + locationKey + "; it will be harmlessly replayed again on the next restart.", e);
+        }
+    }
+
+    /**
+     * Replays journaled TNT Wand debits from before the last shutdown, and
+     * immediately reconciles any location whose chunk is already loaded.
+     */
+    public void loadDebitJournal(ChunkCollectorManager collectors) {
+        List<WandDebitWal.Entry> entries;
+        try {
+            entries = debitWal.load();
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not read the TNT Wand debit journal; a source debit "
+                    + "from before the last shutdown may not be reconciled.", e);
+            return;
+        }
+        Set<Chunk> loadedChunks = new LinkedHashSet<>();
+        for (WandDebitWal.Entry entry : entries) {
+            nextDebitVersion.updateAndGet(current -> Math.max(current, entry.version()));
+            pendingDebits.put(entry.locationKey(), new PendingWandDebit(entry.version(), entry.gunpowder(), entry.sand()));
+            Location location = locationFromKey(entry.locationKey());
+            if (location != null && location.getWorld().isChunkLoaded(location.getBlockX() >> 4, location.getBlockZ() >> 4)) {
+                loadedChunks.add(location.getWorld().getChunkAt(location.getBlockX() >> 4, location.getBlockZ() >> 4));
+            }
+        }
+        for (Chunk chunk : loadedChunks) {
+            reconcileChunk(chunk, collectors);
+        }
+    }
+
+    /**
+     * Forces any journaled TNT Wand debit covering a location in this chunk
+     * back onto its live container: removes the owed amount if the
+     * container still has it (the crash happened before removal), or leaves
+     * it alone if it does not (removal already happened). Either way the
+     * journal entry is then cleared -- there is nothing further it can force.
+     */
+    public void reconcileChunk(Chunk chunk, ChunkCollectorManager collectors) {
+        if (pendingDebits.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, PendingWandDebit> entry : List.copyOf(pendingDebits.entrySet())) {
+            Location location = locationFromKey(entry.getKey());
+            if (location == null || !location.getWorld().equals(chunk.getWorld())
+                    || (location.getBlockX() >> 4) != chunk.getX() || (location.getBlockZ() >> 4) != chunk.getZ()) {
+                continue;
+            }
+            reconcileLocation(location, entry.getValue(), collectors);
+        }
+    }
+
+    private void reconcileLocation(Location location, PendingWandDebit pending, ChunkCollectorManager collectors) {
+        WandContainer container = WandContainer.of(location.getBlock(), collectors);
+        if (container != null) {
+            Map<Material, Integer> contents = container.contents(this::isPlainStack);
+            int gunpowder = Math.min(pending.gunpowder(), contents.getOrDefault(Material.GUNPOWDER, 0));
+            int sand = Math.min(pending.sand(), contents.getOrDefault(Material.SAND, 0));
+            if (gunpowder > 0) {
+                container.remove(Material.GUNPOWDER, gunpowder, this::isPlainStack);
+            }
+            if (sand > 0) {
+                container.remove(Material.SAND, sand, this::isPlainStack);
+            }
+            if (gunpowder > 0 || sand > 0) {
+                container.commit();
+            }
+        }
+        clearDebitIfCurrent(location, pending.version());
+    }
+
+    private static String key(Location location) {
+        return location.getWorld().getName() + ":" + location.getBlockX() + ":" + location.getBlockY()
+                + ":" + location.getBlockZ();
+    }
+
+    private Location locationFromKey(String locationKey) {
+        String[] parts = locationKey.split(":", 4);
+        World world = plugin.getServer().getWorld(parts[0]);
+        if (world == null) {
+            return null;
+        }
+        return new Location(world, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
     }
 }

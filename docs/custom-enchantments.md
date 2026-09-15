@@ -33,6 +33,26 @@ the direct-drag instruction. Applied equipment intentionally shows only the
 tier-colored enchant name and level; it never adds an Arena section or Rune
 statistics to armor lore.
 
+## Normal Rune pools and live effects
+
+The four normal Rune tiers are intentionally separate: every tier has five
+unique Rune types, and a Rune ID appears in only one normal tier. Mob Arena
+Runes remain a separate system and are not part of these pools.
+
+| Tier | Default Rune types |
+| --- | --- |
+| Simple | Ore Sense, Crop Bounty, Featherbound, Ironhide, Scholar's Mark |
+| Elite | Sky Stepper, Dasher, Soul Siphon, Ember Edge, Windrunner |
+| Rare | Ravager, Aegis, Executioner, Reclaimer, Deadeye |
+| Legendary | Phoenix Heart, Titan's Fury, Void Leech, Riftwalker, Stormcall |
+
+Normal Runes now have live, configurable effects. A Rune must be on compatible
+equipped gear for its effect to run. For movement Runes, the player crouches
+while airborne. When more than one movement Rune is eligible, Vertex checks
+their configured `priority` from highest to lowest. By default Sky Stepper
+(`200`) runs before Dasher (`100`); Dasher can still be used if Sky Stepper is
+missing, unavailable, blocked by combat, or on cooldown.
+
 ## Lucky Gems
 
 There is one universal Lucky Gem rule: every Gem adds **+3.50%** and success is
@@ -76,7 +96,11 @@ Staff with `vertex.enchant.give` can use:
   tables, and the universal Lucky Gem’s material/model/price. Its former
   per-tier Lucky Gem effectiveness section is retired.
 - `enchants.yml` sets each valid enchant, compatible equipment, levels,
-  effect values, proc chance, success rate, and item icon.
+  effect values, proc chance, success rate, item icon, and live-effect
+  behaviour. Each definition may set `effect`, `priority`, and
+  `blocked-in-combat`; each level may set numeric `effect-settings` such as
+  movement velocity or cooldown. Changes take effect after the normal Vertex
+  reload.
 - `arena-runes.yml` sets Mob Arena Rune price/currency and Arena effect
   behavior. It no longer has a separate Lucky Gem price or bonus.
 

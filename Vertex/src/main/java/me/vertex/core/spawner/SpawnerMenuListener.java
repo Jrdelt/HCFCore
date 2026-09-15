@@ -1,12 +1,10 @@
 package me.vertex.core.spawner;
 
-import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.faction.RallyManager;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.staff.StaffManager;
-import net.milkbowl.vault.economy.Economy;
-import net.milkbowl.vault.economy.EconomyResponse;
+import me.vertex.core.storage.InventoryAccess;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -60,6 +58,9 @@ public final class SpawnerMenuListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
+        if (!InventoryAccess.ready(spawnerManager.plugin(), player)) {
+            return;
+        }
         Location location = holder.location();
         SpawnerData data = spawnerManager.get(location);
         if (data == null) {
@@ -89,10 +90,6 @@ public final class SpawnerMenuListener implements Listener {
             withdraw(player, location, data, 1);
         } else if (slot == SpawnerManagementMenu.WITHDRAW_ALL_SLOT) {
             withdraw(player, location, data, data.stackSize());
-        } else if (slot == SpawnerManagementMenu.SELL_ONE_SLOT) {
-            sell(player, location, data, 1);
-        } else if (slot == SpawnerManagementMenu.SELL_ALL_SLOT) {
-            sell(player, location, data, data.stackSize());
         } else {
             return;
         }
@@ -131,32 +128,6 @@ public final class SpawnerMenuListener implements Listener {
         int newSize = spawnerManager.decreaseStack(location, amount);
         clearBlockIfEmpty(location, newSize);
         player.sendMessage(messages.get(player, "spawner.withdrew", "amount", String.valueOf(amount)));
-    }
-
-    private void sell(Player player, Location location, SpawnerData data, int amount) {
-        amount = Math.min(amount, data.stackSize());
-        if (amount <= 0) {
-            return;
-        }
-        SpawnerManager.MobConfig config = spawnerManager.getMobConfig(data.mobType());
-        double price = config != null ? config.price() : 0;
-        double refund = price * spawnerManager.sellRefundPercent() / 100.0 * amount;
-
-        if (refund > 0) {
-            if (!EconomyHook.isAvailable()) {
-                player.sendMessage(messages.get(player, "spawner.no-economy"));
-                return;
-            }
-            EconomyResponse response = EconomyHook.getEconomy().depositPlayer(player, refund);
-            if (!response.transactionSuccess()) {
-                player.sendMessage(messages.get(player, "spawner.no-economy"));
-                return;
-            }
-        }
-        int newSize = spawnerManager.decreaseStack(location, amount);
-        clearBlockIfEmpty(location, newSize);
-        player.sendMessage(messages.get(player, "spawner.sold", "amount", String.valueOf(amount),
-                "refund", EconomyHook.format(refund)));
     }
 
     /**

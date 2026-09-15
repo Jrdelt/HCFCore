@@ -159,7 +159,8 @@ public final class FPowerBooster implements CommandExecutor, TabCompleter, Liste
             player.updateInventory();
             return;
         }
-        if (player.getInventory().addItem(refund).isEmpty()) {
+        if (me.vertex.core.storage.InventoryAccess.ready(plugin, player)
+                && player.getInventory().addItem(refund).isEmpty()) {
             player.updateInventory();
             return;
         }
@@ -174,7 +175,11 @@ public final class FPowerBooster implements CommandExecutor, TabCompleter, Liste
         meta.displayName(messages.get(null, "fpowerbooster.item-name", "amount", String.valueOf(tier)));
         meta.lore(messages.getList(null, "fpowerbooster.item-lore", "amount", String.valueOf(tier)));
         meta.getPersistentDataContainer().set(amountKey, PersistentDataType.INTEGER, tier);
-        if (customModelData != null) meta.setCustomModelData(customModelData);
+        if (customModelData != null) {
+            var modelData = meta.getCustomModelDataComponent();
+            modelData.setFloats(List.of(customModelData.floatValue()));
+            meta.setCustomModelDataComponent(modelData);
+        }
         meta.setEnchantmentGlintOverride(glowing);
         item.setItemMeta(meta);
         return item;

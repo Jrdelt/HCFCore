@@ -56,8 +56,7 @@ that map falls back to its configured Spawners-shop purchase price
 recommended so a later shop price change never silently reshapes the
 leaderboard.
 
-Removing spawners from a stack (withdraw or sell, from the spawner's
-management GUI) always takes the **youngest** individuals first,
+Withdrawing spawners from a stack (from the spawner's management GUI) always takes the **youngest** individuals first,
 preserving the oldest — and therefore most valuable — spawners in what's
 left.
 

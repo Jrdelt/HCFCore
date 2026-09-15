@@ -44,7 +44,9 @@ public final class SellCommand implements CommandExecutor, TabCompleter {
             ShopManager.TradeOutcome outcome = shops.sellSlot(player, player.getInventory().getHeldItemSlot());
             if (outcome.result() != ShopManager.TradeResult.OK) {
                 player.sendMessage(messages.get(player,
-                        outcome.result() == ShopManager.TradeResult.STORAGE_UNAVAILABLE
+                        outcome.result() == ShopManager.TradeResult.PENDING_DELIVERY
+                                ? "delivery.pending"
+                                : outcome.result() == ShopManager.TradeResult.STORAGE_UNAVAILABLE
                                 ? "delivery.storage-unavailable"
                                 : outcome.result() == ShopManager.TradeResult.NO_ECONOMY
                                         ? "shop.trade-failed" : "shop.sell-nothing"));

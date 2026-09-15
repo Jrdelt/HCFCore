@@ -232,23 +232,30 @@ public final class FactionAdminCommand implements CommandExecutor, TabCompleter 
     }
 
     private void bank(CommandSender sender, String[] args) {
-        if (args.length < 5) { send(sender, "usage-bank"); return; }
+        if (args.length != 5) { send(sender, "usage-bank"); return; }
         FactionData faction = resolveFaction(args[1]);
         if (faction == null) { send(sender, "faction-not-found"); return; }
-        String type = args[2].toLowerCase(Locale.ROOT), operation = args[3].toLowerCase(Locale.ROOT);
-        double raw;
-        try { raw = Double.parseDouble(args[4]); } catch (NumberFormatException error) { send(sender, "invalid-number"); return; }
-        if (!Double.isFinite(raw) || raw < 0D || !List.of("money", "xp", "tnt").contains(type)
-                || !List.of("set", "add", "take").contains(operation)) { send(sender, "usage-bank"); return; }
-        double money = bank.money(faction.id()); long xp = bank.experience(faction.id()), tnt = bank.tnt(faction.id());
-        if (type.equals("money")) money = calculate(money, raw, operation);
-        else if (type.equals("xp")) xp = (long) calculate(xp, raw, operation);
-        else tnt = (long) calculate(tnt, raw, operation);
-        double nextMoney = Math.max(0D, money); long nextXp = Math.max(0L, xp), nextTnt = Math.max(0L, tnt);
-        CompletableFuture<Boolean> future = bank.set(faction.id(), nextMoney, nextXp, nextTnt);
+        BankChange change = BankChange.parse(args[2], args[3], args[4]);
+        if (change == null) { send(sender, "usage-bank"); return; }
+        if (change.type() == FactionBankManager.BankType.TNT && upgrades == null) {
+            audited(sender, "BANK_OVERRIDE", faction.tag(), change.auditDetails(), false);
+            send(sender, "failed");
+            return;
+        }
+        long tntCapacity = change.type() == FactionBankManager.BankType.TNT
+                ? upgrades.tntCapacity(faction.id()) : Long.MAX_VALUE;
+        if (change.type() == FactionBankManager.BankType.TNT
+                && change.operation() == FactionBankManager.AdminOperation.SET
+                && change.wholeAmount() > tntCapacity) {
+            audited(sender, "BANK_OVERRIDE", faction.tag(), change.auditDetails(), false);
+            sender.sendMessage(messages.get(sender, "fa.bank-tnt-cap", "maximum", String.valueOf(tntCapacity)));
+            return;
+        }
+        CompletableFuture<Boolean> future = bank.adjustForAdmin(faction.id(), change.type(), change.operation(),
+                change.moneyAmount(), change.wholeAmount(), tntCapacity);
         future.whenComplete((success, error) -> onMain(() -> {
             boolean ok = error == null && Boolean.TRUE.equals(success);
-            audited(sender, "BANK_OVERRIDE", faction.tag(), type + " " + operation + " " + raw, ok);
+            audited(sender, "BANK_OVERRIDE", faction.tag(), change.auditDetails(), ok);
             send(sender, ok ? "updated" : "failed");
         }));
     }
@@ -496,8 +503,41 @@ public final class FactionAdminCommand implements CommandExecutor, TabCompleter 
     private static boolean hasForce(String[] args) {
         return Stream.of(args).anyMatch("--force"::equalsIgnoreCase);
     }
-    private static double calculate(double old, double amount, String operation) {
-        return operation.equals("set") ? amount : operation.equals("add") ? old + amount : old - amount;
+    static record BankChange(FactionBankManager.BankType type, FactionBankManager.AdminOperation operation,
+            double moneyAmount, long wholeAmount) {
+        static BankChange parse(String operationRaw, String amountRaw, String typeRaw) {
+            FactionBankManager.AdminOperation operation = switch (operationRaw.toLowerCase(Locale.ROOT)) {
+                case "set" -> FactionBankManager.AdminOperation.SET;
+                case "add" -> FactionBankManager.AdminOperation.ADD;
+                case "take" -> FactionBankManager.AdminOperation.TAKE;
+                default -> null;
+            };
+            FactionBankManager.BankType type = switch (typeRaw.toLowerCase(Locale.ROOT)) {
+                case "money" -> FactionBankManager.BankType.MONEY;
+                case "xp", "experience" -> FactionBankManager.BankType.EXPERIENCE;
+                case "tnt" -> FactionBankManager.BankType.TNT;
+                default -> null;
+            };
+            if (operation == null || type == null) return null;
+            if (type == FactionBankManager.BankType.MONEY) {
+                try {
+                    double amount = Double.parseDouble(amountRaw);
+                    return Double.isFinite(amount) && amount >= 0D
+                            ? new BankChange(type, operation, amount, 0L) : null;
+                } catch (NumberFormatException ignored) { return null; }
+            }
+            try {
+                long amount = Long.parseLong(amountRaw);
+                return amount >= 0L ? new BankChange(type, operation, 0D, amount) : null;
+            } catch (NumberFormatException ignored) { return null; }
+        }
+
+        private String auditDetails() {
+            String amount = type == FactionBankManager.BankType.MONEY
+                    ? Double.toString(moneyAmount) : Long.toString(wholeAmount);
+            return type.name().toLowerCase(Locale.ROOT) + " "
+                    + operation.name().toLowerCase(Locale.ROOT) + " " + amount;
+        }
     }
     private static int integer(String raw, int fallback) {
         try { return Integer.parseInt(raw); } catch (NumberFormatException ignored) { return fallback; }
@@ -520,8 +560,8 @@ public final class FactionAdminCommand implements CommandExecutor, TabCompleter 
         else if (args.length == 4 && root.equals("power")) values = Stream.of("current", "max");
         else if (args.length == 3 && root.equals("shield")) values = Stream.of("active", "inactive", "clear");
         else if (args.length == 4 && root.equals("shield")) values = Stream.of("--force");
-        else if (args.length == 3 && root.equals("bank")) values = Stream.of("money", "xp", "tnt");
-        else if (args.length == 4 && root.equals("bank")) values = Stream.of("set", "add", "take");
+        else if (args.length == 3 && root.equals("bank")) values = Stream.of("set", "add", "take");
+        else if (args.length == 5 && root.equals("bank")) values = Stream.of("money", "xp", "tnt");
         else if (args.length == 3 && root.equals("vault")) values = Stream.of("--force");
         else if (args.length == 3 && root.equals("upgrades")) values = Stream.of(FactionUpgrade.values()).map(FactionUpgrade::configKey);
         else if (args.length == 4 && root.equals("upgrades") && upgrades != null) {

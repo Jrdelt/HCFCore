@@ -161,8 +161,8 @@ public final class MobStackListener implements Listener {
         }
         int limit = spawnerManager.maxStackLimit();
         // Half-radius cells ensure every pair inside the same cell is close
-        // enough to merge. Only the 26 neighboring cells then need a distance
-        // check; this avoids comparing every stack in a world to every other.
+        // enough to merge. A within-radius pair can be TWO cells apart; search
+        // that bounded neighborhood and retain the exact distance check.
         double cellSize = radius / 2D;
 
         for (World world : plugin.getServer().getWorlds()) {
@@ -189,9 +189,9 @@ public final class MobStackListener implements Listener {
 
             for (Map.Entry<StackCell, Map<StackGroup, List<Mob>>> entry : cells.entrySet()) {
                 StackCell cell = entry.getKey();
-                for (int offsetX = -1; offsetX <= 1; offsetX++) {
-                    for (int offsetY = -1; offsetY <= 1; offsetY++) {
-                        for (int offsetZ = -1; offsetZ <= 1; offsetZ++) {
+                for (int offsetX = -2; offsetX <= 2; offsetX++) {
+                    for (int offsetY = -2; offsetY <= 2; offsetY++) {
+                        for (int offsetZ = -2; offsetZ <= 2; offsetZ++) {
                             StackCell neighbor = new StackCell(cell.x + offsetX, cell.y + offsetY, cell.z + offsetZ);
                             if (compareCells(cell, neighbor) >= 0) {
                                 continue;

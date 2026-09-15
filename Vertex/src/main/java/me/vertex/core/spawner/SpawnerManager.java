@@ -58,6 +58,26 @@ public final class SpawnerManager {
     private final NamespacedKey placedAtDataKey;
     private final Random random = new Random();
     private final Map<String, SpawnerData> spawners = new ConcurrentHashMap<>();
+    private final SpawnerDebitWal debitWal;
+    /**
+     * Locations with a journaled stack debit/removal not yet confirmed
+     * durable in SQL, keyed by location with the version that journal entry
+     * was written at. {@link #spawners} already reflects the journaled
+     * state (set as soon as it's journaled); an entry here is cleared -- and
+     * the journal entry with it -- only once a SQL write/delete carrying its
+     * exact version completes (see {@link #clearDebitJournalIfCurrent}), or
+     * once {@link #reconcileChunk} forces it onto that location's PDC after
+     * a crash. The version guards against a slower, now-superseded write
+     * completing after a newer one already moved this location on, which
+     * would otherwise let it wrongly clear a still-pending later entry.
+     */
+    private final Map<String, PendingDebit> pendingDebits = new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicLong nextDebitVersion = new java.util.concurrent.atomic.AtomicLong();
+    private record PendingDebit(long version, SpawnerData data) {
+        boolean removed() {
+            return data == null;
+        }
+    }
     private final java.util.Set<CompletableFuture<Void>> pendingWrites = ConcurrentHashMap.newKeySet();
     /** Serializes mutations for each physical location without making unrelated spawners wait. */
     private final Map<String, CompletableFuture<Void>> writeChains = new ConcurrentHashMap<>();
@@ -69,7 +89,6 @@ public final class SpawnerManager {
     private volatile int maxStackSize;
     private volatile boolean silkTouchRequired;
     private volatile BreakMode breakMode;
-    private volatile double sellRefundPercent;
     private volatile int spawnCountPerStack;
     private volatile int maxSpawnCount;
     private volatile int maxNearbyEntitiesPerStack;
@@ -110,6 +129,7 @@ public final class SpawnerManager {
         this.stackSizeKey = new NamespacedKey(plugin, "spawner_stack_size");
         this.ownerFactionKey = new NamespacedKey(plugin, "spawner_owner_faction");
         this.placedAtDataKey = new NamespacedKey(plugin, "spawner_placed_at_data");
+        this.debitWal = new SpawnerDebitWal(plugin.getDataFolder());
     }
 
     Plugin plugin(){return plugin;}
@@ -139,13 +159,6 @@ public final class SpawnerManager {
         silkTouchRequired = config.getBoolean("silk-touch-required", true);
         breakMode = "decrement".equalsIgnoreCase(config.getString("break-mode", "drop-all"))
                 ? BreakMode.DECREMENT : BreakMode.DROP_ALL;
-        double configuredRefund = config.getDouble("sell-refund-percent", 50);
-        sellRefundPercent = Math.max(0, Math.min(100, configuredRefund));
-        if (configuredRefund != sellRefundPercent) {
-            plugin.getLogger().warning("Clamped spawners.yml sell-refund-percent from " + configuredRefund
-                    + " to " + sellRefundPercent + " (valid range: 0-100).");
-        }
-
         spawnCountPerStack = Math.max(1, config.getInt("spawn-count-per-stack", 1));
         maxSpawnCount = Math.max(1, config.getInt("max-spawn-count", 8));
         maxNearbyEntitiesPerStack = Math.max(1, config.getInt("max-nearby-entities-per-stack", 2));
@@ -290,24 +303,91 @@ public final class SpawnerManager {
         return value instanceof Number number ? number.intValue() : fallback;
     }
 
-    /** Loads every persisted spawner from the database into memory. */
+    /**
+     * Loads every persisted spawner from the database into memory.
+     *
+     * <p>Replays the debit journal first (see {@link #decreaseStack}) so a
+     * stack debit/removal whose withdrawal payout was already durably
+     * delivered, but whose own SQL/PDC write never reached disk before a
+     * crash, is re-applied here instead of trusting whatever stale row or
+     * block state survived -- otherwise the placed stack could silently
+     * revert to its pre-withdrawal size while the payout still lands.
+     */
     public void loadSpawnersFromDatabase() {
+        loadDebitJournal();
         try {
             for (SpawnerStorage.StoredSpawner stored : storage.loadAll()) {
-                World world = plugin.getServer().getWorld(stored.world());
+                // stored.world() is shard-qualified (ISS-15): a shared MySQL
+                // table can hold another shard's row for a world of the same
+                // bare name at the same coordinates, and that row must never
+                // be loaded, reconciled, or overwritten as if it were local.
+                if (!me.vertex.core.storage.ShardScope.isLocalShard(stored.world())) {
+                    continue;
+                }
+                String localWorldName = me.vertex.core.storage.ShardScope.localWorld(stored.world());
+                String locationKey = key(localWorldName, stored.x(), stored.y(), stored.z());
+                if (pendingDebits.containsKey(locationKey)) {
+                    // Already resolved (or overridden pending reconciliation)
+                    // from the journal above -- a stale row here must not
+                    // clobber it back to its pre-withdrawal state.
+                    continue;
+                }
+                World world = plugin.getServer().getWorld(localWorldName);
                 if (world == null) {
                     continue;
                 }
                 Location location = new Location(world, stored.x(), stored.y(), stored.z());
                 SpawnerData data = new SpawnerData(stored.mobType(), stored.placedAtMillis(),
                         stored.ownerFactionTag());
-                spawners.put(key(location), data);
+                spawners.put(locationKey, data);
                 if (world.isChunkLoaded(stored.x() >> 4, stored.z() >> 4)) {
                     reconcileChunk(world.getChunkAt(stored.x() >> 4, stored.z() >> 4));
                 }
             }
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to load spawners from the database.", e);
+        }
+    }
+
+    /**
+     * Replays journaled stack debits/removals from before the last shutdown.
+     * Each entry's SQL side is corrected immediately here; its physical
+     * block is corrected -- and the entry cleared -- by
+     * {@link #reconcileChunk} once that location's chunk is loaded (including
+     * immediately below, if it already is).
+     */
+    private void loadDebitJournal() {
+        List<SpawnerDebitWal.Entry> entries;
+        try {
+            entries = debitWal.load();
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not read the spawner debit journal; a stack debit or "
+                    + "removal from before the last shutdown may not be reconciled.", e);
+            return;
+        }
+        for (SpawnerDebitWal.Entry entry : entries) {
+            nextDebitVersion.updateAndGet(current -> Math.max(current, entry.version()));
+        }
+        for (SpawnerDebitWal.Entry entry : entries) {
+            Location location = locationFromKey(entry.locationKey());
+            if (location == null) {
+                // That world no longer exists; nothing physical to reconcile.
+                clearDebitJournalIfCurrent(entry.locationKey(), entry.version());
+                continue;
+            }
+            if (entry.removed()) {
+                spawners.remove(entry.locationKey());
+                pendingDebits.put(entry.locationKey(), new PendingDebit(entry.version(), null));
+                queueDelete(location, entry.version());
+            } else {
+                SpawnerData data = entry.toSpawnerData();
+                spawners.put(entry.locationKey(), data);
+                pendingDebits.put(entry.locationKey(), new PendingDebit(entry.version(), data));
+                persist(location, data, entry.version());
+            }
+            if (location.getWorld().isChunkLoaded(location.getBlockX() >> 4, location.getBlockZ() >> 4)) {
+                reconcileChunk(location.getWorld().getChunkAt(location.getBlockX() >> 4, location.getBlockZ() >> 4));
+            }
         }
     }
 
@@ -326,6 +406,7 @@ public final class SpawnerManager {
      * marker existed. Never call this for an unloaded chunk.
      */
     public void reconcileChunk(Chunk chunk) {
+        reconcilePendingDebits(chunk);
         java.util.Set<String> found = new java.util.HashSet<>();
         for (BlockState state : chunk.getTileEntities()) {
             if (!(state instanceof CreatureSpawner spawner)) {
@@ -357,6 +438,36 @@ public final class SpawnerManager {
         }
     }
 
+    /**
+     * Forces any journaled debit/removal covering a location in this chunk
+     * onto its physical block, ahead of the normal PDC/SQL reconciliation
+     * below -- which would otherwise treat an unflushed, still-stale PDC (or
+     * a not-yet-applied SQL delete) as trustworthy again. Idempotent: once
+     * applied, the journal entry is cleared, so a later reconcile of the same
+     * chunk with the (now-corrected) PDC no-ops here and proceeds normally.
+     */
+    private void reconcilePendingDebits(Chunk chunk) {
+        for (Map.Entry<String, PendingDebit> entry : List.copyOf(pendingDebits.entrySet())) {
+            Location location = locationFromKey(entry.getKey());
+            if (location == null || !sameChunk(location, chunk)) {
+                continue;
+            }
+            PendingDebit pending = entry.getValue();
+            if (pending.removed()) {
+                spawners.remove(entry.getKey());
+                if (location.getBlock().getType() == Material.SPAWNER) {
+                    location.getBlock().setType(Material.AIR);
+                }
+                queueDelete(location, pending.version());
+            } else {
+                spawners.put(entry.getKey(), pending.data());
+                writeData(location, pending.data());
+                applyTuning(location, pending.data());
+                persist(location, pending.data(), pending.version());
+            }
+        }
+    }
+
     private List<Location> locationsInChunk(Chunk chunk) {
         List<Location> result = new ArrayList<>();
         for (Location location : locations()) {
@@ -372,14 +483,28 @@ public final class SpawnerManager {
     private List<Location> locations() {
         List<Location> result = new ArrayList<>();
         for (String locationKey : spawners.keySet()) {
-            String[] parts = locationKey.split(":", 4);
-            World world = plugin.getServer().getWorld(parts[0]);
-            if (world != null) {
-                result.add(new Location(world, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]),
-                        Integer.parseInt(parts[3])));
+            Location location = locationFromKey(locationKey);
+            if (location != null) {
+                result.add(location);
             }
         }
         return result;
+    }
+
+    /** @return the decoded location, or null if its world isn't currently loaded. */
+    private Location locationFromKey(String locationKey) {
+        String[] parts = locationKey.split(":", 4);
+        World world = plugin.getServer().getWorld(parts[0]);
+        if (world == null) {
+            return null;
+        }
+        return new Location(world, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+    }
+
+    private static boolean sameChunk(Location location, Chunk chunk) {
+        return location.getWorld().equals(chunk.getWorld())
+                && (location.getBlockX() >> 4) == chunk.getX()
+                && (location.getBlockZ() >> 4) == chunk.getZ();
     }
 
     public MobConfig getMobConfig(EntityType type) {
@@ -400,10 +525,6 @@ public final class SpawnerManager {
 
     public BreakMode breakMode() {
         return breakMode;
-    }
-
-    public double sellRefundPercent() {
-        return sellRefundPercent;
     }
 
     /** How far (in blocks) from a spawner block vanilla will actually spawn a mob. */
@@ -519,22 +640,39 @@ public final class SpawnerManager {
      * Lowers the stack by amount; if it reaches 0, the spawner is untracked
      * (and the caller should remove the physical block).
      *
+     * <p>Callers (withdraw/etc.) admit the payout to a durable delivery
+     * inbox before calling this. That admission cannot be undone once it
+     * succeeds, so from that point on the stack debit below must survive a
+     * crash too -- otherwise a hard stop before this location's own SQL
+     * write (or before its already-mutated PDC ever reaches disk) would let
+     * the placed stack silently revert to its pre-withdrawal size while the
+     * payout still lands, duplicating value. {@link #journalApply}/
+     * {@link #journalRemoval} close that gap by durably recording the
+     * intended final state synchronously, before it is applied; see
+     * {@link #loadDebitJournal} and {@link #reconcileChunk} for how a
+     * survived journal entry is replayed.
+     *
      * @return the new stack size (0 meaning it was fully removed).
      */
     public int decreaseStack(Location location, int amount) {
-        SpawnerData data = spawners.get(key(location));
+        String locationKey = key(location);
+        SpawnerData data = spawners.get(locationKey);
         if (data == null) {
             return 0;
         }
         data.removeYoungest(amount);
         int newSize = data.stackSize();
         if (newSize <= 0) {
-            remove(location);
+            long version = journalRemoval(locationKey);
+            spawners.remove(locationKey);
+            nextManualSpawnTicks.remove(locationKey);
+            queueDelete(location, version);
             return 0;
         }
+        long version = journalApply(locationKey, data);
         writeData(location, data);
         applyTuning(location, data);
-        persist(location, data);
+        persist(location, data, version);
         return newSize;
     }
 
@@ -545,14 +683,88 @@ public final class SpawnerManager {
             return;
         }
         nextManualSpawnTicks.remove(locationKey);
+        queueDelete(location, null);
+    }
+
+    private void queueDelete(Location location, Long debitVersion) {
         queue(location, () -> {
             try {
                 me.vertex.core.storage.SqlRetry.run(plugin, "Spawner delete at " + key(location),
                         () -> storage.delete(location));
+                if (debitVersion != null) {
+                    clearDebitJournalIfCurrent(key(location), debitVersion);
+                }
             } catch (Exception e) {
                 plugin.getLogger().log(Level.SEVERE, "Failed to delete spawner from the database after retries.", e);
             }
         });
+    }
+
+    /**
+     * Durably records that {@code locationKey} must end up as {@code data},
+     * before that state is actually applied, and returns the version this
+     * entry was journaled at. If the process dies before this location's own
+     * SQL write (or its already-mutated PDC) reaches disk,
+     * {@link #loadDebitJournal} replays this entry and {@link #reconcileChunk}
+     * forces it back onto the block once loaded, instead of trusting
+     * whichever stale copy survived. The returned version must be passed to
+     * the matching {@link #persist}/{@link #queueDelete} call so its
+     * completion only clears this entry if nothing newer superseded it first
+     * -- otherwise a slower, now-stale write finishing after a second rapid
+     * withdrawal on the same spawner could wrongly clear that later entry
+     * before its own write ever reaches SQL.
+     */
+    private long journalApply(String locationKey, SpawnerData data) {
+        long version = nextDebitVersion.incrementAndGet();
+        try {
+            debitWal.put(SpawnerDebitWal.Entry.applying(locationKey, version, data));
+            pendingDebits.put(locationKey, new PendingDebit(version, data));
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not journal the spawner stack debit at " + locationKey
+                    + " before applying it. Its withdrawal payout cannot be undone at this point, so a crash "
+                    + "before the next save could re-inflate this stack even though the payout already landed.", e);
+        }
+        return version;
+    }
+
+    /** Removal counterpart of {@link #journalApply}; see its documentation. */
+    private long journalRemoval(String locationKey) {
+        long version = nextDebitVersion.incrementAndGet();
+        try {
+            debitWal.put(SpawnerDebitWal.Entry.removing(locationKey, version));
+            pendingDebits.put(locationKey, new PendingDebit(version, null));
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not journal the spawner removal at " + locationKey
+                    + " before applying it. Its withdrawal payout cannot be undone at this point, so a crash "
+                    + "before the next save could re-inflate this stack even though the payout already landed.", e);
+        }
+        return version;
+    }
+
+    /**
+     * Called once a journaled debit/removal at {@code version} has been
+     * durably confirmed (its SQL write/delete succeeded, or it was force-
+     * applied to the physical block by {@link #reconcileChunk}). A no-op if
+     * a newer entry has since superseded it there.
+     */
+    private void clearDebitJournalIfCurrent(String locationKey, long version) {
+        boolean[] current = {false};
+        pendingDebits.computeIfPresent(locationKey, (key, pending) -> {
+            if (pending.version() != version) {
+                return pending;
+            }
+            current[0] = true;
+            return null;
+        });
+        if (!current[0]) {
+            return;
+        }
+        try {
+            debitWal.removeIfVersion(locationKey, version);
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Could not clear the reconciled spawner debit journal entry at "
+                    + locationKey + "; it will be harmlessly replayed again on the next restart.", e);
+        }
     }
 
     private SpawnerData readData(PersistentDataContainer pdc) {
@@ -621,11 +833,27 @@ public final class SpawnerManager {
     }
 
     private void persist(Location location, SpawnerData data) {
+        persist(location, data, null);
+    }
+
+    /**
+     * @param debitVersion when non-null, the {@link #journalApply} version
+     *                     this save applies -- cleared (see
+     *                     {@link #clearDebitJournalIfCurrent}) once this SQL
+     *                     write succeeds, unless a newer debit has since
+     *                     superseded it. {@code null} for saves unrelated to
+     *                     a journaled debit (place/increaseStack/etc.), which
+     *                     must never touch the journal.
+     */
+    private void persist(Location location, SpawnerData data, Long debitVersion) {
         SpawnerData snapshot = new SpawnerData(data.mobType(), data.placedAtMillis(), data.ownerFactionTag());
         queue(location, () -> {
             try {
                 me.vertex.core.storage.SqlRetry.run(plugin, "Spawner save at " + key(location),
                         () -> storage.save(location, snapshot));
+                if (debitVersion != null) {
+                    clearDebitJournalIfCurrent(key(location), debitVersion);
+                }
             } catch (Exception e) {
                 plugin.getLogger().log(Level.SEVERE, "Failed to save spawner to the database after retries.", e);
             }

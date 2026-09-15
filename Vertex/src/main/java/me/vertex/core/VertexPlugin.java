@@ -86,7 +86,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerLoginEvent;
+import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
@@ -227,6 +227,10 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
             boolean sharedClaims = getConfig().getBoolean("network.enabled", false)
                     && database.dialect() == Database.Dialect.MYSQL;
             me.vertex.core.claims.ChunkKey.configureShard(sharedClaims
+                    ? getConfig().getString("network.shard-id", "standalone") : "");
+            // Spawners and Chunk Collectors share the same shard-collision
+            // risk as claims (ISS-15): same condition, same shard id.
+            me.vertex.core.storage.ShardScope.configure(sharedClaims
                     ? getConfig().getString("network.shard-id", "standalone") : "");
             storage = new SqlStorage(database);
             // One-time schema check at boot; the recurring load/save calls
@@ -509,6 +513,11 @@ combatManager.start();
                 new me.vertex.core.faction.TntFillCommand(this, messages, factionBankManager);
         getCommand("tntfill").setExecutor(tntFillCommand);
         getCommand("tntfill").setTabCompleter(tntFillCommand);
+        me.vertex.core.faction.TntUnfillCommand tntUnfillCommand =
+                new me.vertex.core.faction.TntUnfillCommand(this, messages, factionBankManager, factionUpgradeManager);
+        getCommand("tntunfill").setExecutor(tntUnfillCommand);
+        getCommand("tntunfill").setTabCompleter(tntUnfillCommand);
+        Bukkit.getPluginManager().registerEvents(tntUnfillCommand, this);
         Bukkit.getPluginManager().registerEvents(factionBankManager, this);
         Bukkit.getPluginManager().registerEvents(factionBankMenu, this);
 
@@ -546,6 +555,10 @@ combatManager.start();
         getCommand("vanish").setExecutor(new VanishCommand(staffManager, messages));
         getCommand("staffchat").setExecutor(new StaffChatCommand(staffManager, messages));
         getCommand("staffbuild").setExecutor(new StaffBuildCommand(staffManager, messages));
+        me.vertex.core.redstone.LastRedstoneCommand lastRedstoneCommand =
+                new me.vertex.core.redstone.LastRedstoneCommand(this, messages);
+        Bukkit.getPluginManager().registerEvents(lastRedstoneCommand, this);
+        getCommand("lastredstone").setExecutor(lastRedstoneCommand);
         FreezeCommand freezeCommand = new FreezeCommand(staffManager, messages);
         getCommand("freeze").setExecutor(freezeCommand);
         getCommand("freeze").setTabCompleter(freezeCommand);
@@ -769,6 +782,9 @@ combatManager.start();
         gcManager = new me.vertex.core.gc.GcManager(this, gcStorage);
         gcManager.load();
         gcManager.loadState();
+        gcManager.setCodeFormatPublisher(() -> networkManager.publishInvalidation("gc-code-formats", "changed"));
+        networkManager.registerInvalidation("gc-code-formats", () -> gcManager.refreshCodeFormatsAsync());
+        Bukkit.getScheduler().runTaskTimer(this, () -> gcManager.refreshCodeFormatsAsync(), 200L, 200L);
         gcInteropHook = new me.vertex.core.gc.GcInteropHook(this);
         gcInteropHook.configure(gcManager.interopCommandTemplate());
         gcMenu = new me.vertex.core.gc.GcMenu(this, gcManager, messages, menuRegistry);
@@ -805,6 +821,8 @@ combatManager.start();
         enchantManager.load();
         me.vertex.core.enchant.RuneListener runeListener = new me.vertex.core.enchant.RuneListener(enchantManager, messages);
         Bukkit.getPluginManager().registerEvents(runeListener, this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.enchant.RuneEffectListener(enchantManager, combatManager), this);
         me.vertex.core.enchant.EnchantCommand enchantCommand =
                 new me.vertex.core.enchant.EnchantCommand(enchantManager, messages);
         getCommand("enchant").setExecutor(enchantCommand);
@@ -823,7 +841,6 @@ combatManager.start();
         me.vertex.core.backpack.BackpackFilterManager backpackFilterManager = new me.vertex.core.backpack.BackpackFilterManager(
                 this);
         backpackFilterManager.load();
-        Bukkit.getPluginManager().registerEvents(new me.vertex.core.storage.ClaimDeliveryGuard(this), this);
         me.vertex.core.backpack.BackpackInteractListener backpackInteractListener = new me.vertex.core.backpack.BackpackInteractListener(
                 backpackManager, messages);
         Bukkit.getPluginManager().registerEvents(backpackInteractListener, this);
@@ -948,6 +965,7 @@ combatManager.start();
 
         wandManager = new me.vertex.core.wand.WandManager(this);
         wandManager.load();
+        wandManager.loadDebitJournal(chunkCollectorManager);
         me.vertex.core.wand.WandCommand wandCommand =
                 new me.vertex.core.wand.WandCommand(wandManager, messages);
         getCommand("wand").setExecutor(wandCommand);
@@ -1252,8 +1270,9 @@ combatManager.start();
                 getConfig().getBoolean("sandbot.enabled", true),
                 getConfig().getInt("sandbot.radius-blocks", 5),
                 getConfig().getLong("sandbot.tick-interval-ticks", 1L),
-                getConfig().getInt("sandbot.placements-per-column-per-tick", 2),
-                getConfig().getInt("sandbot.max-placements-per-tick", 50),
+                getConfig().getInt("sandbot.placements-per-column-per-tick", 1),
+                getConfig().getInt("sandbot.max-placements-per-tick", 121),
+                getConfig().getInt("sandbot.prepaid-buffer-passes", 10),
                 getConfig().getDouble("sandbot.low-bank-warning-threshold", 500000D),
                 getConfig().getLong("sandbot.low-bank-warning-cooldown-seconds", 60L),
                 org.bukkit.entity.EntityType.PLAYER);
@@ -1267,8 +1286,9 @@ combatManager.start();
                 getConfig().getBoolean("sandbot.enabled", true),
                 getConfig().getInt("sandbot.radius-blocks", 5),
                 getConfig().getLong("sandbot.tick-interval-ticks", 1L),
-                getConfig().getInt("sandbot.placements-per-column-per-tick", 2),
-                getConfig().getInt("sandbot.max-placements-per-tick", 50),
+                getConfig().getInt("sandbot.placements-per-column-per-tick", 1),
+                getConfig().getInt("sandbot.max-placements-per-tick", 121),
+                getConfig().getInt("sandbot.prepaid-buffer-passes", 10),
                 getConfig().getDouble("sandbot.low-bank-warning-threshold", 500000D),
                 getConfig().getLong("sandbot.low-bank-warning-cooldown-seconds", 60L),
                 org.bukkit.entity.EntityType.PLAYER);
@@ -1417,8 +1437,8 @@ combatManager.start();
      * on every line of the art.
      */
     private void printStartupBanner() {
-        String version = getDescription().getVersion();
-        String authors = String.join(", ", getDescription().getAuthors());
+        String version = getPluginMeta().getVersion();
+        String authors = String.join(", ", getPluginMeta().getAuthors());
 
         CommandSender console = Bukkit.getConsoleSender();
         console.sendMessage(Component.empty());
@@ -1509,6 +1529,7 @@ combatManager.start();
     }
 
     public me.vertex.core.storage.DeliveryManager deliveryManager(){return deliveryManager;}
+    public me.vertex.core.network.NetworkManager networkManager(){return networkManager;}
 
     public void reload() {
         reloadConfig();
@@ -1850,9 +1871,9 @@ combatManager.start();
 
     /** Keeps an accepted migration a true point-in-time copy. */
     @EventHandler
-    public void onPlayerLogin(PlayerLoginEvent event) {
+    public void onPlayerLogin(AsyncPlayerPreLoginEvent event) {
         if (storageMigrationRunning.get()) {
-            event.disallow(PlayerLoginEvent.Result.KICK_OTHER,
+            event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER,
                     messages.get(null, "admin.storage-login-blocked"));
         }
     }

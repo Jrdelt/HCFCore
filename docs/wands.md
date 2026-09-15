@@ -81,13 +81,17 @@ player nothing.
 
 ## Transaction safety
 
-- The clicked container location is locked for the duration.
+- Both halves of a double chest are locked for the duration, as are the
+  collector or single container being processed. Hopper transfers and explosion
+  removal are blocked for locked containers.
   The TNT path holds that lock across its asynchronous bank write rather
   than releasing it when the click handler returns.
-- Per-wand reservation, double-chest lock identity and crash-safe coupling of
-  bank credits to consumed materials are **not yet complete**. See the open
-  findings in [issues.md](../issues.md); the current lock is not an atomic
-  world-inventory/database transaction.
+- Only one pending wand operation may own a player's inventory. Moving/using the
+  wand or starting another transaction is blocked until the callback finishes;
+  the original item slot, contents, remaining use, faction and session are
+  checked again. These reservations are runtime locks, **not** a crash-safe
+  journal. Bank credits/material consumption and uncertain compensation still
+  have open work in [issues.md](../issues.md).
 - Sell Wand sales and TNT Wand conversions are logged to console with the
   player, the amounts, and the tier used.
 

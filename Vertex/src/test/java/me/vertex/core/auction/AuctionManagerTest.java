@@ -368,6 +368,7 @@ class AuctionManagerTest {
         return count;
     }
 
+    @SuppressWarnings("deprecation") // Vault 1.7 still requires legacy String overloads on Economy implementations.
     private static final class FakeEconomy implements Economy {
         private final Map<UUID, Double> balances = new ConcurrentHashMap<>();
 

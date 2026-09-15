@@ -1,4 +1,4 @@
-# Audit repair progress — 2026-09-12
+# Audit repair progress — 2026-09-13
 
 This is a **partial repair and review checkpoint**, not a production certification.
 The whole-project, every-file review requested by the owner is **not finished**.
@@ -6,7 +6,52 @@ The checklist below deliberately distinguishes targeted work from completed
 top-to-bottom review. Compilation, text searches and green tests do not prove
 that every file or every crash scenario was reviewed.
 
-## Results
+## 2026-09-13 pass
+
+| Closed | Fix / regression evidence |
+| --- | --- |
+| ISS-08 | `ClaimDelivery.checkpoint` forces `Player#saveData()` immediately after a successful `ClaimDelivery.add` and before the SQL claim is told it is complete, at all four collection paths: delivery inbox (`DeliveryManager.deliverAt`), trade (`TradeManager.deliverTradeReservation`), auction (`AuctionManager.deliverReservationAt`) and coinflip (`CoinflipManager.deliverReservationAt`). This closes the crash window where SQL committed completion before the received item was ever durable on disk. Existing `ClaimDeliveryTest`, `DeliveryStorageTest`, `AuctionManagerTest`, `TradeOwnershipTest` and `CoinflipManagerTest` suites (105 tests) still pass unmodified; MockBukkit does not model real disk I/O timing, so **Paper crash testing per the retest note is still required** to confirm the save actually lands before a kill -9. |
+| ISS-09 | Selling from the spawner management GUI was removed entirely (withdraw-only now; the middle info item shows stack size and the current F Top aged value), so only withdrawal's debit atomicity needed closing. `SpawnerManager.decreaseStack` now journals the stack's intended final state (or full removal) to a new synchronous, fsynced local WAL (`SpawnerDebitWal`) *before* applying it, versioned per location so a slower, now-superseded write's completion can never wrongly clear a newer pending entry. `loadSpawnersFromDatabase`/`loadDebitJournal` replay that journal ahead of any stale SQL row, and `reconcileChunk` forces a survived entry onto the physical block (or clears it if it was a removal) the moment that chunk next loads, instead of trusting whichever stale PDC/SQL copy happened to survive. `SpawnerDebitRecoveryTest` (3 new tests) simulates the crash directly by seeding a journal entry against an intentionally stale SQL row and asserting a fresh manager both trusts the journal in memory and force-corrects SQL; a fourth case confirms rapid repeated withdrawals leave only the final state journaled/persisted with no leaked entries. Full suite: 824 tests, 0 failures/errors, 1 existing MockBukkit skip. The physical-block/PDC side of recovery is exercised structurally, not with a real MockBukkit `CreatureSpawner` block state, and **Paper crash testing (kill -9 mid-withdrawal, then restart) is still required** to confirm the on-disk PDC/chunk-save interaction matches this model. |
+| ISS-15 | Spawner and Chunk Collector rows now carry the same stable shard identity that claims already used to solve this exact problem (`me.vertex.core.claims.ChunkKey`, ISS-15's own prior art): a new shared utility, `me.vertex.core.storage.ShardScope`, prefixes the stored `world` column with the configured shard id (`shard::world`) on every `SpawnerStorage`/`ChunkCollectorStorage` save and delete, and `SpawnerManager.loadSpawnersFromDatabase`/`ChunkCollectorManager.loadIndexFromDatabase` now skip any row whose shard doesn't match before it ever reaches the in-memory index or `reconcileChunk` -- a remote shard's row for a same-named world at the same coordinates can no longer be loaded, reconciled, or overwritten as local. `ShardScope.configure` is wired into `VertexPlugin.onEnable` right next to the existing `ChunkKey.configureShard` call, gated by the identical `network.enabled && MySQL` condition, so both stay in sync trivially. Legacy (pre-scheme, unqualified) rows migrate automatically on first read (`ShardScope.fromStorage`, mirroring `ChunkKey.fromStorage`'s exact strategy) -- no migration script needed, and a standalone/non-MySQL server sees byte-identical stored world names to before this existed, since a blank shard makes every `ShardScope` method a no-op passthrough. `ShardScopeTest` (6 tests) covers the utility directly; `SpawnerShardIsolationTest` (3 tests) and `ChunkCollectorShardIsolationTest` (2 tests) reproduce the exact retest scenario -- two shards sharing one database, a world literally named `world`, identical coordinates, different spawners/collectors -- and confirm each shard only ever sees its own row, including after one shard deletes its own row and the other is unaffected, and that a legacy unqualified row is adopted by whichever shard loads it first. Full suite: 842 tests, 0 failures/errors, 1 existing MockBukkit skip. Only the spawner and collector tables were in scope here per the issue; the "audit other block-location tables" instruction still applies to any other shared-MySQL, world/coordinate-keyed table not covered by `ChunkKey` or this pass (zone geometry is tracked separately as ISS-43). |
+
+## Latest focused repair pass — 2026-09-12
+
+Baseline: clean `main` at `4e104a8`. Ten findings were removed from the open
+backlog after implementing fixes and regression coverage; 13 remain open or
+partially fixed. No live database migration, reset, deployment, commit or push
+was performed in this pass.
+
+Final `./mvnw -B -ntp clean package` on JDK 25 (Java 21 target): **809 tests,
+808 passed, 1 existing MockBukkit skip; zero failures/errors**. This adds 35
+tests to the 774-test baseline. One clean attempt could not remove generated
+`target/classes`; retrying clean/package succeeded. Expected fault-injection
+logs and preexisting dependency-shading warnings remain visible.
+
+| Closed | Fix / regression evidence |
+| --- | --- |
+| ISS-14 | Cursor and crafting ingredients return to storage before snapshots; result previews are excluded. Refuse full inventories and unfinished custom menus. `SnapshotInventoryPreparationTest`. |
+| ISS-26 | Landing/logout stops renewal instead of removing someone else's potion. Flight-only effects expire within five seconds; existing longer/stronger effects remain. `FlightEffectsTest`. Unmarked infinite legacy effects are intentionally not guessed at or mass-cleared; an operator must inspect those individually. |
+| ISS-36 | Cancel native invsee transfers; validate the live target, then debit/credit synchronously. No close-time write-back. Stale pickup/shift-click, repeated clicks, full inventory, live amount changes and drag conservation covered by `InvseeMenuListenerTest`. |
+| ISS-37, 38 | Entire Rune Shop/confirmation/catalog views are protected. Shift-right selects maximum confirmation; ordinary right-click still opens the catalog. `RuneShopMenuListenerTest`. |
+| ISS-39 | Authoritative GC insufficient-funds result is preserved, and the listing stays available. Two-manager stale-balance test in `CoinflipManagerTest`. |
+| ISS-40 | Next milestone selects the smallest future threshold; actual boost selects the highest reached threshold, independently of map order. `ZoneMilestoneTest`. |
+| ISS-41 | Finite/bounded mob, health, damage, route, loot and milestone values, with invalid-config warnings. Invalid persisted route numbers are rejected. `ZoneConfigSafetyTest`. |
+| ISS-44 | Half-radius stacking cells search two cells in each direction and keep exact distance checks. `MobStackListenerTest`. |
+| ISS-45 | Administrative event messages follow SQL completion; stale no-ops and failures have distinct messages. Failed admin intent is not silently retried. `ZoneEventStorageTest`. |
+
+Additional fixes found while testing: Rune Catalog tolerates an unavailable arena
+module; an undersized Riftlands ticket region returns no safe destination instead
+of throwing/overflowing; a bank cache-invalidation error cannot report a committed
+write as failed.
+
+Partial improvements remain explicitly open: early network admission and exact
+player-session checks, retried marked claims, serialized wand operations
+and double-chest locks, transactional TNT withdrawal entitlements, durable refund
+fallbacks, and running-shard GC format refresh. See the current evidence and
+remaining work in [issues.md](../issues.md). Neither a runtime lock nor green
+SQLite tests prove crash-safe world/inventory/MySQL ownership.
+
+## Earlier repair results
 
 - Starting tree: `main`, based on `29e58b1`; earlier GC-cooldown changes were already present and preserved.
 - Clean Maven package: **774 tests; 773 passed, 1 skipped; 0 failures/errors**.
@@ -15,7 +60,7 @@ that every file or every crash scenario was reviewed.
 - A disposable MySQL test verified single/multi-use redemption concurrency, stale-cache overdraft rejection, wallet overflow/code preservation, transactional auction failure/retry, and competing auction/coinflip spending. MySQL was shut down afterward.
 - Generated artifact: `Vertex/target/vertex-1.0.0.jar`. JARs are intentionally ignored by Git; source, tests and documentation are the versioned deliverables. Deployment to a server is a separate operator action.
 - Expected test logs include deliberately injected SQL failures and test-only missing delivery services. Packaging still emits existing dependency manifest/module-info overlap warnings; no blanket warning suppression was added.
-- [issues.md](../issues.md) contains 23 remaining/partially resolved findings and staging scenarios, including six from the scheduled scan, three shard/mob findings and the pre-push admin-confirmation finding (ISS-45). Completed findings are removed from that backlog and retained in this history.
+- At that checkpoint, the backlog contained 23 remaining/partially resolved findings. The latest pass above supersedes that count; current unresolved findings remain in [issues.md](../issues.md).
 - Deployment choice confirmed: multiple MySQL shards plus optional standalone SQLite/dedicated MySQL, controlled by the existing `network.enabled`. Startup validates the mode and identity; reload preserves the boot identity.
 - The trade ownership pass added 21 regression cases across deployment, ownership, GUI gating and migration. An additional disposable MySQL probe verified cross-shard rejection, eight concurrent settlement retries, concurrent restart refunds and injected SQL failure/rollback. Its server was shut down afterward. These are storage-level tests, not a two-Paper-server certification.
 - The shared-event/PvP Top pass added 17 cases: idempotent additive scoring, settlement deadlines, restart/replay, finalization rollback/contention, stale player saves, administrative cycle transitions, deterministic ties, cache replacement and migration. A separate two-pool MySQL probe passed 16 competing score calls, eight competing finalizers, receipt rollback/retry and the database-clock query. The disposable MySQL server is stopped. None of this certifies general player-row ownership, geometry ownership or inventory transfers.
@@ -44,17 +89,17 @@ Additional findings fixed while implementing these repairs:
 - Staff GC mutations now report SQL completion asynchronously, and staff balance inspection refreshes SQL first.
 - Shared zone-event scores use SQL deltas with replay receipts; winner finalization reads global durable scores once and cannot be overwritten by stale player saves. PvP Top refreshes remote awards/disbands and replaces stale caches. See the shared-event results above and [network rollout](network-shards.md#shared-events-and-leaderboard-rollout).
 
-Partial fixes retained in the open list:
+Partial work at the earlier checkpoint (superseded by the latest pass):
 
 - ISS-26: finite renewable flight effects and logout/shutdown cleanup stop new permanent-effect leaks. Legitimate potion ownership/restoration and legacy-effect migration remain.
 - ISS-32: historical GC formats survive local reload/restart. Format invalidation across already-running shards remains.
 
 ## Next repair order
 
-1. Shared inventory-session/delivery barrier, durable player-save receipts and the remaining live trade snapshot window (ISS-07, 08, 13, 14, 35); staff inventory and Rune Shop loss/dupe findings ISS-36/37.
-2. Source-debit journals and per-wand reservations for spawners/TNT (ISS-09, 11, 12).
+1. Complete the cross-module inventory-session barrier, durable player-save receipts and live trade escrow ownership (ISS-07, 08, 13, 35).
+2. Source-debit and compensation journals for spawners/TNT (ISS-09, 11, 12); runtime reservations and transactional withdrawal entitlements are now implemented.
 3. Shard-qualified persisted block/zone identity, player progression fencing, aggregate F Top and coordinated season reset/backup (ISS-15–17, 42/43). Do not guess which shard owns ambiguous legacy world-coordinate records.
-4. Finish ISS-26/32, the scheduled UX/configuration findings ISS-38–41, mob-stack neighbor coverage (ISS-44), durable admin confirmations (ISS-45), and the remaining file-by-file review below.
+4. Close the first-new-format GC chat propagation gap (ISS-32) and continue the unchecked file review below.
 5. Repeat a clean build and two-Paper-backend crash/disconnect tests. No live-season reset or migration has been executed.
 
 ## File-review coverage
@@ -436,7 +481,6 @@ New files from the shard ownership pass (not in the baseline inventory):
 - [ ] `Vertex/src/main/java/me/vertex/core/stats/PlayerStatsManager.java` — full-file review pending
 - [ ] `Vertex/src/main/java/me/vertex/core/stats/PlayerStatsStorage.java` — full-file review pending
 - [ ] `Vertex/src/main/java/me/vertex/core/storage/ClaimDelivery.java` — targeted review/changes; full-file review pending
-- [ ] `Vertex/src/main/java/me/vertex/core/storage/ClaimDeliveryGuard.java` — full-file review pending
 - [ ] `Vertex/src/main/java/me/vertex/core/storage/Database.java` — full-file review pending
 - [ ] `Vertex/src/main/java/me/vertex/core/storage/DeliveryManager.java` — targeted review/changes; full-file review pending
 - [ ] `Vertex/src/main/java/me/vertex/core/storage/DeliveryStorage.java` — targeted review/changes; full-file review pending

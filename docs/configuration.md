@@ -287,6 +287,10 @@ factions:
 - **`system-claims.max-chunks-per-tick`** limits main-thread cache/event work
   after an atomic `/f claim <Safezone|Warzone> [radius]` save. Radius claims
   are squares: radius `1` is `3x3` chunks.
+- **`tntunfill.enabled`**, **`tntunfill.max-radius`**, and
+  **`tntunfill.default-radius`** control `/tntunfill`. Both radius values are
+  safely capped at 100 blocks; the no-argument command uses `default-radius`.
+  The command always returns TNT to the faction bank and never to inventory.
 - **`command-aliases`** is retained for existing Vertex subcommand listeners;
   Bukkit aliases themselves are declared in `plugin.yml`.
 

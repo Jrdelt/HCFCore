@@ -66,7 +66,7 @@ public final class ChunkCollectorStorage {
              ResultSet results = statement.executeQuery()) {
             while (results.next()) {
                 collectors.add(new StoredCollector(
-                        results.getString("world"),
+                        me.vertex.core.storage.ShardScope.fromStorage(results.getString("world")),
                         results.getInt("x"),
                         results.getInt("y"),
                         results.getInt("z"),
@@ -80,7 +80,7 @@ public final class ChunkCollectorStorage {
     public void save(Location location, String ownerFactionTag, String ownerUuid) throws SQLException {
         try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(upsert)) {
-            statement.setString(1, location.getWorld().getName());
+            statement.setString(1, me.vertex.core.storage.ShardScope.qualify(location.getWorld().getName()));
             statement.setInt(2, location.getBlockX());
             statement.setInt(3, location.getBlockY());
             statement.setInt(4, location.getBlockZ());
@@ -93,7 +93,7 @@ public final class ChunkCollectorStorage {
     public void delete(Location location) throws SQLException {
         try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(DELETE)) {
-            statement.setString(1, location.getWorld().getName());
+            statement.setString(1, me.vertex.core.storage.ShardScope.qualify(location.getWorld().getName()));
             statement.setInt(2, location.getBlockX());
             statement.setInt(3, location.getBlockY());
             statement.setInt(4, location.getBlockZ());

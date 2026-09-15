@@ -451,6 +451,10 @@ public final class KitManager {
     }
 
     public void apply(Player player, Kit kit) {
+        if (!me.vertex.core.storage.InventoryAccess.ready(plugin, player)) {
+            player.sendMessage(messages.get(player, "delivery.pending"));
+            return;
+        }
         if (kit.getPermission() != null && !kit.getPermission().isEmpty() && !player.hasPermission(kit.getPermission())) {
             player.sendMessage(messages.getChat(player, "kit.no-kit-permission"));
             return;

@@ -3,6 +3,7 @@ package me.vertex.core.zone;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.lang.SmallCaps;
+import me.vertex.core.storage.InventoryAccess;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -110,6 +111,7 @@ public final class ZoneMenu implements Listener {
     public void onClick(InventoryClickEvent event) {
         if (!(event.getInventory().getHolder() instanceof Holder holder)) return;
         if (!(event.getWhoClicked() instanceof Player player)) { event.setCancelled(true); return; }
+        if (!InventoryAccess.ready(plugin, player)) { event.setCancelled(true); return; }
         if (holder.kind == Kind.ENTRY) {
             event.setCancelled(true);
             int center = event.getInventory().getSize() / 2;
@@ -238,7 +240,7 @@ public final class ZoneMenu implements Listener {
 
     private void queueOpen(Player player, Runnable action) {
         Bukkit.getScheduler().runTask(plugin, () -> {
-            if (player.isOnline()) action.run();
+            if (InventoryAccess.ready(plugin, player)) action.run();
         });
     }
 

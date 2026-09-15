@@ -29,46 +29,46 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("vertex.admin")) {
-            sender.sendMessage(messages.getChat(sender, "general.no-permission"));
+            sender.sendMessage(messages.get(sender, "general.no-permission"));
             return true;
         }
 
         if (args.length == 1 && args[0].equalsIgnoreCase("reload")) {
             plugin.reload();
-            sender.sendMessage(messages.getChat(sender, "admin.reloaded"));
+            sender.sendMessage(messages.get(sender, "admin.reloaded"));
             return true;
         }
 
         if (args.length == 1 && args[0].equalsIgnoreCase("clearmobstacks")) {
             int removed = plugin.clearMobStacks();
-            sender.sendMessage(messages.getChat(sender, "admin.mobstacks-cleared", "amount", String.valueOf(removed)));
+            sender.sendMessage(messages.get(sender, "admin.mobstacks-cleared", "amount", String.valueOf(removed)));
             return true;
         }
 
         if (args.length == 1 && args[0].equalsIgnoreCase("spawnerinfo")) {
             if (!(sender instanceof org.bukkit.entity.Player player)) {
-                sender.sendMessage(messages.getChat(sender, "general.players-only"));
+                sender.sendMessage(messages.get(sender, "general.players-only"));
                 return true;
             }
             org.bukkit.block.Block target = player.getTargetBlockExact(8);
             if (target == null) {
-                player.sendMessage(messages.getChat(player, "admin.spawner-report-no-target"));
+                player.sendMessage(messages.get(player, "admin.spawner-report-no-target"));
                 return true;
             }
-            player.sendMessage(messages.getChat(player, "admin.spawner-report-header"));
+            player.sendMessage(messages.get(player, "admin.spawner-report-header"));
             for (String line : plugin.spawnerManager().describe(target.getLocation())) {
-                player.sendMessage(messages.getChat(player, "admin.spawner-report-line", "detail", line));
+                player.sendMessage(messages.get(player, "admin.spawner-report-line", "detail", line));
             }
             return true;
         }
 
         if (args.length == 1 && args[0].equalsIgnoreCase("spawnerdebug")) {
             if (!(sender instanceof org.bukkit.entity.Player player)) {
-                sender.sendMessage(messages.getChat(sender, "general.players-only"));
+                sender.sendMessage(messages.get(sender, "general.players-only"));
                 return true;
             }
             boolean enabled = plugin.spawnerManager().toggleDebug(player.getUniqueId());
-            player.sendMessage(messages.getChat(player,
+            player.sendMessage(messages.get(player,
                     enabled ? "admin.spawner-debug-enabled" : "admin.spawner-debug-disabled"));
             return true;
         }
@@ -82,7 +82,7 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        sender.sendMessage(messages.getChat(sender, "admin.usage"));
+        sender.sendMessage(messages.get(sender, "admin.usage"));
         return true;
     }
 
@@ -90,36 +90,36 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
     private void handlePerformance(CommandSender sender) {
         me.vertex.core.performance.PerformanceManager performance = plugin.performanceManager();
         if (performance == null || performance.level() == me.vertex.core.performance.PerformanceManager.Level.OFF) {
-            sender.sendMessage(messages.getChat(sender, "performance.off"));
+            sender.sendMessage(messages.get(sender, "performance.off"));
             return;
         }
 
-        sender.sendMessage(messages.getChat(sender, "performance.header",
+        sender.sendMessage(messages.get(sender, "performance.header",
                 "level", performance.level().name(),
                 "duration", formatDuration(System.currentTimeMillis() - performance.monitoringSinceMillis())));
 
         List<me.vertex.core.performance.PerformanceManager.ScheduledTaskInfo> tasks = performance.scheduledTasks();
         if (tasks.isEmpty()) {
-            sender.sendMessage(messages.getChat(sender, "performance.no-scheduled-tasks"));
+            sender.sendMessage(messages.get(sender, "performance.no-scheduled-tasks"));
         } else {
             for (var task : tasks) {
-                sender.sendMessage(messages.getChat(sender, "performance.scheduled-task",
+                sender.sendMessage(messages.get(sender, "performance.scheduled-task",
                         "label", task.label(), "interval", String.valueOf(task.intervalTicks())));
             }
         }
 
         if (performance.level() != me.vertex.core.performance.PerformanceManager.Level.DETAILED) {
-            sender.sendMessage(messages.getChat(sender, "performance.detailed-hint"));
+            sender.sendMessage(messages.get(sender, "performance.detailed-hint"));
             return;
         }
 
         List<me.vertex.core.performance.PerformanceManager.TaskStatsSnapshot> stats = performance.taskStats();
         if (stats.isEmpty()) {
-            sender.sendMessage(messages.getChat(sender, "performance.no-stats"));
+            sender.sendMessage(messages.get(sender, "performance.no-stats"));
             return;
         }
         for (var stat : stats) {
-            sender.sendMessage(messages.getChat(sender, "performance.stat-line",
+            sender.sendMessage(messages.get(sender, "performance.stat-line",
                     "label", stat.label(), "count", String.valueOf(stat.count()),
                     "avg", String.format(java.util.Locale.ROOT, "%.2f", stat.avgMillis()),
                     "last", String.format(java.util.Locale.ROOT, "%.2f", stat.lastMillis()),
@@ -145,7 +145,7 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
         Database.Dialect current = plugin.storageDialect();
 
         if (args.length == 1) {
-            sender.sendMessage(messages.getChat(sender, "admin.storage-current",
+            sender.sendMessage(messages.get(sender, "admin.storage-current",
                     "type", nameOf(current)));
             return true;
         }
@@ -154,23 +154,23 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
         boolean namedLocal = args[1].equalsIgnoreCase("local") || args[1].equalsIgnoreCase("sqlite");
         boolean namedMysql = args[1].equalsIgnoreCase("mysql");
         if (!namedLocal && !namedMysql) {
-            sender.sendMessage(messages.getChat(sender, "admin.storage-usage"));
+            sender.sendMessage(messages.get(sender, "admin.storage-usage"));
             return true;
         }
 
         if (target == current) {
-            sender.sendMessage(messages.getChat(sender, "admin.storage-already",
+            sender.sendMessage(messages.get(sender, "admin.storage-already",
                     "type", nameOf(current)));
             return true;
         }
 
         if (!plugin.beginStorageMigration()) {
-            sender.sendMessage(messages.getChat(sender, "admin.storage-requires-idle-server"));
+            sender.sendMessage(messages.get(sender, "admin.storage-requires-idle-server"));
             return true;
         }
 
         boolean confirmed = args.length >= 3 && args[2].equalsIgnoreCase("confirm");
-        sender.sendMessage(messages.getChat(sender, "admin.storage-migrating",
+        sender.sendMessage(messages.get(sender, "admin.storage-migrating",
                 "from", nameOf(current), "to", nameOf(target)));
 
         // The copy touches two databases and can take a while on a large
@@ -187,7 +187,7 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
                 if (existing > 0 && !confirmed) {
                     Database toClose = targetDatabase;
                     Bukkit.getScheduler().runTask(plugin, () -> {
-                        sender.sendMessage(messages.getChat(sender, "admin.storage-not-empty",
+                        sender.sendMessage(messages.get(sender, "admin.storage-not-empty",
                                 "type", nameOf(target), "rows", String.valueOf(existing)));
                         toClose.close();
                         plugin.finishStorageMigration();
@@ -216,7 +216,7 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
                 Database toClose = targetDatabase;
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     toClose.close();
-                    sender.sendMessage(messages.getChat(sender, "admin.storage-migrated",
+                    sender.sendMessage(messages.get(sender, "admin.storage-migrated",
                             "rows", String.valueOf(result.total()), "type", nameOf(target)));
                     Bukkit.shutdown();
                 });
@@ -238,7 +238,7 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
                     if (toClose != null) {
                         toClose.close();
                     }
-                    sender.sendMessage(messages.getChat(sender, "admin.storage-failed",
+                    sender.sendMessage(messages.get(sender, "admin.storage-failed",
                             "error", String.valueOf(e.getMessage())));
                     plugin.finishStorageMigration();
                 });

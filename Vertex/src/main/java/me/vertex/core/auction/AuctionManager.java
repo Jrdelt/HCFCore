@@ -778,6 +778,7 @@ public final class AuctionManager {
      * only after tagged items are present in the player's inventory.
      */
     public CompletableFuture<ClaimResult> deliverClaims(Player player) {
+        if (!me.vertex.core.storage.InventoryAccess.readyForHandoff(plugin, player)) return CompletableFuture.completedFuture(ClaimResult.OFFLINE);
         UUID owner = player.getUniqueId();
         if (!claimsInProgress.add(owner)) return CompletableFuture.completedFuture(ClaimResult.FAILED);
         CompletableFuture<ClaimDeliveryBatch> load = CompletableFuture.supplyAsync(() -> {
@@ -810,7 +811,7 @@ public final class AuctionManager {
     private void deliverReservations(Player player, ClaimDeliveryBatch batch,
             CompletableFuture<ClaimResult> result) {
         List<AuctionStorage.ClaimReservation> reservations = batch.reservations();
-        if (!player.isOnline()) {
+        if (!me.vertex.core.storage.InventoryAccess.readyForHandoff(plugin, player)) {
             releaseFreshReservation(player.getUniqueId(), batch, result, ClaimResult.OFFLINE);
             return;
         }
@@ -824,6 +825,10 @@ public final class AuctionManager {
 
     private void deliverReservationAt(Player player, ClaimDeliveryBatch batch, int index,
             boolean deliveredAny, CompletableFuture<ClaimResult> result) {
+        if (!me.vertex.core.storage.InventoryAccess.readyForHandoff(plugin, player)) {
+            releaseFreshReservation(player.getUniqueId(), batch, result, ClaimResult.OFFLINE);
+            return;
+        }
         List<AuctionStorage.ClaimReservation> reservations = batch.reservations();
         if (index >= reservations.size()) {
             result.complete(deliveredAny ? ClaimResult.CLAIMED : ClaimResult.EMPTY);
@@ -839,6 +844,7 @@ public final class AuctionManager {
             releaseFreshReservation(player.getUniqueId(), batch, result, ClaimResult.FULL);
             return;
         }
+        ClaimDelivery.checkpoint(player);
         CompletableFuture<Integer> complete = CompletableFuture.supplyAsync(() -> {
             try {
                 return storage.completeReservation(player.getUniqueId(), reservation.token());
@@ -854,6 +860,7 @@ public final class AuctionManager {
                 result.complete(ClaimResult.FAILED);
                 return;
             }
+            if (!me.vertex.core.storage.InventoryAccess.readyForHandoff(plugin, player)) { result.complete(ClaimResult.OFFLINE); return; }
             ClaimDelivery.clearMarkers(player, plugin, "auction", reservation.token());
             deliverReservationAt(player, batch, index + 1, true, result);
         }));
@@ -916,7 +923,7 @@ public final class AuctionManager {
     /** Gives the item directly if the owner is online, otherwise queues it as a claim. */
     private void giveOrClaim(UUID ownerUuid, ItemStack item) {
         Player online = Bukkit.getPlayer(ownerUuid);
-        if (online != null) {
+        if (me.vertex.core.storage.InventoryAccess.ready(plugin, online)) {
             online.getInventory().addItem(item.clone()).values().forEach(leftover -> queueClaim(ownerUuid, leftover));
         } else {
             queueClaim(ownerUuid, item);

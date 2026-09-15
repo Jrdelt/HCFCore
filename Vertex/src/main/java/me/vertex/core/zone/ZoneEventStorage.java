@@ -127,10 +127,10 @@ public final class ZoneEventStorage {
     }
 
     /** Administrative changes use one durable operation timestamp so persistence retries are safe. */
-    public void start(long requestedStart, Settings settings) throws SQLException {
-        transaction(c -> {
+    public boolean start(long requestedStart, Settings settings) throws SQLException {
+        return transaction(c -> {
             long current = anchor(c, now(c), settings.cycle);
-            if (current >= requestedStart) return null;
+            if (current >= requestedStart) return false;
             try (var s = c.prepareStatement("UPDATE zone_event_runs SET ends_at=? WHERE finalized_at IS NULL AND ends_at>? AND event_start<?")) {
                 s.setLong(1, requestedStart); s.setLong(2, requestedStart); s.setLong(3, requestedStart); s.executeUpdate();
             }
@@ -138,16 +138,16 @@ public final class ZoneEventStorage {
                 s.setLong(1, requestedStart); s.executeUpdate();
             }
             ensureRun(c, requestedStart, settings);
-            return null;
+            return true;
         });
     }
 
-    public void stop(long start, long stoppedAt) throws SQLException {
-        transaction(c -> {
+    public boolean stop(long start, long stoppedAt) throws SQLException {
+        return transaction(c -> {
             try (var s = c.prepareStatement("UPDATE zone_event_runs SET ends_at=? WHERE event_start=? AND finalized_at IS NULL AND ends_at>?")) {
-                s.setLong(1, Math.max(start, stoppedAt)); s.setLong(2, start); s.setLong(3, stoppedAt); s.executeUpdate();
+                s.setLong(1, Math.max(start, stoppedAt)); s.setLong(2, start); s.setLong(3, stoppedAt);
+                return s.executeUpdate() == 1;
             }
-            return null;
         });
     }
 

@@ -67,6 +67,7 @@ public final class NetworkManager implements Listener {
     private final Map<UUID, String> incomingTransfers = new ConcurrentHashMap<>();
     /** Resolves true only for an ordinary join that may receive first-join Spawn handling. */
     private final Map<UUID, CompletableFuture<Boolean>> joinSpawnAdmissions = new ConcurrentHashMap<>();
+    private final Map<UUID, Player> pendingAdmissions = new ConcurrentHashMap<>();
     private final Set<UUID> evacuationDepartures = ConcurrentHashMap.newKeySet();
     private final Map<String, Runnable> invalidationHandlers = new ConcurrentHashMap<>();
     private final Map<String, java.util.function.Predicate<NetworkLocation>> destinationValidators = new ConcurrentHashMap<>();
@@ -224,8 +225,7 @@ public final class NetworkManager implements Listener {
             String reason, boolean allowQueue) {
         if (player == null || destination == null) return CompletableFuture.completedFuture(TransferStatus.INVALID_DESTINATION);
         UUID playerId = player.getUniqueId();
-        if (preparingTransfers.contains(playerId) || departing.containsKey(playerId)
-                || incomingTransfers.containsKey(playerId)) {
+        if (frozen(player) || me.vertex.core.storage.ClaimDelivery.hasMarkedItem(plugin, player)) {
             return CompletableFuture.completedFuture(TransferStatus.BUSY);
         }
         if (destination.shardId().equalsIgnoreCase(shardId)) {
@@ -237,6 +237,10 @@ public final class NetworkManager implements Listener {
                     ? TransferStatus.LOCAL_COMPLETE : TransferStatus.INVALID_DESTINATION);
         }
         if (!enabled) return CompletableFuture.completedFuture(TransferStatus.DISABLED);
+        if (!SnapshotInventoryPreparation.prepare(player, plugin)) {
+            player.sendMessage(messages.get(player, "network.finish-inventory"));
+            return CompletableFuture.completedFuture(TransferStatus.BUSY);
+        }
         if (!preparingTransfers.add(playerId)) {
             return CompletableFuture.completedFuture(TransferStatus.BUSY);
         }
@@ -314,6 +318,7 @@ public final class NetworkManager implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         if (!enabled) return;
         Player player = event.getPlayer();
+        pendingAdmissions.put(player.getUniqueId(), player);
         CompletableFuture<Boolean> spawnAdmission = new CompletableFuture<>();
         CompletableFuture<Boolean> replaced = joinSpawnAdmissions.put(player.getUniqueId(), spawnAdmission);
         if (replaced != null) replaced.complete(false);
@@ -330,9 +335,14 @@ public final class NetworkManager implements Listener {
         });
         track(lookup);
         lookup.thenAccept(join -> Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!currentSession(player) || pendingAdmissions.get(player.getUniqueId()) != player) {
+                spawnAdmission.complete(false);
+                return;
+            }
             boolean ordinary = !join.failed() && join.incoming() == null && join.unresolved() == null
                     && state != ShardState.CRASH_RECOVERY;
             spawnAdmission.complete(ordinary);
+            if (ordinary) pendingAdmissions.remove(player.getUniqueId(), player);
             if (join.failed()) routeFallback(player, "transfer state unavailable");
             else if (join.incoming() != null) acceptIncoming(player, join.incoming());
             else if (join.unresolved() != null) recoverOrphan(player, join.unresolved());
@@ -355,7 +365,7 @@ public final class NetworkManager implements Listener {
         });
         track(recovery);
         recovery.thenAccept(locked -> Bukkit.getScheduler().runTask(plugin, () -> {
-            if (!locked || !player.isOnline()) return;
+            if (!locked || !currentSession(player)) return;
             try {
                 snapshot.apply(player);
                 player.sendMessage(messages.get(player, "network.transfer-recovered"));
@@ -364,6 +374,10 @@ public final class NetworkManager implements Listener {
                     catch(Exception error){log("Could not finalize transfer recovery",error);return false;}
                 });
                 track(complete);
+                complete.thenAccept(committed -> Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (committed && currentSession(player)) pendingAdmissions.remove(player.getUniqueId(), player);
+                    else if (currentSession(player)) routeFallback(player, "recovery acknowledgement failed");
+                }));
             } catch (Exception error) {
                 log("Could not restore source-authoritative player snapshot", error);
                 player.sendMessage(messages.get(player, "network.transfer-recovery-failed"));
@@ -373,7 +387,7 @@ public final class NetworkManager implements Listener {
     }
 
     private void acceptIncoming(Player player, NetworkStorage.Handoff handoff) {
-        if (!player.isOnline()) return;
+        if (!currentSession(player)) return;
         if (state != ShardState.ONLINE || Bukkit.getOnlinePlayers().size() > maxPlayers || handoff == null) {
             if (state != ShardState.ONLINE) routeFallback(player, "shard-unavailable");
             else if (Bukkit.getOnlinePlayers().size() > maxPlayers) routeFallback(player, "shard-full");
@@ -402,7 +416,7 @@ public final class NetworkManager implements Listener {
                 });
                 track(update);
                 update.thenAccept(saved -> Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (!player.isOnline()) return;
+                    if (!currentSession(player)) return;
                     if (!saved) {
                         failIncoming(player, handoff, "destination reroll was stale");
                         return;
@@ -425,11 +439,11 @@ public final class NetworkManager implements Listener {
                 if (player.isOnline()) routeFallback(player, "handoff no longer available");
                 return;
             }
-            incomingTransfers.put(player.getUniqueId(), handoff.id());
-            if (!player.isOnline()) {
+            if (!currentSession(player)) {
                 abortIncoming(player.getUniqueId(), handoff.id(), "player disconnected during handoff");
                 return;
             }
+            incomingTransfers.put(player.getUniqueId(), handoff.id());
             try {
                 PlayerStateSnapshot.decode(handoff.snapshot()).apply(player);
             } catch (Exception error) {
@@ -450,7 +464,8 @@ public final class NetworkManager implements Listener {
                 track(completion);
                 completion.thenAccept(committed -> Bukkit.getScheduler().runTask(plugin, () -> {
                     incomingTransfers.remove(player.getUniqueId(), handoff.id());
-                    if (teleported && committed && player.isOnline()) {
+                    if (teleported && committed && currentSession(player)) {
+                        pendingAdmissions.remove(player.getUniqueId(), player);
                         java.util.function.BiConsumer<Player, NetworkLocation> handler = arrivalHandlers.get(handoff.reason());
                         if (handler != null) handler.accept(player, handoff.destination());
                     } else if (player.isOnline()) {
@@ -480,6 +495,7 @@ public final class NetworkManager implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
+        pendingAdmissions.remove(playerId, event.getPlayer());
         CompletableFuture<Boolean> admission = joinSpawnAdmissions.remove(playerId);
         if (admission != null) admission.complete(false);
         preparingTransfers.remove(playerId);
@@ -559,6 +575,14 @@ public final class NetworkManager implements Listener {
 
     private void evacuatePlayers() {
         for (Player player : List.copyOf(Bukkit.getOnlinePlayers())) {
+            if (frozen(player) || me.vertex.core.storage.ClaimDelivery.hasMarkedItem(plugin, player)
+                    || !SnapshotInventoryPreparation.prepare(player, plugin)) {
+                // Never publish an incomplete snapshot. Closing returns ordinary UI inputs
+                // before the normal local player save on disconnect.
+                player.closeInventory();
+                player.kick(messages.get(player, "network.evacuation-unavailable"));
+                continue;
+            }
             evacuationDepartures.add(player.getUniqueId());
             if (combat != null) combat.clear(player.getUniqueId());
             final PlayerStateSnapshot snapshot;
@@ -801,38 +825,43 @@ public final class NetworkManager implements Listener {
         },200L);
     }
 
-    private boolean frozen(Player player){return player!=null&&(preparingTransfers.contains(player.getUniqueId())
+    private boolean frozen(Player player){return player!=null&&(pendingAdmissions.containsKey(player.getUniqueId())
+            ||preparingTransfers.contains(player.getUniqueId())
             ||departing.containsKey(player.getUniqueId())||incomingTransfers.containsKey(player.getUniqueId())
             ||evacuationDepartures.contains(player.getUniqueId()));}
+    public boolean inventoryReady(Player player) { return currentSession(player) && !frozen(player); }
+    private boolean currentSession(Player player) {
+        return player != null && player.isOnline() && Bukkit.getPlayer(player.getUniqueId()) == player;
+    }
     private void cancelFrozen(Player player,Cancellable event){if(frozen(player))event.setCancelled(true);}
 
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=false)
     public void onFrozenInventoryClick(InventoryClickEvent event){if(event.getWhoClicked() instanceof Player player)cancelFrozen(player,event);}
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=false)
     public void onFrozenInventoryDrag(InventoryDragEvent event){if(event.getWhoClicked() instanceof Player player)cancelFrozen(player,event);}
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=false)
     public void onFrozenInventoryOpen(InventoryOpenEvent event){if(event.getPlayer() instanceof Player player)cancelFrozen(player,event);}
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=false)
     public void onFrozenInteract(PlayerInteractEvent event){cancelFrozen(event.getPlayer(),event);}
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=false)
     public void onFrozenDrop(PlayerDropItemEvent event){cancelFrozen(event.getPlayer(),event);}
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=false)
     public void onFrozenSwap(PlayerSwapHandItemsEvent event){cancelFrozen(event.getPlayer(),event);}
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=false)
     public void onFrozenConsume(PlayerItemConsumeEvent event){cancelFrozen(event.getPlayer(),event);}
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=false)
     public void onFrozenBreak(BlockBreakEvent event){cancelFrozen(event.getPlayer(),event);}
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=false)
     public void onFrozenPlace(BlockPlaceEvent event){cancelFrozen(event.getPlayer(),event);}
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=false)
     public void onFrozenPickup(EntityPickupItemEvent event){if(event.getEntity() instanceof Player player)cancelFrozen(player,event);}
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=false)
     public void onFrozenDamage(EntityDamageEvent event){if(event.getEntity() instanceof Player player)cancelFrozen(player,event);}
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=false)
     public void onFrozenFood(FoodLevelChangeEvent event){if(event.getEntity() instanceof Player player)cancelFrozen(player,event);}
-    @EventHandler(priority=EventPriority.HIGHEST)
+    @EventHandler(priority=EventPriority.LOWEST)
     public void onFrozenExperience(PlayerExpChangeEvent event){if(frozen(event.getPlayer()))event.setAmount(0);}
-    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=false)
     public void onFrozenCommand(PlayerCommandPreprocessEvent event){
         if(!frozen(event.getPlayer()))return;event.setCancelled(true);
         event.getPlayer().sendMessage(messages.get(event.getPlayer(),"network.transfer-busy"));

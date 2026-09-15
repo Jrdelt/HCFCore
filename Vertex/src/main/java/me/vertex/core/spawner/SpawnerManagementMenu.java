@@ -21,8 +21,6 @@ public final class SpawnerManagementMenu {
 
     public static final int WITHDRAW_ONE_SLOT = 2;
     public static final int WITHDRAW_ALL_SLOT = 3;
-    public static final int SELL_ONE_SLOT = 5;
-    public static final int SELL_ALL_SLOT = 6;
 
     private SpawnerManagementMenu() {
     }
@@ -36,26 +34,15 @@ public final class SpawnerManagementMenu {
         Component mobName = config != null ? MessageFormatter.deserialize(config.displayName())
                 : Component.text(data.mobType().name());
 
-        double unitPrice = config != null ? config.price() : 0;
         FTopManager.StackValue fTop = manager.getFTopValue(location, data);
         inventory.setItem(4, icon(Material.SPAWNER, mobName, List.of(
                 messages.getGui(player, "spawner.info-stack-size", "size", String.valueOf(data.stackSize())),
-                messages.getGui(player, "spawner.info-value", "amount", EconomyHook.format(unitPrice)),
                 messages.getGui(player, "spawner.ftop-current", "amount", EconomyHook.format(fTop.currentValue()),
-                        "percent", String.format(java.util.Locale.ROOT, "%.1f", fTop.percent())),
-                messages.getGui(player, "spawner.ftop-full", "amount", EconomyHook.format(fTop.fullValue())),
-                messages.getGui(player, "spawner.ftop-remaining", "time", formatDuration(fTop.longestRemainingMillis())))));
+                        "percent", String.format(java.util.Locale.ROOT, "%.1f", fTop.percent())))));
         inventory.setItem(WITHDRAW_ONE_SLOT, icon(Material.CHEST,
                 messages.getGui(player, "spawner.withdraw-one"), List.of()));
         inventory.setItem(WITHDRAW_ALL_SLOT, icon(Material.ENDER_CHEST,
                 messages.getGui(player, "spawner.withdraw-all"), List.of()));
-
-        double refund = unitPrice * manager.sellRefundPercent() / 100.0;
-        inventory.setItem(SELL_ONE_SLOT, icon(Material.GOLD_INGOT,
-                messages.getGui(player, "spawner.sell-one", "amount", EconomyHook.format(refund)), List.of()));
-        inventory.setItem(SELL_ALL_SLOT, icon(Material.GOLD_BLOCK,
-                messages.getGui(player, "spawner.sell-all", "amount", EconomyHook.format(refund * data.stackSize())),
-                List.of()));
 
         player.openInventory(inventory);
     }
@@ -67,11 +54,6 @@ public final class SpawnerManagementMenu {
         meta.lore(lore);
         item.setItemMeta(meta);
         return item;
-    }
-
-    private static String formatDuration(long millis) {
-        long seconds = Math.max(0L, (millis + 999L) / 1_000L);
-        return (seconds / 3_600L) + "h " + ((seconds / 60L) % 60L) + "m";
     }
 
     public static final class Holder implements InventoryHolder {

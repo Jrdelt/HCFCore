@@ -33,6 +33,16 @@
             </goals>
             <configuration>
               <minimizeJar>false</minimizeJar>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>module-info.class</exclude>
+                    <exclude>META-INF/versions/**/module-info.class</exclude>
+                    <exclude>META-INF/MANIFEST.MF</exclude>
+                  </excludes>
+                </filter>
+              </filters>
               <transformers>
                 <transformer />
               </transformers>
@@ -62,6 +72,9 @@
       <url>https://repo.papermc.io/repository/maven-public/</url>
     </repository>
     <repository>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
       <id>jitpack</id>
       <url>https://jitpack.io</url>
     </repository>
@@ -192,6 +205,12 @@
           <groupId>org.junit.jupiter</groupId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-nop</artifactId>
+      <version>2.0.16</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
   <dependencyManagement>

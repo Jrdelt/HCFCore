@@ -12,9 +12,6 @@ silk-touch-required: false
 #   decrement  - drops just 1 spawner, the block stays if any are left
 break-mode: drop-all
 
-# Percentage of the shop price refunded when withdrawing spawners from a
-# stack via the management GUI (right-click a spawner with an empty hand).
-sell-refund-percent: 35
 
 # --- VANILLA SPAWNER TUNING ---
 # These scale a stack's own CreatureSpawner block-entity fields by its

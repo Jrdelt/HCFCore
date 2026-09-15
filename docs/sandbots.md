@@ -25,16 +25,28 @@ it. These blocks are anchors and remain in place:
 - Any coloured concrete fills its column with matching concrete powder.
 
 For each anchor, the Bot creates one falling block directly underneath it.
-After that block lands, it creates the next one. This continues until the
-column has stacked back up to the underside of the anchor. Each block is
-charged at the matching Shop buy price directly from the native Vertex
-faction bank. If the bank cannot pay, the Bot is paused and remains deployed;
-it does not despawn. While an active Bot is trying to place and the bank is
-below `sandbot.low-bank-warning-threshold`, online faction members receive a
-rate-limited warning.
+It waits while that entity remains in the source cell, but releases the
+source immediately if gravity carries the entity out of that cell or a slime
+block/piston moves it sideways. This keeps both deep drops and moving cannons
+fed without deleting the earlier falling block. It
+continues until the column has stacked back up to the underside of the anchor.
+Each block is charged at the matching Shop buy price directly from the native
+Vertex faction bank. To avoid database latency starving a moving cannon, the
+Bot safely prepays a short configurable number of placement passes
+(`sandbot.prepaid-buffer-passes`) and uses that reserve while its next bank
+write runs. Any unused reserve is returned to the faction bank when the Bot is
+paused, despawned, or the server stops. The reserve is also saved with the Bot
+about once a second, so after a crash it resumes on the same Bot instead of
+being lost; at worst, up to a second of placements made just before the crash
+is not deducted. If the bank cannot fund the next placement, the Bot is paused
+and remains deployed; it does not despawn. While an active Bot is trying to
+place and the bank is below `sandbot.low-bank-warning-threshold`, online
+faction members receive a rate-limited warning.
 
 Right-click the Bot to pause/resume it or despawn it. `/sandbot stop` stops
 your own active Bots; `vertex.sandbot.admin` can stop another player's Bot.
 Placed Bots are saved in the plugin data file `sandbots.yml`, including their
-owner, faction, world, position, and paused/active state, and are recreated
-after a reboot. Deliberately despawning a Bot removes its saved record.
+owner, faction, world, position, paused/active state, and unused prepaid
+reserve, and are recreated after a reboot. If a saved Bot's world is missing,
+its reserve is returned to the faction bank; if its faction no longer exists,
+the amount is logged instead. Deliberately despawning a Bot removes its saved record.

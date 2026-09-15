@@ -191,7 +191,7 @@ public final class PortableBardListener implements Listener {
 
         // Validated before checkAndStart (which consumes the cooldown/item)
         // so a misconfigured effect-type can't waste either for nothing.
-        PotionEffectType type = PotionEffectType.getByName(ability.getString("effect-type", ""));
+        PotionEffectType type = AbilityEffectTypes.find(ability.getString("effect-type", ""));
         if (type == null) {
             return;
         }

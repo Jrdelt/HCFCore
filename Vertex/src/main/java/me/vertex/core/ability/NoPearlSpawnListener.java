@@ -95,6 +95,9 @@ public final class NoPearlSpawnListener implements Listener {
                 plugin, player, java.util.List.of(refund), "blocked-pearl-refund")) {
             return true;
         }
+        if (!me.vertex.core.storage.InventoryAccess.ready(plugin, player)) {
+            return false;
+        }
         return player.getInventory().addItem(refund).isEmpty();
     }
 

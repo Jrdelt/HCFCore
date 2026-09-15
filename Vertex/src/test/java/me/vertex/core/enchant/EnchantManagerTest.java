@@ -12,13 +12,16 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.util.Vector;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
+import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.plugin.PluginMock;
 
 import java.io.IOException;
@@ -110,6 +113,29 @@ class EnchantManagerTest {
         EnchantManager.RollOutcome outcome = manager.rollRune(null, 0.0);
         assertFalse(outcome.ok());
         assertNull(outcome.createdItem());
+    }
+
+    @Test
+    void skyStepperRunsBeforeDasherWhenBothMovementRunesAreReady() {
+        PlayerMock player = MockBukkit.getMock().addPlayer();
+        player.setOnGround(false);
+        player.setInWater(false);
+        player.setFlying(false);
+        player.setVelocity(new Vector());
+
+        ItemStack boots = new ItemStack(Material.DIAMOND_BOOTS);
+        assertEquals(EnchantManager.ApplyResult.SUCCESS,
+                manager.applyEnchant(boots, manager.createEnchantItem("sky_stepper", 1, RuneTier.ELITE), 0, 0D).result());
+        assertEquals(EnchantManager.ApplyResult.SUCCESS,
+                manager.applyEnchant(boots, manager.createEnchantItem("dasher", 1, RuneTier.ELITE), 0, 0D).result());
+        player.getInventory().setBoots(boots);
+
+        new RuneEffectListener(manager, null).onSneak(new PlayerToggleSneakEvent(player, true));
+
+        assertEquals(1D, player.getVelocity().getY(), 0.0001,
+                "Sky Stepper's upward launch proves it won over Dasher's small hop");
+        assertEquals(0.2D, player.getVelocity().getZ(), 0.0001,
+                "the first ready movement Rune must supply the full velocity");
     }
 
     // ------------------------------------------------------------------
@@ -435,6 +461,30 @@ class EnchantManagerTest {
                     proc-chance: 30.0
                     success-rate: 90.0
                     ability-value: 1.0
+              sky_stepper:
+                display-name: "Sky Stepper"
+                compatible-types: [BOOTS]
+                effect: SKY_STEPPER
+                priority: 200
+                levels:
+                  1:
+                    material: DIAMOND
+                    proc-chance: 100.0
+                    success-rate: 100.0
+                    ability-value: 1.0
+                    effect-settings: { upward-velocity: 1.0, forward-velocity: 0.2, cooldown-seconds: 17 }
+              dasher:
+                display-name: "Dasher"
+                compatible-types: [BOOTS]
+                effect: DASHER
+                priority: 100
+                levels:
+                  1:
+                    material: GOLD_INGOT
+                    proc-chance: 100.0
+                    success-rate: 100.0
+                    ability-value: 2.0
+                    effect-settings: { upward-velocity: 0.1, forward-velocity: 2.0, cooldown-seconds: 17 }
             """;
 
     private static final String RUNES_YML = """

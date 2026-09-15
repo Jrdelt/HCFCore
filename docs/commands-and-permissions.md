@@ -230,6 +230,7 @@ dynamic prices. Runes are deliberately separate from `/shop`; use `/runes`,
 | `/f bank` | Faction member; role permissions apply to deposits/withdrawals | Opens the six-row faction bank for money, experience, and TNT. |
 | `/f tnt` | Faction member | Shows the faction's current TNT and its upgrade-derived capacity. |
 | `/tntfill <radius> <amount> bank\|inventory` | `vertex.tntfill.use` (default: everyone) | Fills every dispenser within `radius` blocks (max 100) of you, inside your own faction's claim, with up to `amount` TNT — drawn from the faction's Vertex TNT bank (the same one `/f bank` manages) or your own inventory. The bank is debited before any dispenser is filled, and anything the dispensers cannot take is returned immediately. |
+| `/tntunfill [radius] [bank]` | `vertex.tntunfill.use` (default: everyone) | Returns TNT from dispensers within the optional radius (default: configured maximum, hard-capped at 100) in your own faction claims to the faction TNT bank only. `bank` is an optional explicit destination; inventory is never accepted. The operation stops at the current upgrade-derived bank capacity. |
 | `/f top` | Open to all | Vertex's claimed, individually-aged spawner-value leaderboard, separate from native faction power. See [Faction Leaderboards](faction-leaderboards.md#f-top-claimed-spawner-value). |
 | `/ftopforcecheck` | `vertex.ftop.forcecheck` | Immediately recalculates F Top for every faction without moving the regular scheduled deadline. |
 | `/f baseclaim` (or any `factions.command-aliases` alias) | `vertex.baseclaim.view` | Opens the Base Claim info/removal GUI if standing on one; otherwise attempts to create one (Leader/Co-Leader + `vertex.baseclaim.create` only). Confirming removal in that GUI additionally requires `vertex.baseclaim.remove` (default: true). See [Base and Raid Claims](base-and-raid-claims.md). |
@@ -239,6 +240,7 @@ dynamic prices. Runes are deliberately separate from `/shop`; use `/runes`,
 | `/f shield` | All faction members can view; Leader/Co-Leader configure | Opens the persistent weekly Base Claim Shield schedule and PvP option. |
 | `/f shield activate` | Leader or Co-Leader + `vertex.shield.activate` | Optional manual Shield activation. Rejects duplicate/cooldown activation. |
 | `/fa shield <faction> active\|inactive\|clear --force` | `vertex.fa.shield` | Persistent, audited staff override. Clearing it resumes the real schedule/manual deadline. |
+| `/fa bank <faction> <set\|add\|take> <amount> <money\|xp\|tnt>` | `vertex.fa.bank` | Audited native faction-bank adjustment. TNT is atomically limited to the faction's current configured TNT Bank upgrade capacity; money and XP have no configured capacity. |
 | `/fpowerbooster give <player> <10\|25\|50\|75\|100> [amount]` | `vertex.fpowerbooster.give` | Gives persistent personal maximum-power vouchers. Redeeming raises max power only, up to the configured absolute cap. |
 
 ## Chunk Busters
@@ -323,6 +325,7 @@ rewards, and the `capture-events.yml` reference.
 | `/vanish` | `vertex.staff.vanish` | Toggles vanish; also lets you see other vanished staff. |
 | `/staffchat` | `vertex.staff.staffchat` | Toggles staff-only chat; also needed to read it. |
 | `/staffbuild` | `vertex.staff.staffbuild` | Toggles claim-protection bypass everywhere. |
+| `/lastredstone` | `vertex.redstone.replay` | Replays the last successfully player-used lever or button. Levers toggle on/off; buttons receive a new normal-length press. |
 | `/freeze <player>` | `vertex.staff.freeze` | Toggles freezing a player; also needed for the leave-while-frozen ban alert. |
 | `/invsee <player>` | `vertex.staff.invsee` | Opens the target's storage/armor/offhand GUI. |
 | `/endersee <player>` | `vertex.staff.endersee` | Opens the target's live ender chest. |

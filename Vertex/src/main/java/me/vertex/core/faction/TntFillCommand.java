@@ -206,7 +206,7 @@ public final class TntFillCommand implements CommandExecutor, TabCompleter {
     private record FillResult(int placed, int dispensers) {
     }
 
-    private static int countTnt(Inventory inventory) {
+    static int countTnt(Inventory inventory) {
         int count = 0;
         for (ItemStack item : inventory.getContents()) {
             if (item != null && item.getType() == Material.TNT) {
@@ -226,7 +226,7 @@ public final class TntFillCommand implements CommandExecutor, TabCompleter {
         return count;
     }
 
-    private static List<Dispenser> findClaimedDispensers(Location center, int radius, int factionId) {
+    static List<Dispenser> findClaimedDispensers(Location center, int radius, int factionId) {
         var world = center.getWorld();
         if (world == null) {
             return List.of();

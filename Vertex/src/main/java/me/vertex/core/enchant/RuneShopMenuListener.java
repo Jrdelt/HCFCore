@@ -2,6 +2,7 @@ package me.vertex.core.enchant;
 
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.storage.InventoryAccess;
 import net.kyori.adventure.text.Component;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
@@ -37,6 +38,10 @@ public final class RuneShopMenuListener implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        if (!InventoryAccess.ready(manager.plugin(), player)) {
+            event.setCancelled(true);
             return;
         }
         var top = event.getView().getTopInventory();

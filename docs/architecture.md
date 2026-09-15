@@ -159,7 +159,12 @@ lifecycle and wires listeners/commands together in `onEnable()`.
   stale row behind.
 - Auction, Coinflip, and Trade collection rows move through `READY` and
   `DELIVERING` reservations. Temporary item markers bridge the SQL-to-player
-  inventory handoff and are removed only after acknowledgement.
+  inventory handoff and are removed only after acknowledgement, so a restart
+  does not pay a reservation twice. Markers do not lock the player: marked
+  items can be moved and used, and there is no periodic reconciliation
+  sweep. Unfinished claims resume on the owning feature's own triggers —
+  join and the delivery retry timer for the inbox, join for Trade, and the
+  claim menus for Auction and Coinflip.
 - Valuable inventory overflow uses the shared persistent delivery inbox instead
   of ground drops. Before the asynchronous SQL insert begins, each batch is
   synchronously appended to `plugins/Vertex/delivery-wal.yml`; startup replays

@@ -7,6 +7,7 @@ import me.vertex.core.chunkbuster.ChunkBusterType;
 import me.vertex.core.economy.EconomyHook;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.storage.InventoryAccess;
 import me.vertex.core.spawner.SpawnerManager;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Material;
@@ -48,6 +49,10 @@ public final class ShopMenuListener implements Listener {
         if (!(event.getInventory().getHolder() instanceof ShopMenu.Holder holder)
                 || !(event.getWhoClicked() instanceof Player player)) return;
         event.setCancelled(true);
+        if (!InventoryAccess.ready(manager.plugin(), player)) {
+            player.sendMessage(messages.get(player, "delivery.pending"));
+            return;
+        }
         if (event.getClickedInventory() == null
                 || !(event.getClickedInventory().getHolder() instanceof ShopMenu.Holder)) return;
 
@@ -181,6 +186,7 @@ public final class ShopMenuListener implements Listener {
             case NO_ECONOMY -> "spawner.no-economy";
             case CANNOT_AFFORD -> "shop.cannot-afford";
             case STORAGE_UNAVAILABLE -> "delivery.storage-unavailable";
+            case PENDING_DELIVERY -> "delivery.pending";
             default -> "shop.trade-failed";
         };
     }
@@ -191,6 +197,7 @@ public final class ShopMenuListener implements Listener {
             case NO_ECONOMY -> "spawner.no-economy";
             case NOT_ENOUGH_ITEMS -> "shop.not-enough-items";
             case STORAGE_UNAVAILABLE -> "delivery.storage-unavailable";
+            case PENDING_DELIVERY -> "delivery.pending";
             default -> "shop.trade-failed";
         };
     }

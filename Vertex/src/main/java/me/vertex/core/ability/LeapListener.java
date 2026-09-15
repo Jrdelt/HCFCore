@@ -65,7 +65,7 @@ public final class LeapListener implements Listener {
         // effect-type/effect-amplifier/effect-duration-seconds were
         // configured but never applied -- Leap is meant to grant a landing
         // buff (SPEED by default) alongside the jump itself.
-        PotionEffectType type = PotionEffectType.getByName(ability.getString("effect-type", ""));
+        PotionEffectType type = AbilityEffectTypes.find(ability.getString("effect-type", ""));
         if (type != null) {
             int durationSeconds = Math.max(1, ability.getInt("effect-duration-seconds", 5));
             int amplifier = Math.max(0, ability.getInt("effect-amplifier", 0));

@@ -682,7 +682,8 @@ public final class CoinflipManager {
         // The outcome is committed before a single coin moves. If it cannot
         // be, both wagers go back and the coinflip returns to the list, so a
         // failure leaves the world exactly as it was.
-        if (!persistResolution(coinflip, opponent.getUniqueId(), winnerUuid, resolvedAt, null, payout, null)) {
+        PlayResult persistence = persistResolution(coinflip, opponent.getUniqueId(), winnerUuid, resolvedAt, null, payout, null);
+        if (persistence != PlayResult.OK) {
             if (coinflip.type() == CoinflipType.MONEY) {
                 EconomyHook.getEconomy().depositPlayer(opponent, coinflip.amount());
             } else if (coinflip.type() != CoinflipType.GC) {
@@ -690,7 +691,7 @@ public final class CoinflipManager {
             }
             activeCoinflips.put(coinflipId, coinflip);
             browserChanged();
-            return PlayOutcome.failure(PlayResult.GONE);
+            return PlayOutcome.failure(persistence);
         }
 
         processPendingPayouts(winnerUuid);
@@ -802,8 +803,8 @@ public final class CoinflipManager {
         // Committed before either side's items are handed to the winner. If it
         // fails, both wagers stay escrowed and the match goes back to pending,
         // so nobody gains or loses anything.
-        if (!persistResolution(coinflip, match.opponentUuid(), winnerUuid, resolvedAt,
-                combined.toArray(new ItemStack[0]), 0D, match.id())) {
+        if (persistResolution(coinflip, match.opponentUuid(), winnerUuid, resolvedAt,
+                combined.toArray(new ItemStack[0]), 0D, match.id()) != PlayResult.OK) {
             activeCoinflips.put(coinflipId, coinflip);
             pendingItemMatches.put(coinflipId, match);
             browserChanged();
@@ -889,18 +890,18 @@ public final class CoinflipManager {
      * @return false when nothing committed, meaning the caller must not pay
      *         out and should return the wagers instead
      */
-    private boolean persistResolution(Coinflip coinflip, UUID opponentUuid, UUID winnerUuid, long resolvedAt,
+    private PlayResult persistResolution(Coinflip coinflip, UUID opponentUuid, UUID winnerUuid, long resolvedAt,
             ItemStack[] payoutItems, double payoutAmount, Integer pendingMatchId) {
         try {
             return storage.resolveCoinflip(coinflip, opponentUuid, winnerUuid, summarize(coinflip), resolvedAt,
-                    payoutItems, payoutAmount, pendingMatchId);
+                    payoutItems, payoutAmount, pendingMatchId) ? PlayResult.OK : PlayResult.GONE;
         } catch (me.vertex.core.gc.GcStorage.BalanceRejectedException insufficient) {
             if (gcManager != null) gcManager.refreshBalance(opponentUuid);
-            return false;
+            return PlayResult.CANNOT_AFFORD;
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE,
                     "Failed to persist resolved Coinflip " + coinflip.id() + " -- nobody was paid.", e);
-            return false;
+            return PlayResult.GONE;
         }
     }
 
@@ -989,7 +990,7 @@ public final class CoinflipManager {
                 }
                 case EXP -> {
                     Player online = Bukkit.getPlayer(payout.ownerUuid());
-                    if (online != null) {
+                    if (me.vertex.core.storage.InventoryAccess.ready(plugin,online)) {
                         online.setLevel(online.getLevel() + (int) Math.round(payout.amount()));
                         delivered = true;
                     } else definitelyNotDelivered = true;
@@ -1282,6 +1283,7 @@ public final class CoinflipManager {
     }
 
     public CompletableFuture<ClaimResult> deliverClaims(Player player) {
+        if (!me.vertex.core.storage.InventoryAccess.readyForHandoff(plugin, player)) return CompletableFuture.completedFuture(ClaimResult.OFFLINE);
         UUID owner = player.getUniqueId();
         if (!claimsInProgress.add(owner)) return CompletableFuture.completedFuture(ClaimResult.BUSY);
         CompletableFuture<ClaimDeliveryBatch> load = CompletableFuture.supplyAsync(() -> {
@@ -1314,7 +1316,7 @@ public final class CoinflipManager {
     private void deliverReservations(Player player, ClaimDeliveryBatch batch,
             CompletableFuture<ClaimResult> result) {
         List<CoinflipStorage.ClaimReservation> reservations = batch.reservations();
-        if (!player.isOnline()) {
+        if (!me.vertex.core.storage.InventoryAccess.readyForHandoff(plugin, player)) {
             releaseFreshReservation(player.getUniqueId(), batch, result, ClaimResult.OFFLINE);
         } else if (reservations.isEmpty()) {
             ClaimDelivery.clearSourceMarkers(player, plugin, "coinflip");
@@ -1326,6 +1328,10 @@ public final class CoinflipManager {
 
     private void deliverReservationAt(Player player, ClaimDeliveryBatch batch, int index,
             boolean deliveredAny, CompletableFuture<ClaimResult> result) {
+        if (!me.vertex.core.storage.InventoryAccess.readyForHandoff(plugin, player)) {
+            releaseFreshReservation(player.getUniqueId(), batch, result, ClaimResult.OFFLINE);
+            return;
+        }
         List<CoinflipStorage.ClaimReservation> reservations = batch.reservations();
         if (index >= reservations.size()) {
             result.complete(deliveredAny ? ClaimResult.CLAIMED : ClaimResult.EMPTY);
@@ -1345,6 +1351,7 @@ public final class CoinflipManager {
             releaseFreshReservation(player.getUniqueId(), batch, result, ClaimResult.FULL);
             return;
         }
+        ClaimDelivery.checkpoint(player);
         CompletableFuture<Integer> complete = CompletableFuture.supplyAsync(() -> {
             try { return storage.completeReservation(player.getUniqueId(), reservation.token()); }
             catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
@@ -1357,6 +1364,7 @@ public final class CoinflipManager {
                 result.complete(ClaimResult.FAILED);
                 return;
             }
+            if (!me.vertex.core.storage.InventoryAccess.readyForHandoff(plugin, player)) { result.complete(ClaimResult.OFFLINE); return; }
             ClaimDelivery.clearMarkers(player, plugin, "coinflip", reservation.token());
             deliverReservationAt(player, batch, index + 1, true, result);
         }));
@@ -1449,7 +1457,7 @@ public final class CoinflipManager {
 
     /** Gives items directly if possible and retains all overflow in the durable claim stash. */
     private void giveOrClaim(Player player, ItemStack[] items) {
-        if (player.isOnline()) {
+        if (me.vertex.core.storage.InventoryAccess.ready(plugin, player)) {
             for (ItemStack leftover : player.getInventory().addItem(items).values()) {
                 queueClaim(player.getUniqueId(), new ItemStack[] { leftover });
             }

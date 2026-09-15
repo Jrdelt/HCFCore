@@ -83,7 +83,7 @@ public final class MageSpellListener implements Listener {
             attacker.sendMessage(messages.get(attacker, "ability.region-blocked"));
             return;
         }
-        PotionEffectType type = PotionEffectType.getByName(ability.getString("effect-type", ""));
+        PotionEffectType type = AbilityEffectTypes.find(ability.getString("effect-type", ""));
         if (type == null) {
             return;
         }

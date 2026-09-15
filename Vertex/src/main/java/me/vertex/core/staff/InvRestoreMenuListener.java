@@ -75,6 +75,10 @@ public final class InvRestoreMenuListener implements Listener {
     }
 
     private void restoreToInventory(Player staffPlayer, Death death) {
+        if (!me.vertex.core.storage.InventoryAccess.ready(plugin, staffPlayer)) {
+            staffPlayer.sendMessage(messages.get(staffPlayer, "delivery.pending"));
+            return;
+        }
         staffPlayer.closeInventory();
         java.util.List<ItemStack> items = new java.util.ArrayList<>();
         for (ItemStack item : death.getAllItems()) {

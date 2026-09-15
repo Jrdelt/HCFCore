@@ -372,7 +372,7 @@ public final class PortalManager {
     public void releaseFlight(Player player, boolean slowFall) { releaseFlight(player.getUniqueId(), slowFall); }
 
     public void clearSlowFall(Player player) {
-        if (slowFallers.remove(player.getUniqueId())) player.removePotionEffect(PotionEffectType.SLOW_FALLING);
+        slowFallers.remove(player.getUniqueId()); // Preserve effects granted by potions/other plugins.
     }
 
     private PortalRoute chooseRoute(PortalTarget target) {
@@ -412,7 +412,7 @@ public final class PortalManager {
         if (!player.teleport(first.location(world))) return false;
         player.setAllowFlight(false);
         player.setFlying(false);
-player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 100, 0, false, false, false));
+me.vertex.core.util.FlightEffects.renewSlowFall(player);
         slowFallers.add(player.getUniqueId());
         flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), previous, route.waypoints(), route.speed()));
         if (!preview && route.target().kind() == PortalTarget.Kind.RIFTLANDS) zones.startPortalRiftSession(player);
@@ -429,7 +429,7 @@ player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 100, 0, f
         if (flight.before.allowFlight() && flight.before.flying()) player.setFlying(true);
         player.setFlySpeed(flight.before.flySpeed());
         if (slowFall) {
-            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 100, 0, false, false, false));
+            me.vertex.core.util.FlightEffects.renewSlowFall(player);
             slowFallers.add(playerId);
         }
     }
@@ -439,11 +439,10 @@ player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 100, 0, f
         for (UUID playerId : List.copyOf(slowFallers)) {
             Player player = Bukkit.getPlayer(playerId);
             if (player == null || player.isOnGround()) {
-                if (player != null) player.removePotionEffect(PotionEffectType.SLOW_FALLING);
                 slowFallers.remove(playerId);
             } else {
                 // A finite, renewed effect cannot become permanent after a crash.
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 100, 0, false, false, false));
+                me.vertex.core.util.FlightEffects.renewSlowFall(player);
             }
         }
     }

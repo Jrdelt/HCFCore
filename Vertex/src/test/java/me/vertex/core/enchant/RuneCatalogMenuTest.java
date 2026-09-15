@@ -48,10 +48,10 @@ class RuneCatalogMenuTest {
         List<ItemStack> entries = Arrays.stream(player.getOpenInventory().getTopInventory().getContents())
                 .filter(item -> item != null && manager.isEnchantItem(item))
                 .toList();
-        assertEquals(2, entries.size(), "Simple has two configured enchant types, not one icon per level");
+        assertEquals(5, entries.size(), "Simple has five configured enchant types, not one icon per level");
         assertTrue(entries.stream().allMatch(item -> item.getItemMeta().lore().stream()
                 .map(PlainTextComponentSerializer.plainText()::serialize)
-                .anyMatch(line -> line.contains("I, II"))));
+                .anyMatch(line -> line.contains("I, II, III"))));
         assertFalse(entries.stream().anyMatch(item -> item.getItemMeta().lore().stream()
                 .map(PlainTextComponentSerializer.plainText()::serialize)
                 .anyMatch(line -> line.contains("Arena Runes"))));
@@ -66,6 +66,6 @@ class RuneCatalogMenuTest {
                 .toList();
         assertTrue(entries.stream().allMatch(item -> item.getItemMeta().lore().stream()
                 .map(PlainTextComponentSerializer.plainText()::serialize)
-                .anyMatch(line -> line.contains("IV") && line.contains("ᴍᴀx"))));
+                .anyMatch(line -> line.contains("III") && line.contains("ᴍᴀx"))));
     }
 }

@@ -111,6 +111,9 @@ commands:
   staffbuild:
     description: Toggle build/break bypass in claimed land.
     usage: /<command>
+  lastredstone:
+    description: Replay the last player-used lever or button.
+    usage: /<command>
   freeze:
     description: Freeze or unfreeze a player in place.
     usage: /<command> <player>
@@ -173,6 +176,9 @@ commands:
   tntfill:
     description: Fill dispensers in your claim with TNT from your faction's TNT bank or your own inventory.
     usage: /<command> <radius> <amount> bank|inventory
+  tntunfill:
+    description: Return TNT from dispensers in your claim directly to your faction's TNT bank.
+    usage: /<command> [radius] [bank]
   ftopforcecheck:
     description: Immediately recalculate Vertex F Top without changing its automatic schedule.
     usage: /<command>
@@ -421,6 +427,9 @@ permissions:
   vertex.staff.staffbuild:
     description: Bypass claim protection to build/break/interact anywhere.
     default: op
+  vertex.redstone.replay:
+    description: Replay the last player-used lever or button.
+    default: op
   vertex.staff.freeze:
     description: Freeze/unfreeze a player, and see freeze-related alerts.
     default: op
@@ -444,6 +453,9 @@ permissions:
     default: op
   vertex.tntfill.use:
     description: Fill dispensers in your claim with TNT from your faction bank or inventory.
+    default: true
+  vertex.tntunfill.use:
+    description: Return TNT from dispensers in your claim directly to your faction TNT bank.
     default: true
   vertex.gc.use:
     description: Open the GC wallet and redeem codes.

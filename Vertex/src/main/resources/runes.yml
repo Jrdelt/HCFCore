@@ -1,23 +1,12 @@
 # ============================================
-# CUSTOM ENCHANTMENTS -- RUNES & LUCKY GEMS
+# CUSTOM ENCHANTMENTS -- RUNE TIER POOLS
 # ============================================
-# Right-clicking a Rune rolls it immediately (no GUI) using its tier's
-# table below and gives you the resulting identified Rune. See
-# enchants.yml for what each (enchant, level) combo referenced in a table
-# actually looks like and does -- this file only controls which combos are
-# reachable per tier, their relative weights, each tier's material/model/glow
-# cosmetic and shop price. Lucky Gems always add a universal +3.50% success chance.
-# Base Runes and Lucky Gems stack to 64; identified Runes stack only when
-# their stored data matches.
-#
-# Rune names and lore are standardized by Vertex so the item presentation
-# stays consistent. The configurable fields below affect material, optional
-# custom model data, glow, shop price, and the roll table.
+# Each normal tier has its own five-enchant pool. An enchant ID appears in
+# one tier only, so rolling a higher tier never repeats a lower-tier Rune.
+# Every table entry is independently weighted; weights do not need to total 100.
 
 lucky-gem:
   material: GREEN_DYE
-  # Presentation is standardized in code. These fields retain material/model
-  # cosmetics only; every current and legacy gem adds exactly +3.50%.
   glow: true
   shop-price: 10.0
 
@@ -26,46 +15,82 @@ runes:
     material: LIGHT_GRAY_CANDLE
     glow: false
     shop-price: 250.0
-    # Which (enchant, level) combos this tier's table can roll, and their
-    # weights (need not sum to 100 -- normalised automatically). A higher
-    # level intentionally has a smaller weight than a lower one of the same
-    # enchant, so it rolls less often.
     table:
-      - { enchant: haste_pickaxe, level: 1, weight: 55 }
-      - { enchant: haste_pickaxe, level: 2, weight: 20 }
-      - { enchant: sharpened_edge, level: 1, weight: 55 }
-      - { enchant: sharpened_edge, level: 2, weight: 20 }
+      - { enchant: ore_sense, level: 1, weight: 50 }
+      - { enchant: ore_sense, level: 2, weight: 30 }
+      - { enchant: ore_sense, level: 3, weight: 15 }
+      - { enchant: crop_bounty, level: 1, weight: 50 }
+      - { enchant: crop_bounty, level: 2, weight: 30 }
+      - { enchant: crop_bounty, level: 3, weight: 15 }
+      - { enchant: featherbound, level: 1, weight: 50 }
+      - { enchant: featherbound, level: 2, weight: 30 }
+      - { enchant: featherbound, level: 3, weight: 15 }
+      - { enchant: ironhide, level: 1, weight: 50 }
+      - { enchant: ironhide, level: 2, weight: 30 }
+      - { enchant: ironhide, level: 3, weight: 15 }
+      - { enchant: scholars_mark, level: 1, weight: 50 }
+      - { enchant: scholars_mark, level: 2, weight: 30 }
+      - { enchant: scholars_mark, level: 3, weight: 15 }
 
   ELITE:
     material: YELLOW_CANDLE
     glow: false
     shop-price: 900.0
     table:
-      - { enchant: haste_pickaxe, level: 1, weight: 25 }
-      - { enchant: haste_pickaxe, level: 2, weight: 45 }
-      - { enchant: haste_pickaxe, level: 3, weight: 15 }
-      - { enchant: sharpened_edge, level: 1, weight: 25 }
-      - { enchant: sharpened_edge, level: 2, weight: 45 }
-      - { enchant: sharpened_edge, level: 3, weight: 15 }
+      - { enchant: sky_stepper, level: 1, weight: 45 }
+      - { enchant: sky_stepper, level: 2, weight: 25 }
+      - { enchant: sky_stepper, level: 3, weight: 10 }
+      - { enchant: dasher, level: 1, weight: 45 }
+      - { enchant: dasher, level: 2, weight: 25 }
+      - { enchant: dasher, level: 3, weight: 10 }
+      - { enchant: soul_siphon, level: 1, weight: 45 }
+      - { enchant: soul_siphon, level: 2, weight: 25 }
+      - { enchant: soul_siphon, level: 3, weight: 10 }
+      - { enchant: ember_edge, level: 1, weight: 45 }
+      - { enchant: ember_edge, level: 2, weight: 25 }
+      - { enchant: ember_edge, level: 3, weight: 10 }
+      - { enchant: windrunner, level: 1, weight: 45 }
+      - { enchant: windrunner, level: 2, weight: 25 }
+      - { enchant: windrunner, level: 3, weight: 10 }
 
   RARE:
     material: MAGENTA_CANDLE
     glow: true
     shop-price: 2500.0
     table:
-      - { enchant: haste_pickaxe, level: 2, weight: 30 }
-      - { enchant: haste_pickaxe, level: 3, weight: 45 }
-      - { enchant: haste_pickaxe, level: 4, weight: 10 }
-      - { enchant: sharpened_edge, level: 2, weight: 30 }
-      - { enchant: sharpened_edge, level: 3, weight: 45 }
-      - { enchant: sharpened_edge, level: 4, weight: 10 }
+      - { enchant: ravager, level: 1, weight: 35 }
+      - { enchant: ravager, level: 2, weight: 20 }
+      - { enchant: ravager, level: 3, weight: 8 }
+      - { enchant: aegis, level: 1, weight: 35 }
+      - { enchant: aegis, level: 2, weight: 20 }
+      - { enchant: aegis, level: 3, weight: 8 }
+      - { enchant: executioner, level: 1, weight: 35 }
+      - { enchant: executioner, level: 2, weight: 20 }
+      - { enchant: executioner, level: 3, weight: 8 }
+      - { enchant: reclaimer, level: 1, weight: 35 }
+      - { enchant: reclaimer, level: 2, weight: 20 }
+      - { enchant: reclaimer, level: 3, weight: 8 }
+      - { enchant: deadeye, level: 1, weight: 35 }
+      - { enchant: deadeye, level: 2, weight: 20 }
+      - { enchant: deadeye, level: 3, weight: 8 }
 
   LEGENDARY:
     material: PINK_CANDLE
     glow: true
     shop-price: 7500.0
     table:
-      - { enchant: haste_pickaxe, level: 3, weight: 40 }
-      - { enchant: haste_pickaxe, level: 4, weight: 35 }
-      - { enchant: sharpened_edge, level: 3, weight: 40 }
-      - { enchant: sharpened_edge, level: 4, weight: 35 }
+      - { enchant: phoenix_heart, level: 1, weight: 25 }
+      - { enchant: phoenix_heart, level: 2, weight: 12 }
+      - { enchant: phoenix_heart, level: 3, weight: 4 }
+      - { enchant: titans_fury, level: 1, weight: 25 }
+      - { enchant: titans_fury, level: 2, weight: 12 }
+      - { enchant: titans_fury, level: 3, weight: 4 }
+      - { enchant: void_leech, level: 1, weight: 25 }
+      - { enchant: void_leech, level: 2, weight: 12 }
+      - { enchant: void_leech, level: 3, weight: 4 }
+      - { enchant: riftwalker, level: 1, weight: 25 }
+      - { enchant: riftwalker, level: 2, weight: 12 }
+      - { enchant: riftwalker, level: 3, weight: 4 }
+      - { enchant: stormcall, level: 1, weight: 25 }
+      - { enchant: stormcall, level: 2, weight: 12 }
+      - { enchant: stormcall, level: 3, weight: 4 }

@@ -12,26 +12,11 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.UUID;
-
 /**
- * The GUI /invsee opens. A plain {@code openInventory(target.getInventory())}
- * (what this used to be) only shows the target's 36 hotbar/storage slots --
- * there's no vanilla container type for someone else's armor and offhand,
- * so this builds a real 45-slot menu: slots 0-35 mirror storage, 36-39 are
- * the four armor pieces, 40 is offhand, and 41-44 are inert filler so the
- * bottom row doesn't look broken.
- *
- * <p>Not a live shared reference like the old approach -- it's a snapshot
- * synced back to the target after every click ({@link InvseeMenuListener}).
- * Unlike the naive version of this (blindly push all 41 tracked slots to
- * the target on every sync), {@link #writeBack} only pushes the specific
- * slots that actually changed *in the menu* since the last sync -- any
- * slot the staff member didn't touch is left alone, re-read fresh from the
- * target's own current live value instead of overwritten with a stale
- * snapshot. Without this, any independent change to the target's gear
- * (they pick something up, are given an item, etc.) made while the menu is
- * open gets silently destroyed by the next click's writeback, even one
- * that only touched the staff member's own inventory pane.
+ * Detached 45-slot staff view: storage 0-35, armor 36-39, offhand 40 and inert filler 41-44.
+ * InvseeMenuListener cancels native transfers, validates this snapshot against live target
+ * contents, then debits and credits both inventories synchronously. Closing never writes
+ * a stale view back. Snapshot items are cloned so live ItemStack mutations are detectable.
  */
 public final class InvseeMenu {
 
@@ -65,7 +50,7 @@ public final class InvseeMenu {
     static void populate(Inventory inventory, Player target) {
         ItemStack[] storage = target.getInventory().getStorageContents();
         for (int i = 0; i < storage.length; i++) {
-            inventory.setItem(i, storage[i]);
+            inventory.setItem(i, storage[i] == null ? null : storage[i].clone());
         }
         ItemStack[] armor = target.getInventory().getArmorContents(); // [boots, leggings, chestplate, helmet]
         inventory.setItem(SLOT_BOOTS, armor[0]);
@@ -79,7 +64,8 @@ public final class InvseeMenu {
     static ItemStack[] snapshot(Inventory inventory) {
         ItemStack[] snapshot = new ItemStack[TRACKED_SLOTS];
         for (int slot = 0; slot < TRACKED_SLOTS; slot++) {
-            snapshot[slot] = inventory.getItem(slot);
+            ItemStack item = inventory.getItem(slot);
+            snapshot[slot] = item == null ? null : item.clone();
         }
         return snapshot;
     }
@@ -165,7 +151,7 @@ public final class InvseeMenu {
         };
     }
 
-    private static void setLiveSlot(Player target, int slot, ItemStack value) {
+    static void setLiveSlot(Player target, int slot, ItemStack value) {
         if (slot < 36) {
             ItemStack[] storage = target.getInventory().getStorageContents();
             storage[slot] = value;

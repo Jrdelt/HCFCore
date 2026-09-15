@@ -194,6 +194,9 @@ public final class EnchantManager {
         }
         Set<String> enabledWorlds = lowercasedSet(section.getStringList("enabled-worlds"));
         Set<String> disabledWorlds = lowercasedSet(section.getStringList("disabled-worlds"));
+        String effect = section.getString("effect", "NONE");
+        int priority = section.getInt("priority", 0);
+        boolean blockedInCombat = section.getBoolean("blocked-in-combat", false);
 
         List<EnchantDefinition.Level> levels = new ArrayList<>();
         ConfigurationSection levelsSection = section.getConfigurationSection("levels");
@@ -220,7 +223,8 @@ public final class EnchantManager {
             plugin.getLogger().warning(where + ": enchant '" + id + "' has no levels configured, skipping it entirely.");
             return null;
         }
-        return new EnchantDefinition(id, displayName, description, compatible, enabledWorlds, disabledWorlds, levels);
+        return new EnchantDefinition(id, displayName, description, compatible, enabledWorlds, disabledWorlds,
+                effect, priority, blockedInCombat, levels);
     }
 
     private EnchantDefinition.Level readLevel(String where, String enchantId, int levelNumber, ConfigurationSection section) {
@@ -231,8 +235,26 @@ public final class EnchantManager {
         double procChance = clampPercent(section.getDouble("proc-chance", 0D));
         double successRate = clampPercent(section.getDouble("success-rate", 50D));
         double abilityValue = section.getDouble("ability-value", 0D);
+        Map<String, Double> effectSettings = new LinkedHashMap<>();
+        ConfigurationSection settings = section.getConfigurationSection("effect-settings");
+        if (settings != null) {
+            for (String key : settings.getKeys(false)) {
+                Object raw = settings.get(key);
+                if (!(raw instanceof Number) && !(raw instanceof String)) {
+                    plugin.getLogger().warning(where + ": enchant '" + enchantId + "' level " + levelNumber
+                            + " has a non-numeric effect setting '" + key + "', ignoring it.");
+                    continue;
+                }
+                try {
+                    effectSettings.put(key.toLowerCase(Locale.ROOT), Double.parseDouble(String.valueOf(raw)));
+                } catch (NumberFormatException error) {
+                    plugin.getLogger().warning(where + ": enchant '" + enchantId + "' level " + levelNumber
+                            + " has a non-numeric effect setting '" + key + "', ignoring it.");
+                }
+            }
+        }
         return new EnchantDefinition.Level(levelNumber, material, customModelData, glow, procChance, successRate,
-                abilityValue);
+                abilityValue, effectSettings);
     }
 
     private void loadRunes() {

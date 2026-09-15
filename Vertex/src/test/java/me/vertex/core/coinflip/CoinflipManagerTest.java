@@ -58,6 +58,20 @@ class CoinflipManagerTest {
     private PlayerMock host;
     private PlayerMock opponent;
 
+    @Test void insufficientAuthoritativeGcBalanceKeepsListingAndReportsCannotAfford() throws Exception {
+        var gcStorage=new me.vertex.core.gc.GcStorage(database);gcStorage.init();
+        var gc=new me.vertex.core.gc.GcManager(plugin,gcStorage);gc.load();gc.loadState();manager.setGcManager(gc);
+        assertTrue(gc.setBalance(host.getUniqueId(),host.getUniqueId(),me.vertex.core.gc.GcAction.STAFF_SET,1000,"test"));
+        assertTrue(gc.setBalance(opponent.getUniqueId(),host.getUniqueId(),me.vertex.core.gc.GcAction.STAFF_SET,1000,"test"));
+        manager.createGcCoinflip(host,100,null);gc.awaitWrites();settle();
+        int id=manager.activeCoinflips().iterator().next().id();
+        var other=new me.vertex.core.gc.GcManager(plugin,gcStorage);other.load();other.loadState();
+        assertTrue(other.setBalance(opponent.getUniqueId(),host.getUniqueId(),me.vertex.core.gc.GcAction.STAFF_SET,0,"spent on other shard"));
+        assertEquals(CoinflipManager.PlayResult.CANNOT_AFFORD,manager.play(id,opponent).result());
+        assertTrue(manager.activeCoinflips().stream().anyMatch(cf->cf.id()==id));
+        assertEquals(0,gcStorage.loadBalance(opponent.getUniqueId()));gc.awaitWrites();other.awaitWrites();
+    }
+
     @BeforeEach
     void setUp() throws Exception {
         server = MockBukkit.mock();

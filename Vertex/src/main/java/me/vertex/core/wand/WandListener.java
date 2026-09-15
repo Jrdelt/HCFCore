@@ -11,6 +11,7 @@ import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.shop.ShopManager;
 import me.vertex.core.util.Numbers;
+import me.vertex.core.storage.InventoryAccess;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -25,6 +26,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
@@ -89,6 +91,9 @@ public final class WandListener implements Listener {
 
         Player player = event.getPlayer();
         event.setCancelled(true);
+        if(!InventoryAccess.ready(plugin,player)||me.vertex.core.storage.ClaimDelivery.hasMarkedItem(plugin,player)){
+            player.sendMessage(messages.get(player,"wand.container-busy"));return;
+        }
 
         if (!wands.isEnabled(tier.type())) {
             player.sendMessage(messages.get(player, "wand.disabled"));
@@ -106,25 +111,31 @@ public final class WandListener implements Listener {
         if (container.isCollector() && !canUseCollector(player, block)) {
             return;
         }
-        if (!busy.add(block.getLocation())) {
+        Set<Location> locks=ContainerLocks.locations(block);
+        if (locks.stream().anyMatch(busy::contains)) {
             player.sendMessage(messages.get(player, "wand.container-busy"));
             return;
         }
-        Location location = block.getLocation();
+        busy.addAll(locks);
         if (tier.type() == WandType.SELL) {
             try {
                 runSell(player, held, tier, container);
             } finally {
-                busy.remove(location);
+                busy.removeAll(locks);
             }
             return;
         }
         // The TNT path finishes inside an async bank write, so it releases the
         // lock itself once that lands. Releasing here would drop the lock
         // while the transaction was still open.
-        if (!runTnt(player, held, tier, container, location)) {
-            busy.remove(location);
+        if(!InventoryAccess.reserve(plugin,player)){busy.removeAll(locks);return;}
+        try {
+            if(runTnt(player,held,tier,container,block.getLocation(),locks))return;
+        }catch(RuntimeException error){
+            plugin.getLogger().log(java.util.logging.Level.SEVERE,"TNT wand transaction failed for "+player.getUniqueId(),error);
+            player.sendMessage(messages.get(player,"wand.transaction-failed"));
         }
+        busy.removeAll(locks);InventoryAccess.release(player);
     }
 
     private void runSell(Player player, ItemStack held, WandTier tier, WandContainer container) {
@@ -180,7 +191,10 @@ public final class WandListener implements Listener {
     }
 
     /** @return true when an async bank write took ownership of the container lock. */
-    private boolean runTnt(Player player, ItemStack held, WandTier tier, WandContainer container, Location location) {
+    private boolean runTnt(Player player, ItemStack held, WandTier tier, WandContainer container,
+            Location location, Set<Location> locks) {
+        int slot=player.getInventory().getHeldItemSlot();
+        ItemStack expected=held.clone();
         int factionId = FactionsHook.getFactionId(player);
         if (factionId == FactionsHook.NO_FACTION) {
             player.sendMessage(messages.get(player, "wand.no-faction"));
@@ -214,20 +228,23 @@ public final class WandListener implements Listener {
                                     "max", Numbers.formatFull(capacity)));
                             return;
                         }
-                        settleTnt(player, held, tier, container, factionId, converted);
+                        ItemStack live=player.getInventory().getItem(slot);
+                        boolean valid=player.isOnline()&&!player.isDead()&&Bukkit.getPlayer(player.getUniqueId())==player
+                                &&expected.equals(live)&&wands.usesLeft(live)>0&&FactionsHook.getFactionId(player)==factionId;
+                        settleTnt(player,valid?live:null,tier,container,location,factionId,converted);
                     } finally {
-                        busy.remove(location);
+                        busy.removeAll(locks);InventoryAccess.release(player);
                     }
                 }));
         return true;
     }
 
     private void settleTnt(Player player, ItemStack held, WandTier tier, WandContainer container,
-            int factionId, int converted) {
+            Location location, int factionId, int converted) {
         // Re-checked against the container as it is now: the lock keeps other
         // wands out, but a player can still empty a chest by hand during the
         // bank write, and the gunpowder that was priced must still be there.
-        if (convertibleTnt(container, converted) < converted) {
+        if (held==null || convertibleTnt(container, converted) < converted) {
             bank.withdrawTnt(factionId, converted).whenComplete((reversed, error) -> {
                 if (error != null || !Boolean.TRUE.equals(reversed)) {
                     plugin.getLogger().severe("TNT Wand bank compensation failed for faction " + factionId
@@ -238,11 +255,25 @@ public final class WandListener implements Listener {
             return;
         }
 
-        container.remove(Material.GUNPOWDER, converted * wands.gunpowderPerTnt(), wands::isPlainStack);
-        if (wands.sandPerTnt() > 0) {
-            container.remove(Material.SAND, converted * wands.sandPerTnt(), wands::isPlainStack);
+        // The bank credit above is already committed to SQL and therefore
+        // irrevocable -- from here on the source debit itself must survive a
+        // crash too, or a hard stop before the container's own removal
+        // reaches disk (a chest's contents rely on the next chunk autosave;
+        // a Chunk Collector's own SQL write is separately async) would let
+        // the source materials survive while the bank credit still lands,
+        // creating TNT for free. journalDebit/clearDebitIfCurrent close that
+        // gap; see WandManager.reconcileChunk for how a survived entry is
+        // replayed.
+        int gunpowderOwed = converted * wands.gunpowderPerTnt();
+        int sandOwed = wands.sandPerTnt() > 0 ? converted * wands.sandPerTnt() : 0;
+        long debitVersion = wands.journalDebit(location, gunpowderOwed, sandOwed);
+
+        container.remove(Material.GUNPOWDER, gunpowderOwed, wands::isPlainStack);
+        if (sandOwed > 0) {
+            container.remove(Material.SAND, sandOwed, wands::isPlainStack);
         }
         container.commit();
+        wands.clearDebitIfCurrent(location, debitVersion);
         spendUse(player, held, tier);
         player.sendMessage(messages.get(player, "wand.tnt-converted",
                 "amount", Numbers.formatFull(converted)));
@@ -284,6 +315,16 @@ public final class WandListener implements Listener {
         return true;
     }
 
+    /**
+     * Forces any TNT Wand source debit journaled before the last shutdown
+     * back onto its container the moment that chunk is loaded again. See
+     * {@link WandManager#reconcileChunk}.
+     */
+    @EventHandler
+    public void onChunkLoad(ChunkLoadEvent event) {
+        wands.reconcileChunk(event.getChunk(), collectors);
+    }
+
     /** Prevent a player breaking or editing a locked chest between quote and commit. */
     @EventHandler(ignoreCancelled = true)
     public void onBusyBreak(BlockBreakEvent event) {
@@ -292,21 +333,32 @@ public final class WandListener implements Listener {
         }
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled = true)
     public void onBusyInventoryClick(InventoryClickEvent event) {
-        Location location = event.getView().getTopInventory().getLocation();
-        if (location != null && busy.contains(location)) {
+        if (event.getWhoClicked() instanceof Player player && InventoryAccess.reserved(player)
+                || ContainerLocks.locations(event.getView().getTopInventory()).stream().anyMatch(busy::contains)) {
             event.setCancelled(true);
         }
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled = true)
     public void onBusyInventoryDrag(InventoryDragEvent event) {
-        Location location = event.getView().getTopInventory().getLocation();
-        if (location != null && busy.contains(location)) {
+        if (event.getWhoClicked() instanceof Player player && InventoryAccess.reserved(player)
+                || ContainerLocks.locations(event.getView().getTopInventory()).stream().anyMatch(busy::contains)) {
             event.setCancelled(true);
         }
     }
+
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=true)
+    public void onHopper(org.bukkit.event.inventory.InventoryMoveItemEvent event){
+        if(ContainerLocks.locations(event.getSource()).stream().anyMatch(busy::contains)
+                ||ContainerLocks.locations(event.getDestination()).stream().anyMatch(busy::contains))event.setCancelled(true);
+    }
+
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=true)
+    public void onExplosion(org.bukkit.event.entity.EntityExplodeEvent event){event.blockList().removeIf(block->busy.contains(block.getLocation()));}
+    @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=true)
+    public void onBlockExplosion(org.bukkit.event.block.BlockExplodeEvent event){event.blockList().removeIf(block->busy.contains(block.getLocation()));}
 
 
     private void spendUse(Player player, ItemStack held, WandTier tier) {

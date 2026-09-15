@@ -1,6 +1,7 @@
 package me.vertex.core.coinflip;
 
 import me.vertex.core.lang.Messages;
+import me.vertex.core.storage.InventoryAccess;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -36,6 +37,10 @@ public final class CoinflipWagerMenuListener implements Listener {
     public void onClick(InventoryClickEvent event) {
         if (!(event.getInventory().getHolder() instanceof CoinflipWagerMenu.Holder holder)
                 || !(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        if (!InventoryAccess.ready(manager.plugin(), player)) {
+            event.setCancelled(true);
             return;
         }
         boolean clickedTop = event.getClickedInventory() != null

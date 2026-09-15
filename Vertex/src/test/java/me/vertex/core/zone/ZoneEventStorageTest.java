@@ -22,6 +22,15 @@ class ZoneEventStorageTest {
     final ZoneEventStorage.Settings settings = new ZoneEventStorage.Settings(120_000, 10_000, 5_000, 5, 3, 1);
     UUID player = UUID.randomUUID();
 
+    @Test void administrativeResultReportsCommittedChangeOrStaleNoop() throws Exception {
+        assertTrue(a.start(121_000,settings));
+        assertFalse(b.start(120_500,settings));
+        assertEquals(121_000,a.refresh(settings).anchor());
+        assertTrue(a.stop(121_000,122_000));
+        assertFalse(b.stop(121_000,123_000));
+        assertFalse(b.stop(999_999,123_000));
+    }
+
     @BeforeEach void setup() throws Exception {
         database = new Database(new YamlConfiguration(), directory.toFile());
         new ZoneStorage(database).init();

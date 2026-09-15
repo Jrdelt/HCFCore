@@ -28,6 +28,21 @@ public final class DeliveryStorage {
         enqueuePrepared(owner,prepare(items),source);
     }
 
+    /** New entitlements committed in the SAME transaction as a caller's source debit.
+     * Duplicate IDs fail the transaction rather than silently permitting a repeated debit. */
+    public static void enqueueNew(Connection connection, UUID owner, Collection<PreparedDelivery> items,
+                                  String source) throws SQLException {
+        if(connection.getAutoCommit())throw new SQLException("Source and delivery require an explicit transaction");
+        try(var insert=connection.prepareStatement("INSERT INTO item_delivery_inbox (delivery_id,owner_uuid,source,item,state,reservation_token,created_at) VALUES (?,?,?,?,'READY',NULL,?)")){
+            for(var item:items){
+                insert.setString(1,item.id());insert.setString(2,owner.toString());insert.setString(3,safeSource(source));
+                insert.setBytes(4,ItemStack.serializeItemsAsBytes(new ItemStack[]{item.item()}));
+                insert.setLong(5,System.currentTimeMillis());insert.addBatch();
+            }
+            insert.executeBatch();
+        }
+    }
+
     /** Every new inbox row fits one normal item stack. Stable IDs are retained by the WAL. */
     public static List<PreparedDelivery> prepare(Collection<ItemStack> items){
         List<PreparedDelivery> prepared=new ArrayList<>();

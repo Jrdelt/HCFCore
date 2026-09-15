@@ -116,6 +116,17 @@ public final class ClaimDelivery {
         return copy;
     }
 
+    /**
+     * Forces the player's data file to disk immediately after a successful {@link #add}.
+     * Callers must call this <em>before</em> telling SQL the claim/reservation is complete:
+     * {@code add} only mutates the live in-memory inventory, so without a durable
+     * checkpoint a crash between SQL completion and the next routine autosave can
+     * restore the pre-add inventory with no SQL row left to recover it from (ISS-08).
+     */
+    public static void checkpoint(Player player) {
+        player.saveData();
+    }
+
     public static void clearMarkers(Player player, Plugin plugin, String source, String token) {
         String prefix = source + ":" + token + ":";
         NamespacedKey key = key(plugin);
@@ -162,6 +173,7 @@ public final class ClaimDelivery {
     }
 
     public static boolean hasMarkedItem(Plugin plugin, Player player) {
+        if (isMarked(plugin, player.getItemOnCursor())) return true;
         for (ItemStack item : player.getInventory().getContents()) {
             if (isMarked(plugin, item)) return true;
         }

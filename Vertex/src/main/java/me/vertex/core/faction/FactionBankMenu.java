@@ -152,6 +152,9 @@ public final class FactionBankMenu implements Listener {
                 || event.getClickedInventory() != event.getView().getTopInventory()) {
             return;
         }
+        if (!me.vertex.core.storage.InventoryAccess.ready(plugin, player)) {
+            return;
+        }
         FactionData faction = FactionsHook.getFaction(player).orElse(null);
         if (faction == null || faction.id() != bankHolder.factionId) {
             player.closeInventory();
@@ -238,7 +241,7 @@ public final class FactionBankMenu implements Listener {
             if (!success) return;
             manager.audit(factionId, resource.name() + "_" + operation.name(), player,
                     "amount=" + amount);
-            if (!player.isOnline()) return;
+            if (!me.vertex.core.storage.InventoryAccess.ready(plugin,player)) return;
             player.sendMessage(messages.getGui(player, "faction-bank." + operation.key + "-success",
                     "amount", String.format("%,d", amount), "resource", resource.label(messages, player)));
             open(player);
@@ -365,51 +368,77 @@ public final class FactionBankMenu implements Listener {
     }
 
     private void depositTnt(Player player, FactionData faction, long amount, OperationResult result) {
+        if(!me.vertex.core.storage.InventoryAccess.ready(plugin,player)){result.complete(false);return;}
         long capacity = upgrades.tntCapacity(faction.id());
-        if (manager.tnt(faction.id()) + amount > capacity) {
+        if (amount > capacity || manager.tnt(faction.id()) > capacity - amount) {
             player.sendMessage(messages.getGui(player, "faction-bank.tnt-full", "max", Numbers.formatFull(capacity)));
             result.complete(false);
             return;
         }
+        // Journaled before the source is even touched: from here on this
+        // operation's TNT is gone from the player's control, and either the
+        // bank credit below or the compensating refund on failure must be
+        // the only thing that decides where it ends up -- a crash before
+        // either lands must be reported, not silently lost (ISS-12).
+        String operationId = manager.journalDepositIntent(player.getUniqueId(), faction.id(), amount);
+
         // Items leave the inventory only after the capacity check, and the
         // credit is applied only after the database write succeeds -- so a
         // failed write hands the TNT straight back instead of consuming it.
         if (!removeItems(player, Material.TNT, amount)) {
+            manager.clearDepositIntent(operationId);
             player.sendMessage(messages.getGui(player, "faction-bank.not-enough"));
             result.complete(false);
             return;
         }
+        // Forces the removal durable to disk before the credit is even
+        // attempted. Without this, a crash after the credit below commits
+        // but before the next routine player-data save could restore the
+        // pre-removal inventory with the bank already paid -- the same
+        // duplication ClaimDelivery.checkpoint closes for ISS-08.
+        me.vertex.core.storage.ClaimDelivery.checkpoint(player);
         manager.depositTnt(player, faction.id(), amount, capacity, "tnt-deposit")
                 .whenComplete((saved, error) -> onMain(() -> {
             if (error != null || !Boolean.TRUE.equals(saved)) {
-                giveTnt(player, amount);
-                player.sendMessage(messages.getGui(player, "faction-bank.transaction-failed"));
+                boolean givenDirectly = giveTnt(player, amount);
+                // Same reasoning as the checkpoint above: a direct give only
+                // mutates the live inventory, so it must be forced durable
+                // before this refund is treated as resolved -- otherwise a
+                // crash right after could lose the refund with the journal
+                // already cleared and nothing left to recover it from.
+                if (givenDirectly) {
+                    me.vertex.core.storage.ClaimDelivery.checkpoint(player);
+                } else if (!me.vertex.core.storage.DeliveryManager.queueOverflow(plugin,player,
+                        List.of(new ItemStack(Material.TNT,(int)amount)),"faction-tnt-deposit-refund")) {
+                    plugin.getLogger().severe("TNT deposit refund could not be admitted: owner="+player.getUniqueId()
+                            +" faction="+faction.id()+" amount="+amount+"; staff recovery required.");
+                }
+                manager.clearDepositIntent(operationId);
+                if(me.vertex.core.storage.InventoryAccess.ready(plugin,player))player.sendMessage(messages.getGui(player, "faction-bank.transaction-failed"));
                 result.complete(false);
                 return;
             }
+            manager.clearDepositIntent(operationId);
             result.complete(true);
         }));
     }
 
     private void withdrawTnt(Player player, FactionData faction, long amount, OperationResult result) {
+        if(!me.vertex.core.storage.InventoryAccess.ready(plugin,player)){result.complete(false);return;}
         if (!canFullyFit(player.getInventory(), Material.TNT, amount)) {
             player.sendMessage(messages.getGui(player, "faction-bank.inventory-full"));
             result.complete(false);
             return;
         }
-        manager.withdrawTnt(player, faction.id(), amount, "tnt-withdraw")
+        manager.withdrawTntToInbox(player, faction.id(), amount, "tnt-withdraw")
                 .whenComplete((saved, error) -> onMain(() -> {
-            if (error != null || !Boolean.TRUE.equals(saved)) {
-                player.sendMessage(messages.getGui(player, "faction-bank.not-enough"));
-                result.complete(false);
-                return;
+            // Also reconcile an uncertain commit response: a committed entitlement may already exist.
+            Player current=Bukkit.getPlayer(player.getUniqueId());
+            if(current!=null&&plugin instanceof me.vertex.core.VertexPlugin vertex&&vertex.deliveryManager()!=null){
+                vertex.deliveryManager().deliver(current);
             }
-            // A player may have changed inventories while the durable bank
-            // write was running. Never drop bank TNT on the ground. Put the
-            // balance back if it no longer fits, then ask them to free space.
-            if (!giveTnt(player, amount)) {
-                manager.depositTnt(faction.id(), amount, upgrades.tntCapacity(faction.id()));
-                player.sendMessage(messages.getGui(player, "faction-bank.inventory-full"));
+            if (error != null || !Boolean.TRUE.equals(saved)) {
+                if(me.vertex.core.storage.InventoryAccess.ready(plugin,player))player.sendMessage(messages.getGui(player, "faction-bank.transaction-failed"));
                 result.complete(false);
                 return;
             }
@@ -418,6 +447,7 @@ public final class FactionBankMenu implements Listener {
     }
 
     private boolean giveTnt(Player player, long amount) {
+        if(!me.vertex.core.storage.InventoryAccess.ready(plugin,player))return false;
         if (!canFullyFit(player.getInventory(), Material.TNT, amount)) {
             return false;
         }

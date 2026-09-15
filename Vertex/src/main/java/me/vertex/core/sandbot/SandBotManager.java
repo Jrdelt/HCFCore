@@ -33,7 +33,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -46,12 +45,25 @@ public final class SandBotManager {
     private final NamespacedKey itemTagKey;
     private final File stateFile;
     private final Object stateLock = new Object();
+    /** Orders state writes so a slower asynchronous save never overwrites a newer one. */
+    private final java.util.concurrent.atomic.AtomicLong stateVersion = new java.util.concurrent.atomic.AtomicLong();
+    private long writtenStateVersion;
+    /** Set when a prepaid balance changed since the last successful state write. */
+    private volatile boolean prepaidDirty;
+    private long lastPrepaidSaveAt;
 
     private volatile boolean enabled;
     private volatile int radiusBlocks;
     private volatile long tickIntervalTicks;
     private volatile int placementsPerColumnPerTick;
     private volatile int maxPlacementsPerTick;
+    /**
+     * Number of recent placement passes kept prepaid.  Bank writes are
+     * intentionally asynchronous; without a small balance owned by the bot,
+     * a moving cannon can only receive a block after every database round
+     * trip.
+     */
+    private volatile int prepaidBufferPasses;
     private volatile double lowBankWarningThreshold;
     private volatile long lowBankWarningCooldownMillis;
     private final Map<String, SandBotSession> sessions = new ConcurrentHashMap<>();
@@ -62,6 +74,7 @@ public final class SandBotManager {
     public SandBotManager(Plugin plugin, FactionBankManager factionBankManager, ShopManager shopManager,
             Messages messages, boolean enabled, int radiusBlocks, long tickIntervalTicks,
             int placementsPerColumnPerTick, int maxPlacementsPerTick,
+            int prepaidBufferPasses,
             double lowBankWarningThreshold, long lowBankWarningCooldownSeconds,
             org.bukkit.entity.EntityType ignoredNpcType) {
         this.plugin = plugin;
@@ -71,6 +84,7 @@ public final class SandBotManager {
         this.itemTagKey = new NamespacedKey(plugin, "sandbot-item");
         this.stateFile = new File(plugin.getDataFolder(), "sandbots.yml");
         reconfigure(enabled, radiusBlocks, tickIntervalTicks, placementsPerColumnPerTick, maxPlacementsPerTick,
+                prepaidBufferPasses,
                 lowBankWarningThreshold, lowBankWarningCooldownSeconds, ignoredNpcType);
     }
 
@@ -78,6 +92,7 @@ public final class SandBotManager {
 
     public void reconfigure(boolean enabled, int radiusBlocks, long tickIntervalTicks,
             int placementsPerColumnPerTick, int maxPlacementsPerTick,
+            int prepaidBufferPasses,
             double lowBankWarningThreshold, long lowBankWarningCooldownSeconds,
             org.bukkit.entity.EntityType ignoredNpcType) {
         long previousInterval = this.tickIntervalTicks;
@@ -86,6 +101,7 @@ public final class SandBotManager {
         this.tickIntervalTicks = Math.max(1, tickIntervalTicks);
         this.placementsPerColumnPerTick = Math.max(1, Math.min(16, placementsPerColumnPerTick));
         this.maxPlacementsPerTick = Math.max(1, Math.min(200, maxPlacementsPerTick));
+        this.prepaidBufferPasses = Math.max(1, Math.min(40, prepaidBufferPasses));
         this.lowBankWarningThreshold = Math.max(0D, Double.isFinite(lowBankWarningThreshold)
                 ? lowBankWarningThreshold : 500_000D);
         this.lowBankWarningCooldownMillis = Math.max(5_000L, lowBankWarningCooldownSeconds * 1_000L);
@@ -117,7 +133,12 @@ public final class SandBotManager {
         for (SandBotSession session : List.copyOf(sessions.values())) {
             removePendingBlocks(session);
             removeNpcOnly(session);
+            refundPrepaidBalance(session);
         }
+        // Record the refunded (zero) reserves so the next boot does not restore
+        // them a second time. Skip when nothing was loaded, or this write would
+        // erase bot records that were never read.
+        if (loadedPersisted) saveState();
         sessions.clear();
     }
 
@@ -222,16 +243,32 @@ public final class SandBotManager {
                 UUID ownerId = UUID.fromString(ownerText);
                 World world = Bukkit.getWorld(worldName == null ? "" : worldName);
                 FactionData faction = FactionsHook.getFactionById(factionId).orElse(null);
+                double prepaid = bots.getDouble(npcId + ".prepaid", 0D);
+                if (!Double.isFinite(prepaid) || prepaid < 0D) prepaid = 0D;
                 if (world == null || faction == null) {
                     plugin.getLogger().warning("Skipping Sand Bot " + npcId
                             + " because its world or faction is no longer available.");
+                    if (prepaid > 0.000001D) {
+                        if (faction != null && factionBankManager != null) {
+                            factionBankManager.depositMoney(factionId, prepaid);
+                            plugin.getLogger().warning("Returned " + prepaid + " prepaid by skipped Sand Bot "
+                                    + npcId + " to faction " + factionId + ".");
+                        } else {
+                            plugin.getLogger().severe("Sand Bot " + npcId + " held " + prepaid
+                                    + " prepaid for faction " + factionId
+                                    + ", which no longer exists; the amount could not be returned.");
+                        }
+                    }
                     continue;
                 }
                 Location location = new Location(world, bots.getDouble(npcId + ".x"),
                         bots.getDouble(npcId + ".y"), bots.getDouble(npcId + ".z"));
                 String ownerName = bots.getString(npcId + ".owner-name", ownerId.toString());
-                createSession(npcId, ownerId, ownerName, factionId, faction, location,
+                SandBotSession session = createSession(npcId, ownerId, ownerName, factionId, faction, location,
                         bots.getBoolean(npcId + ".active", true));
+                // A crash skips stop()'s refund, so the reserve that was saved
+                // resumes on the same Bot instead of being lost.
+                session.prepaidBalance = prepaid;
             } catch (RuntimeException error) {
                 plugin.getLogger().log(java.util.logging.Level.WARNING,
                         "Skipping invalid persisted Sand Bot " + npcId, error);
@@ -239,32 +276,63 @@ public final class SandBotManager {
         }
     }
 
-    public void persistState() { saveState(); }
-
     private void saveState() {
-        synchronized (stateLock) {
-            YamlConfiguration yaml = new YamlConfiguration();
-            for (SandBotSession session : sessions.values()) {
-                String path = "bots." + session.npcId;
-                yaml.set(path + ".owner", session.ownerId.toString());
-                yaml.set(path + ".owner-name", Bukkit.getOfflinePlayer(session.ownerId).getName());
-                yaml.set(path + ".faction", session.factionId);
-                yaml.set(path + ".world", session.world.getName());
-                yaml.set(path + ".x", session.centerX + 0.5D);
-                yaml.set(path + ".y", session.centerY);
-                yaml.set(path + ".z", session.centerZ + 0.5D);
-                yaml.set(path + ".active", session.active);
-            }
-            try {
-                if (!stateFile.getParentFile().exists() && !stateFile.getParentFile().mkdirs()) {
-                    throw new IOException("Could not create plugin data directory");
-                }
-                yaml.save(stateFile);
-            } catch (IOException error) {
-                plugin.getLogger().log(java.util.logging.Level.SEVERE,
-                        "Could not persist Sand Bot state", error);
-            }
+        writeState(snapshotState(), false);
+    }
+
+    private void saveStateAsync() {
+        writeState(snapshotState(), true);
+    }
+
+    private YamlConfiguration snapshotState() {
+        YamlConfiguration yaml = new YamlConfiguration();
+        for (SandBotSession session : sessions.values()) {
+            String path = "bots." + session.npcId;
+            yaml.set(path + ".owner", session.ownerId.toString());
+            yaml.set(path + ".owner-name", Bukkit.getOfflinePlayer(session.ownerId).getName());
+            yaml.set(path + ".faction", session.factionId);
+            yaml.set(path + ".world", session.world.getName());
+            yaml.set(path + ".x", session.centerX + 0.5D);
+            yaml.set(path + ".y", session.centerY);
+            yaml.set(path + ".z", session.centerZ + 0.5D);
+            yaml.set(path + ".active", session.active);
+            yaml.set(path + ".prepaid", session.prepaidBalance);
         }
+        return yaml;
+    }
+
+    private void writeState(YamlConfiguration yaml, boolean async) {
+        long version = stateVersion.incrementAndGet();
+        prepaidDirty = false;
+        lastPrepaidSaveAt = System.currentTimeMillis();
+        Runnable write = () -> {
+            synchronized (stateLock) {
+                if (version <= writtenStateVersion) return;
+                try {
+                    if (!stateFile.getParentFile().exists() && !stateFile.getParentFile().mkdirs()) {
+                        throw new IOException("Could not create plugin data directory");
+                    }
+                    yaml.save(stateFile);
+                    writtenStateVersion = version;
+                } catch (IOException error) {
+                    prepaidDirty = true;
+                    plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                            "Could not persist Sand Bot state", error);
+                }
+            }
+        };
+        if (async && plugin.isEnabled()) {
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, write);
+        } else {
+            write.run();
+        }
+    }
+
+    /** Pausing returns the unused reserve; resuming funds a new one on the next pass. */
+    public void setActive(SandBotSession session, boolean active) {
+        session.active = active;
+        if (!active) refundPrepaidBalance(session);
+        saveState();
     }
 
     public SandBotSession getSessionByNpcId(String npcId) {
@@ -348,6 +416,11 @@ public final class SandBotManager {
     }
 
     private void tickAll() {
+        // Spending only lowers a reserve, so saving it about once a second keeps
+        // a crash from losing the money while avoiding a disk write every tick.
+        if (prepaidDirty && System.currentTimeMillis() - lastPrepaidSaveAt >= 1_000L) {
+            saveStateAsync();
+        }
         if (!enabled) {
             return;
         }
@@ -406,12 +479,10 @@ public final class SandBotManager {
                     blockedColumns++;
                     continue;
                 }
-                int pending = pendingCount(session, key);
-                // Only one falling block may be in flight for a column. The
-                // old implementation spawned several blocks at the same
-                // coordinate, which made their collision physics determine
-                // the final shape instead of the bot's column plan.
-                if (pending == 0 && openGap > 0) {
+                // Only one falling entity may be in flight from a source
+                // column. It is deliberately allowed to be moved sideways by
+                // a piston or slime block after spawning.
+                if (pendingCount(session, key) == 0 && openGap > 0) {
                     int targetY = anchor.getY() - openGap;
                     queue.add(new Column(anchor, output, key, targetY));
                 }
@@ -420,8 +491,8 @@ public final class SandBotManager {
 
         if (queue.isEmpty()) {
             // A filled column is an idle state, not completion. Keep the Bot
-            // visible and let it resume automatically if falling blocks are
-            // removed or a new anchor/gap appears in its scan radius.
+            // visible and let it resume automatically if cannon movement
+            // clears a block or a new anchor/gap appears in its scan radius.
             if (session.pendingColumns.isEmpty()) {
                 debugOwner(session, "idle", "anchors", String.valueOf(anchors), "complete", String.valueOf(completeColumns),
                         "blocked", String.valueOf(blockedColumns), "outside", String.valueOf(unclaimedColumns), "y", String.valueOf(floorY));
@@ -429,23 +500,29 @@ public final class SandBotManager {
             return;
         }
 
-        // Never start a second debit while the previous tick's database write is pending.
-        if (session.paymentPending) return;
-
+        // Begin every available column before returning to a column that has
+        // already had a turn. The previous fixed scan order always spent a
+        // small global budget at the same edge of the footprint first, making
+        // a large print look like staggered horizontal bands instead of a
+        // uniform sand wall.
+        int queueSize = queue.size();
+        int startingIndex = Math.floorMod(session.nextPlacementCursor, queueSize);
         int placementBudget = maxPlacementsPerTick;
         List<PaidPlacement> planned = new ArrayList<>();
         double totalCost = 0D;
-        for (Column column : queue) {
+        for (int offset = 0; offset < queueSize; offset++) {
             if (placementBudget == 0) {
                 break;
             }
+            int index = (startingIndex + offset) % queueSize;
+            Column column = queue.get(index);
+            session.nextPlacementCursor = (index + 1) % queueSize;
             if (!shopManager.isTradeable(column.output)) {
                 debugOwner(session, "not-tradeable", "material", column.output.name(), "location", format(column.anchor.getLocation()));
                 continue;
             }
-            // Keep the configured value as a compatibility setting, but cap
-            // this deterministic falling-block implementation at one
-            // in-flight placement per column.
+            // A single falling entity per source column makes the wall start
+            // uniformly without creating overlapping entity physics.
             int placements = Math.min(1, Math.min(placementsPerColumnPerTick, placementBudget));
             double cost = shopManager.buyPrice(column.output);
             if (!Double.isFinite(cost) || cost <= 0D) continue;
@@ -458,35 +535,83 @@ public final class SandBotManager {
         if (planned.isEmpty()) return;
         double bankBalance = factionBankManager == null ? 0D : factionBankManager.money(session.factionId);
         warnLowBankIfNeeded(session, bankBalance);
-        if (factionBankManager == null || bankBalance + 0.000001D < totalCost) {
-            debugOwner(session, "cannot-pay", "cost", String.valueOf(totalCost));
+        if (session.prepaidBalance + 0.000001D >= totalCost) {
+            // The bank has already been debited for this small reserve. Do not
+            // make a cannon wait for another SQL round trip before each row of
+            // its clock cycle; refill below runs in parallel with physics.
+            spawnPrepaidPlacements(session, planned);
+            refillPrepaidBalance(session, totalCost, false);
+            return;
+        }
+
+        // The first wave (or a bot that has exhausted its reserve) still
+        // waits for a durable debit. Once funded it keeps several placement
+        // passes available, so a moving slime/piston path receives entities
+        // at the configured tick rate rather than the storage latency.
+        refillPrepaidBalance(session, totalCost, true, planned);
+    }
+
+    private void refillPrepaidBalance(SandBotSession session, double required, boolean requiredNow) {
+        refillPrepaidBalance(session, required, requiredNow, null);
+    }
+
+    private void refillPrepaidBalance(SandBotSession session, double required, boolean requiredNow,
+            List<PaidPlacement> placementsWaitingForFunds) {
+        if (factionBankManager == null || session.prepaidFundingPending) {
+            return;
+        }
+        double missing = Math.max(0D, required - session.prepaidBalance);
+        if (requiredNow && missing > 0D
+                && factionBankManager.money(session.factionId) + 0.000001D < missing) {
+            debugOwner(session, "cannot-pay", "cost", String.valueOf(required));
             pauseForFunds(session);
             return;
         }
-        session.paymentPending = true;
-        double reserved = totalCost;
-        factionBankManager.withdrawMoney(session.factionId, reserved).whenComplete((withdrawn, error) ->
-                Bukkit.getScheduler().runTask(plugin, () -> settlePaidPlacements(session, planned, reserved,
-                        error == null && Boolean.TRUE.equals(withdrawn))));
-    }
-
-    private void settlePaidPlacements(SandBotSession session, List<PaidPlacement> planned,
-            double reserved, boolean withdrawn) {
-        session.paymentPending = false;
-        if (!withdrawn) {
-            if (sessions.get(session.npcId) == session) {
+        double desired = Math.max(missing, (required * prepaidBufferPasses) - session.prepaidBalance);
+        double available = factionBankManager.money(session.factionId);
+        double funding = Math.min(desired, Math.max(0D, available));
+        if (funding <= 0.000001D) {
+            if (requiredNow) {
+                debugOwner(session, "cannot-pay", "cost", String.valueOf(required));
                 pauseForFunds(session);
             }
             return;
         }
-        if (sessions.get(session.npcId) != session || !session.active) {
-            factionBankManager.depositMoney(session.factionId, reserved);
+        session.prepaidFundingPending = true;
+        factionBankManager.withdrawMoney(session.factionId, funding).whenComplete((withdrawn, error) ->
+                Bukkit.getScheduler().runTask(plugin, () -> settlePrepaidFunding(session, funding,
+                        placementsWaitingForFunds, error == null && Boolean.TRUE.equals(withdrawn))));
+    }
+
+    private void settlePrepaidFunding(SandBotSession session, double funding,
+            List<PaidPlacement> placementsWaitingForFunds, boolean withdrawn) {
+        session.prepaidFundingPending = false;
+        if (!withdrawn) {
+            if (sessions.get(session.npcId) == session) {
+                if (placementsWaitingForFunds != null) pauseForFunds(session);
+            }
             return;
         }
+        if (sessions.get(session.npcId) != session || !session.active) {
+            factionBankManager.depositMoney(session.factionId, funding);
+            return;
+        }
+        session.prepaidBalance += funding;
+        // The bank debit is already durable; record the reserve right away.
+        saveStateAsync();
+        if (placementsWaitingForFunds != null) {
+            spawnPrepaidPlacements(session, placementsWaitingForFunds);
+        }
+    }
+
+    /** Spawns only against a balance that was successfully debited first. */
+    private void spawnPrepaidPlacements(SandBotSession session, List<PaidPlacement> planned) {
         double spent = 0D;
         int spawned = 0;
+        List<String> spawnedLocations = new ArrayList<>();
         Map<Long, Boolean> claims = new HashMap<>();
         for (PaidPlacement placement : planned) {
+            if (session.prepaidBalance + 0.000001D < placement.cost) break;
             if (outputFor(placement.anchor.getType()) != placement.output
                     || !isOwnedClaim(placement.anchor, session, claims)) continue;
             if (pendingCount(session, placement.key) != 0) continue;
@@ -500,14 +625,23 @@ public final class SandBotManager {
                     entity -> entity.setBlockData(placement.output.createBlockData()));
             falling.setDropItem(false);
             session.pendingColumns.computeIfAbsent(placement.key, ignored -> new HashMap<>())
-                    .put(falling.getUniqueId(), new PendingPlacement(targetY));
+                    .put(falling.getUniqueId(), new PendingPlacement());
             spent += placement.cost;
+            session.prepaidBalance = Math.max(0D, session.prepaidBalance - placement.cost);
             spawned++;
+            // Keep the diagnostic useful when a Bot is servicing several
+            // anchors. The old message showed only the first coordinate,
+            // which made a missing right-side anchor look as though it had
+            // been supplied whenever any other anchor had spawned.
+            if (spawnedLocations.size() < 12) {
+                spawnedLocations.add(placement.output.name() + "@" + format(drop)
+                        + " gap=" + openGap);
+            }
         }
-        double refund = Math.max(0D, reserved - spent);
-        if (refund > 0.000001D) factionBankManager.depositMoney(session.factionId, refund);
         if (spent > 0D) {
-            debugOwner(session, "spawned-blocks", "amount", String.valueOf(spawned), "cost", String.valueOf(spent));
+            prepaidDirty = true;
+            debugOwner(session, "spawned-blocks", "amount", String.valueOf(spawned),
+                    "placements", String.join("; ", spawnedLocations));
         }
     }
 
@@ -551,10 +685,12 @@ public final class SandBotManager {
     }
 
     /**
-     * Removes completed or invalid falling blocks from the in-flight table.
-     * A live entity is retained until it either lands or disappears; this
-     * prevents the next tick from spawning a duplicate block into the same
-     * column while the previous one is still falling.
+     * Releases a source column after its falling block has landed, disappeared,
+     * fallen out of the source cell, or has been pushed out of that source
+     * cell. A deep vertical gap must release the source too: retaining the
+     * entry until the block lands made a 44-block drop delay the next output
+     * for the entire fall. Releasing the tracking entry never removes the
+     * entity itself, so earlier blocks continue through the cannon.
      */
     private static void reconcilePendingBlocks(SandBotSession session) {
         session.pendingColumns.entrySet().removeIf(columnEntry -> {
@@ -562,25 +698,19 @@ public final class SandBotManager {
             Map<UUID, PendingPlacement> pending = columnEntry.getValue();
             pending.entrySet().removeIf(pendingEntry -> {
                 org.bukkit.entity.Entity entity = Bukkit.getEntity(pendingEntry.getKey());
-                if (entity == null || !entity.isValid() || entity.isDead()) {
+                if (entity == null || !entity.isValid() || entity.isDead() || !(entity instanceof FallingBlock)) {
                     return true;
                 }
-                if (!(entity instanceof FallingBlock)) {
-                    entity.remove();
-                    return true;
-                }
-
                 Location location = entity.getLocation();
-                boolean sameColumn = location.getWorld() == session.world
+                boolean stillInSourceCell = location.getWorld() == session.world
                         && Math.abs(location.getX() - (key.x() + 0.5D)) <= 0.75D
-                        && Math.abs(location.getZ() - (key.z() + 0.5D)) <= 0.75D;
-                if (!sameColumn) {
-                    // Do not allow a displaced falling block to make the bot
-                    // believe that the intended column is progressing.
-                    entity.remove();
-                    return true;
-                }
-                return false;
+                        && Math.abs(location.getZ() - (key.z() + 0.5D)) <= 0.75D
+                        // New entities start in the block directly below an
+                        // anchor (key.y() - 1). Once gravity carries them out
+                        // of that cell, another entity may safely start at the
+                        // source without deleting or replacing the first.
+                        && location.getY() >= key.y() - 1.75D;
+                return !stillInSourceCell;
             });
             return pending.isEmpty();
         });
@@ -603,7 +733,23 @@ public final class SandBotManager {
         sessions.remove(session.npcId);
         removePendingBlocks(session);
         removeNpcOnly(session);
+        refundPrepaidBalance(session);
         saveState();
+    }
+
+    /**
+     * A prepaid balance belongs to the faction, never to the NPC.  Returning
+     * it here means pausing or despawning a Bot cannot strand the amount that
+     * was set aside to keep its physical output smooth. Callers save state
+     * afterwards; until then the reserve is also recorded in {@code sandbots.yml}.
+     */
+    private void refundPrepaidBalance(SandBotSession session) {
+        double refund = session.prepaidBalance;
+        session.prepaidBalance = 0D;
+        prepaidDirty = true;
+        if (refund > 0.000001D && factionBankManager != null) {
+            factionBankManager.depositMoney(session.factionId, refund);
+        }
     }
 
     private void removeNpcOnly(SandBotSession session) {
@@ -643,9 +789,8 @@ public final class SandBotManager {
     }
 
     private void pauseForFunds(SandBotSession session) {
-        session.active = false;
+        setActive(session, false);
         setNpcStatus(session.npc, false);
-        saveState();
         notifyOwner(session, "sandbot.paused-out-of-funds");
     }
 
@@ -679,7 +824,11 @@ public final class SandBotManager {
         public final int centerY;
         public final int centerZ;
         private final Map<ColumnKey, Map<UUID, PendingPlacement>> pendingColumns = new HashMap<>();
-        private boolean paymentPending;
+        private boolean prepaidFundingPending;
+        /** Money already withdrawn from the faction bank for imminent output. */
+        private double prepaidBalance;
+        /** Next starting position for a fair, rotating placement pass. */
+        private int nextPlacementCursor;
         public boolean active = true;
         private long lastLowBankWarningAt;
 
@@ -719,9 +868,8 @@ public final class SandBotManager {
 
     private record PaidPlacement(Block anchor, Material output, ColumnKey key, int targetY, double cost) { }
 
-    private record PendingPlacement(int targetY) { }
+    private record PendingPlacement() { }
 
-    private record ColumnKey(int x, int y, int z) {
-    }
+    private record ColumnKey(int x, int y, int z) { }
 
 }

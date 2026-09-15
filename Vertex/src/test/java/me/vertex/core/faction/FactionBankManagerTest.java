@@ -33,6 +33,34 @@ class FactionBankManagerTest {
     private FactionBankStorage storage;
     private FactionBankManager manager;
 
+    @Test void withdrawalAndInboxEntitlementCommitTogetherAndCannotRepeat() throws Exception {
+        var inbox=new me.vertex.core.storage.DeliveryStorage(database);inbox.init();
+        var owner=java.util.UUID.randomUUID();
+        var items=me.vertex.core.storage.DeliveryStorage.prepare(java.util.List.of(new org.bukkit.inventory.ItemStack(org.bukkit.Material.TNT,10)));
+        assertTrue(manager.depositTnt(FACTION,100,1000).get());
+        java.util.function.Function<FactionBankStorage.StoredBank,FactionBankStorage.StoredBank> debit=b->
+                new FactionBankStorage.StoredBank(b.factionId(),b.money(),b.experience(),b.tnt()-10);
+        FactionBankStorage.TransactionEffect payout=c->me.vertex.core.storage.DeliveryStorage.enqueueNew(c,owner,items,"test-bank");
+        assertTrue(storage.mutate(FACTION,debit,payout).isPresent());
+        org.junit.jupiter.api.Assertions.assertThrows(java.sql.SQLException.class,()->storage.mutate(FACTION,debit,payout));
+        assertEquals(90,storage.loadAll().getFirst().tnt());
+        assertEquals(10,inbox.reserve(owner).rows().getFirst().item().getAmount());
+    }
+
+    @Test void failedInboxWriteRollsBackBankDebit() throws Exception {
+        assertTrue(manager.depositTnt(FACTION,100,1000).get());
+        org.junit.jupiter.api.Assertions.assertThrows(java.sql.SQLException.class,()->storage.mutate(FACTION,
+                b->new FactionBankStorage.StoredBank(b.factionId(),b.money(),b.experience(),0),
+                c->{throw new java.sql.SQLException("injected delivery failure");}));
+        assertEquals(100,storage.loadAll().getFirst().tnt());
+    }
+
+    @Test void invalidationFailureMustNotReportCommittedBankWriteAsFailed() throws Exception {
+        manager.setMutationPublisher(()->{throw new IllegalStateException("injected publish failure");});
+        assertTrue(manager.depositTnt(FACTION,100,1000).get());
+        assertEquals(100,storage.loadAll().getFirst().tnt());
+    }
+
     @BeforeEach
     void setUp() throws Exception {
         MockBukkit.mock();
@@ -60,11 +88,68 @@ class FactionBankManagerTest {
         assertEquals(300L, manager.tnt(FACTION));
     }
 
+    /**
+     * ISS-12: a resolved deposit's journal entry must not linger -- otherwise
+     * every ordinary deposit would accumulate a permanent, never-cleared
+     * "unresolved" report at the next restart.
+     */
+    @Test
+    void resolvedDepositJournalEntryLeavesNothingBehind() throws Exception {
+        var owner = java.util.UUID.randomUUID();
+        String operationId = manager.journalDepositIntent(owner, FACTION, 50L);
+        assertFalse(new TntDepositWal(plugin.getDataFolder()).load().isEmpty(),
+                "the entry must be durable before the caller removes any source item");
+
+        manager.clearDepositIntent(operationId);
+        assertTrue(new TntDepositWal(plugin.getDataFolder()).load().isEmpty());
+    }
+
+    /**
+     * ISS-12: a deposit journaled before the last shutdown, but never
+     * resolved (the crash landed before the credit or a refund could be
+     * confirmed), must be reported for staff reconciliation on the next
+     * load -- and must NOT be auto-credited, since the balance carries no
+     * per-operation receipt to tell an already-applied credit apart from
+     * one that never happened.
+     */
+    @Test
+    void survivedDepositJournalEntryIsReportedNotAutoCreditedOnReload() throws Exception {
+        var owner = java.util.UUID.randomUUID();
+        new TntDepositWal(plugin.getDataFolder()).put(new TntDepositWal.Entry(
+                java.util.UUID.randomUUID().toString(), owner, FACTION, 75L));
+
+        FactionBankManager restarted = new FactionBankManager(plugin, storage);
+        restarted.load();
+
+        assertEquals(0L, restarted.tnt(FACTION), "a survived entry must never be auto-credited");
+        assertTrue(new TntDepositWal(plugin.getDataFolder()).load().isEmpty(),
+                "the entry must be cleared once reported, so it is not reported again on every future restart");
+    }
+
     @Test
     void refusesDepositBeyondCapacity() throws Exception {
         assertTrue(manager.depositTnt(FACTION, 900L, 1_000L).get());
         assertFalse(manager.depositTnt(FACTION, 200L, 1_000L).get());
         assertEquals(900L, manager.tnt(FACTION), "a refused deposit must not partially apply");
+    }
+
+    @Test
+    void adminAdjustmentsRespectTheTntCapacityInsideTheSerializedWrite() throws Exception {
+        assertFalse(manager.adjustForAdmin(FACTION, FactionBankManager.BankType.TNT,
+                FactionBankManager.AdminOperation.SET, 0D, 1_001L, 1_000L).get());
+        assertTrue(manager.adjustForAdmin(FACTION, FactionBankManager.BankType.TNT,
+                FactionBankManager.AdminOperation.SET, 0D, 900L, 1_000L).get());
+        var firstAdd = manager.adjustForAdmin(FACTION, FactionBankManager.BankType.TNT,
+                FactionBankManager.AdminOperation.ADD, 0D, 75L, 1_000L);
+        var secondAdd = manager.adjustForAdmin(FACTION, FactionBankManager.BankType.TNT,
+                FactionBankManager.AdminOperation.ADD, 0D, 75L, 1_000L);
+        assertTrue(firstAdd.get());
+        assertFalse(secondAdd.get(), "the queued admin add must see the committed first add");
+        assertEquals(975L, manager.tnt(FACTION), "concurrent admin adds must not exceed the cap");
+
+        assertTrue(manager.adjustForAdmin(FACTION, FactionBankManager.BankType.TNT,
+                FactionBankManager.AdminOperation.TAKE, 0D, 400L, 1_000L).get());
+        assertEquals(575L, manager.tnt(FACTION));
     }
 
     @Test

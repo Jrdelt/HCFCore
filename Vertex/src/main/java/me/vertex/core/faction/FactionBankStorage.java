@@ -111,9 +111,30 @@ public final class FactionBankStorage {
         return mutate(factionId, actor, expectedRole, action, defaultAllowed, mutation);
     }
 
+    @FunctionalInterface
+    public interface TransactionEffect { void apply(Connection connection) throws SQLException; }
+
+    public Optional<StoredBank> mutateAuthorized(int factionId, UUID actor, FactionRole expectedRole,
+            String action, boolean defaultAllowed, Function<StoredBank,StoredBank> mutation,
+            TransactionEffect effect) throws SQLException {
+        if(actor==null||expectedRole==null||action==null||action.isBlank())return Optional.empty();
+        return mutate(factionId,actor,expectedRole,action,defaultAllowed,mutation,effect);
+    }
+
+    Optional<StoredBank> mutate(int factionId, Function<StoredBank,StoredBank> mutation,
+                               TransactionEffect effect) throws SQLException {
+        return mutate(factionId,null,null,null,false,mutation,effect);
+    }
+
     private Optional<StoredBank> mutate(int factionId, UUID actor, FactionRole expectedRole,
             String action, boolean defaultAllowed, Function<StoredBank, StoredBank> mutation)
             throws SQLException {
+        return mutate(factionId,actor,expectedRole,action,defaultAllowed,mutation,connection -> {});
+    }
+
+    private Optional<StoredBank> mutate(int factionId, UUID actor, FactionRole expectedRole,
+            String action, boolean defaultAllowed, Function<StoredBank, StoredBank> mutation,
+            TransactionEffect effect) throws SQLException {
         try (Connection connection = database.getConnection()) {
             boolean previous = connection.getAutoCommit();
             connection.setAutoCommit(false);
@@ -161,6 +182,7 @@ public final class FactionBankStorage {
                     update.setInt(4, factionId);
                     if (update.executeUpdate() != 1) throw new SQLException("Faction bank update was not committed");
                 }
+                effect.apply(connection);
                 connection.commit();
                 return Optional.of(next);
             } catch (SQLException | RuntimeException error) {

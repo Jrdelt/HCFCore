@@ -13,6 +13,15 @@ rejoin, the same as combat tags — and each is gated behind its own
 | `/staffbuild` | `vertex.staff.staffbuild` | Bypasses Vertex claim protection entirely — block break/place, containers/doors, buckets, item frames/paintings, and entity interaction all work in any claim while on. |
 | `/staff` | `vertex.staff.mode` | Toggles vanish + staff-build together as one switch, and also grants **godmode** and **flight** for the duration. Treats everything as "on" only when vanish and staff-build are *both* already on — so if you'd turned one off individually, `/staff` turns everything back on rather than finishing the job of turning it off. |
 
+## Last redstone control
+
+`/lastredstone` (`vertex.redstone.replay`) is an admin-only, session-scoped
+control for cannon testing. It replays the most recently successful
+player interaction with a lever or button anywhere on the server. A lever
+toggles between powered and unpowered; a button is re-pressed for its normal
+stone or wooden pulse duration. If the original block was removed or replaced,
+the command safely refuses to act. Each replay is logged to the server console.
+
 ## Freeze
 
 `/freeze <player>` (`vertex.staff.freeze`) locks a player in place while
@@ -42,7 +51,7 @@ path.
 | Command | Permission | Behavior |
 |---|---|---|
 | `/endersee <player>` | `vertex.staff.endersee` | Opens the target's **live** ender chest — a real two-way Bukkit inventory view, not a custom GUI. An edit on either side shows up for both immediately. |
-| `/invsee <player>` | `vertex.staff.invsee` | Opens a custom GUI showing the target's hotbar, main storage, **and their equipped armor and offhand** — there's no vanilla container type that exposes someone else's equipment. Unlike `/endersee`, this is not a live shared reference: edits sync back to the target one tick after each click, and armor slots reject anything that isn't actually that armor piece. A change the target makes to their own gear while the menu is open won't show up until it's reopened. |
+| `/invsee <player>` | `vertex.staff.invsee` | Shows storage, armor and offhand. Every edit validates the current target inventory and performs the debit/credit synchronously. A stale edit is rejected and the view refreshed; closing never writes the old view back. Armor placement is validated. Double-click collection, creative cloning and self-editing are blocked. Transfer/delivery reservations also block edits. |
 
 Block breaking in WarZone/SafeZone claims is left entirely to
 Vertex's native protection — staff-build is the explicit bypass.

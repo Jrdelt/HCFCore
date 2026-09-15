@@ -37,10 +37,12 @@ include their shard identity, so Base regions can exist on Star, Comet, and
 Vertex without connecting across servers.
 
 **Known deployment limits:** this is not yet a network-production sign-off.
-Spawner/collector block keys and F Top aggregation still have the cross-shard
-isolation issues tracked as ISS-15/16 in [issues.md](../issues.md). Transfer
-inventory/delivery ordering and season reset also have open findings there.
-Do not infer that every module is shard-safe from the teleport/claim namespace.
+Spawner/collector block keys are now shard-qualified the same way claims are
+(`ShardScope`, matching `ChunkKey`); F Top aggregation still has the
+cross-shard isolation issue tracked as ISS-16 in [issues.md](../issues.md).
+Transfer inventory/delivery ordering and season reset also have open findings
+there. Do not infer that every module is shard-safe from the teleport/claim
+namespace.
 
 Trade escrow now has a shard owner, per-process fencing token and SQL lease.
 Only the owning shard's next process recovers its abandoned sessions. A second
@@ -66,7 +68,7 @@ transaction protection or an explicit owner.
 | Player preferences and progression/cooldowns | Follow the player | Preferences refresh on reconnect. Zone progression/session snapshots still need cross-shard write fencing (ISS-42). |
 | Mob Kill Event points and winner boosts | One combined network event | Idempotent SQL kill receipts, transactional global finalization and periodic authoritative refresh. Implemented and storage-tested in this pass. |
 | PvP Top points | Shared leaderboard | Existing idempotent awards plus refresh after remote awards/disbands/reload and a 10-second reconciliation fallback. |
-| Spawners, collectors, portals, routes and other placed/world data | Durable, but owned by the shard containing the world | Do not replicate blocks/entities to every shard. Spawner/collector keys need migration (ISS-15); zone geometry/flight recovery also lack shard-qualified identities (ISS-43). F Top needs network aggregation (ISS-16). |
+| Spawners, collectors, portals, routes and other placed/world data | Durable, but owned by the shard containing the world | Do not replicate blocks/entities to every shard. Spawner/collector keys are shard-qualified (`ShardScope`); zone geometry/flight recovery still lack shard-qualified identities (ISS-43). F Top needs network aggregation (ISS-16). |
 | Inventories and active interactions | One active player/transaction owner | Persisted handoffs and trade ownership exist, but inventory/delivery admission and crash windows remain. Never merge inventory snapshots from two servers. |
 | GUI viewers, live entities, task handles and performance counters | Local runtime state | Reconstruct from durable records when appropriate; do not share Bukkit objects or blindly serialize every cache. |
 
@@ -152,9 +154,13 @@ For a cross-shard teleport Vertex:
 
 Inventory, armor, offhand, Ender Chest, health/food, experience, game mode,
 flight, selected slot, absorption, fire/air/fall state, and potion effects are
-included. The current locks block many item, inventory, command and damage
-events, but do not yet cover every incoming-join window or delayed delivery;
-ISS-14 and ISS-35 describe these gaps and the missing cursor/crafting capture.
+included. Cursor and crafting ingredients are moved into storage before capture,
+without drops or crafted-result duplication. Insufficient room or an unfinished
+custom/container GUI blocks the transfer; finish the interaction and retry.
+Incoming joins freeze before their SQL lookup, and claim deliveries wait for
+the exact live session to be admitted. Direct API writers and crash recovery
+still need the remaining checks in ISS-07/08/35; this is not a blanket transfer
+safety guarantee.
 An unresolved handoff blocks another
 transfer and alerts staff after the configured threshold.
 

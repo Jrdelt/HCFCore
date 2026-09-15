@@ -49,6 +49,8 @@ public final class GcManager {
     private volatile String redeemCodeCharset;
     private volatile long maxCodeLifetimeSeconds;
     private final Map<Integer, String> recognizedCodeAlphabets = new ConcurrentHashMap<>();
+    private volatile Runnable codeFormatPublisher = () -> { };
+    private final java.util.concurrent.atomic.AtomicBoolean formatRefresh = new java.util.concurrent.atomic.AtomicBoolean();
     private volatile int logPageSize;
     private volatile String interopCommandTemplate;
 
@@ -154,6 +156,25 @@ public final class GcManager {
     }
 
     public java.util.Set<Integer> recognizedCodeLengths() { return java.util.Set.copyOf(recognizedCodeAlphabets.keySet()); }
+
+    public void setCodeFormatPublisher(Runnable publisher) { codeFormatPublisher = java.util.Objects.requireNonNull(publisher); }
+
+    /** Merges (never forgets) historical formats, without querying SQL from chat handlers. */
+    public CompletableFuture<Void> refreshCodeFormatsAsync() {
+        if (!formatRefresh.compareAndSet(false, true)) return CompletableFuture.completedFuture(null);
+        CompletableFuture<Void> refresh = CompletableFuture.runAsync(() -> {
+            try { storage.loadCodeAlphabets().forEach(this::rememberCodeAlphabet); }
+            catch (Exception error) { plugin.getLogger().log(Level.WARNING, "Could not refresh GC chat-protection formats", error); }
+        }).whenComplete((ignored, error) -> formatRefresh.set(false));
+        track(refresh);
+        return refresh;
+    }
+
+    private void issuedCode(String code) {
+        rememberCodeAlphabet(code.length(), code);
+        try { codeFormatPublisher.run(); }
+        catch (RuntimeException error) { plugin.getLogger().log(Level.WARNING, "Could not publish GC format invalidation; periodic refresh will retry", error); }
+    }
 
     /** Includes persisted historical formats so a reload cannot expose an older code in chat. */
     public boolean isRedeemCodeCandidate(String token) {
@@ -493,6 +514,7 @@ public final class GcManager {
                             return new WithdrawCodeOutcome(WithdrawCodeResult.INSUFFICIENT, null, balance(ownerUuid));
                         }
                         finishMutation(ownerUuid, -amount, outcome.balanceAfter());
+                        issuedCode(code);
                         return new WithdrawCodeOutcome(WithdrawCodeResult.OK, code, outcome.balanceAfter());
                     } catch (Exception e) {
                         finishMutation(ownerUuid, -amount, null);
@@ -523,6 +545,7 @@ public final class GcManager {
         CompletableFuture<CreateCodeOutcome> request = CompletableFuture.supplyAsync(() -> {
             try {
                 storage.insertRedeemCode(code, amount, uses, staffUuid, System.currentTimeMillis(), expiresAtMillis);
+                issuedCode(code);
                 return new CreateCodeOutcome(true, code);
             } catch (Exception e) {
                 plugin.getLogger().log(Level.SEVERE, "Failed to persist a new GC redeem code.", e);

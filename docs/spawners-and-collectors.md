@@ -16,8 +16,7 @@ it with a matching spawner item to stack (shift-right-click deposits
 every matching spawner in your inventory at once).
 
 Right-clicking a spawner with an empty or non-matching hand opens a
-management GUI to withdraw or sell spawners from the stack for
-`sell-refund-percent` of the shop price.
+management GUI to withdraw spawners from the stack.
 
 **Stacking scales vanilla behavior, not a re-implementation of it** — a
 stack's own `CreatureSpawner` block-entity fields (spawn count, nearby

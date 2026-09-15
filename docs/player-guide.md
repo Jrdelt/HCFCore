@@ -32,6 +32,7 @@ you what a click does.
 | `/f rally` · `/frally` | Faction role / `/f permissions` | Set a faction rally point |
 | `/f bank` · `/f upgrades` | Faction role / `/f permissions` | Faction money/XP/TNT bank and upgrades |
 | `/tntfill <radius> <amount> bank\|inventory` | `vertex.tntfill.use` | Bulk-fill dispensers in your claim |
+| `/tntunfill [radius] [bank]` | `vertex.tntunfill.use` | Return nearby dispenser TNT to your faction TNT bank only |
 | `/language [code]` | Open to all | Change your language |
 | `/nextreboot` | Open to all | When the next restart is |
 
@@ -211,7 +212,9 @@ faction commands still work. On top of them:
 The **TNT bank** holds up to 1,000,000 TNT, raised to 10,000,000 by the TNT
 Bank upgrade. `/tntfill <radius> <amount> bank|inventory` fills every
 dispenser within range inside your own claim, drawn from the bank or your
-inventory.
+inventory. `/tntunfill [radius]` does the reverse: it returns TNT from
+dispensers in your own claims directly to your faction bank, up to the
+remaining upgrade-derived capacity. It never puts TNT in a player inventory.
 
 **TNT Wands** convert Gunpowder in a chest or Chunk Collector straight into
 banked TNT. If the bank is full the wand isn't used at all — no uses spent,

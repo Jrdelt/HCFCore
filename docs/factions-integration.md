@@ -21,6 +21,7 @@ through `/f permissions`; only command-level visibility is shown below.
 | `/f open`, `/f close`, `/f description <text>`, `/f rename <tag>` | Role-gated (`Member`-level settings depend on your faction role) | Manage faction settings. |
 | `/f home`, `/f sethome`, `/f warp [name]`, `/f setwarp <name>`, `/f delwarp <name>` | Open to faction members, role checks still apply | Native faction homes and warps. |
 | `/f bank <deposit\|withdraw> <amount> <money\|experience\|tnt>` | Role-gated by `/f permissions` | The only typed faction-bank transaction path; the GUI is also available through `/f bank`. |
+| `/tntunfill [radius] [bank]` | `vertex.tntunfill.use` plus the faction's **Use TNT Fill** role action | Returns dispenser TNT in your own claims directly to the faction TNT bank. With no radius, it uses the configured default (maximum by default); `bank` is accepted only as an optional explicit destination, and inventory is never accepted. |
 | `/f chat [faction\|ally\|public]` or `/f c [f\|a\|p]`, `/f map [on\|off]` | Open to all players with faction settings | Toggle faction chat, ally chat, and map display. Both preferences persist per player; ally chat includes your faction and mutually allied factions. Map width/height are configured independently, and a green crosshair marks the player's current chunk. Hover a claimed chunk to see its faction and whether it is a Base Claim or Raid Claim; Raid Claims also show their remaining lifetime. |
 
 `/f` and `/f help` show a paginated clickable help menu. The previous and
@@ -80,6 +81,27 @@ membership, leadership transfer, claim changes, and faction deletion are
 committed before cache changes or claim-bound item listeners run. The faction
 identity table does not keep a second money balance: all money bank actions
 use the durable `faction_banks` ledger through `/f bank`.
+
+### TNT withdrawal delivery
+
+A TNT withdrawal commits the bank debit and a player-owned inbox entitlement
+in the same database transaction. The inbox supplies the items when inventory
+space and the current server-transfer state permit. Disconnecting or filling
+the inventory does not require a capacity-sensitive faction-bank refund, and
+items are not dropped on the ground. A failed deposit returns TNT directly only
+to the same ready player session; otherwise it attempts durable inbox admission.
+Physical deposit checkpoints and the shared inventory acknowledgement crash
+window remain open in [issues.md](../issues.md); this is not full crash-proofing.
+
+### TNT dispenser unfill
+
+`/tntunfill [radius]` finds only loaded dispensers in the caller's own faction
+claims. It removes only as much TNT as the current TNT Bank upgrade can still
+hold, then records the bank credit. While the durable bank write is pending,
+the affected dispenser inventories, dispensing, hopper transfers, breakage,
+movement, and explosions are temporarily locked. A failed write restores the
+same TNT to the same locked dispensers; the command never uses a player
+inventory as a destination.
 Existing FactionsUUID data is intentionally not auto-imported: its storage
 layout and server-specific custom fields vary, and an unsafe import could
 misassign land or balances. Back up its data before removing that plugin. A

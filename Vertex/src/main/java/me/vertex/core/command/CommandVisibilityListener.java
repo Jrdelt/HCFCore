@@ -47,6 +47,7 @@ public final class CommandVisibilityListener implements Listener {
             Map.entry("vanish", List.of("vertex.staff.vanish")),
             Map.entry("staffchat", List.of("vertex.staff.staffchat")),
             Map.entry("staffbuild", List.of("vertex.staff.staffbuild")),
+            Map.entry("lastredstone", List.of("vertex.redstone.replay")),
             Map.entry("freeze", List.of("vertex.staff.freeze")),
             Map.entry("invsee", List.of("vertex.staff.invsee")),
             Map.entry("endersee", List.of("vertex.staff.endersee")),

@@ -5,6 +5,7 @@ import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.faction.RallyManager;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.staff.StaffManager;
+import me.vertex.core.storage.InventoryAccess;
 import me.vertex.core.util.ChatAmountPrompt;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
@@ -64,6 +65,9 @@ public final class ChunkCollectorMenuListener implements Listener {
             return;
         }
         if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        if (!InventoryAccess.ready(manager.plugin(), player)) {
             return;
         }
         Location location = holder.location();
@@ -159,6 +163,9 @@ public final class ChunkCollectorMenuListener implements Listener {
     }
 
     private void withdraw(Player player, Location location, ChunkCollectorData data, Material material, long requestedAmount) {
+        if (!InventoryAccess.ready(manager.plugin(), player)) {
+            return;
+        }
         long stored = data.stored(material);
         if (stored <= 0) {
             return;

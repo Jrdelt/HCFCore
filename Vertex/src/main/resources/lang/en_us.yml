@@ -1,7 +1,7 @@
 # Bumped whenever a bundled message changes. On startup Vertex replaces an
 # older on-disk copy of this file with the new bundled one, moving the
 # previous file into lang/backup/ first so customizations can be re-applied.
-lang-version: 34
+lang-version: 35
 
 general:
   no-permission: "<red>✖ You do not have access to that command."
@@ -73,6 +73,17 @@ tntfill:
   inventory-empty: "<red>✖ <gray>You don't have any TNT to fill with."
   none-found: "<red>✖ <gray>No dispensers found in range within your faction's claim."
   filled: "<green>✔ <green>Filled {dispensers} dispenser(s) with {amount} TNT."
+
+tntunfill:
+  usage: "<red>✖ <gray>Usage: /tntunfill [radius] [bank]"
+  disabled: "<red>✖ <gray>TNT Unfill is currently disabled."
+  invalid-radius: "<red>✖ <gray>Radius must be between 1 and {max}."
+  no-faction: "<red>✖ <gray>You must be in a faction to use this."
+  bank-full: "<red>✖ <gray>Your faction's TNT bank is full."
+  none-found: "<red>✖ <gray>No TNT-filled dispensers were found in range within your faction's claim."
+  processing: "<yellow>⚠ <gray>Your faction already has a TNT unfill transaction in progress."
+  failed: "<red>✖ <gray>The TNT bank write failed, so the dispenser TNT was restored safely."
+  unfilled: "<green>✔ <gray>Returned <white>{amount}<gray> TNT from <white>{dispensers}<gray> dispenser(s) to your faction bank."
 
 tags:
   filter-button: "<aqua>Filter"
@@ -640,6 +651,14 @@ staff:
   endersee-usage: "&c&lSTAFF&r &7> <gray>Usage: /<yellow>endersee <player>"
   endersee-opened: "&c&lSTAFF&r &7> <green>Viewing {player}'s ender chest."
 
+redstone:
+  usage: "&c&lSTAFF&r &7> <gray>Usage: <yellow>/lastredstone"
+  no-last-control: "&c&lSTAFF&r &7> <red>No player has used a lever or button since this server started."
+  last-control-unavailable: "&c&lSTAFF&r &7> <red>The last used redstone control no longer exists."
+  lever-activated: "&c&lSTAFF&r &7> <green>Activated the last used lever."
+  lever-deactivated: "&c&lSTAFF&r &7> <red>Deactivated the last used lever."
+  button-activated: "&c&lSTAFF&r &7> <green>Re-pressed the last used button."
+
 spawner:
   debug-line: "<gray>[Spawner Debug] {detail}"
   claim-only: "&3&lSPAWNERS&r &7> <gray>Spawners can only be placed in your own faction's claimed territory."
@@ -650,16 +669,10 @@ spawner:
   stacked: "&3&lSPAWNERS&r &7> <green>Stacked {amount}x -- now {size} in this stack."
   management-title: "           ꜱᴘᴀᴡɴᴇʀ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ"
   info-stack-size: "<gray>ꜱᴛᴀᴄᴋ ꜱɪᴢᴇ:  <white>{size}"
-  info-value: "<gray>ᴠᴀʟᴜᴇ:  <white>{amount}"
   ftop-current: "<gray>ꜰ ᴛᴏᴘ ᴠᴀʟᴜᴇ: <green>{amount} <gray>({percent}%)"
-  ftop-full: "<gray>ꜰᴜʟʟ ᴠᴀʟᴜᴇ: <green>{amount}"
-  ftop-remaining: "<gray>ᴍᴀx ᴀɢɪɴɢ ʟᴇꜰᴛ: <white>{time}"
   withdraw-one: "<green>ᴡɪᴛʜᴅʀᴀᴡ 1"
   withdraw-all: "<green>ᴡɪᴛʜᴅʀᴀᴡ ᴀʟʟ"
-  sell-one: "<gold>ꜱᴇʟʟ 1 <gray>(+{amount})"
-  sell-all: "<gold>ꜱᴇʟʟ ᴀʟʟ <gray>(+{amount})"
   withdrew: "<green>Withdrew {amount}x spawner(s)."
-  sold: "&3&lSPAWNERS&r &7> <yellow>Sold <green>{amount}x <yellow>spawner(s) for {refund}."
   shop-title: "ꜱᴘᴀᴡɴᴇʀ ꜱʜᴏᴘ"
   shop-price: "<gray>ᴘʀɪᴄᴇ: <white>{amount}"
   shop-hint: "<gray>ᴄʟɪᴄᴋ ᴛᴏ ʙᴜʏ.."
@@ -1231,7 +1244,7 @@ sandbot:
     idle: "&c&lSTAFF&r &7> <yellow>[SAND BOT] <gray>Idle: anchors={anchors}, complete={complete}, blocked={blocked}, outside-claim={outside}, ready=0 at Y={y}."
     not-tradeable: "&c&lSTAFF&r &7> <yellow>[SAND BOT] <gray>Skipped {material} at {location}: it has no tradeable Shop entry."
     cannot-pay: "&c&lSTAFF&r &7> <yellow>[SAND BOT] <gray>Stopped: faction cannot pay {cost} for {material}."
-    spawned-blocks: "&c&lSTAFF&r &7> <yellow>[SAND BOT] <gray>Spawned {amount}x {material} below {location} (gap={gap}, in-flight={inflight})."
+    spawned-blocks: "&c&lSTAFF&r &7> <yellow>[SAND BOT] <gray>Spawned {amount}x: {placements}."
   out-of-funds: "<red>✖ Your Sand Bot ran out of funds and despawned."
   stopped: "<green>✔ Stopped {amount} of your active Sand Bot(s)."
   stopped-other: "<green>✔ Stopped {amount} of {player}'s active Sand Bot(s)."
@@ -1280,6 +1293,7 @@ boosters:
   reason-no-hot-zone: "no Hot Zone is running here"
 
 wand:
+  transaction-failed: "&d&lWANDS&r &7> <red>The wand transaction could not be completed. Please contact staff."
   usage: "&d&lWANDS&r &7> <gray>Usage: <yellow>/wand give <player> <tier> [uses]"
   unknown-tier: "&d&lWANDS&r &7> <red>Unknown wand. Available: <yellow>{tiers}"
   given: "&d&lWANDS&r &7> <green>Gave a <yellow>{tier}<green> wand with <yellow>{uses}<green> uses to {player}."
@@ -1452,6 +1466,7 @@ dupe:
   pending-alert: "&c&lDUPE&r &7> <red>There are {count} open suspected-duplicate case(s). Run /dupe inspect list."
 
 delivery:
+  pending: "&c&lDELIVERY&r &7> <yellow>Your items are waiting for storage confirmation. Please wait before using or moving them."
   storage-unavailable: "&c&lDELIVERY&r &7> <red>Item storage is temporarily unavailable. Nothing was consumed; please try again."
 
 zones:
@@ -1545,6 +1560,9 @@ zones:
   route-selection-failed: "&5&lZONES&r &7> <red>Could not start route selection: {reason}"
   admin-usage: "&5&lZONES&r &7> <yellow>/{command} admin event start|stop <gray>or <yellow>/{command} admin inspect <player> <gray>or <yellow>/{command} admin clear-mobs [all]"
   admin-event-started: "&5&lZONES&r &7> <green>Kill event started."
+  admin-event-pending: "&5&lZONES&r &7> <yellow>Saving the event change..."
+  admin-event-failed: "&5&lZONES&r &7> <red>Could not confirm the event change. Check /events and the console before retrying."
+  admin-event-unchanged: "&5&lZONES&r &7> <yellow>No change: the event has already changed or ended."
   admin-event-stopped: "&5&lZONES&r &7> <green>Kill event stopped."
   admin-inspect: "&5&lZONES&r &7> <gold>{player} <gray>Haven: <white>{haven} <gray>Riftlands: <white>{riftlands} <gray>Amplification: <green>+{amplification}%"
   admin-unknown: "&5&lZONES&r &7> <red>Unknown admin action."
@@ -1812,7 +1830,8 @@ fa:
   usage-disband: "<yellow>/fa disband <faction> --force"
   usage-relation: "<yellow>/fa relation <faction> <faction> ally|neutral|enemy --force"
   usage-shield: "<yellow>/fa shield <faction> active|inactive|clear --force"
-  usage-bank: "<yellow>/fa bank <faction> money|xp|tnt set|add|take <amount>"
+  usage-bank: "<yellow>/fa bank <faction> set|add|take <amount> money|xp|tnt"
+  bank-tnt-cap: "&6&lFA ADMIN&r &7> <red>That would exceed this faction's TNT bank capacity of <white>{maximum}<red>."
   usage-members: "<yellow>/fa members remove <player> --force | setrole <player> <role>"
   usage-combat: "<yellow>/fa combat clear <player>"
   usage-vault: "<yellow>/fa vault <faction>"
@@ -1828,7 +1847,7 @@ fa:
     disband: "/fa disband <faction> --force"
     relation: "/fa relation <faction> <faction> ally|neutral|enemy --force"
     shield: "/fa shield <faction> active|inactive|clear --force"
-    bank: "/fa bank <faction> money|xp|tnt set|add|take <amount>"
+    bank: "/fa bank <faction> set|add|take <amount> money|xp|tnt"
     vault: "/fa vault <faction>"
     upgrades: "/fa upgrades <faction> <upgrade> <level>"
     members: "/fa members remove <player> --force | setrole <player> <role>"
@@ -1937,13 +1956,14 @@ faction-permissions:
   action-xp-withdraw: "<gold>Withdraw XP"
   action-tnt-deposit: "<gold>Deposit TNT"
   action-tnt-withdraw: "<gold>Withdraw TNT"
-  action-tnt-fill: "<gold>Use TNT Fill"
+  action-tnt-fill: "<gold>Use TNT Fill / Unfill"
   action-vault-use: "<gold>Use Faction Vault"
   action-levers: "<gold>Use Levers"
   action-buttons: "<gold>Use Buttons"
   action-pvp: "<gold>PvP"
 
 network:
+  finish-inventory: "&b&lNETWORK&r &7> <yellow>Close your menu and make inventory space for cursor/crafting items before changing servers."
   shard-full: "<red>✖ <gray>{shard} is currently full. You have not been moved."
   shard-offline: "<red>✖ <gray>{shard} is currently offline. You have not been moved."
   shard-draining: "<yellow>⚠ <gray>{shard} is preparing to restart and is not accepting players."

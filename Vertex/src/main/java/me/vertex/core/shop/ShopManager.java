@@ -333,7 +333,7 @@ public final class ShopManager {
     }
 
     public enum TradeResult {
-        OK, DISABLED, UNKNOWN_BLOCK, NO_ECONOMY, CANNOT_AFFORD, NOT_ENOUGH_ITEMS, STORAGE_UNAVAILABLE
+        OK, DISABLED, UNKNOWN_BLOCK, NO_ECONOMY, CANNOT_AFFORD, NOT_ENOUGH_ITEMS, STORAGE_UNAVAILABLE, PENDING_DELIVERY
     }
 
     public record TradeOutcome(TradeResult result, double total) {
@@ -343,6 +343,9 @@ public final class ShopManager {
     }
 
     public TradeOutcome buy(Player player, Material material, int amount) {
+        if (!me.vertex.core.storage.InventoryAccess.ready(plugin, player)) {
+            return TradeOutcome.failure(TradeResult.PENDING_DELIVERY);
+        }
         if (!enabled) {
             return TradeOutcome.failure(TradeResult.DISABLED);
         }
@@ -372,6 +375,9 @@ public final class ShopManager {
     }
 
     public TradeOutcome sell(Player player, Material material, int amount) {
+        if (!me.vertex.core.storage.InventoryAccess.ready(plugin, player)) {
+            return TradeOutcome.failure(TradeResult.PENDING_DELIVERY);
+        }
         if (!enabled) {
             return TradeOutcome.failure(TradeResult.DISABLED);
         }
@@ -413,6 +419,9 @@ public final class ShopManager {
 
     /** Sells exactly the live stack in one inventory slot (used by /sell hand). */
     public TradeOutcome sellSlot(Player player, int slot) {
+        if (!me.vertex.core.storage.InventoryAccess.ready(plugin, player)) {
+            return TradeOutcome.failure(TradeResult.PENDING_DELIVERY);
+        }
         if (!enabled) return TradeOutcome.failure(TradeResult.DISABLED);
         if (slot < 0 || slot >= player.getInventory().getStorageContents().length) {
             return TradeOutcome.failure(TradeResult.NOT_ENOUGH_ITEMS);

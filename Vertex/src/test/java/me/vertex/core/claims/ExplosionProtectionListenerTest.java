@@ -2,6 +2,8 @@ package me.vertex.core.claims;
 
 import org.bukkit.Location;
 import org.bukkit.block.Block;
+import org.bukkit.damage.DamageSource;
+import org.bukkit.damage.DamageType;
 import org.bukkit.entity.TNTPrimed;
 import org.bukkit.entity.Zombie;
 import org.bukkit.event.block.BlockExplodeEvent;
@@ -107,8 +109,8 @@ class ExplosionProtectionListenerTest {
         ExplosionProtectionListener listener = new ExplosionProtectionListener(loc -> false);
         PlayerMock player = server.addPlayer();
 
-        EntityDamageEvent event = new EntityDamageEvent(player,
-                EntityDamageEvent.DamageCause.ENTITY_EXPLOSION, 6D);
+        EntityDamageEvent event = damageEvent(player, EntityDamageEvent.DamageCause.ENTITY_EXPLOSION,
+                DamageType.EXPLOSION, 6D);
         listener.onExplosionDamage(event);
 
         assertFalse(event.isCancelled(), "normal explosion damage must remain outside Grace/Shield claims");
@@ -119,8 +121,8 @@ class ExplosionProtectionListenerTest {
         ExplosionProtectionListener listener = new ExplosionProtectionListener(loc -> true);
         Zombie zombie = world.spawn(new Location(world, 0, 64, 0), Zombie.class);
 
-        EntityDamageEvent event = new EntityDamageEvent(zombie,
-                EntityDamageEvent.DamageCause.BLOCK_EXPLOSION, 6D);
+        EntityDamageEvent event = damageEvent(zombie, EntityDamageEvent.DamageCause.BLOCK_EXPLOSION,
+                DamageType.EXPLOSION, 6D);
         listener.onExplosionDamage(event);
 
         assertTrue(event.isCancelled(), "TNT must never damage mobs, even inside a Base Claim");
@@ -131,7 +133,7 @@ class ExplosionProtectionListenerTest {
         ExplosionProtectionListener listener = new ExplosionProtectionListener(loc -> true);
         PlayerMock player = server.addPlayer();
 
-        EntityDamageEvent event = new EntityDamageEvent(player, EntityDamageEvent.DamageCause.FALL, 6D);
+        EntityDamageEvent event = damageEvent(player, EntityDamageEvent.DamageCause.FALL, DamageType.FALL, 6D);
         listener.onExplosionDamage(event);
 
         assertFalse(event.isCancelled(), "only explosion-caused damage should be touched by this listener");
@@ -145,10 +147,15 @@ class ExplosionProtectionListenerTest {
         org.bukkit.entity.EnderCrystal crystal =
                 world.spawn(new Location(world, 0, 64, 0), org.bukkit.entity.EnderCrystal.class);
 
-        EntityDamageEvent event = new EntityDamageEvent(crystal,
-                EntityDamageEvent.DamageCause.ENTITY_EXPLOSION, 6D);
+        EntityDamageEvent event = damageEvent(crystal, EntityDamageEvent.DamageCause.ENTITY_EXPLOSION,
+                DamageType.EXPLOSION, 6D);
         listener.onExplosionDamage(event);
 
         assertFalse(event.isCancelled());
+    }
+
+    private static EntityDamageEvent damageEvent(org.bukkit.entity.Entity entity,
+            EntityDamageEvent.DamageCause cause, DamageType damageType, double damage) {
+        return new EntityDamageEvent(entity, cause, DamageSource.builder(damageType).build(), damage);
     }
 }

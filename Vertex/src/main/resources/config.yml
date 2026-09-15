@@ -454,12 +454,24 @@ sandbot:
   # How often the bot attempts a conversion pass (in ticks; 20 = 1 second).
   tick-interval-ticks: 1
 
-  # Maximum new falling blocks for each anchor column in one conversion pass.
-  placements-per-column-per-tick: 2
+  # Compatibility setting for older configs. A Sand Bot deliberately keeps
+  # one falling block in flight per source column, so falling-block physics
+  # cannot make columns collide or start out of order.
+  placements-per-column-per-tick: 1
 
-  # Global safety cap across one Sand Bot in one conversion pass. A radius of
-  # 2 has at most 25 columns, so 50 permits the two-per-column default.
-  max-placements-per-tick: 50
+  # Global safety cap across one Sand Bot in one conversion pass. 121 covers
+  # every column in the default maximum 11x11 footprint, so each new layer
+  # starts uniformly. Keep this at or above (radius-blocks * 2 + 1)^2 for a
+  # full-width print; the hard safety cap is 200.
+  max-placements-per-tick: 121
+
+  # Placement passes prepaid from the faction bank. This keeps the physical
+  # falling-block stream running while the next safe bank write is in progress.
+  # A higher value is smoother on a remote database but reserves more money
+  # temporarily; unused money is returned when the Bot is paused, despawned,
+  # or the server stops, and is saved with the Bot so a crash cannot lose it.
+  # Hard-capped at 40.
+  prepaid-buffer-passes: 10
   # Warn faction members only while an active Bot is trying to place.
   low-bank-warning-threshold: 500000.0
   low-bank-warning-cooldown-seconds: 60
@@ -476,6 +488,18 @@ tntfill:
 
   # Hard-capped at 100 in code regardless of this value.
   max-radius: 7511
+
+# ============================================
+# TNT UNFILL
+# /tntunfill [radius] [bank] returns TNT from dispensers in the player's
+# own faction claim into the native faction TNT bank. `bank` is accepted only
+# as an optional explicit destination; inventory is never a valid destination.
+# ============================================
+tntunfill:
+  enabled: true
+  # Both values are hard-capped at 100 in code to keep the loaded-chunk scan bounded.
+  max-radius: 100
+  default-radius: 100
 
 # ============================================
 # REBOOT SYSTEM

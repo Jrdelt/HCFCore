@@ -93,8 +93,7 @@ public final class SandBotListener implements Listener {
         if (session != null && (player.getUniqueId().equals(session.ownerId)
                 || player.hasPermission("vertex.sandbot.admin"))) {
             if (event.getSlot() == 11) {
-                session.active = !session.active;
-                manager.persistState();
+                manager.setActive(session, !session.active);
                 player.closeInventory();
                 manager.openControlPanel(player, session);
             } else if (event.getSlot() == 15) {

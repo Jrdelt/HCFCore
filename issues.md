@@ -1,11 +1,11 @@
 # Vertex — unresolved issues
 
-Updated 2026-09-12. **23 open or partially fixed findings.**
+Updated 2026-09-13. **9 open or partially fixed findings.**
 This is not a production sign-off or a completed every-file audit.
 
 Only unresolved issues belong here. Completed fixes and their evidence are kept
-in [audit progress](docs/audit-progress.md). Latest verification:
-**774 tests, 773 passed, 1 existing MockBukkit skip, no failures/errors**.
+in [audit progress](docs/audit-progress.md). Latest clean package: **809 tests,
+808 passed, 1 existing MockBukkit skip, zero failures/errors**.
 Cross-shard Paper transfer/crash testing remains required.
 
 Priority: **P1** = duplication, loss, protection or shared-data risk;
@@ -14,45 +14,21 @@ the named method is the evidence anchor because line numbers change during repai
 
 ## Open findings
 
-### ISS-07 [P1] Delivery markers do not fully lock items awaiting acknowledgement
+### ISS-11 [P1] TNT Wand use-count debit and bank-withdrawal compensation still lack a crash-safe journal
 
-Evidence: [ClaimDeliveryGuard](Vertex/src/main/java/me/vertex/core/storage/ClaimDeliveryGuard.java), [delivery acknowledgement failure](Vertex/src/main/java/me/vertex/core/storage/DeliveryManager.java).
+**Partial fix:** one player can own only one pending wand operation. The live session, original slot/item, faction and remaining use are rechecked; item movement and transfer snapshot capture are blocked while reserved. Both halves of a double chest, hopper moves and explosion removal are guarded. The source-material debit itself is now journaled: `WandManager.journalDebit`/`clearDebitIfCurrent` durably record the gunpowder/sand a settled conversion still owes its container *before* removal, and `WandManager.reconcileChunk` (driven by `ChunkLoadEvent`, plus an immediate pass at startup for already-loaded chunks) forces a survived entry back onto the container instead of trusting whichever state happened to reach disk. Covers both a chest (autosave-dependent) and a Chunk Collector (PDC-write-dependent). `WandDebitRecoveryTest` (5 tests) covers survived-debit replay for both container types, the already-reconciled no-op case, and immediate reconciliation of an already-loaded chunk at journal-load time.
+- **Still open:** the wand item's own use-count debit (`WandManager.consumeUse`, a PDC write on the held item) is not journaled -- it is only as durable as the next player-data save, so a crash there could let a use survive uncounted. If revalidation fails, the bank-withdrawal compensation (`bank.withdrawTnt`) can still lose a race against another faction bank withdrawal.
+- **Fix direction:** journal the use-count debit the same way as the material debit, keyed to the wand item rather than a block location. Give the compensation withdrawal a durable, idempotent operation id so a losing race is retried rather than dropped.
+- **Evidence:** [WandListener.settleTnt](Vertex/src/main/java/me/vertex/core/wand/WandListener.java), [WandManager.consumeUse](Vertex/src/main/java/me/vertex/core/wand/WandManager.java).
+- **Retest:** kill the server between a settled conversion's material removal and its use-count write; verify the use was still spent on restart. Race the revalidation-failure compensation withdrawal against a concurrent faction bank withdrawal.
 
-- **Problem:** The guard covers inventory clicks/drags and dropping, but not placing, consuming or other direct use of a marked item already in the selected slot. During delayed/failed acknowledgement, an item can leave the inventory through use; retry then treats it as missing and supplies it again. Any marked item also grants blanket damage immunity until the marker is cleared, potentially for the duration of a database outage.
-- **Fix direction:** Treat the handoff as an explicit restricted transaction. Block every relevant mutation/use path until ownership is resolved, with a bounded failure/reconciliation policy rather than indefinite gameplay immunity.
-- **Retest:** Delay acknowledgement and attempt to place a delivered block, consume a delivered item, use a custom item, swap offhand, and take damage. No retry may recreate something already used.
+### ISS-12 [P1] TNT deposit crash recovery has no automatic, exactly-once repair
 
-### ISS-08 [P1] SQL claims can be deleted before the received inventory is durable
-
-Evidence: [ClaimDelivery.add](Vertex/src/main/java/me/vertex/core/storage/ClaimDelivery.java), [DeliveryManager acknowledgement](Vertex/src/main/java/me/vertex/core/storage/DeliveryManager.java), [TradeManager claim acknowledgement](Vertex/src/main/java/me/vertex/core/trade/TradeManager.java).
-
-- **Problem, crash window:** Adding an ItemStack/PDC marker changes the live inventory, not a durable player save. The code then permanently completes/deletes SQL claims without a durable receipt/player-state checkpoint. A crash after SQL completion but before player-data persistence can restore the old inventory with no remaining SQL claim to recover.
-- **Fix direction:** Design the handoff around durable player state/receipts and explicit recovery states. An in-memory PDC mutation alone is not an atomic inventory/database transaction. Apply the solution consistently to delivery, trade, auction and coinflip collection.
-- **Retest on Paper:** Terminate the process at each handoff stage, especially immediately after SQL acknowledgement and before a player save; verify both no loss and no replay duplicates.
-
-### ISS-09 [P1] Spawner withdrawal/selling does not atomically debit the source stack
-
-Evidence: [SpawnerMenuListener.withdraw/sell](Vertex/src/main/java/me/vertex/core/spawner/SpawnerMenuListener.java), [decreaseStack](Vertex/src/main/java/me/vertex/core/spawner/SpawnerManager.java), [queued persistence](Vertex/src/main/java/me/vertex/core/spawner/SpawnerManager.java).
-
-- **Problem, crash/failure window:** Withdrawal durably queues the payout before decreasing the placed stack. Selling credits Vault before decreasing it. The decrease is applied to live block PDC and queued SQL, with no durable transaction linking source and reward. A crash or failed source save can retain the old stack while the withdrawal/payout survives.
-- **Fix direction:** Journal a unique operation and source version; atomically record the stack debit with a durable payout entitlement where possible. Reconcile block/PDC state from the transaction on startup instead of independently trusting both.
-- **Retest:** Interrupt withdrawal and selling before/after source persistence and chunk save. Total physical spawners plus remaining stack must be conserved, and a sale must pay once.
-
-### ISS-11 [P1] One TNT Wand can start multiple uses before its last use is consumed
-
-Evidence: [WandListener.onInteract](Vertex/src/main/java/me/vertex/core/wand/WandListener.java), [async runTnt](Vertex/src/main/java/me/vertex/core/wand/WandListener.java), [spendUse](Vertex/src/main/java/me/vertex/core/wand/WandListener.java).
-
-- **Problem:** Only the clicked container location is locked. Wand use is consumed after SQL completes, using the originally captured ItemStack. While SQL is pending, the same one-use wand can activate other containers, or be moved/transferred. Completion does not revalidate its actual inventory slot/identity or remaining uses.
-- **Fix direction:** Reserve the specific wand/use and lock it across the async transaction, with durable completion/refund handling. Revalidate the owner/session and item identity before committing. Canonicalize double-chest locks too.
-- **Retest:** With delayed SQL and one remaining use, hit two different chests, then move/drop/trade the wand or disconnect. At most one conversion may succeed.
-
-### ISS-12 [P1] TNT bank refunds/delivery can silently lose TNT
-
-Evidence: [FactionBankMenu.depositTnt/withdrawTnt/giveTnt](Vertex/src/main/java/me/vertex/core/faction/FactionBankMenu.java).
-
-- **Problem:** A failed deposit calls giveTnt but ignores false when the inventory filled meanwhile. A withdrawal that no longer fits queues a bank refund without checking its result; another deposit can have filled the capacity. Callbacks also use the captured Player without handling a disconnect/replaced session, so inventory delivery is not safely tied to the durable owner.
-- **Fix direction:** Use durable, UUID-owned refunds/deliveries. Reserve bank capacity during compensation or record a guaranteed compensating credit; never discard a failed refund result.
-- **Retest:** Fill inventory during a failed deposit; disconnect during withdrawal; fill the bank before a withdrawal refund. All TNT must remain either in the bank or in an explicitly recoverable delivery.
+**Partial fix:** TNT withdrawals now debit the faction and insert a player-owned delivery in the same SQL transaction. Full inventory/disconnect no longer triggers a capacity-sensitive bank refund. A failed deposit returns TNT only to the same ready session, otherwise uses the durable inbox. Cache-invalidation failure no longer turns a committed bank write into a reported failure. The duplication direction is now closed: `FactionBankMenu.depositTnt` journals the operation (`FactionBankManager.journalDepositIntent`, a synchronous fsynced WAL, `TntDepositWal`) before removing any source TNT, then calls `ClaimDelivery.checkpoint` (forces `Player#saveData()`, reusing ISS-08's fix) immediately after removal and before the bank credit is attempted -- so a crash after a committed credit can no longer restore the pre-removal inventory. The same checkpoint now also covers a direct-to-inventory refund on the failure path, closing the mirrored gap there. The journal entry is cleared once the credit or the refund is confirmed.
+- **Still open:** the bank balance carries no per-operation receipt, so a deposit whose journal entry survives a crash (the process died before this JVM learned whether the credit or a refund had completed) cannot be safely auto-resolved -- crediting an already-credited deposit, or refunding an already-refunded one, would itself duplicate value. `FactionBankManager.replayDepositJournal` now reports the owner/faction/amount as a severe log for staff to reconcile against the actual balance and mail, instead of losing it silently, but reconciliation is still manual. If both refund WAL and SQL admission fail and inventory restoration is impossible, only a severe recovery log remains -- unchanged.
+- **Fix direction:** a full fix needs the bank mutation itself to carry a durable per-operation receipt/idempotency key (write it inside the same SQL transaction as the credit, the way `DeliveryStorage.enqueueNew`'s stable IDs do for the withdrawal/delivery side) so a replayed operation can tell "already applied" apart from "never happened" and repair itself automatically.
+- **Evidence:** [FactionBankMenu.depositTnt](Vertex/src/main/java/me/vertex/core/faction/FactionBankMenu.java), [FactionBankManager.journalDepositIntent/replayDepositJournal](Vertex/src/main/java/me/vertex/core/faction/FactionBankManager.java), [TntDepositWal](Vertex/src/main/java/me/vertex/core/faction/TntDepositWal.java).
+- **Retest:** kill the server between the checkpoint and the credit landing (or between a direct refund give and its own checkpoint); verify the journal reports it on restart and the balance/inventory were not silently duplicated or lost. `FactionBankManagerTest` covers journal write/clear and that a survived entry is reported, cleared, and never auto-credited.
 
 ### ISS-13 [P1] Trade offer editing has an unsaved escrow window
 
@@ -61,22 +37,6 @@ Evidence: [TradeListener.onClick/onDrag](Vertex/src/main/java/me/vertex/core/tra
 - **Problem:** Bukkit changes the live inventory first. A next-tick task captures it and then queues a SQL snapshot; SQL errors are only logged. A crash between these stages, or an unsuccessful snapshot followed by a crash, leaves recovery with an older offer. Items moved into the offer can be lost; items returned to the player can be refunded again from old escrow.
 - **Fix direction:** Journal/serialize offer mutations with their inventory ownership changes and keep uncertain edits unavailable until durable. Preserve operation IDs and failures for reconciliation; simply adding more async retries does not close the crash gap.
 - **Retest:** Crash after adding/removing an item but before the next-tick snapshot, and fail the escrow write. Recovery must match the last completed ownership transfer.
-
-### ISS-14 [P1] Cross-shard snapshots omit items on the cursor and in temporary inventories
-
-Evidence: [NetworkManager.transfer](Vertex/src/main/java/me/vertex/core/network/NetworkManager.java), [restart evacuation snapshot](Vertex/src/main/java/me/vertex/core/network/NetworkManager.java), [PlayerStateSnapshot.capture](Vertex/src/main/java/me/vertex/core/network/PlayerStateSnapshot.java).
-
-- **Problem:** Snapshot capture includes storage/armor/offhand/ender chest but neither cursor nor crafting/other temporary GUI items. Transfer and evacuation do not settle/close those views before capture. Closing them on departure can return items only to the old shard, after the authoritative snapshot has already been made.
-- **Fix direction:** Before capture, safely settle or close inventory sessions and return cursor/crafting items to owned storage/durable overflow. Coordinate outstanding escrow/delivery callbacks so later writes cannot mutate an already-captured source inventory.
-- **Retest:** Hold valuables on the cursor/in the 2x2 crafting grid when a cross-shard countdown finishes or a planned evacuation begins. Everything must arrive exactly once.
-
-### ISS-15 [P1] Spawner and collector database keys collide across shards with the same world name
-
-Evidence: [SpawnerStorage schema](Vertex/src/main/java/me/vertex/core/spawner/SpawnerStorage.java), [ChunkCollectorStorage schema](Vertex/src/main/java/me/vertex/core/collector/ChunkCollectorStorage.java), [spawner loading](Vertex/src/main/java/me/vertex/core/spawner/SpawnerManager.java).
-
-- **Problem, shared MySQL:** Both tables identify a block using only world name and coordinates. Two supported shards with a world named world and a block at the same coordinates overwrite/delete the same record. Loading resolves every shared row against the current server's same-named world, so reconciliation can also mistake another shard's records for local blocks.
-- **Fix direction:** Add stable shard identity to keys, queries and reconciliation, and provide an explicit legacy-data migration. Audit other block-location tables under the same rule.
-- **Retest:** On two shards with matching world names/coordinates, place different spawners/collectors. Restart and remove one; the other must be unchanged.
 
 ### ISS-16 [P1] Each shard overwrites the shared F Top leaderboard with its local spawners
 
@@ -94,90 +54,22 @@ Evidence: [SeasonResetManager.reset](Vertex/src/main/java/me/vertex/core/season/
 - **Fix direction:** Require all shards to enter a persisted maintenance state and acknowledge drained writers; complete and verify a restorable snapshot before deletion. Define reset coverage for world/PDC/local state and block new writes until clean restart. Use a separate confirmation token, not only a repeatable --force flag.
 - **Retest:** Race joins, queued bank/spawner saves and an active background operation against reset. Fail backup deliberately. No purge may start without a valid backup, and old state must not reappear afterward.
 
-### ISS-26 [P2] Flight cleanup can remove an unrelated Slow Falling effect
+### ISS-32 [P2] GC format propagation still has an initial chat-protection gap
 
-Status: **partially fixed**. New portal/zone flight effects last five seconds and are renewed while tracked; logout/shutdown clears tracked effects. They can no longer remain effectively infinite after losing runtime tracking.
+**Partial fix:** code issuance publishes the existing network invalidation event; running shards merge persisted historical formats asynchronously. A ten-second refresh repairs missed events and never forgets old formats. Regression coverage verifies a second running manager learns the new format.
 
-- **Remaining problem:** cleanup calls `removePotionEffect(SLOW_FALLING)` without identifying which effect is currently active or restoring an earlier legitimate potion. A stronger/longer effect applied independently during flight can be removed on landing. Old infinite effects from previous builds also have no persisted ownership marker for safe migration.
-- **Evidence:** `PortalManager.clearSlowFall/tick` and `ZoneManager.clearSlowFall/tickSlowFalling`.
-- **Plain English:** flight cleanup should end the flight bonus, not take away a normal potion.
-- **Fix direction:** record effect ownership and any preexisting potion/expiry; remove or restore only the effect owned by the flight system. Decide a safe legacy-effect cleanup policy.
-- **Retest:** apply a normal or stronger Slow Falling potion before/during a flight, then land, disconnect and reload. Its remaining legitimate duration must be preserved.
+- **Still open:** propagation is eventual. Between first issuance in a new format and the remote refresh, that remote chat guard can still miss it.
+- **Fix direction:** pre-register/version allowed formats network-wide before enabling issuance, or add an authoritative asynchronous chat admission check. Never query JDBC synchronously from chat handling.
+- **Evidence:** [GcManager.refreshCodeFormatsAsync/issuedCode](Vertex/src/main/java/me/vertex/core/gc/GcManager.java), [GcChatProtectionListener](Vertex/src/main/java/me/vertex/core/gc/GcChatProtectionListener.java).
+- **Retest:** issue the first new-format code on A and immediately post it on B before invalidation delivery. Keep code-generation settings aligned during rollout; the chat warning is not a secrecy guarantee.
 
-### ISS-32 [P2] GC chat guards do not learn newly changed formats on another running shard
+### ISS-35 [P1] Finish cross-module incoming-transfer isolation and recovery fencing
 
-Status: **partially fixed**. Local reload remembers old formats; startup also derives historical formats from persisted codes. Regression tests verify both paths.
+**Partial fix:** joins freeze immediately, before the asynchronous handoff lookup. Admission checks use the exact live player session; delivery, auction, coinflip and trade claims wait for readiness. Coinflip/trade EXP payouts also defer while unavailable. Native mutation guards run early and transfers refuse active inventory reservations. Cursor/crafting inputs are settled without drops before snapshots; custom menus must finish first.
 
-- **Remaining problem:** each manager's format inventory is populated locally at load/startup. If shard A changes format and issues a code after shard B has already loaded, B does not automatically learn that format. Redemption still accepts the code, but B's chat guard can miss it.
-- **Evidence:** `GcManager.load/loadState/recognizedCodeLengths`, `GcChatProtectionListener.containsUnescapedCode`. No network invalidation or refresh subscription updates the historical-format map.
-- **Plain English:** changing code formats on one server can leave another server's accidental-code-sharing warning out of date.
-- **Fix direction:** share/version code formats and refresh existing guards through the network invalidation system. Keep JDBC out of the chat-event thread.
-- **Retest:** start both nodes, change only A's code format, issue a code and send it unescaped on B. It must be blocked while remaining redeemable. Until fixed, keep generation settings aligned and reload all shards together.
-
-### ISS-35 [P1] Incoming transfer loading is not isolated from inventory edits and deliveries
-
-Evidence: [NetworkManager.onJoin](Vertex/src/main/java/me/vertex/core/network/NetworkManager.java), [late incoming lock and snapshot application](Vertex/src/main/java/me/vertex/core/network/NetworkManager.java), [frozen-state predicate](Vertex/src/main/java/me/vertex/core/network/NetworkManager.java), [automatic delivery](Vertex/src/main/java/me/vertex/core/storage/DeliveryManager.java), [snapshot overwrite](Vertex/src/main/java/me/vertex/core/network/PlayerStateSnapshot.java).
-
-- **Problem:** Join starts an asynchronous handoff lookup, but `frozen()` does not include that pending admission. `incomingTransfers` is set only after the later SQL state transition. During that interval a player can interact with the destination's existing inventory. Separately, DeliveryManager runs after 20 ticks and during retries, adds items and acknowledges their SQL records without checking network readiness. Applying the incoming/recovery snapshot then replaces the inventory wholesale. Source-side automatic deliveries after snapshot capture have the same missing coordination.
-- **Evidence scope:** Source-confirmed ordering gap. A local snapshot probe confirms that an item added after capture disappears on apply; a complete two-Paper-server timing reproduction remains required.
-- **Plain English:** Slow transfers can let players use stale items, or erase a newly delivered reward after the system has marked it received.
-- **Fix direction:** Introduce/reuse one inventory-session admission barrier from the start of join through committed transfer/recovery completion. Defer item/XP deliveries and other inventory-mutating callbacks while a snapshot is frozen or not yet applied. Check the current login/session identity before delayed callbacks run.
-- **Retest:** Delay incoming lookup and destination validation beyond one second while delivering a pending reward; spam drop/trade/use commands during loading. Also delay proxy departure while a source-side delivery finishes. No stale items may escape and no acknowledged reward may disappear.
-
-### ISS-36 [P1] A rejected staff inventory edit can leave a duplicated item with the staff member
-
-Evidence: [InvseeMenuListener.onClick](Vertex/src/main/java/me/vertex/core/staff/InvseeMenuListener.java), [deferred sync](Vertex/src/main/java/me/vertex/core/staff/InvseeMenuListener.java), [InvseeMenu.writeBack conflict handling](Vertex/src/main/java/me/vertex/core/staff/InvseeMenu.java).
-
-- **Problem:** Native clicks move items between the detached `/invsee` GUI and the staff member before next-tick source validation. If validation then detects a changed target slot, it refreshes only the GUI; it never reverses the item already put on the staff cursor/inventory. If the target disconnects, sync simply returns. Bottom-inventory clicks also skip prevalidation entirely, even when a double-click collects matching items from the top inventory.
-- **Plain English:** Rejecting a stale edit does not take back the copied item already handed to staff. In the opposite direction, staff can lose an item placed into an edit that is subsequently discarded.
-- **Fix direction:** Cancel native cross-inventory transfers and validate/apply the target and staff inventory/cursor changes together on the main thread. Cover shift-click, collect-to-cursor, hotbar/offhand swaps and disconnects; do not rely solely on a later target-only refresh.
-- **Retest:** Open `/invsee <test-player>`, have the target move/drop a diamond, then double-click a matching diamond in the staff member's bottom inventory. Also simulate a target mutation/disconnect between an allowed top click and the scheduled sync. Count both players' items, cursors and ground drops. The existing seven `InvseeMenuTest` cases exercise target-side snapshots, not this two-player transfer boundary; reproduce native click behavior on Paper.
-
-### ISS-37 [P1] Shift-clicking into the Rune Shop can destroy the player's items
-
-Evidence: [RuneShopMenuListener.onClick](Vertex/src/main/java/me/vertex/core/enchant/RuneShopMenuListener.java), [shop inventory construction](Vertex/src/main/java/me/vertex/core/enchant/RuneShopMenu.java), [confirmation inventory construction](Vertex/src/main/java/me/vertex/core/enchant/RuneShopMenu.java).
-
-- **Problem:** Shop/confirmation protection checks the *clicked inventory's* holder. Clicking the player's bottom inventory returns without cancellation, allowing native shift-click to move ordinary items into empty top slots. These menus have no close-time recovery of deposited items. Closing or replacing the GUI discards them. The catalog and drag handlers already protect the whole view, but these click branches do not.
-- **Plain English:** Accidentally shift-clicking a valuable item while shopping can lose it.
-- **Fix direction:** Identify the menu from the top inventory, cancel cross-boundary actions across the whole view, then handle legitimate top-slot buttons. Apply this to both shop and confirmation holders without changing purchase behavior.
-- **Retest:** In `/runes`, shift-click ordinary diamonds from the bottom inventory, then close or open the catalog. Repeat in bulk confirmation. Items must stay with the player. Also test double-click collection, hotbar swaps and drags on Paper.
-
-### ISS-38 [P2] Shift-right-click opens the rune catalog instead of maximum-purchase confirmation
-
-Evidence: [RuneShopMenuListener click ordering](Vertex/src/main/java/me/vertex/core/enchant/RuneShopMenuListener.java), [advertised shop controls](Vertex/src/main/resources/lang/en_us.yml).
-
-- **Problem:** `isRightClick()` is checked before `isShiftClick()`. Shift-right-click satisfies both, so every non-Lucky-Gem product opens its catalog and never reaches the maximum-purchase branch. The lore explicitly advertises shift-right-click for maximum purchases.
-- **Plain English:** The displayed “buy maximum” shortcut does not work for normal or Arena Runes.
-- **Fix direction:** Handle shift-click first, or restrict catalog opening to ordinary right-click. Keep bulk confirmation and ordinary right-click catalog behavior intact.
-- **Retest:** With enough balance and space for more than 64, shift-right-click every rune tier, Arena Rune and Lucky Gem. Confirm the maximum quantity, exact charge and delivery. Shift-left must still request up to 64; ordinary right-click must still open the catalog.
-
-### ISS-39 [P2] An unaffordable GC coinflip reports that the listing disappeared
-
-Evidence: [CoinflipManager.play failure result](Vertex/src/main/java/me/vertex/core/coinflip/CoinflipManager.java), [balance rejection handling](Vertex/src/main/java/me/vertex/core/coinflip/CoinflipManager.java), [result-to-message mapping](Vertex/src/main/java/me/vertex/core/coinflip/CoinflipMenuListener.java).
-
-- **Problem:** The authoritative GC debit correctly rejects insufficient funds. However, `persistResolution` converts that typed rejection to `false`, and `play` restores the active listing while returning `GONE`. The player sees “That coinflip is no longer available” even though it remains available. This is a messaging defect, not evidence that the repaired debit permits overdrafts.
-- **Plain English:** A player with too little GC gets the wrong explanation.
-- **Fix direction:** Propagate a typed persistence/settlement outcome and map balance rejection to `CANNOT_AFFORD`. Preserve atomic SQL balance validation; do not restore the old cache-only affordability decision.
-- **Retest:** Attempt to join a GC coinflip with an insufficient authoritative balance, including after spending GC on another shard. Show the existing cannot-afford message, retain the listing and leave both wagers unchanged. Distinguish a real removed listing and an actual SQL failure.
-
-### ISS-40 [P2] Haven/Riftlands can display the wrong next kill milestone
-
-Evidence: [ZoneManager.nextMilestone](Vertex/src/main/java/me/vertex/core/zone/ZoneManager.java), [milestone map conversion](Vertex/src/main/java/me/vertex/core/zone/ZoneManager.java), [progress GUI consumer](Vertex/src/main/java/me/vertex/core/zone/ZoneMenu.java), [placeholder consumers](Vertex/src/main/java/me/vertex/core/placeholderapi/VertexPlaceholderExpansion.java).
-
-- **Problem:** `nextMilestone` takes the first larger key from a `Map.copyOf` map. That map guarantees neither numeric nor YAML insertion order. It can choose a later threshold instead of the nearest one, producing incorrect next-goal and kills-remaining GUI/placeholder values. Configuration order and JVM restarts must not determine progression display.
-- **Plain English:** Players may be told they need far more kills than the actual next milestone requires.
-- **Fix direction:** Select the minimum configured threshold greater than current kills, or use a numerically ordered immutable map. This finding concerns the displayed target; it does not establish incorrect reward grants.
-- **Retest:** Define milestones out of order, such as 1000, 100, 500. At 0/100/500/1000 kills, expect next targets 100/500/1000/none and matching remaining counts, including after restart.
-
-### ISS-41 [P2] Non-finite zone configuration values pass validation and can repeatedly break spawning
-
-Evidence: [ZoneConfig validation/read](Vertex/src/main/java/me/vertex/core/zone/ZoneManager.java), [MobDefinition validation](Vertex/src/main/java/me/vertex/core/zone/ZoneManager.java), [weighted spawn selection](Vertex/src/main/java/me/vertex/core/zone/ZoneManager.java).
-
-- **Problem:** Numeric validation uses `Math.max`/`Math.min` without finite checks. For example, `mobs.<id>.spawn-weight: .nan` survives `Math.max(0, weight)`. The enabled-weight sum becomes NaN, bypasses `total <= 0`, and reaches `ThreadLocalRandom.nextDouble(total)`, which rejects the invalid bound. Infinity, including an overflowing sum of individually finite weights, also fails. Similar non-finite values can survive route-speed, spawn-bias, health and loot-chance parsing.
-- **Partial fix:** Shared-event scoring/reward configuration now rejects non-finite values with a warning and fallback; the spawning/health/loot paths described here still need repair.
-- **Plain English:** One malformed number can stop zone mobs from spawning and repeatedly spam the console instead of falling back safely.
-- **Fix direction:** Reject non-finite numbers before clamping, use safe defaults with a warning naming the exact config key, and validate the aggregate spawn weight before random selection. Keep invalid definitions from disrupting the rest of the zone tick.
-- **Retest:** In disposable Haven/Riftlands configs, test `.nan`, `.inf`, negative weights, all-zero/disabled pools and huge finite weights whose sum overflows. Reload and trigger spawning. Invalid values must produce a clear configuration warning, no recurring task exception and safe behavior for valid remaining mobs. Add finite-value regression coverage alongside the current mob-budget test.
+- **Still open:** direct/delayed inventory writers outside these paths still need the same admission boundary. Recovery/teleport acknowledgement must be crash-tested and fully fenced against disconnect/reconnect callbacks, including failed/uncertain SQL transitions. Inventory checkpoints remain ISS-08.
+- **Evidence:** [NetworkManager.onJoin/acceptIncoming/recoverOrphan](Vertex/src/main/java/me/vertex/core/network/NetworkManager.java), [InventoryAccess](Vertex/src/main/java/me/vertex/core/storage/InventoryAccess.java).
+- **Retest:** pause incoming lookup and acknowledgement; trigger staff restore, grants and delayed GUI returns; disconnect/reconnect before old callbacks run. Source/destination inventories must have one owner throughout.
 
 ### ISS-42 [P1] Zone progression and session snapshots still lack cross-shard fencing
 
@@ -195,21 +87,6 @@ Evidence: [ZoneConfig validation/read](Vertex/src/main/java/me/vertex/core/zone/
 - **Retest:** Give two backends identically named worlds/zone IDs at the same coordinates. Claim a zone on A; verify B cannot spawn its mobs, edit its geometry or apply A's pending flight landing locally.
 - **Simply:** World-related saves need to remember which server they belong to.
 
-### ISS-44 [P2] Mob stacking misses nearby stacks across grid cells
-
-- **Evidence:** `MobStackListener.consolidateStacks` uses cells of `radius / 2` but checks only neighboring offsets -1 through 1.
-- **Problem:** Two mobs can be within merge radius but two cell indices apart. With radius 6 and cell size 3, x=2.9 and x=6.1 are only 3.2 blocks apart but are never compared.
-- **Fix direction:** Search offsets through `ceil(radius/cellSize)` and retain distance/source/type checks. Do not enlarge cells without validating within-cell distances, since current same-cell merging assumes all occupants are close enough.
-- **Retest:** Test boundary coordinates on all three axes, negative coordinates, exact radius, different spawner sources and full stacks.
-- **Simply:** Some mobs close enough to stack are overlooked, leaving extra live entities.
-
-### ISS-45 [P2] Zone event administration reports success before SQL commits
-
-- **Evidence:** [ZoneCommand.admin](Vertex/src/main/java/me/vertex/core/zone/ZoneCommand.java) sends `zones.admin-event-started/stopped` immediately after the void [ZoneManager.forceStartEvent/forceStopEvent](Vertex/src/main/java/me/vertex/core/zone/ZoneManager.java) queues an asynchronous write. Persistence failures retry later; they never change that staff confirmation.
-- **Problem:** During a database outage or lock timeout, staff are told the event started/stopped although the durable schedule is unchanged. A late retry can execute well after the intended start, or an older start can be ignored after another admin has changed the shared anchor.
-- **Fix direction:** Return a durable operation result/future; send success only after commit and shared-state confirmation. Distinguish pending, failed and superseded operations, with translated messages and an auditable operation ID. Keep JDBC off the server thread and revalidate the admin's current session before sending delayed feedback.
-- **Retest:** Hold/fail the event write, issue start/stop from both shards, and then release the write. No success message may precede a committed applicable transition; old retries must not revive a stopped/superseded event.
-- **Simply:** The command can say an event changed when the database has not actually saved the change.
 
 ## Required staging tests / commands
 
@@ -223,7 +100,8 @@ Use disposable worlds/databases and two Paper backends for network tests. Never 
 6. Hot Zones: enable early location announcements with two defined mines; the announced mine must start. Haven/Riftlands: set a small local mob target and `max-spawns-per-pass: 1`; check actual distances and per-pass spawn count.
 7. Staff/settings: enable `/staffbuild`; authorized claim building should work, but rune placement and transfer locks must still block invalid actions. Rapidly change `/settings`, reconnect and check all saved toggles.
 8. Network: hold items on the cursor/crafting grid during transfer; queue rewards while source/destination SQL is delayed; verify no stale inventory escapes or acknowledged rewards disappear.
-9. Flight: land/disconnect/restart while slow falling, including with a legitimate potion active (ISS-26).
+9. Flight: land/disconnect/restart while slow falling, including with a legitimate potion active. The potion must remain; the flight-only effect expires within five seconds after renewal stops.
 10. Shared data: two worlds named `world` on distinct shards, identical spawner/collector coordinates; verify ownership, F Top and reset isolation before any migration or release.
 
-11. Shared events: `/haven admin event start` on A, earn Haven and Riftlands kills across A/B, then `/haven admin event stop` on B. Check combined scores, one durable winner set, restart recovery, and PvP Top refresh after remote awards/disband. Delay SQL and verify ISS-45's premature admin confirmation.
+11. Shared events: `/haven admin event start` on A, earn Haven and Riftlands kills across A/B, then `/haven admin event stop` on B. Check combined scores, one durable winner set, restart recovery, and PvP Top refresh after remote awards/disband. Delay SQL: only the pending message may appear before commit; failure/no-op must not say started/stopped.
+12. Fixed inventory cases: shift-click personal items while `/runes` is open; shift-right a rune category and confirm it opens the maximum-purchase confirmation. With `/invsee`, move the target's item before staff shift-click it; no second copy may reach staff, and the view should refresh.
