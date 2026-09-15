@@ -21,11 +21,13 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * {@code /seasonal roll item <enchant-id> [amount]} -- gives the sender a
- * random-level roll of one specific seasonal item, for admins previewing
- * seasonal content without picking an exact level themselves. Each of
- * {@code amount}'s copies rolls its level independently (not one level
- * applied to every copy), matching how a real crate roll would behave.
+ * {@code /seasonal roll item <enchant-id-or-catalog-id> [amount]} -- gives
+ * the sender a random-level roll of one specific seasonal item, for admins
+ * previewing seasonal content without picking an exact level themselves.
+ * Each of {@code amount}'s copies rolls its level independently (not one
+ * level applied to every copy), matching how a real crate roll would
+ * behave. Accepts a catalog id (e.g. {@code fallen_helmet}) exactly like
+ * {@code give} does -- see {@link #resolveSeasonalDefinition}.
  *
  * <p>{@code /seasonal item <material> <customModelData> [name]} -- a plain
  * blank item stamped with a material and custom model data (and optional
@@ -53,7 +55,16 @@ import java.util.stream.Stream;
  * This is the actual "refill a crate easily" workflow for anything that
  * isn't a Rune: build the finished reward item by hand once, catalog it,
  * then {@code give} it back for players or for re-dropping into a crate
- * plugin's reward-item slot every season.
+ * plugin's reward-item slot every season. {@code catalog save} itself
+ * auto-attaches the matching ability whenever the held item's material is
+ * compatible with exactly one seasonal Rune (bakes it on at that Rune's max
+ * level before saving) -- no need to name the enchant by hand when the item
+ * already tells you which one it is; a non-Rune item (the backpack) or an
+ * ambiguous match just saves as-is, same as before. Once saved that way, no
+ * further config wiring is needed either: {@link EnchantManager#createEnchantItem}
+ * discovers that catalog entry on its own by scanning for whichever saved
+ * item already carries the requested ability, so {@code give}/{@code roll}/
+ * the Seasonal Set preview menu all pick up the real item automatically.
  *
  * <p>Shares {@link EnchantCommand#GIVE_PERMISSION} rather than a second,
  * parallel permission node -- this is the same admin/event distribution
@@ -99,8 +110,8 @@ public final class SeasonalCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         String id = args[2];
-        EnchantDefinition definition = manager.definition(id);
-        if (definition == null || !manager.isSeasonal(id)) {
+        EnchantDefinition definition = resolveSeasonalDefinition(id);
+        if (definition == null) {
             player.sendMessage(messages.get(player, "enchant.unknown-seasonal-item", "id", id));
             return true;
         }
@@ -122,7 +133,7 @@ public final class SeasonalCommand implements CommandExecutor, TabCompleter {
         List<ItemStack> items = new ArrayList<>(amount);
         for (int i = 0; i < amount; i++) {
             int rolledLevel = 1 + ThreadLocalRandom.current().nextInt(maxLevel);
-            ItemStack created = manager.createEnchantItem(id, rolledLevel, RuneTier.SEASONAL);
+            ItemStack created = manager.createEnchantItem(definition.id(), rolledLevel, RuneTier.SEASONAL);
             if (created != null) {
                 items.add(created);
             }
@@ -139,6 +150,32 @@ public final class SeasonalCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(messages.get(player, "seasonal.rolled", "amount", String.valueOf(items.size()),
                 "enchant", definition.displayName()));
         return true;
+    }
+
+    /**
+     * Accepts either a seasonal Rune id directly, or a catalog id -- looked
+     * up by finding whichever ability is already baked onto that saved
+     * item (there should only ever be one, since {@code catalog save}
+     * bakes at most one ability per item). Lets {@code /seasonal roll item}
+     * take the same catalog names {@code give} and {@code catalog} already
+     * use, instead of requiring the underlying ability id.
+     */
+    private EnchantDefinition resolveSeasonalDefinition(String id) {
+        EnchantDefinition direct = manager.definition(id);
+        if (direct != null && manager.isSeasonal(id)) {
+            return direct;
+        }
+        ItemStack catalogued = catalog.get(id);
+        if (catalogued == null) {
+            return null;
+        }
+        for (String enchantId : manager.enchantsOf(catalogued).keySet()) {
+            EnchantDefinition candidate = manager.definition(enchantId);
+            if (candidate != null && manager.isSeasonal(enchantId)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     /**
@@ -325,8 +362,44 @@ public final class SeasonalCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(messages.get(player, "seasonal.catalog-empty-hand"));
                     return true;
                 }
+                // Every seasonal enchant is configured for exactly one
+                // compatible piece type (helmet-only, sword-only, ...), so
+                // the held item's own material tells us which ability
+                // belongs on it -- auto-bake it on before saving whenever
+                // that's unambiguous. Zero or multiple matches (a non-Rune
+                // item like the backpack, or overlapping compatible-types)
+                // just saves the item as-is, same as before.
+                List<EnchantDefinition> matches = new ArrayList<>();
+                for (String enchantId : manager.seasonalIds()) {
+                    EnchantDefinition candidate = manager.definition(enchantId);
+                    if (candidate != null && candidate.isCompatible(held.getType())) {
+                        matches.add(candidate);
+                    }
+                }
+                if (matches.size() == 1) {
+                    EnchantDefinition definition = matches.get(0);
+                    int level = definition.maxLevel();
+                    ItemStack baked = manager.bakeEnchantOnto(held.clone(), definition.id(), level, RuneTier.SEASONAL);
+                    catalog.save(id, baked);
+                    player.sendMessage(messages.get(player, "seasonal.catalog-saved-with-enchant", "id", id,
+                            "enchant", definition.displayName(), "level", String.valueOf(level)));
+                    return true;
+                }
                 catalog.save(id, held);
-                player.sendMessage(messages.get(player, "seasonal.catalog-saved", "id", id));
+                if (matches.isEmpty()) {
+                    // Still succeeds -- this is the expected, ordinary case
+                    // for a non-Rune catalog item (the backpack) -- but says
+                    // so explicitly rather than staying silent, since it's
+                    // also exactly what a material mismatch on an intended
+                    // Rune piece looks like (nothing to compare the held
+                    // item's actual Material against without this).
+                    player.sendMessage(messages.get(player, "seasonal.catalog-saved-no-match", "id", id,
+                            "material", held.getType().name()));
+                } else {
+                    String ids = matches.stream().map(EnchantDefinition::id).collect(Collectors.joining(", "));
+                    player.sendMessage(messages.get(player, "seasonal.catalog-saved-ambiguous", "id", id,
+                            "material", held.getType().name(), "matches", ids));
+                }
             }
             case "remove" -> {
                 if (args.length < 3) {
@@ -395,7 +468,7 @@ public final class SeasonalCommand implements CommandExecutor, TabCompleter {
                     .filter(s -> s.startsWith(args[0].toLowerCase(Locale.ROOT)))
                     .toList();
             case 2 -> "item".startsWith(args[1].toLowerCase(Locale.ROOT)) ? List.of("item") : List.of();
-            case 3 -> manager.seasonalIds().stream()
+            case 3 -> Stream.concat(manager.seasonalIds().stream(), catalog.ids().stream())
                     .filter(id -> id.startsWith(args[2].toLowerCase(Locale.ROOT)))
                     .toList();
             default -> List.of();

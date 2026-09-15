@@ -438,7 +438,32 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
         if (!player.hasPermission("vertex.factions.admin")) { player.sendMessage(messages.get(player, "general.no-permission")); return; }
         if (args.length < 2) { send(player, "admin-usage"); return; }
         if (args[1].equalsIgnoreCase("unclaim")) { ChunkKey key=ChunkKey.of(player.getLocation());factions.submitMutation(()->factions.forceUnclaim(key)).whenComplete((removed,error)->onMain(()->send(player,error==null&&Boolean.TRUE.equals(removed)?"admin-claim-removed":"admin-no-claim")));return; }
+        if (args[1].equalsIgnoreCase("unclaimall")) { startSystemUnclaim(player, args); return; }
         send(player, "admin-usage");
+    }
+
+    /** {@code /f admin unclaimall <Safezone|Warzone>} -- bulk-release every chunk the given system faction currently owns in one DB statement. */
+    private void startSystemUnclaim(Player player, String[] args) {
+        if (args.length != 3) { send(player, "system-unclaim-usage"); return; }
+        String type = systemClaimType(args[2]);
+        if (type == null) { send(player, "system-unclaim-usage"); return; }
+        if (!systemClaimInProgress.compareAndSet(false, true)) { send(player, "system-claim-busy"); return; }
+        String tag = factionsTag(type);
+        int pending = factions.systemClaimChunks(type).size();
+        if (pending == 0) {
+            systemClaimInProgress.set(false);
+            send(player, "system-unclaim-empty", "faction", tag);
+            return;
+        }
+        send(player, "system-unclaim-started", "faction", tag, "count", String.valueOf(pending));
+        factions.forceUnclaimAllSystemClaims(type).whenComplete((removed, error) -> onMain(() -> {
+            systemClaimInProgress.set(false);
+            if (error != null || removed == null || removed == 0) {
+                send(player, "system-claim-failed", "faction", tag);
+                return;
+            }
+            send(player, "system-unclaim-finished", "faction", tag, "count", String.valueOf(removed));
+        }));
     }
 
     private String factionsTag(String type) { return factions.systemTag(type); }
@@ -493,7 +518,11 @@ public final class FactionCommand implements CommandExecutor, TabCompleter {
             return complete(args[1], Stream.of("Safezone", "Warzone"));
         }
         if (args.length == 2 && sub.equals("admin") && sender.hasPermission("vertex.factions.admin")) {
-            return complete(args[1], Stream.of("unclaim"));
+            return complete(args[1], Stream.of("unclaim", "unclaimall"));
+        }
+        if (args.length == 3 && sub.equals("admin") && args[1].equalsIgnoreCase("unclaimall")
+                && sender.hasPermission("vertex.factions.admin")) {
+            return complete(args[2], Stream.of("Safezone", "Warzone"));
         }
         if (args.length == 2 && sub.equals("warp") && sender instanceof Player player) return complete(args[1], factions.warps(FactionsHook.getFactionId(player)).stream().map(FactionWarp::name));
         return List.of();

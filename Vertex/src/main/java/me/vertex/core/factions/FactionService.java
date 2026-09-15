@@ -320,6 +320,76 @@ public final class FactionService {
         FactionData faction = factions.get(factionId);
         return faction != null && faction.system() && faction.tag().equalsIgnoreCase(systemTag(type));
     }
+
+    /** @return the system faction id tagged {@code type} (e.g. "safezone"/"warzone"), or null if it doesn't exist (never claimed yet). */
+    private Integer systemFactionId(String type) {
+        String tag = systemTag(type);
+        for (FactionData faction : factions.values()) {
+            if (faction.system() && faction.tag().equalsIgnoreCase(tag)) {
+                return faction.id();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Every chunk currently claimed by the system faction tagged {@code
+     * type} -- for bulk admin release ({@code /f admin unclaimall}) when a
+     * SafeZone/WarZone claim needs redoing. A live-cache snapshot, not a DB
+     * query, same as every other claim read here.
+     */
+    public List<ChunkKey> systemClaimChunks(String type) {
+        Integer factionId = systemFactionId(type);
+        if (factionId == null) {
+            return List.of();
+        }
+        List<ChunkKey> keys = new ArrayList<>();
+        for (Map.Entry<ChunkKey, Integer> entry : claims.entrySet()) {
+            if (entry.getValue().intValue() == factionId.intValue()) {
+                keys.add(entry.getKey());
+            }
+        }
+        return keys;
+    }
+
+    /**
+     * Bulk-releases every chunk the system faction tagged {@code type}
+     * (e.g. "safezone"/"warzone") owns, in a single DB statement rather
+     * than one round trip per chunk -- {@code /f admin unclaimall}. The
+     * live cache and one {@code UNCLAIMED} event per released chunk are
+     * applied only after the delete durably commits. @return how many
+     * chunks were released (0 if the system faction doesn't exist or the
+     * delete failed).
+     */
+    public CompletableFuture<Integer> forceUnclaimAllSystemClaims(String type) {
+        Integer factionId = systemFactionId(type);
+        if (factionId == null) {
+            return CompletableFuture.completedFuture(0);
+        }
+        List<ChunkKey> released = systemClaimChunks(type);
+        return submitMutation(() -> {
+            try {
+                return storage.deleteAllClaimsForFactionUnchecked(factionId, true) == FactionStorage.ClaimDeleteResult.OK;
+            } catch (Exception error) {
+                log("Could not bulk-release system faction claims", asException(error));
+                return false;
+            }
+        }).thenApply(ok -> {
+            if (!Boolean.TRUE.equals(ok)) {
+                return 0;
+            }
+            FactionData owner = factions.get(factionId);
+            synchronized (this) {
+                claims.entrySet().removeIf(entry -> entry.getValue().intValue() == factionId.intValue());
+            }
+            if (owner != null) {
+                for (ChunkKey key : released) {
+                    callEvent(new FactionClaimEvent(FactionClaimEvent.Action.UNCLAIMED, owner, null, key));
+                }
+            }
+            return released.size();
+        });
+    }
     public void setWarpBonusProvider(java.util.function.IntUnaryOperator provider) { warpBonusProvider = provider == null ? ignored -> 0 : provider; }
     public int warpLimit(int factionId) { return Math.max(0, Math.min(100, maxWarps + Math.max(0, warpBonusProvider.applyAsInt(factionId)))); }
 

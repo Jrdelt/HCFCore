@@ -49,15 +49,15 @@ class BackpackManagerTest {
     @Test
     void loadParsesBundledTiers() {
         assertTrue(manager.isEnabled());
-        assertTrue(manager.tierIds().contains("t1_basic"));
-        assertTrue(manager.tierIds().contains("t3_corrupted"));
-        assertEquals(25.0, manager.getTier("t1_basic").dropBonusBasePercent());
-        assertTrue(manager.getTier("t1_basic").dropBonusPerLevelPercent() >= 0.0);
+        assertTrue(manager.tierIds().contains("fallen_crate"));
+        assertTrue(manager.tierIds().contains("war_chest"));
+        assertEquals(25.0, manager.getTier("fallen_crate").dropBonusBasePercent());
+        assertTrue(manager.getTier("fallen_crate").dropBonusPerLevelPercent() >= 0.0);
     }
 
     @Test
     void createBackpackItemUsesConfiguredMaterialAndCustomModelData() {
-        BackpackTier tier = manager.getTier("t1_basic");
+        BackpackTier tier = manager.getTier("fallen_crate");
         ItemStack item = manager.createBackpackItem(tier);
 
         assertEquals(tier.itemType(), item.getType());
@@ -66,10 +66,10 @@ class BackpackManagerTest {
 
     @Test
     void actionBarValuesUseTheConfiguredNameAndReadableTier() {
-        BackpackTier tier = manager.getTier("t1_basic");
+        BackpackTier tier = manager.getTier("fallen_crate");
 
-        assertEquals("T1 Winter Backpack", manager.displayName(tier));
-        assertEquals("T1 Basic", manager.tierLabel(tier));
+        assertEquals("Fallen Backpack", manager.displayName(tier));
+        assertEquals("Fallen Crate", manager.tierLabel(tier));
     }
 
     @Test
@@ -89,7 +89,7 @@ class BackpackManagerTest {
         // before hitting the advertised item-count capacity -- the rest
         // silently landed on the ground instead of in the backpack. There
         // is no slot array anymore, so this must all fit.
-        BackpackTier tier = manager.getTier("t1_basic");
+        BackpackTier tier = manager.getTier("fallen_crate");
         ItemStack item = manager.createBackpackItem(tier);
         BackpackManager.EquippedBackpack equipped = new BackpackManager.EquippedBackpack(item, tier, manager.readData(item));
 
@@ -114,7 +114,7 @@ class BackpackManagerTest {
 
     @Test
     void storeAutoCollectedMergesRepeatedDropsOfTheSameMaterialPastVanillaMaxStack() {
-        BackpackTier tier = manager.getTier("t1_basic");
+        BackpackTier tier = manager.getTier("fallen_crate");
         ItemStack item = manager.createBackpackItem(tier);
 
         // 5 separate mining events, 60 coal each. The shipped base bonus
@@ -136,7 +136,7 @@ class BackpackManagerTest {
 
     @Test
     void storeAutoCollectedDropsOnlyTheExcessOnceCapacityIsReached() {
-        BackpackTier tier = manager.getTier("t1_basic");
+        BackpackTier tier = manager.getTier("fallen_crate");
         ItemStack item = manager.createBackpackItem(tier);
         long capacity = manager.itemCapacityForLevel(1);
         BackpackManager.EquippedBackpack equipped =
@@ -176,13 +176,13 @@ class BackpackManagerTest {
         ItemStack item = new ItemStack(Material.BUNDLE);
         // All-null contents (no distinct materials stored yet) -- there is
         // no fixed slot count to preserve, so this compacts to empty.
-        BackpackData data = new BackpackData("t1_basic", 3, new ItemStack[18]);
+        BackpackData data = new BackpackData("fallen_crate", 3, new ItemStack[18]);
 
         manager.writeData(item, data);
 
         assertTrue(manager.isBackpack(item));
         BackpackData read = manager.readData(item);
-        assertEquals("t1_basic", read.tierId());
+        assertEquals("fallen_crate", read.tierId());
         assertEquals(3, read.level());
         assertEquals(0, read.contents().length);
     }
@@ -195,7 +195,7 @@ class BackpackManagerTest {
         meta.getPersistentDataContainer().set(legacyKey, PersistentDataType.LONG, 999_999L);
         item.setItemMeta(meta);
 
-        manager.writeData(item, new BackpackData("t1_basic", 1, new ItemStack[9]));
+        manager.writeData(item, new BackpackData("fallen_crate", 1, new ItemStack[9]));
 
         assertFalse(item.getItemMeta().getPersistentDataContainer().has(legacyKey, PersistentDataType.LONG));
     }
@@ -208,7 +208,7 @@ class BackpackManagerTest {
         meta.getPersistentDataContainer().set(legacyKey, PersistentDataType.LONG, 1L);
         item.setItemMeta(meta);
 
-        manager.writeData(item, new BackpackData("t1_basic", 1, new ItemStack[9]));
+        manager.writeData(item, new BackpackData("fallen_crate", 1, new ItemStack[9]));
 
         assertFalse(item.getItemMeta().getPersistentDataContainer().has(legacyKey, PersistentDataType.LONG));
     }
@@ -217,7 +217,7 @@ class BackpackManagerTest {
     void eachWrittenBackpackGetsItsOwnNonStackingIdentity() {
         ItemStack first = new ItemStack(Material.BUNDLE);
         ItemStack second = new ItemStack(Material.BUNDLE);
-        BackpackData data = new BackpackData("t1_basic", 1, new ItemStack[18]);
+        BackpackData data = new BackpackData("fallen_crate", 1, new ItemStack[18]);
 
         manager.writeData(first, data);
         manager.writeData(second, data);
@@ -237,7 +237,7 @@ class BackpackManagerTest {
         sparseContents[40] = new ItemStack(Material.DIAMOND);
 
         // No configured upper level cap -- 999 is a legitimate level.
-        manager.writeData(item, new BackpackData("t1_basic", 999, sparseContents));
+        manager.writeData(item, new BackpackData("fallen_crate", 999, sparseContents));
         BackpackData read = manager.readData(item);
 
         assertEquals(999, read.level());
@@ -255,7 +255,7 @@ class BackpackManagerTest {
         // there's no fixed slot layout to preserve.
         ItemStack[] contents = new ItemStack[9];
         contents[2] = new ItemStack(Material.DIAMOND, 5);
-        BackpackData data = new BackpackData("t1_basic", 1, contents);
+        BackpackData data = new BackpackData("fallen_crate", 1, contents);
 
         manager.writeData(item, data);
         BackpackData read = manager.readData(item);
@@ -268,7 +268,7 @@ class BackpackManagerTest {
     @Test
     void readDataReturnsNullWhenTheTierNoLongerExistsInConfig() {
         ItemStack item = new ItemStack(Material.BUNDLE);
-        manager.writeData(item, new BackpackData("t1_basic", 1, new ItemStack[9]));
+        manager.writeData(item, new BackpackData("fallen_crate", 1, new ItemStack[9]));
 
         BackpackManager freshManagerWithoutT1 = managerWithNoTiers();
         assertNull(freshManagerWithoutT1.readData(item));
@@ -285,14 +285,14 @@ class BackpackManagerTest {
 
     @Test
     void upgradeCostHasNoTierConfiguredLevelCap() {
-        BackpackTier tier = manager.getTier("t1_basic");
+        BackpackTier tier = manager.getTier("fallen_crate");
         assertTrue(manager.upgradeCost(tier, 1) >= 0);
         assertTrue(manager.upgradeCost(tier, 999_999) >= 0);
     }
 
     @Test
     void storingAndEmptyingContentsImmediatelyRebuildsTheLoreCount() {
-        BackpackTier tier = manager.getTier("t1_basic");
+        BackpackTier tier = manager.getTier("fallen_crate");
         ItemStack item = manager.createBackpackItem(tier);
         BackpackManager.EquippedBackpack equipped =
                 new BackpackManager.EquippedBackpack(item, tier, manager.readData(item));

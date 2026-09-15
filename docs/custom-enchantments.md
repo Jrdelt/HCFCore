@@ -116,7 +116,7 @@ only, via `/seasonal` (shares the `vertex.enchant.give` permission with
 /seasonal catalog save <id>
 /seasonal catalog remove <id>
 /seasonal catalog list
-/seasonal roll item <enchant-id> [amount]
+/seasonal roll item <enchant-id-or-catalog-id> [amount]
 ```
 
 `/seasonal give <id> [level] [amount]` is the one command that covers every
@@ -125,41 +125,66 @@ kind of seasonal reward, checking three id spaces in order: a
 each backpack needs its own instance id -- `[level]` is its starting level),
 a seasonal Rune id from `customEnchants/runes.yml` (an identified copy at
 `[level]`, default 1, `[amount]` copies), then a saved catalog item.
+`/seasonal roll item` accepts either form too -- a catalog id resolves to
+whichever ability is already baked onto that saved item, then rolls a
+random level of it instead of a specific one.
 
 `/seasonal item` stamps a plain item with a material and custom model data
 (and optional name) for quickly staging a crate reward's display/win item --
 no lore or enchants, independent of everything else here.
 
-### The seasonal item catalog
+### The seasonal item catalog: the actual "refill a crate" workflow
 
 `/seasonal catalog save <id>` snapshots whatever's in the sender's hand --
-enchantments, lore, custom model data, any other plugin's PDC, all of it --
-exactly as-is into `seasonal-items.yml`, via Bukkit's native `ItemStack`
-serialization. `/seasonal give <id>` then reproduces that exact item
-forever after, both for handing to players and for re-dropping into a crate
-plugin's reward-item slot when a season rolls over. `catalog remove`/`list`
-round it out.
+enchantments, lore (including hex-color gradients), custom model data, any
+other plugin's PDC, all of it -- exactly as-is into `seasonal-items.yml`,
+via Bukkit's native `ItemStack` serialization. Since every seasonal Rune is
+configured for exactly one compatible piece type (helmet-only, sword-only,
+...), `catalog save` also auto-detects which ability belongs on the held
+item from its material and bakes that ability on (at its max level) before
+saving -- no need to name the enchant by hand. A non-Rune item (the
+backpack) or an ambiguous match (more than one seasonal Rune compatible with
+that material) just saves the item as-is, with a message explaining why
+nothing was baked on.
 
-### Tying a seasonal ability directly to a real item
+`/seasonal give <id>` then reproduces that exact saved item forever after,
+both for handing to players and for re-dropping into a crate plugin's
+reward-item slot when a season rolls over. `catalog remove`/`list` round it
+out.
 
-A seasonal level may set `catalog-item: <id>` in `runes.yml` to reference a
-catalog entry. When set, `EnchantManager.createEnchantItem` bakes that
-ability directly onto a clone of the catalog's saved item (its real
-material, custom model data, lore, vanilla enchants all preserved) instead
-of a generic placeholder icon -- the item is wearable and active immediately,
-no separate apply step. This applies everywhere a seasonal item is created
-(`/seasonal give`, `/seasonal roll item`, `/enchant give ... seasonalset`,
-and the `/ce` Seasonal Set preview menu), automatically, once the referenced
-catalog id has been saved. Until it has, that level logs a startup warning
-and falls back to the placeholder icon so nothing is ever silently missing.
+Once an item has been saved this way, nothing else needs configuring:
+`EnchantManager` discovers it on its own by scanning the catalog for
+whichever saved item already carries a given ability's data, and bakes a
+fresh copy at whatever level is requested. That means `/seasonal give`,
+`/seasonal roll item`, `/enchant give ... seasonalset`, and the `/ce`
+Seasonal Set preview menu all automatically show and hand out the real item
+-- no `runes.yml` edit required. (A level may still set `catalog-item: <id>`
+explicitly as a manual override, useful only in the rare case two saved
+items could otherwise both carry the same ability.)
 
-Enchants may also be grouped under `sets: <set-name>: enchants:` (instead of
+### Staging a season before release
+
+Add `hidden: true` to a seasonal enchant, or to a whole `sets: <name>:`
+block (inherited by everything nested under it unless a level overrides
+it), to build a season out ahead of time without revealing it. Every admin
+command (`give`, `roll`, `catalog`) keeps working normally on a hidden
+piece -- it's excluded only from the player-facing `/ce` Seasonal Set
+preview menu, until the flag is removed or set to `false`.
+
+### Grouping and display order
+
+Enchants may be grouped under `sets: <set-name>: enchants:` (instead of
 loose in the flat `enchants:` block) purely to keep one season's whole set
 together in the file. A `sets: <set-name>:` block may itself set a default
-`material`/`custom-model-data`/`catalog-item` that every nested level
-inherits unless it configures its own. The set name is config-organizational
-only -- it's never part of an enchant's id and never shows up in a rune's
-in-game name.
+`material`/`custom-model-data`/`catalog-item`/`hidden` that every nested
+level inherits unless it configures its own. The set name is
+config-organizational only -- it's never part of an enchant's id and never
+shows up in a rune's in-game name.
+
+The order Runes appear in the `/ce` Seasonal Set preview grid (and anywhere
+else that lists seasonal Runes) is exactly the order they're written in
+`runes.yml` -- reorder the `enchants:`/`sets:` entries in the file to
+reorder the menu.
 
 ## Configuration
 

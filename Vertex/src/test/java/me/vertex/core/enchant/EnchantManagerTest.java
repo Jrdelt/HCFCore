@@ -79,6 +79,47 @@ class EnchantManagerTest {
         Files.writeString(path, content, StandardCharsets.UTF_8);
     }
 
+    /**
+     * definitions used to be wrapped in {@code Map.copyOf(...)}, whose
+     * iteration order is explicitly unspecified per its javadoc -- it
+     * silently scrambled the deliberate order an admin wrote in runes.yml
+     * (e.g. the Seasonal Set preview menu's item order). Deliberately picks
+     * ids that would sort differently alphabetically than the file order,
+     * so a regression back to Map.copyOf (or any other order-losing
+     * collector) fails this test instead of only showing up as "the GUI
+     * looks wrong" days later.
+     */
+    @Test
+    void seasonalIdsPreserveTheOrderTheyAppearInTheConfigFile() throws Exception {
+        writeConfig(plugin.getDataFolder().toPath().resolve("customEnchants/runes.yml"), RUNES_YML + """
+
+                  seasonal:
+                    material: GOLD_BLOCK
+                    enchants:
+                      zebra_first:
+                        display-name: "Zebra First"
+                        compatible-types: [HELMET]
+                        seasonal: true
+                        levels:
+                          1: { material: GOLDEN_HELMET, proc-chance: 0, success-rate: 100, ability-value: 1, weight: 0 }
+                      apple_second:
+                        display-name: "Apple Second"
+                        compatible-types: [CHESTPLATE]
+                        seasonal: true
+                        levels:
+                          1: { material: GOLDEN_CHESTPLATE, proc-chance: 0, success-rate: 100, ability-value: 1, weight: 0 }
+                      middle_third:
+                        display-name: "Middle Third"
+                        compatible-types: [SWORD]
+                        seasonal: true
+                        levels:
+                          1: { material: GOLDEN_SWORD, proc-chance: 0, success-rate: 100, ability-value: 1, weight: 0 }
+                """);
+        manager.load();
+
+        assertEquals(List.of("zebra_first", "apple_second", "middle_third"), List.copyOf(manager.seasonalIds()));
+    }
+
     // ------------------------------------------------------------------
     // Rune rolling
     // ------------------------------------------------------------------

@@ -71,27 +71,6 @@ upgrade-cost:
 # upgraded Backpack meaningfully better than a fresh one instead of only
 # creeping up by a fixed amount each level. Higher tiers compound faster.
 tiers:
-  t1_basic:
-    display-name: '<white>T1 Winter Backpack'
-    item-type: LEATHER
-    custom-model-data: 10001
-    drop-bonus-base-percent: 25.0
-    drop-bonus-per-level-percent: 3.725
-
-  t2_reinforced:
-    display-name: '<aqua>T2 Reinforced Backpack'
-    item-type: LEATHER
-    custom-model-data: 10002
-    drop-bonus-base-percent: 25.0
-    drop-bonus-per-level-percent: 7.45
-
-  t3_corrupted:
-    display-name: '<light_purple>T3 Corrupted Backpack'
-    item-type: LEATHER
-    custom-model-data: 10003
-    drop-bonus-base-percent: 25.0
-    drop-bonus-per-level-percent: 13.97
-
   # War Chest (seasonal, black-and-gold/eagle set): I-V only, given via
   # `/backpack give <player> war_chest` then upgraded to the desired level.
   # Its normal auto-store drop bonus stays at 0 -- all of its value comes
@@ -105,11 +84,12 @@ tiers:
     drop-bonus-base-percent: 0.0
     drop-bonus-per-level-percent: 0.0
 
-  # Fallen Backpack (seasonal crate-exclusive, black-and-gold/Fallen set):
-  # given via `/backpack give <player> fallen_crate [level]` or
-  # `/seasonal give fallen_crate [level]`. Drop-bonus curve mirrors
-  # t3_corrupted (the top standard tier) -- tune here if it should sit
-  # somewhere else in the power curve.
+  # Fallen Backpack (seasonal crate-exclusive, black-and-gold/Fallen set) --
+  # the only Backpack a player can be freshly given unless another tier is
+  # explicitly defined above. Given via
+  # `/backpack give <player> fallen_crate [level]` or
+  # `/seasonal give fallen_crate [level]`, starting at level 1 (I) unless a
+  # level is given.
   fallen_crate:
     display-name: '<gradient:#D4AF37:#937025>Fallen Backpack</gradient>'
     item-type: PAPER

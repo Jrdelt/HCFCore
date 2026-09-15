@@ -197,7 +197,7 @@ commands:
     aliases: [ce, customenchants, runes]
   seasonal:
     description: Admin-only seasonal Rune distribution -- a random-level roll of one specific item.
-    usage: /<command> give <id> [level] [amount]|item <material> <customModelData> [name]|catalog save/remove/list <id>|roll item <enchant-id> [amount]
+    usage: /<command> give <id> [level] [amount]|item <material> <customModelData> [name]|catalog save/remove/list <id>|roll item <enchant-id-or-catalog-id> [amount]
   runeinfo:
     description: Inspect every custom Rune applied to your main-hand item.
     usage: /<command>

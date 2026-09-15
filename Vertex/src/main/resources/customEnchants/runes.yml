@@ -646,15 +646,24 @@ runes:
   # (everything else -- cooldown-seconds, radii, durations, potion levels,
   # etc., all in the units named by their own key). All values below are
   # editable starting defaults, not fixed requirements.
-  # Any level under here may add `catalog-item: <id>` to tie that ability
-  # directly onto a real saved item instead of the generic `material`/
-  # `custom-model-data` placeholder below -- e.g. `catalog-item:
-  # fallen_helmet` bakes Huntmaster's Call onto the exact Fallen Helmet
-  # (real texture, lore, vanilla enchants) the moment it's created, no
-  # separate apply step. The referenced id must exist in seasonal-items.yml
-  # first (/seasonal catalog save <id> while holding that item in-game) --
-  # until it does, that level falls back to the placeholder icon and logs a
-  # warning on startup. See EnchantDefinition.Level#catalogItem.
+  # No config wiring is needed to tie an ability onto a real item: just
+  # `/seasonal catalog save <id>` while holding the real, finished piece --
+  # it auto-detects which seasonal Rune is compatible with that item's
+  # material (each is configured for exactly one piece type) and bakes it
+  # on before saving. From then on, give/roll/the Seasonal Set preview menu
+  # all discover and use that saved item automatically -- nothing below
+  # needs a `catalog-item` key. That key still exists as a manual override
+  # (useful only if two saved items could otherwise both carry the same
+  # ability, which shouldn't normally happen) -- see
+  # EnchantDefinition.Level#catalogItem.
+  #
+  # Add `hidden: true` to an enchant (or to a whole `sets: <name>:` block,
+  # inherited by everything nested under it) to stage it without releasing
+  # it: give/roll/catalog all keep working normally for admins, but it's
+  # skipped from the player-facing Seasonal Set preview menu until you flip
+  # it back to false (or remove the line). Lets a whole season's worth of
+  # gear and abilities get built and tested ahead of time, then revealed
+  # all at once.
   #
   # Enchants may optionally be grouped under `sets: <set-name>: enchants:`
   # instead of loose in `enchants:` below -- purely to keep a season's whole
@@ -664,6 +673,7 @@ runes:
   #
   #   sets:
   #     fall:
+  #       hidden: true   # whole season staged; flip to false (or delete) to release it
   #       enchants:
   #         huntmasters_call: { ... same shape as any enchant below ... }
   #         golden_bastion: { ... }

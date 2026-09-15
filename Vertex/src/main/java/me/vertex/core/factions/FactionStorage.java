@@ -1171,6 +1171,42 @@ public final class FactionStorage {
             }
         }
     }
+    /**
+     * Bulk, unchecked release of every claim a faction owns -- for {@code
+     * /f admin unclaimall}, releasing a SafeZone/WarZone system faction's
+     * whole area in one statement. Unlike {@link
+     * #deleteClaimsForFactionChecked}, this needs no actor/member/role
+     * authorization (the system faction has no members); the command layer
+     * gates it on {@code vertex.factions.admin} instead. Still locks the
+     * faction row first so this can't race a concurrent claim/unclaim on
+     * the same faction.
+     */
+    public ClaimDeleteResult deleteAllClaimsForFactionUnchecked(int factionId, boolean clearMetadata) throws SQLException {
+        try (Connection connection = database.getConnection()) {
+            boolean previous = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                if (lockFaction(connection, factionId) == null) {
+                    connection.rollback();
+                    return ClaimDeleteResult.OWNER_CHANGED;
+                }
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM vertex_faction_claims WHERE faction_id=?")) {
+                    statement.setInt(1, factionId);
+                    statement.executeUpdate();
+                }
+                if (clearMetadata) clearFactionClaimMetadata(connection, factionId);
+                connection.commit();
+                return ClaimDeleteResult.OK;
+            } catch (SQLException error) {
+                connection.rollback();
+                throw error;
+            } finally {
+                connection.setAutoCommit(previous);
+            }
+        }
+    }
+
     public boolean deleteClaim(ChunkKey key,int expectedOwner)throws SQLException {
         return deleteClaim(key, expectedOwner, false);
     }

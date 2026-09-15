@@ -280,8 +280,9 @@ public final class EnchantManager {
                         Integer setCustomModelData = setSection.contains("custom-model-data")
                                 ? setSection.getInt("custom-model-data") : null;
                         String setCatalogItem = setSection.getString("catalog-item");
+                        boolean setHidden = setSection.getBoolean("hidden", false);
                         LevelIconDefaults setIconDefaults = new LevelIconDefaults(setMaterial, setCustomModelData,
-                                setCatalogItem != null && setCatalogItem.isBlank() ? null : setCatalogItem);
+                                setCatalogItem != null && setCatalogItem.isBlank() ? null : setCatalogItem, setHidden);
                         for (String id : setEnchants.getKeys(false)) {
                             ConfigurationSection enchantSection = setEnchants.getConfigurationSection(id);
                             if (enchantSection == null) {
@@ -320,7 +321,13 @@ public final class EnchantManager {
         }
 
         Map<String, EnchantDefinition> previousDefinitions = definitions;
-        definitions = Map.copyOf(loadedDefinitions);
+        // Map.copyOf's iteration order is deliberately unspecified -- unlike
+        // Collections.unmodifiableMap, it does NOT preserve the source map's
+        // order, so it silently scrambled the runes.yml file order every
+        // load. seasonalIds() (and anything else iterating definitions in
+        // display order, like the Seasonal Set preview menu) needs that
+        // order to actually be admin-controllable by editing the file.
+        definitions = Collections.unmodifiableMap(loadedDefinitions);
         runeCosmetics = Map.copyOf(cosmetics);
         runeShopPrices = Map.copyOf(prices);
         runeShopCurrencies = Map.copyOf(currencies);
@@ -328,6 +335,42 @@ public final class EnchantManager {
         rollTables = Map.copyOf(tables);
         loadWarChest(config);
         notifyNoLongerBindable(previousDefinitions);
+        warnIfSeasonalPieceMappingIsAmbiguous();
+    }
+
+    /**
+     * {@code /seasonal catalog create} identifies which seasonal Rune to
+     * bake onto a held item purely from that item's material, which only
+     * works while every seasonal Rune targets exactly one piece type and no
+     * two target the same one. Config is free to violate that (a seasonal
+     * Rune could legitimately list more than one compatible type, or two
+     * could overlap), so this only warns -- it never rejects a load -- but
+     * makes a silent, confusing "wrong Rune got baked on" failure mode
+     * loud and immediate instead.
+     */
+    private void warnIfSeasonalPieceMappingIsAmbiguous() {
+        Map<String, List<String>> claimants = new LinkedHashMap<>();
+        for (EnchantDefinition definition : definitions.values()) {
+            if (!definition.isSeasonal()) {
+                continue;
+            }
+            Set<String> types = definition.compatibleTypes();
+            if (types.size() != 1) {
+                plugin.getLogger().warning(RUNES_CONFIG_PATH + ": seasonal Rune '" + definition.id()
+                        + "' has compatible-types " + types + " (" + types.size() + " entries) -- "
+                        + "/seasonal catalog create needs exactly one to know which item this belongs on.");
+            }
+            for (String type : types) {
+                claimants.computeIfAbsent(type, key -> new ArrayList<>()).add(definition.id());
+            }
+        }
+        for (Map.Entry<String, List<String>> entry : claimants.entrySet()) {
+            if (entry.getValue().size() > 1) {
+                plugin.getLogger().warning(RUNES_CONFIG_PATH + ": seasonal Runes " + entry.getValue()
+                        + " all claim compatible-types '" + entry.getKey() + "' -- "
+                        + "/seasonal catalog create can't tell them apart for that item type.");
+            }
+        }
     }
 
     /**
@@ -500,8 +543,8 @@ public final class EnchantManager {
      * preserves the exact old hardcoded {@code Material.STONE}/null/null
      * fallback.
      */
-    private record LevelIconDefaults(Material material, Integer customModelData, String catalogItem) {
-        static final LevelIconDefaults NONE = new LevelIconDefaults(null, null, null);
+    private record LevelIconDefaults(Material material, Integer customModelData, String catalogItem, boolean hidden) {
+        static final LevelIconDefaults NONE = new LevelIconDefaults(null, null, null, false);
     }
 
     private LoadedEnchant readEnchant(String where, String id, ConfigurationSection section,
@@ -534,6 +577,7 @@ public final class EnchantManager {
         boolean blockedInCombat = section.getBoolean("blocked-in-combat", false);
         boolean seasonal = section.getBoolean("seasonal", false);
         boolean bindable = section.getBoolean("bindable", false);
+        boolean hidden = section.getBoolean("hidden", iconDefaults.hidden());
         Set<RuneTag> tags = readTags(where, id, section.getStringList("tags"));
 
         List<EnchantDefinition.Level> levels;
@@ -549,7 +593,7 @@ public final class EnchantManager {
         }
         EnchantDefinition definition = new EnchantDefinition(id, displayName, description, compatible,
                 enabledWorlds, disabledWorlds, enabledZones, disabledZones, effect, damageSource, targetFilter,
-                priority, blockedInCombat, seasonal, bindable, tags, levels, seasonalSet);
+                priority, blockedInCombat, seasonal, bindable, tags, levels, seasonalSet, hidden);
         return new LoadedEnchant(definition, rollEntries);
     }
 
@@ -983,13 +1027,17 @@ public final class EnchantManager {
         if (definition == null || levelConfig == null) {
             return null;
         }
-        if (originTier == RuneTier.SEASONAL && levelConfig.catalogItem() != null) {
-            ItemStack baked = createCatalogedSeasonalItem(enchantId, level, levelConfig.catalogItem());
+        if (originTier == RuneTier.SEASONAL) {
+            ItemStack baked = levelConfig.catalogItem() != null
+                    ? createCatalogedSeasonalItem(enchantId, level, levelConfig.catalogItem())
+                    : findCatalogedSeasonalItemByEnchant(enchantId, level);
             if (baked != null) {
                 return baked;
             }
-            // Configured but not (yet) saved to the catalog -- fall through
-            // to the generic placeholder rather than handing out nothing.
+            // Neither an explicit catalog-item link nor a discoverable
+            // catalog entry carrying this ability exists yet -- fall
+            // through to the generic placeholder rather than handing out
+            // nothing.
         }
         Material material = originTier == RuneTier.SEASONAL
                 ? levelConfig.material() : RuneFormatting.tierCandle(originTier);
@@ -1033,6 +1081,32 @@ public final class EnchantManager {
             return null;
         }
         return bakeEnchantOnto(base, enchantId, level, RuneTier.SEASONAL);
+    }
+
+    /**
+     * The zero-config "tie an ability directly to a real item" path:
+     * {@code /seasonal catalog save} already bakes an ability onto the item
+     * it saves (see {@link me.vertex.core.enchant.SeasonalCommand}), so the
+     * saved item itself already records which ability it belongs to --
+     * nothing needs wiring back into {@code runes.yml} by hand. This scans
+     * the catalog for the (expected to be unique) entry already carrying
+     * {@code enchantId} and re-bakes it at the requested {@code level}. An
+     * explicit {@code catalog-item} config link, checked by the caller
+     * first, always wins when both exist. Null if no catalog entry carries
+     * this ability yet.
+     */
+    private ItemStack findCatalogedSeasonalItemByEnchant(String enchantId, int level) {
+        SeasonalItemCatalog catalog = seasonalCatalog;
+        if (catalog == null) {
+            return null;
+        }
+        for (String catalogId : catalog.ids()) {
+            ItemStack candidate = catalog.get(catalogId);
+            if (candidate != null && enchantsOf(candidate).containsKey(enchantId)) {
+                return bakeEnchantOnto(candidate, enchantId, level, RuneTier.SEASONAL);
+            }
+        }
+        return null;
     }
 
     /** Rebuilds the complete, standardized presentation from durable Rune data. */

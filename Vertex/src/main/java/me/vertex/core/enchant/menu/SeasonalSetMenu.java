@@ -23,7 +23,11 @@ import java.util.List;
  * piece's actual identified Rune item (level I), rendered through the exact
  * same {@link EnchantManager#createEnchantItem} every other menu uses, so
  * hovering it shows its real description/ability value/application info --
- * no separate lore is authored here.
+ * no separate lore is authored here. A piece whose {@code runes.yml} entry
+ * sets {@code hidden: true} (directly, or inherited from its {@code sets:}
+ * group) is skipped here -- staged content stays fully usable through every
+ * admin command, just not shown in this player-facing preview until
+ * released.
  */
 public final class SeasonalSetMenu {
 
@@ -52,7 +56,7 @@ public final class SeasonalSetMenu {
                 break;
             }
             EnchantDefinition definition = manager.definition(id);
-            if (definition == null) {
+            if (definition == null || definition.isHidden()) {
                 continue;
             }
             ItemStack item = manager.createEnchantItem(id, 1, RuneTier.SEASONAL);

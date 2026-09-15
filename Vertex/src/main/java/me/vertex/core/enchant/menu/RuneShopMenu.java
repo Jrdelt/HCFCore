@@ -93,7 +93,7 @@ public final class RuneShopMenu {
     }
 
     private static ItemStack filler() {
-        return button(Material.PURPLE_STAINED_GLASS_PANE, Component.empty(), List.of());
+        return button(Material.BLACK_STAINED_GLASS_PANE, Component.empty(), List.of());
     }
 
     private static ItemStack buildIcon(Player player, Messages messages, EnchantManager manager, RuneTier tier) {

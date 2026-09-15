@@ -89,6 +89,7 @@ public final class EnchantDefinition {
     private final Set<RuneTag> tags;
     private final List<Level> levels;
     private final String seasonalSet;
+    private final boolean hidden;
 
     public EnchantDefinition(String id, String displayName, String description, Set<String> compatibleTypes,
             Set<String> enabledWorlds, Set<String> disabledWorlds, String effect, int priority,
@@ -111,7 +112,7 @@ public final class EnchantDefinition {
             List<Level> levels) {
         this(id, displayName, description, compatibleTypes, enabledWorlds, disabledWorlds, enabledZones,
                 disabledZones, effect, damageSource, targetFilter, priority, blockedInCombat, seasonal, bindable,
-                tags, levels, null);
+                tags, levels, null, false);
     }
 
     /**
@@ -124,13 +125,21 @@ public final class EnchantDefinition {
      *                    display-name} are unaffected by which group it's
      *                    nested under, so grouping enchants into a set in
      *                    config never leaks into a rune's in-game name.
+     * @param hidden      seasonal only: whether this piece is staged but not
+     *                    yet released. A hidden seasonal Rune stays fully
+     *                    usable through every admin command (give/roll/
+     *                    catalog) -- an operator can build out a whole
+     *                    season's worth of gear and abilities ahead of time
+     *                    -- it's only excluded from the player-facing
+     *                    Seasonal Set preview menu until unhidden.
      */
     public EnchantDefinition(String id, String displayName, String description, Set<String> compatibleTypes,
             Set<String> enabledWorlds, Set<String> disabledWorlds, Set<ZoneType> enabledZones,
             Set<ZoneType> disabledZones, String effect, EffectScope damageSource, EffectScope targetFilter,
             int priority, boolean blockedInCombat, boolean seasonal, boolean bindable, Set<RuneTag> tags,
-            List<Level> levels, String seasonalSet) {
+            List<Level> levels, String seasonalSet, boolean hidden) {
         this.seasonalSet = seasonalSet;
+        this.hidden = hidden;
         this.id = id;
         this.displayName = displayName;
         this.description = description;
@@ -157,6 +166,11 @@ public final class EnchantDefinition {
     /** @return the {@code seasonal.sets.<name>} group this was loaded from, or null. Organizational only -- see the constructor doc. */
     public String seasonalSet() {
         return seasonalSet;
+    }
+
+    /** Whether this seasonal Rune is staged but not yet released -- see the constructor doc. Always false for a non-seasonal Rune. */
+    public boolean isHidden() {
+        return hidden;
     }
 
     /** Whether this rune may be assigned to a {@code /binds} slot -- explicit config only, never inferred. */

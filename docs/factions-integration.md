@@ -74,8 +74,16 @@ configured SafeZone or WarZone with `/f claim <Safezone|Warzone>`. Adding a
 radius creates a square: radius `1` claims `3x3` chunks, radius `2` claims
 `5x5`, and so on. The area is validated and saved atomically, then its live
 claim updates are applied in bounded tick batches. `/f admin unclaim` removes
-the current claim. System-faction tags, no-PvP tags, and the per-tick batch
-budget are configurable under `factions.system-claims`.
+just the current chunk; `/f admin unclaimall <Safezone|Warzone>` releases
+every chunk that system faction owns in a single DB statement (not a
+per-chunk loop), for redoing a SafeZone/WarZone claim from scratch.
+System-faction tags, no-PvP tags, and the per-tick batch budget are
+configurable under `factions.system-claims`.
+
+A combat-tagged player can neither walk/teleport into a configured SafeZone
+nor be nudged there by the border-push anti-exploit below -- both rules are
+gated on combat, so an untagged player near a SafeZone edge is never
+affected by either.
 
 ## Storage and migration
 

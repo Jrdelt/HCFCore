@@ -18,12 +18,16 @@ import org.bukkit.util.Vector;
  * that would cross from non-SafeZone into SafeZone is cancelled, with a
  * message, rather than let them duck into a no-PvP claim mid-fight.
  *
- * <p>2. Anyone already inside a SafeZone within {@link #BORDER_PUSH_DISTANCE}
- * blocks of its edge is nudged back toward the interior. Standing exactly on
- * the line let a player's hitbox reach past the border while the server
- * still treated their feet location as protected -- hittable outward,
- * unhittable inward. Pushing border-huggers inward removes that gap instead
- * of trying to detect and special-case the straddling hitbox itself.
+ * <p>2. A combat-tagged player already inside a SafeZone within {@link
+ * #BORDER_PUSH_DISTANCE} blocks of its edge is nudged back toward the
+ * interior. Standing exactly on the line let a player's hitbox reach past
+ * the border while the server still treated their feet location as
+ * protected -- hittable outward, unhittable inward. Pushing border-huggers
+ * inward removes that gap instead of trying to detect and special-case the
+ * straddling hitbox itself. Gated on combat the same as rule 1 -- the gap
+ * this closes is only exploitable mid-fight, so an untagged player standing
+ * near the border (spawn traffic, building, anything ordinary) is never
+ * pushed.
  */
 public final class SafezoneGuardListener implements Listener {
 
@@ -60,7 +64,7 @@ public final class SafezoneGuardListener implements Listener {
             player.sendMessage(messages.get(player, "factions.safezone-entry-denied"));
             return;
         }
-        if (!factions.isSystemProtectedZone(to)) {
+        if (!factions.isSystemProtectedZone(to) || !combat.isTagged(player.getUniqueId())) {
             return;
         }
         Vector push = borderPushVector(to);

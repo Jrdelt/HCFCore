@@ -44,7 +44,7 @@ public final class IncineratorMenu {
         Inventory inventory = Bukkit.createInventory(holder, 54, messages.getGui(player, "rune.incinerator-title"));
         holder.inventory = inventory;
         for (int slot = 45; slot < 54; slot++) {
-            inventory.setItem(slot, button(Material.ORANGE_STAINED_GLASS_PANE, Component.empty(), List.of()));
+            inventory.setItem(slot, button(Material.BLACK_STAINED_GLASS_PANE, Component.empty(), List.of()));
         }
         for (int index = 0; index < eligible.size() && index < CONTENT_SLOTS.size(); index++) {
             IncineratorEligibility.Entry entry = eligible.get(index);

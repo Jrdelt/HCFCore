@@ -6,6 +6,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class MessageFormatter {
@@ -13,6 +14,15 @@ public final class MessageFormatter {
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
     private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
     private static final Pattern LEGACY_HEX = Pattern.compile("&#([A-Fa-f0-9]{6})");
+    // The "spread" per-digit form (&x&R&R&G&G&B&B) LegacyComponentSerializer's
+    // own hexColors() support emits by default -- what serialize() actually
+    // produces for a hex-colored Component, as opposed to the compact
+    // &#RRGGBB shorthand LEGACY_HEX above handles. Without this, anything
+    // captured via serialize() (base-lore snapshots baked onto an item,
+    // e.g. a per-letter hex gradient on a crate-exclusive item) came back
+    // through deserialize() as literal, unparsed "&xF&xa..." text instead
+    // of its real color.
+    private static final Pattern LEGACY_HEX_SPREAD = Pattern.compile("&[xX]((?:&[A-Fa-f0-9]){6})");
 
     private MessageFormatter() {
     }
@@ -73,6 +83,7 @@ public final class MessageFormatter {
     }
 
     private static String normalize(String message) {
+        message = replaceSpreadHex(message);
         message = LEGACY_HEX.matcher(message).replaceAll("<#$1>");
         return message
                 .replace("<deny>", "<red>")
@@ -105,5 +116,20 @@ public final class MessageFormatter {
                 .replace("&n", "<underlined>")
                 .replace("&o", "")
                 .replace("&r", "<reset>");
+    }
+
+    /** Converts every {@code &x&R&R&G&G&B&B} run into {@code <#RRGGBB>}, stripping the per-digit {@code &} separators. */
+    private static String replaceSpreadHex(String message) {
+        Matcher matcher = LEGACY_HEX_SPREAD.matcher(message);
+        if (!matcher.find()) {
+            return message;
+        }
+        StringBuilder result = new StringBuilder();
+        do {
+            String hex = matcher.group(1).replace("&", "");
+            matcher.appendReplacement(result, "<#" + hex + ">");
+        } while (matcher.find());
+        matcher.appendTail(result);
+        return result.toString();
     }
 }

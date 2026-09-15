@@ -17,19 +17,20 @@ their data is saved (for example, after opening and closing them).
 
 There's no in-game shop for these yet: `/backpack give <player> <tier>
 [level]` (`vertex.backpack.give`) hands one out directly, starting at
-`level` (default 1, capped to 1-10). Tiers are defined in `backpacks.yml`
-(see [Configuration](configuration.md) for the full key reference) —
-each has an item type, custom model value, and its own
+`level` (default 1, i.e. level I, capped to 1-10). Tiers are defined in
+`backpacks.yml` (see [Configuration](configuration.md) for the full key
+reference) — each has an item type, custom model value, and its own
 drop-bonus stat.
 
-`fallen_crate` is the seasonal, crate-exclusive tier for the Fallen set
-(PAPER item, its own custom model data, gold-gradient name). It behaves
-like any other tier -- normal auto-store drop bonus, same 1-10 level cap --
-just skinned differently. It's also reachable through `/seasonal give
-fallen_crate [level]` (see [Custom Enchantments and
-Runes](custom-enchantments.md)), which resolves any id that matches a
-`backpacks.yml` tier before checking seasonal Runes or the seasonal item
-catalog.
+`backpacks.yml` currently defines exactly two tiers: `fallen_crate`, the
+seasonal Fallen-set backpack (PAPER item, its own custom model data,
+gold-gradient name, normal auto-store drop bonus) -- the only Backpack a
+player can be freshly given unless another tier is added -- and
+`war_chest`, a separate seasonal system (see below). `fallen_crate` is also
+reachable through `/seasonal give fallen_crate [level]` (see [Custom
+Enchantments and Runes](custom-enchantments.md)), which resolves any id
+that matches a `backpacks.yml` tier before checking seasonal Runes or the
+seasonal item catalog.
 
 ## The GUI
 
@@ -69,11 +70,14 @@ matches what it currently holds.
 With a valid single Backpack in the offhand, normal drops from blocks listed
 under `auto-store.mining-materials` are routed into it. The block's ordinary
 Fortune/Silk Touch calculation happens first; Vertex then applies the
-Backpack tier/level bonus to those resulting drops. The bundled tiers all
-start at a guaranteed **+25%** bonus at level 1, compounding higher every
-level from there (see [Leveling and the drop-bonus stat](#leveling-and-the-drop-bonus-stat)
+Backpack tier/level bonus to those resulting drops. `fallen_crate` starts at
+a guaranteed **+25%** bonus at level 1, compounding higher every level from
+there (see [Leveling and the drop-bonus stat](#leveling-and-the-drop-bonus-stat)
 below) -- so a fresh Backpack gives a modest boost, and a heavily upgraded
-one grows until the configured `max-drop-bonus-percent` cap (250% by default).
+one grows until the configured `max-drop-bonus-percent` cap (250% by
+default). `war_chest` is the exception: its own drop-bonus fields stay at
+0%, since all of its value comes from a separate proc/booster system
+instead (see [Custom Enchantments and Runes](custom-enchantments.md)).
 This means enchantment and Backpack bonuses
 stack without replacing each other.
 
