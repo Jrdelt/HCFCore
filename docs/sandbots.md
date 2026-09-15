@@ -11,6 +11,7 @@ for the Bot display and its right-click control panel.
 | `/sandbot give <player>` | `vertex.sandbot.give` | Gives a Sand Bot item. |
 | `/sandbot stop` | Open to all | Stops your own active Sand Bot(s). |
 | `/sandbot stop <player>` | `vertex.sandbot.admin` | Stops another player's active Sand Bot(s). |
+| `/sandbot debug` | `vertex.sandbot.debug` | Toggles chat diagnostics for every Bot you own -- funding, placement, and pause decisions -- until toggled off. Stays on across reconnects; only a server restart clears it. |
 
 The item lore shows the live square placement area. The bundled default is
 an **11 × 11** footprint (`sandbot.radius-blocks: 5`); changing that configured
@@ -37,9 +38,11 @@ Bot safely prepays a short configurable number of placement passes
 write runs. Any unused reserve is returned to the faction bank when the Bot is
 paused, despawned, or the server stops. The reserve is also saved with the Bot
 about once a second, so after a crash it resumes on the same Bot instead of
-being lost; at worst, up to a second of placements made just before the crash
-is not deducted. If the bank cannot fund the next placement, the Bot is paused
-and remains deployed; it does not despawn. While an active Bot is trying to
+being lost; the bank is never charged twice for the same reserve, though up
+to a second of blocks placed right before the crash may briefly show as still
+funded after the restart, since that spending hadn't been saved yet. If the
+bank cannot fund the next placement, the Bot is paused and remains deployed;
+it does not despawn. While an active Bot is trying to
 place and the bank is below `sandbot.low-bank-warning-threshold`, online
 faction members receive a rate-limited warning.
 

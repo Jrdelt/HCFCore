@@ -47,6 +47,7 @@ All code lives under `me.vertex.core`, one package per feature area:
 | `preferences` | Per-player broadcast/message settings |
 | `pvp` | Combat tag, Legacy Combat, Archer Tag, vanilla item cooldowns |
 | `reboot` | Scheduled shutdown |
+| `redstone` | `/lastredstone` lever/button replay for cannon testing |
 | `sandbot` | Sand Bot printing, fuel balance, and territory validation |
 | `season` | Transactional reset of season-scoped Vertex data |
 | `shield` | Weekly faction Shield schedules and Base Claim protection |

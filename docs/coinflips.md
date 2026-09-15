@@ -44,7 +44,8 @@ approval for one elsewhere (`coinflip.already-taking-one`).
 
 Open `/cf` to browse every coinflip you're allowed to join — it
 re-renders in place on a short interval (`gui-refresh-interval-ticks`,
-1 tick by default) so new listings, cancellations, and pending-match
+10 ticks / 0.5s by default, hard-floored at 10 so it can't be configured
+faster) so new listings, cancellations, and pending-match
 state show up live for everyone with it open, not just after your own
 next click. Left-click a listing to play it:
 
@@ -201,7 +202,8 @@ Vault/EXP credit, because those external APIs cannot accept an idempotency key.
 | `house-fee-percent` | Percentage of the *loser's* wager the winner doesn't get back (destroyed, not paid to anyone); 0 by default |
 | `self-ban-days` | How long a self-ban lasts once confirmed |
 | `item-icon-cycle-ticks` | How often a multi-item listing's icon rotates |
-| `gui-refresh-interval-ticks` | How often the open Active Coinflips browser re-renders in place for everyone viewing it; 1 tick (the fastest a server can meaningfully update) by default |
+| `gui-refresh-interval-ticks` | How often the open Active Coinflips browser re-renders in place for everyone viewing it; 10 ticks (0.5s) by default, floored at 10 regardless of what's configured |
+| `animation-duration-seconds` | How long the shared result-animation reel runs before the win/loss chat line fires; clamped to 5-10 seconds; 6 by default |
 | `log-retention-days` | How long resolved/cancelled log entries are kept; 0 = forever |
 
 Results are not announced server-wide; only new listings are announced.

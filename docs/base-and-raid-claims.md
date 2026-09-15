@@ -103,11 +103,11 @@ Explosion protection is controlled by [Grace and Faction Shield](faction-shield.
   soul-sand-and-three-skulls construction (`SpawnReason.BUILD_WITHER`,
   the primary way players make one) exactly the same as a spawn egg,
   spawner, or command. No world or claim scoping; no exceptions.
-- **No admin bypass is wired in for the block-damage rule.** This
-  codebase's one existing "admin bypasses claim protection" pattern,
-  `StaffBuildListener`, un-cancels already-cancelled events for players in
-  staff-build mode — but every event it covers carries a `Player` to
-  check permissions against. `EntityExplodeEvent`/`BlockExplodeEvent`
+- **No admin bypass is wired in for the block-damage rule.** Every other
+  claim-protection listener (`FactionProtectionListener` and friends) checks
+  `StaffManager.isStaffBuild(player)` up front and skips its own cancel
+  entirely when it's on -- but that only works because those events carry a
+  `Player` to check permissions against. `EntityExplodeEvent`/`BlockExplodeEvent`
   carry no igniting player in vanilla Bukkit, so there was nothing to
   hook a bypass onto without inventing new state (tracking who lit each
   TNT) that the spec never asked for. If a staff bypass for this specific
@@ -154,6 +154,7 @@ already bought; it is not written by current gameplay.
 | `/f baseclaim` | `vertex.baseclaim.view` | Opens the info/removal GUI if standing on an existing Base Claim; otherwise attempts to create one. |
 | `/f baseclaim` (create) | `vertex.baseclaim.view` | Leader/Co-Leader only; no separate permission. |
 | Remove confirm (GUI) | `vertex.baseclaim.view` | Leader/Co-Leader only; no separate permission. |
+
 Slots #2/#3 are purchased from `/f upgrades`; there is no `/f baseclaim buy`
 command or separate slot-purchase permission.
 

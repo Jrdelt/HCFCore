@@ -42,7 +42,7 @@ Two different matching rules are used, deliberately:
 
 Equipping a kit's *exact* full armor set (same material, enchantments,
 and durability on all four pieces) grants its `effects` after a
-`kits.effect-warmup-seconds` delay (default 5s) — giving visual feedback
+`kits.effect-warmup-seconds` delay (default 7s) — giving visual feedback
 and preventing instant on/off effect flicker. Taking off any piece
 removes the effects immediately, no warmup on the way out.
 
@@ -150,7 +150,7 @@ about cooldown, lore, or behavior, only what the item looks like in hand.
 - `/cooldowns` shows every active cooldown: kits, ability items, the
   shared global ability cooldown, and the vanilla pearl/gapple/enchanted
   gapple timers.
-- **Global cooldown** (`abilities.global-cooldown-seconds`, default 4s)
+- **Global cooldown** (`abilities.global-cooldown-seconds`, default 3s)
   blocks all ability items while active, on top of each item's own
   cooldown.
 - Abilities are disabled in two independent, additive ways:

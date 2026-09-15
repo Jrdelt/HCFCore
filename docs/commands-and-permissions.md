@@ -374,6 +374,8 @@ area below; crash recovery remains separate as `vertex.network.recovery`.
 | `vertex.fa.logs` | Active/disbanded faction logs |
 | `vertex.fa.network` | Shard and transfer inspection |
 | `vertex.fa.season` | Destructive season reset |
+| `vertex.network.recovery` | Approve crash recovery and return a shard to public service (separate from `vertex.fa.*`) |
+| `vertex.network.transfer.alerts` | Receive alerts for unresolved cross-shard handoffs |
 
 Dangerous irreversible operations require `--force` and are audited. See
 [Native Factions](factions-integration.md) and [Velocity Shards](network-shards.md).

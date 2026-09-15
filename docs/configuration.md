@@ -349,13 +349,13 @@ GUI labels, lore, and purchase/failure messages are configurable in
 ```yaml
 kits:
   default-cooldown-seconds: 30
-  effect-warmup-seconds: 5
-  max-cooldown-seconds: 86400
+  effect-warmup-seconds: 7
+  max-cooldown-seconds: 43200
   max-money-cost: 1000000000.0
   max-cost-item-amount: 64
 
 abilities:
-  global-cooldown-seconds: 4
+  global-cooldown-seconds: 3
   max-getitem-amount: 64
   bard-share-radius-blocks: 30
   disabled-regions: [spawn]
@@ -385,9 +385,11 @@ check whether one is currently scheduled.
 The role icon materials and slots remain under `rally.permission-gui` in
 `config.yml`. All visible title, role, status, hint, and action text is under
 `faction-permissions` in `lang/en_us.yml`, alongside the rest of Vertex's GUI
-copy. Every permission is always a green stained-glass
-pane when allowed and a red stained-glass pane when denied; this is not
-overridable, so allowed actions are never mistaken for blocked ones. The
-shared GUI renderer converts static wording to small caps while preserving
+copy. Every permission is a green stained-glass pane when allowed and a red
+stained-glass pane when denied, so allowed actions are never mistaken for
+blocked ones. The one exception is the ally Place Blocks / Break Blocks rows,
+which turn gray with a hint instead when `factions.protection.allies-can-build`
+is off server-wide — see [Factions Integration](factions-integration.md#claims-and-protection).
+The shared GUI renderer converts static wording to small caps while preserving
 placeholder values. Full behavior
 in [Factions Integration](factions-integration.md#rally-permission-gui).
