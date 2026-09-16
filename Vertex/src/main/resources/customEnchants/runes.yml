@@ -7,15 +7,29 @@
 # items, live effect, tags, and every level's stats -- including that
 # level's roll `weight`). No other file defines rune data.
 #
+# Simple/Elite carry 4 base enchants, Rare/Legendary/Arena carry 3 (Seasonal
+# excluded) -- every effect id below still appears in exactly ONE tier, so
+# no ability is a stronger reskin of another tier's ability under a
+# different name. Each base rune is its own distinct thing; picking a tier
+# is about how it's obtained/priced, not "the same ability, again, but
+# bigger."
+#
 # effect is a built-in Rune effect. priority resolves effects sharing a
-# trigger; higher runs first. Per-level effect-settings are numeric and fully
-# configurable without Java changes. Sky Stepper intentionally outranks Dasher.
+# trigger. Per-level effect-settings are numeric and fully configurable
+# without Java changes.
 #
 # tags are explicit categorization only -- never inferred -- for future
 # tooling (e.g. /runeinfo) to group/filter runes by what they actually do.
 #
 # A rune with no `weight` on any level (see `legacy:` below) is retained only
 # so already-rolled/applied items keep rendering -- it is never rollable.
+# `legacy:` is also where every enchant retired by the 3-per-tier cut above
+# ended up (Simple/Elite/Rare/Legendary only -- their old effect ids may
+# reappear on an already-owned item's tooltip, but can never be rolled
+# again). Arena's retired enchants were dropped outright instead: Arena's
+# per-level values are synthesized from `level-count`/`per-level-value`,
+# which `legacy:` entries don't support, and Arena's steep XP cost means very
+# few, if any, were ever actually owned.
 
 # Every identification jitters that level's configured success-rate by +/-
 # this many percentage points (clamped to 0-100), so two rolls of the same
@@ -58,28 +72,6 @@ runes:
           2: { material: WHEAT, proc-chance: 100, success-rate: 60, ability-value: 17, weight: 30 }
           3: { material: WHEAT, glow: true, proc-chance: 100, success-rate: 45, ability-value: 25, weight: 15 }
 
-      featherbound:
-        display-name: "Featherbound"
-        description: "Reduces fall damage"
-        compatible-types: [BOOTS]
-        effect: FALL_REDUCTION
-        tags: [MOVEMENT, DEFENSIVE, PASSIVE, EQUIPMENT]
-        levels:
-          1: { material: FEATHER, proc-chance: 100, success-rate: 75, ability-value: 12, weight: 50 }
-          2: { material: FEATHER, proc-chance: 100, success-rate: 60, ability-value: 20, weight: 30 }
-          3: { material: FEATHER, glow: true, proc-chance: 100, success-rate: 45, ability-value: 30, weight: 15 }
-
-      ironhide:
-        display-name: "Ironhide"
-        description: "Reduces all incoming damage"
-        compatible-types: [CHESTPLATE]
-        effect: DAMAGE_REDUCTION
-        tags: [DEFENSIVE, PASSIVE, EQUIPMENT]
-        levels:
-          1: { material: IRON_INGOT, proc-chance: 100, success-rate: 75, ability-value: 2, weight: 50 }
-          2: { material: IRON_INGOT, proc-chance: 100, success-rate: 60, ability-value: 3, weight: 30 }
-          3: { material: IRON_INGOT, glow: true, proc-chance: 100, success-rate: 45, ability-value: 4, weight: 15 }
-
       scholars_mark:
         display-name: "Scholar's Mark"
         description: "Grants bonus XP from mob kills"
@@ -91,69 +83,6 @@ runes:
           2: { material: BOOK, proc-chance: 100, success-rate: 60, ability-value: 14, weight: 30 }
           3: { material: BOOK, glow: true, proc-chance: 100, success-rate: 45, ability-value: 20, weight: 15 }
 
-      guardians_will:
-        display-name: "Guardian's Will"
-        description: "Reduces PvP damage taken"
-        compatible-types: [CHESTPLATE]
-        effect: DAMAGE_REDUCTION
-        damage-source: PLAYER
-        tags: [DEFENSIVE, PLAYER, PASSIVE, EQUIPMENT]
-        levels:
-          1: { material: IRON_CHESTPLATE, proc-chance: 100, success-rate: 75, ability-value: 2, weight: 50 }
-          2: { material: IRON_CHESTPLATE, proc-chance: 100, success-rate: 60, ability-value: 3, weight: 30 }
-          3: { material: IRON_CHESTPLATE, glow: true, proc-chance: 100, success-rate: 45, ability-value: 4, weight: 15 }
-
-      quickdraw:
-        display-name: "Quickdraw"
-        description: "Increases bow damage against players"
-        compatible-types: [BOW]
-        effect: PROJECTILE_DAMAGE
-        target-filter: PLAYER
-        tags: [COMBAT, OFFENSIVE, PLAYER, PROJECTILE, PASSIVE]
-        levels:
-          1: { material: BOW, proc-chance: 100, success-rate: 75, ability-value: 4, weight: 50 }
-          2: { material: BOW, proc-chance: 100, success-rate: 60, ability-value: 6, weight: 30 }
-          3: { material: BOW, glow: true, proc-chance: 100, success-rate: 45, ability-value: 8, weight: 15 }
-
-      stonebreaker:
-        display-name: "Stonebreaker"
-        description: "Chance to duplicate mined ore drops -- worn, not wielded"
-        compatible-types: [HELMET]
-        effect: ORE_FORTUNE
-        tags: [MINING, PASSIVE, EQUIPMENT]
-        levels:
-          1: { material: IRON_HELMET, proc-chance: 100, success-rate: 75, ability-value: 6, weight: 50 }
-          2: { material: IRON_HELMET, proc-chance: 100, success-rate: 60, ability-value: 10, weight: 30 }
-          3: { material: IRON_HELMET, glow: true, proc-chance: 100, success-rate: 45, ability-value: 14, weight: 15 }
-
-      fieldworker:
-        display-name: "Fieldworker"
-        description: "Chance to duplicate harvested crops -- worn, not wielded"
-        compatible-types: [BOOTS]
-        effect: CROP_BOUNTY
-        tags: [FARMING, PASSIVE, EQUIPMENT]
-        levels:
-          1: { material: LEATHER_BOOTS, proc-chance: 100, success-rate: 75, ability-value: 7, weight: 50 }
-          2: { material: LEATHER_BOOTS, proc-chance: 100, success-rate: 60, ability-value: 12, weight: 30 }
-          3: { material: LEATHER_BOOTS, glow: true, proc-chance: 100, success-rate: 45, ability-value: 18, weight: 15 }
-
-      second_wind:
-        display-name: "Second Wind"
-        description: "Restores health after a kill"
-        compatible-types: [SWORD]
-        effect: KILL_HEAL
-        tags: [COMBAT, PASSIVE]
-        levels:
-          1: { material: APPLE, proc-chance: 100, success-rate: 75, ability-value: 3, weight: 25 }
-          2: { material: APPLE, proc-chance: 100, success-rate: 60, ability-value: 5, weight: 15 }
-          3: { material: APPLE, glow: true, proc-chance: 100, success-rate: 45, ability-value: 7, weight: 8 }
-
-  elite:
-    material: YELLOW_CANDLE
-    glow: false
-    shop-price: 900.0
-    currency: MONEY
-    enchants:
       sky_stepper:
         display-name: "Sky Stepper"
         description: "Crouch in the air to launch upward"
@@ -168,20 +97,12 @@ runes:
           2: { material: LIGHT_BLUE_DYE, proc-chance: 100, success-rate: 55, ability-value: 1.0, weight: 25, effect-settings: { upward-velocity: 1.0, forward-velocity: 0.20, cooldown-seconds: 13 } }
           3: { material: LIGHT_BLUE_DYE, glow: true, proc-chance: 100, success-rate: 40, ability-value: 1.2, weight: 10, effect-settings: { upward-velocity: 1.2, forward-velocity: 0.25, cooldown-seconds: 9 } }
 
-      dasher:
-        display-name: "Dasher"
-        description: "Crouch in the air to launch forward"
-        compatible-types: [BOOTS]
-        effect: DASHER
-        priority: 100
-        blocked-in-combat: true
-        bindable: false
-        tags: [MOVEMENT, ACTIVE, COOLDOWN, EQUIPMENT]
-        levels:
-          1: { material: SUGAR, proc-chance: 100, success-rate: 70, ability-value: 1.1, weight: 45, effect-settings: { forward-velocity: 1.1, upward-velocity: 0.08, cooldown-seconds: 17 } }
-          2: { material: SUGAR, proc-chance: 100, success-rate: 55, ability-value: 1.33, weight: 25, effect-settings: { forward-velocity: 1.33, upward-velocity: 0.10, cooldown-seconds: 13 } }
-          3: { material: SUGAR, glow: true, proc-chance: 100, success-rate: 40, ability-value: 1.5, weight: 10, effect-settings: { forward-velocity: 1.5, upward-velocity: 0.12, cooldown-seconds: 9 } }
-
+  elite:
+    material: YELLOW_CANDLE
+    glow: false
+    shop-price: 900.0
+    currency: MONEY
+    enchants:
       soul_siphon:
         display-name: "Soul Siphon"
         description: "Heals from melee damage dealt"
@@ -204,17 +125,6 @@ runes:
           2: { material: BLAZE_POWDER, proc-chance: 30, success-rate: 55, ability-value: 3, weight: 25, effect-settings: { fire-seconds: 3 } }
           3: { material: BLAZE_POWDER, glow: true, proc-chance: 35, success-rate: 40, ability-value: 4, weight: 10, effect-settings: { fire-seconds: 4 } }
 
-      windrunner:
-        display-name: "Windrunner"
-        description: "Greatly reduces fall damage"
-        compatible-types: [BOOTS]
-        effect: FALL_REDUCTION
-        tags: [MOVEMENT, DEFENSIVE, PASSIVE, EQUIPMENT]
-        levels:
-          1: { material: WHITE_WOOL, proc-chance: 100, success-rate: 70, ability-value: 18, weight: 45 }
-          2: { material: WHITE_WOOL, proc-chance: 100, success-rate: 55, ability-value: 28, weight: 25 }
-          3: { material: WHITE_WOOL, glow: true, proc-chance: 100, success-rate: 40, ability-value: 40, weight: 10 }
-
       bulwark:
         display-name: "Bulwark"
         description: "Reduces PvP damage taken"
@@ -227,50 +137,19 @@ runes:
           2: { material: DIAMOND_CHESTPLATE, proc-chance: 100, success-rate: 55, ability-value: 4.5, weight: 25 }
           3: { material: DIAMOND_CHESTPLATE, glow: true, proc-chance: 100, success-rate: 40, ability-value: 6, weight: 10 }
 
-      piercer:
-        display-name: "Piercer"
-        description: "Increases crossbow damage against players"
-        compatible-types: [CROSSBOW]
-        effect: PROJECTILE_DAMAGE
-        target-filter: PLAYER
-        tags: [COMBAT, OFFENSIVE, PLAYER, PROJECTILE, PASSIVE]
+      dasher:
+        display-name: "Dasher"
+        description: "Crouch in the air to launch forward"
+        compatible-types: [BOOTS]
+        effect: DASHER
+        priority: 100
+        blocked-in-combat: true
+        bindable: false
+        tags: [MOVEMENT, ACTIVE, COOLDOWN, EQUIPMENT]
         levels:
-          1: { material: CROSSBOW, proc-chance: 100, success-rate: 70, ability-value: 7, weight: 45 }
-          2: { material: CROSSBOW, proc-chance: 100, success-rate: 55, ability-value: 10, weight: 25 }
-          3: { material: CROSSBOW, glow: true, proc-chance: 100, success-rate: 40, ability-value: 13, weight: 10 }
-
-      deep_vein:
-        display-name: "Deep Vein"
-        description: "Chance to duplicate mined ore drops"
-        compatible-types: [PICKAXE]
-        effect: ORE_FORTUNE
-        tags: [MINING, PASSIVE]
-        levels:
-          1: { material: DIAMOND_PICKAXE, proc-chance: 100, success-rate: 70, ability-value: 10, weight: 45 }
-          2: { material: DIAMOND_PICKAXE, proc-chance: 100, success-rate: 55, ability-value: 16, weight: 25 }
-          3: { material: DIAMOND_PICKAXE, glow: true, proc-chance: 100, success-rate: 40, ability-value: 22, weight: 10 }
-
-      bountiful_harvest:
-        display-name: "Bountiful Harvest"
-        description: "Chance to duplicate harvested crops"
-        compatible-types: [HOE]
-        effect: CROP_BOUNTY
-        tags: [FARMING, PASSIVE]
-        levels:
-          1: { material: DIAMOND_HOE, proc-chance: 100, success-rate: 70, ability-value: 12, weight: 45 }
-          2: { material: DIAMOND_HOE, proc-chance: 100, success-rate: 55, ability-value: 19, weight: 25 }
-          3: { material: DIAMOND_HOE, glow: true, proc-chance: 100, success-rate: 40, ability-value: 27, weight: 10 }
-
-      volatile_echo:
-        display-name: "Volatile Echo"
-        description: "Chance to damage nearby mobs on kill"
-        compatible-types: [CHESTPLATE]
-        effect: CORRUPTED_DETONATION
-        tags: [AOE, OFFENSIVE, MOB, PASSIVE, EQUIPMENT]
-        levels:
-          1: { material: MAGMA_CREAM, proc-chance: 20, success-rate: 70, ability-value: 8, weight: 25, effect-settings: { radius: 4.0 } }
-          2: { material: MAGMA_CREAM, proc-chance: 25, success-rate: 55, ability-value: 12, weight: 15, effect-settings: { radius: 4.5 } }
-          3: { material: MAGMA_CREAM, glow: true, proc-chance: 30, success-rate: 40, ability-value: 16, weight: 8, effect-settings: { radius: 5.0 } }
+          1: { material: SUGAR, proc-chance: 100, success-rate: 70, ability-value: 1.1, weight: 45, effect-settings: { forward-velocity: 1.1, upward-velocity: 0.08, cooldown-seconds: 17 } }
+          2: { material: SUGAR, proc-chance: 100, success-rate: 55, ability-value: 1.33, weight: 25, effect-settings: { forward-velocity: 1.33, upward-velocity: 0.10, cooldown-seconds: 13 } }
+          3: { material: SUGAR, glow: true, proc-chance: 100, success-rate: 40, ability-value: 1.5, weight: 10, effect-settings: { forward-velocity: 1.5, upward-velocity: 0.12, cooldown-seconds: 9 } }
 
   rare:
     material: MAGENTA_CANDLE
@@ -300,51 +179,6 @@ runes:
           2: { material: SHIELD, proc-chance: 100, success-rate: 48, ability-value: 16, weight: 20 }
           3: { material: SHIELD, glow: true, proc-chance: 100, success-rate: 34, ability-value: 22, weight: 8 }
 
-      executioner:
-        display-name: "Executioner"
-        description: "Deals extra damage to weakened enemies"
-        compatible-types: [SWORD]
-        effect: EXECUTE
-        tags: [COMBAT, OFFENSIVE, PASSIVE]
-        levels:
-          1: { material: BONE, proc-chance: 100, success-rate: 62, ability-value: 8, weight: 35, effect-settings: { health-threshold-percent: 25 } }
-          2: { material: BONE, proc-chance: 100, success-rate: 48, ability-value: 12, weight: 20, effect-settings: { health-threshold-percent: 30 } }
-          3: { material: BONE, glow: true, proc-chance: 100, success-rate: 34, ability-value: 16, weight: 8, effect-settings: { health-threshold-percent: 35 } }
-
-      reclaimer:
-        display-name: "Reclaimer"
-        description: "Restores health after a kill"
-        compatible-types: [SWORD]
-        effect: KILL_HEAL
-        tags: [COMBAT, PASSIVE]
-        levels:
-          1: { material: APPLE, proc-chance: 100, success-rate: 62, ability-value: 4, weight: 35 }
-          2: { material: APPLE, proc-chance: 100, success-rate: 48, ability-value: 6, weight: 20 }
-          3: { material: APPLE, glow: true, proc-chance: 100, success-rate: 34, ability-value: 8, weight: 8 }
-
-      deadeye:
-        display-name: "Deadeye"
-        description: "Increases bow and crossbow damage"
-        compatible-types: [BOW]
-        effect: PROJECTILE_DAMAGE
-        tags: [COMBAT, OFFENSIVE, PROJECTILE, PASSIVE]
-        levels:
-          1: { material: ARROW, proc-chance: 100, success-rate: 62, ability-value: 5, weight: 35 }
-          2: { material: ARROW, proc-chance: 100, success-rate: 48, ability-value: 8, weight: 20 }
-          3: { material: ARROW, glow: true, proc-chance: 100, success-rate: 34, ability-value: 11, weight: 8 }
-
-      ironclad:
-        display-name: "Ironclad"
-        description: "Reduces PvP damage taken"
-        compatible-types: [CHESTPLATE]
-        effect: DAMAGE_REDUCTION
-        damage-source: PLAYER
-        tags: [DEFENSIVE, PLAYER, PASSIVE, EQUIPMENT]
-        levels:
-          1: { material: DIAMOND_CHESTPLATE, proc-chance: 100, success-rate: 62, ability-value: 4, weight: 35 }
-          2: { material: DIAMOND_CHESTPLATE, proc-chance: 100, success-rate: 48, ability-value: 5.5, weight: 20 }
-          3: { material: DIAMOND_CHESTPLATE, glow: true, proc-chance: 100, success-rate: 34, ability-value: 7, weight: 8 }
-
       marksman:
         display-name: "Marksman"
         description: "Increases crossbow damage against players"
@@ -356,39 +190,6 @@ runes:
           1: { material: CROSSBOW, proc-chance: 100, success-rate: 62, ability-value: 9, weight: 35 }
           2: { material: CROSSBOW, proc-chance: 100, success-rate: 48, ability-value: 13, weight: 20 }
           3: { material: CROSSBOW, glow: true, proc-chance: 100, success-rate: 34, ability-value: 17, weight: 8 }
-
-      excavator:
-        display-name: "Excavator"
-        description: "Chance to duplicate mined ore drops"
-        compatible-types: [PICKAXE]
-        effect: ORE_FORTUNE
-        tags: [MINING, PASSIVE]
-        levels:
-          1: { material: NETHERITE_PICKAXE, proc-chance: 100, success-rate: 62, ability-value: 14, weight: 35 }
-          2: { material: NETHERITE_PICKAXE, proc-chance: 100, success-rate: 48, ability-value: 20, weight: 20 }
-          3: { material: NETHERITE_PICKAXE, glow: true, proc-chance: 100, success-rate: 34, ability-value: 27, weight: 8 }
-
-      abundance:
-        display-name: "Abundance"
-        description: "Chance to duplicate harvested crops"
-        compatible-types: [HOE]
-        effect: CROP_BOUNTY
-        tags: [FARMING, PASSIVE]
-        levels:
-          1: { material: NETHERITE_HOE, proc-chance: 100, success-rate: 62, ability-value: 16, weight: 35 }
-          2: { material: NETHERITE_HOE, proc-chance: 100, success-rate: 48, ability-value: 23, weight: 20 }
-          3: { material: NETHERITE_HOE, glow: true, proc-chance: 100, success-rate: 34, ability-value: 32, weight: 8 }
-
-      bloodthirst:
-        display-name: "Bloodthirst"
-        description: "Heals from melee damage dealt"
-        compatible-types: [SWORD]
-        effect: LIFESTEAL
-        tags: [COMBAT, OFFENSIVE, PASSIVE]
-        levels:
-          1: { material: NETHERITE_SWORD, proc-chance: 40, success-rate: 62, ability-value: 12, weight: 18 }
-          2: { material: NETHERITE_SWORD, proc-chance: 45, success-rate: 48, ability-value: 16, weight: 10 }
-          3: { material: NETHERITE_SWORD, glow: true, proc-chance: 50, success-rate: 34, ability-value: 20, weight: 4 }
 
   legendary:
     material: PINK_CANDLE
@@ -407,28 +208,6 @@ runes:
           1: { material: TOTEM_OF_UNDYING, proc-chance: 100, success-rate: 52, ability-value: 1, weight: 25, effect-settings: { cooldown-seconds: 180, restore-health: 4, regeneration-seconds: 4 } }
           2: { material: TOTEM_OF_UNDYING, proc-chance: 100, success-rate: 38, ability-value: 1, weight: 12, effect-settings: { cooldown-seconds: 150, restore-health: 6, regeneration-seconds: 5 } }
           3: { material: TOTEM_OF_UNDYING, glow: true, proc-chance: 100, success-rate: 25, ability-value: 1, weight: 4, effect-settings: { cooldown-seconds: 120, restore-health: 8, regeneration-seconds: 6 } }
-
-      titans_fury:
-        display-name: "Titan's Fury"
-        description: "Greatly increases axe damage"
-        compatible-types: [AXE]
-        effect: MELEE_DAMAGE
-        tags: [COMBAT, OFFENSIVE, PASSIVE]
-        levels:
-          1: { material: OBSIDIAN, proc-chance: 100, success-rate: 52, ability-value: 8, weight: 25 }
-          2: { material: OBSIDIAN, proc-chance: 100, success-rate: 38, ability-value: 11, weight: 12 }
-          3: { material: OBSIDIAN, glow: true, proc-chance: 100, success-rate: 25, ability-value: 14, weight: 4 }
-
-      void_leech:
-        display-name: "Void Leech"
-        description: "Steals a large share of melee damage as health"
-        compatible-types: [SWORD]
-        effect: LIFESTEAL
-        tags: [COMBAT, OFFENSIVE, PASSIVE]
-        levels:
-          1: { material: ENDER_PEARL, proc-chance: 40, success-rate: 52, ability-value: 14, weight: 25 }
-          2: { material: ENDER_PEARL, proc-chance: 45, success-rate: 38, ability-value: 18, weight: 12 }
-          3: { material: ENDER_PEARL, glow: true, proc-chance: 50, success-rate: 25, ability-value: 22, weight: 4 }
 
       riftwalker:
         display-name: "Riftwalker"
@@ -455,63 +234,6 @@ runes:
           2: { material: LIGHTNING_ROD, proc-chance: 24, success-rate: 38, ability-value: 2.5, weight: 12 }
           3: { material: LIGHTNING_ROD, glow: true, proc-chance: 30, success-rate: 25, ability-value: 3.5, weight: 4 }
 
-      sentinel:
-        display-name: "Sentinel"
-        description: "Greatly reduces PvP damage taken"
-        compatible-types: [CHESTPLATE]
-        effect: DAMAGE_REDUCTION
-        damage-source: PLAYER
-        tags: [DEFENSIVE, PLAYER, PASSIVE, EQUIPMENT]
-        levels:
-          1: { material: NETHERITE_CHESTPLATE, proc-chance: 100, success-rate: 52, ability-value: 5, weight: 25 }
-          2: { material: NETHERITE_CHESTPLATE, proc-chance: 100, success-rate: 38, ability-value: 7, weight: 12 }
-          3: { material: NETHERITE_CHESTPLATE, glow: true, proc-chance: 100, success-rate: 25, ability-value: 9, weight: 4 }
-
-      hunters_mark:
-        display-name: "Hunter's Mark"
-        description: "Greatly increases crossbow damage against players"
-        compatible-types: [CROSSBOW]
-        effect: PROJECTILE_DAMAGE
-        target-filter: PLAYER
-        tags: [COMBAT, OFFENSIVE, PLAYER, PROJECTILE, PASSIVE]
-        levels:
-          1: { material: CROSSBOW, proc-chance: 100, success-rate: 52, ability-value: 11, weight: 25 }
-          2: { material: CROSSBOW, proc-chance: 100, success-rate: 38, ability-value: 15, weight: 12 }
-          3: { material: CROSSBOW, glow: true, proc-chance: 100, success-rate: 25, ability-value: 19, weight: 4 }
-
-      worldbreaker:
-        display-name: "Worldbreaker"
-        description: "Chance to duplicate mined ore drops"
-        compatible-types: [PICKAXE]
-        effect: ORE_FORTUNE
-        tags: [MINING, PASSIVE]
-        levels:
-          1: { material: NETHERITE_PICKAXE, proc-chance: 100, success-rate: 52, ability-value: 18, weight: 25 }
-          2: { material: NETHERITE_PICKAXE, proc-chance: 100, success-rate: 38, ability-value: 25, weight: 12 }
-          3: { material: NETHERITE_PICKAXE, glow: true, proc-chance: 100, success-rate: 25, ability-value: 32, weight: 4 }
-
-      eternal_bloom:
-        display-name: "Eternal Bloom"
-        description: "Chance to duplicate harvested crops"
-        compatible-types: [HOE]
-        effect: CROP_BOUNTY
-        tags: [FARMING, PASSIVE]
-        levels:
-          1: { material: NETHERITE_HOE, proc-chance: 100, success-rate: 52, ability-value: 20, weight: 25 }
-          2: { material: NETHERITE_HOE, proc-chance: 100, success-rate: 38, ability-value: 28, weight: 12 }
-          3: { material: NETHERITE_HOE, glow: true, proc-chance: 100, success-rate: 25, ability-value: 36, weight: 4 }
-
-      apex_predator:
-        display-name: "Apex Predator"
-        description: "Deals extra damage to weakened enemies"
-        compatible-types: [SWORD]
-        effect: EXECUTE
-        tags: [COMBAT, OFFENSIVE, PASSIVE]
-        levels:
-          1: { material: NETHERITE_SWORD, proc-chance: 100, success-rate: 52, ability-value: 12, weight: 12, effect-settings: { health-threshold-percent: 30 } }
-          2: { material: NETHERITE_SWORD, proc-chance: 100, success-rate: 38, ability-value: 16, weight: 6, effect-settings: { health-threshold-percent: 35 } }
-          3: { material: NETHERITE_SWORD, glow: true, proc-chance: 100, success-rate: 25, ability-value: 20, weight: 2, effect-settings: { health-threshold-percent: 40 } }
-
   # Arena Runes -- previously a separate, hand-written system gated on
   # Haven/Riftlands; now just a fifth tier like any other. `level-count` +
   # `level-buckets` synthesize 20 levels per enchant from one `per-level-value`
@@ -531,36 +253,6 @@ runes:
       - { from: 20, to: 20, weight: 1 }
     random-success-range: { min: 15, max: 85 }
     enchants:
-      void_shield:
-        display-name: "Void Shield"
-        description: "Reduces mob damage taken"
-        compatible-types: [DURABLE]
-        effect: DAMAGE_REDUCTION
-        damage-source: MOB
-        enabled-zones: [HAVEN, RIFTLANDS]
-        per-level-value: 0.5
-        tags: [DEFENSIVE, MOB, PASSIVE, EQUIPMENT]
-
-      eclipse_ward:
-        display-name: "Eclipse Ward"
-        description: "Reduces PvP damage taken"
-        compatible-types: [DURABLE]
-        effect: DAMAGE_REDUCTION
-        damage-source: PLAYER
-        enabled-zones: [HAVEN, RIFTLANDS]
-        per-level-value: 0.25
-        tags: [DEFENSIVE, PLAYER, PASSIVE, EQUIPMENT]
-
-      eclipse_strike:
-        display-name: "Eclipse Strike"
-        description: "Increases PvP damage dealt"
-        compatible-types: [CHESTPLATE, SWORD, AXE]
-        effect: MELEE_DAMAGE
-        target-filter: PLAYER
-        enabled-zones: [HAVEN, RIFTLANDS]
-        per-level-value: 0.25
-        tags: [COMBAT, OFFENSIVE, PLAYER, PASSIVE]
-
       abyssal_scavenger:
         display-name: "Abyssal Scavenger"
         description: "Increases mob drops"
@@ -569,24 +261,6 @@ runes:
         enabled-zones: [HAVEN, RIFTLANDS]
         per-level-value: 0.5
         tags: [LOOT, MOB, PASSIVE, EQUIPMENT]
-
-      abyssal_insight:
-        display-name: "Abyssal Insight"
-        description: "Increases mob-kill XP"
-        compatible-types: [DURABLE]
-        effect: XP_BONUS
-        enabled-zones: [HAVEN, RIFTLANDS]
-        per-level-value: 0.5
-        tags: [LOOT, MOB, PASSIVE, EQUIPMENT]
-
-      abyssal_feast:
-        display-name: "Abyssal Feast"
-        description: "Heals max health on mob kills"
-        compatible-types: [DURABLE]
-        effect: KILL_HEAL
-        enabled-zones: [HAVEN, RIFTLANDS]
-        per-level-value: 0.1
-        tags: [DEFENSIVE, MOB, PASSIVE, EQUIPMENT]
 
       corrupted_detonation:
         display-name: "Corrupted Detonation"
@@ -598,25 +272,6 @@ runes:
         proc-chance: 30
         effect-settings: { radius: 5.0 }
         tags: [AOE, OFFENSIVE, MOB, ACTIVE, EQUIPMENT]
-
-      abyssal_marksman:
-        display-name: "Abyssal Marksman"
-        description: "Increases bow and crossbow damage against players"
-        compatible-types: [BOW, CROSSBOW]
-        effect: PROJECTILE_DAMAGE
-        target-filter: PLAYER
-        enabled-zones: [HAVEN, RIFTLANDS]
-        per-level-value: 0.2
-        tags: [COMBAT, OFFENSIVE, PLAYER, PROJECTILE, PASSIVE]
-
-      abyssal_prospector:
-        display-name: "Abyssal Prospector"
-        description: "Increases chance to duplicate mined ore drops"
-        compatible-types: [PICKAXE]
-        effect: ORE_FORTUNE
-        enabled-zones: [HAVEN, RIFTLANDS]
-        per-level-value: 0.5
-        tags: [MINING, PASSIVE]
 
       abyssal_reaper:
         display-name: "Abyssal Reaper"
@@ -632,12 +287,8 @@ runes:
   # SEASONAL -- black-and-gold/eagle-themed crate set. Admin/event-distributed
   # only via `/enchant give <player> item <id> <level> [amount]`; every level
   # below deliberately has NO `weight`, so nothing here is ever rollable from
-  # any base Rune. All twelve items are fully configured per every documented
-  # level; ONLY talon_rend and crown_breaker are wired to live gameplay so
-  # far (see RuneEffectListener#armNextHit/#consumeArmedHit/#onRegainHealth).
-  # The remaining ten are shipped as complete, tunable definitions ahead of
-  # their listener implementation, so admins can already balance them and no
-  # config changes are needed once each is wired up. `bindable` stays false
+  # any base Rune. All ten items are fully wired to live gameplay in
+  # RuneEffectListener. `bindable` stays false
   # for every effect that has no listener yet, so `/binds` never offers a
   # non-functional ability.
   #
@@ -701,33 +352,32 @@ runes:
 
       golden_bastion:
         display-name: "Golden Bastion"
-        description: "Create a stationary circle that shields you and allies inside it"
+        description: "Push every nearby enemy away from you for a few seconds -- your faction and allies are untouched"
         compatible-types: [CHESTPLATE]
         effect: GOLDEN_BASTION
         seasonal: true
         bindable: true
-        tags: [DEFENSIVE, ACTIVE, COOLDOWN, EQUIPMENT]
+        tags: [DEFENSIVE, OFFENSIVE, ACTIVE, COOLDOWN, EQUIPMENT]
         levels:
-          1: { material: GOLDEN_CHESTPLATE, proc-chance: 100, success-rate: 70, ability-value: 7, effect-settings: { cooldown-seconds: 45, radius-blocks: 5, duration-seconds: 6 } }
-          2: { material: GOLDEN_CHESTPLATE, proc-chance: 100, success-rate: 60, ability-value: 9, effect-settings: { cooldown-seconds: 45, radius-blocks: 5, duration-seconds: 6 } }
-          3: { material: GOLDEN_CHESTPLATE, proc-chance: 100, success-rate: 50, ability-value: 11, effect-settings: { cooldown-seconds: 45, radius-blocks: 5, duration-seconds: 6 } }
-          4: { material: GOLDEN_CHESTPLATE, proc-chance: 100, success-rate: 40, ability-value: 13, effect-settings: { cooldown-seconds: 45, radius-blocks: 5, duration-seconds: 6 } }
-          5: { material: GOLDEN_CHESTPLATE, glow: true, proc-chance: 100, success-rate: 30, ability-value: 15, effect-settings: { cooldown-seconds: 45, radius-blocks: 5, duration-seconds: 6 } }
+          1: { material: GOLDEN_CHESTPLATE, proc-chance: 100, success-rate: 70, ability-value: 1.2, effect-settings: { cooldown-seconds: 45, radius-blocks: 5, duration-seconds: 4 } }
+          2: { material: GOLDEN_CHESTPLATE, proc-chance: 100, success-rate: 60, ability-value: 1.4, effect-settings: { cooldown-seconds: 45, radius-blocks: 6, duration-seconds: 5 } }
+          3: { material: GOLDEN_CHESTPLATE, proc-chance: 100, success-rate: 50, ability-value: 1.6, effect-settings: { cooldown-seconds: 45, radius-blocks: 7, duration-seconds: 6 } }
+          4: { material: GOLDEN_CHESTPLATE, proc-chance: 100, success-rate: 40, ability-value: 1.8, effect-settings: { cooldown-seconds: 45, radius-blocks: 8, duration-seconds: 7 } }
+          5: { material: GOLDEN_CHESTPLATE, glow: true, proc-chance: 100, success-rate: 30, ability-value: 2.0, effect-settings: { cooldown-seconds: 45, radius-blocks: 10, duration-seconds: 8 } }
 
       raptors_reversal:
         display-name: "Raptor's Reversal"
-        description: "Brace, then counter the next incoming melee hit with reduced damage and knockback"
+        description: "Passive chance on any incoming melee hit to reduce the damage by a random amount and knock the attacker back"
         compatible-types: [LEGGINGS]
         effect: RAPTORS_REVERSAL
         seasonal: true
-        bindable: true
-        tags: [DEFENSIVE, ACTIVE, COOLDOWN, EQUIPMENT]
+        tags: [DEFENSIVE, PASSIVE, EQUIPMENT]
         levels:
-          1: { material: GOLDEN_LEGGINGS, proc-chance: 100, success-rate: 70, ability-value: 10, effect-settings: { cooldown-seconds: 30, counter-window-seconds: 2, knockback-strength: 1.0 } }
-          2: { material: GOLDEN_LEGGINGS, proc-chance: 100, success-rate: 60, ability-value: 15, effect-settings: { cooldown-seconds: 30, counter-window-seconds: 2, knockback-strength: 1.0 } }
-          3: { material: GOLDEN_LEGGINGS, proc-chance: 100, success-rate: 50, ability-value: 20, effect-settings: { cooldown-seconds: 30, counter-window-seconds: 2, knockback-strength: 1.1 } }
-          4: { material: GOLDEN_LEGGINGS, proc-chance: 100, success-rate: 40, ability-value: 25, effect-settings: { cooldown-seconds: 30, counter-window-seconds: 2, knockback-strength: 1.1 } }
-          5: { material: GOLDEN_LEGGINGS, glow: true, proc-chance: 100, success-rate: 30, ability-value: 30, effect-settings: { cooldown-seconds: 30, counter-window-seconds: 2, knockback-strength: 1.2 } }
+          1: { material: GOLDEN_LEGGINGS, proc-chance: 20, success-rate: 70, ability-value: 0, effect-settings: { cooldown-seconds: 6, min-reduction-percent: 15, max-reduction-percent: 35, knockback-strength: 1.0 } }
+          2: { material: GOLDEN_LEGGINGS, proc-chance: 25, success-rate: 60, ability-value: 0, effect-settings: { cooldown-seconds: 6, min-reduction-percent: 20, max-reduction-percent: 40, knockback-strength: 1.0 } }
+          3: { material: GOLDEN_LEGGINGS, proc-chance: 30, success-rate: 50, ability-value: 0, effect-settings: { cooldown-seconds: 6, min-reduction-percent: 20, max-reduction-percent: 45, knockback-strength: 1.1 } }
+          4: { material: GOLDEN_LEGGINGS, proc-chance: 35, success-rate: 40, ability-value: 0, effect-settings: { cooldown-seconds: 6, min-reduction-percent: 25, max-reduction-percent: 50, knockback-strength: 1.1 } }
+          5: { material: GOLDEN_LEGGINGS, glow: true, proc-chance: 40, success-rate: 30, ability-value: 0, effect-settings: { cooldown-seconds: 6, min-reduction-percent: 25, max-reduction-percent: 55, knockback-strength: 1.2 } }
 
       slipstream:
         display-name: "Slipstream"
@@ -768,11 +418,11 @@ runes:
         bindable: true
         tags: [COMBAT, OFFENSIVE, ACTIVE, COOLDOWN, EQUIPMENT]
         levels:
-          1: { material: GOLDEN_AXE, proc-chance: 100, success-rate: 70, ability-value: 1.0, effect-settings: { cooldown-seconds: 30, arm-window-seconds: 6 } }
-          2: { material: GOLDEN_AXE, proc-chance: 100, success-rate: 60, ability-value: 1.25, effect-settings: { cooldown-seconds: 30, arm-window-seconds: 6 } }
-          3: { material: GOLDEN_AXE, proc-chance: 100, success-rate: 50, ability-value: 1.5, effect-settings: { cooldown-seconds: 30, arm-window-seconds: 6 } }
-          4: { material: GOLDEN_AXE, proc-chance: 100, success-rate: 40, ability-value: 1.75, effect-settings: { cooldown-seconds: 30, arm-window-seconds: 6 } }
-          5: { material: GOLDEN_AXE, glow: true, proc-chance: 100, success-rate: 30, ability-value: 2.0, effect-settings: { cooldown-seconds: 30, arm-window-seconds: 6 } }
+          1: { material: GOLDEN_AXE, proc-chance: 100, success-rate: 70, ability-value: 1.0, effect-settings: { cooldown-seconds: 90, arm-window-seconds: 6 } }
+          2: { material: GOLDEN_AXE, proc-chance: 100, success-rate: 60, ability-value: 1.25, effect-settings: { cooldown-seconds: 90, arm-window-seconds: 6 } }
+          3: { material: GOLDEN_AXE, proc-chance: 100, success-rate: 50, ability-value: 1.5, effect-settings: { cooldown-seconds: 90, arm-window-seconds: 6 } }
+          4: { material: GOLDEN_AXE, proc-chance: 100, success-rate: 40, ability-value: 1.75, effect-settings: { cooldown-seconds: 90, arm-window-seconds: 6 } }
+          5: { material: GOLDEN_AXE, glow: true, proc-chance: 100, success-rate: 30, ability-value: 2.0, effect-settings: { cooldown-seconds: 90, arm-window-seconds: 6 } }
 
       rally_arrow:
         display-name: "Rally Arrow"
@@ -789,40 +439,40 @@ runes:
           4: { material: GOLDEN_HORSE_ARMOR, proc-chance: 100, success-rate: 40, ability-value: 1.75, effect-settings: { cooldown-seconds: 35, arm-window-seconds: 6, radius-blocks: 4, duration-seconds: 3 } }
           5: { material: GOLDEN_HORSE_ARMOR, glow: true, proc-chance: 100, success-rate: 30, ability-value: 2.0, effect-settings: { cooldown-seconds: 35, arm-window-seconds: 6, radius-blocks: 4, duration-seconds: 3 } }
 
-      gale_bolt:
-        display-name: "Gale Bolt"
-        description: "Empower your next bolt to release an outward gust on impact"
-        compatible-types: [CROSSBOW]
-        effect: GALE_BOLT
-        seasonal: true
-        bindable: true
-        tags: [DEFENSIVE, ACTIVE, COOLDOWN, EQUIPMENT]
-        levels:
-          1: { material: GOLDEN_HORSE_ARMOR, proc-chance: 100, success-rate: 70, ability-value: 2.0, effect-settings: { cooldown-seconds: 35, arm-window-seconds: 6, radius-blocks: 2.0, horizontal-knockback-strength: 1.0 } }
-          2: { material: GOLDEN_HORSE_ARMOR, proc-chance: 100, success-rate: 60, ability-value: 2.5, effect-settings: { cooldown-seconds: 35, arm-window-seconds: 6, radius-blocks: 2.5, horizontal-knockback-strength: 1.0 } }
-          3: { material: GOLDEN_HORSE_ARMOR, proc-chance: 100, success-rate: 50, ability-value: 3.0, effect-settings: { cooldown-seconds: 35, arm-window-seconds: 6, radius-blocks: 3.0, horizontal-knockback-strength: 1.1 } }
-          4: { material: GOLDEN_HORSE_ARMOR, proc-chance: 100, success-rate: 40, ability-value: 3.5, effect-settings: { cooldown-seconds: 35, arm-window-seconds: 6, radius-blocks: 3.5, horizontal-knockback-strength: 1.1 } }
-          5: { material: GOLDEN_HORSE_ARMOR, glow: true, proc-chance: 100, success-rate: 30, ability-value: 4.0, effect-settings: { cooldown-seconds: 35, arm-window-seconds: 6, radius-blocks: 4.0, horizontal-knockback-strength: 1.2 } }
-
+      # Gilded Catch's booster potions are individual (personal), not
+      # server-wide: min/max-exp-percent and min/max-sell-percent cap the
+      # full possible range of a rolled potion's percent (15-200% for EXP,
+      # 25-124% for Sell, fully configurable), and min/max-*-duration-seconds
+      # cap how long one lasts once drunk (Sell boosters never longer than
+      # 60s, EXP boosters never longer than 30 minutes = 1800s).
+      # booster-chance (out of 100, separate from proc-chance/success-rate
+      # above) is how often a given genuine catch grants a potion at all --
+      # a higher-level rod is straightforwardly better here, from 1% at
+      # level 1 up to 15% at level 10. Level also biases WHICH percent/
+      # duration gets rolled within that same min/max range (see
+      # RuneEffectListener#biasedFloor): a level 1 rod can still roll
+      # anywhere in the full range, but a level 10 rod's roll floor is
+      # pushed close to the ceiling, so its boosters consistently land near
+      # the top instead of anywhere in it.
       gilded_catch:
         display-name: "Gilded Catch"
-        description: "A genuine catch has a chance to roll one extra seasonal reward"
+        description: "A genuine catch has a chance to roll one extra seasonal reward, and a rarer chance at a personal XP or Sell booster potion that gets both more common and stronger with level"
         compatible-types: [FISHING_ROD]
         effect: GILDED_CATCH
         seasonal: true
         bindable: false
         tags: [FISHING, LOOT, PASSIVE, EQUIPMENT]
         levels:
-          1: { material: FISHING_ROD, proc-chance: 100, success-rate: 70, ability-value: 1, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1 } }
-          2: { material: FISHING_ROD, proc-chance: 100, success-rate: 66, ability-value: 2, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1 } }
-          3: { material: FISHING_ROD, proc-chance: 100, success-rate: 62, ability-value: 3, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1 } }
-          4: { material: FISHING_ROD, proc-chance: 100, success-rate: 58, ability-value: 4, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1 } }
-          5: { material: FISHING_ROD, proc-chance: 100, success-rate: 54, ability-value: 5, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1 } }
-          6: { material: FISHING_ROD, proc-chance: 100, success-rate: 50, ability-value: 6, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1 } }
-          7: { material: FISHING_ROD, proc-chance: 100, success-rate: 46, ability-value: 7, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1 } }
-          8: { material: FISHING_ROD, proc-chance: 100, success-rate: 42, ability-value: 8, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1 } }
-          9: { material: FISHING_ROD, proc-chance: 100, success-rate: 38, ability-value: 9, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1 } }
-          10: { material: FISHING_ROD, glow: true, proc-chance: 100, success-rate: 34, ability-value: 10, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1 } }
+          1: { material: FISHING_ROD, proc-chance: 100, success-rate: 70, ability-value: 1, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1, booster-chance: 1, min-exp-percent: 15, max-exp-percent: 200, min-sell-percent: 25, max-sell-percent: 124, min-exp-duration-seconds: 300, max-exp-duration-seconds: 1800, min-sell-duration-seconds: 15, max-sell-duration-seconds: 60 } }
+          2: { material: FISHING_ROD, proc-chance: 100, success-rate: 66, ability-value: 2, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1, booster-chance: 2, min-exp-percent: 15, max-exp-percent: 200, min-sell-percent: 25, max-sell-percent: 124, min-exp-duration-seconds: 300, max-exp-duration-seconds: 1800, min-sell-duration-seconds: 15, max-sell-duration-seconds: 60 } }
+          3: { material: FISHING_ROD, proc-chance: 100, success-rate: 62, ability-value: 3, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1, booster-chance: 3, min-exp-percent: 15, max-exp-percent: 200, min-sell-percent: 25, max-sell-percent: 124, min-exp-duration-seconds: 300, max-exp-duration-seconds: 1800, min-sell-duration-seconds: 15, max-sell-duration-seconds: 60 } }
+          4: { material: FISHING_ROD, proc-chance: 100, success-rate: 58, ability-value: 4, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1, booster-chance: 4, min-exp-percent: 15, max-exp-percent: 200, min-sell-percent: 25, max-sell-percent: 124, min-exp-duration-seconds: 300, max-exp-duration-seconds: 1800, min-sell-duration-seconds: 15, max-sell-duration-seconds: 60 } }
+          5: { material: FISHING_ROD, proc-chance: 100, success-rate: 54, ability-value: 5, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1, booster-chance: 5, min-exp-percent: 15, max-exp-percent: 200, min-sell-percent: 25, max-sell-percent: 124, min-exp-duration-seconds: 300, max-exp-duration-seconds: 1800, min-sell-duration-seconds: 15, max-sell-duration-seconds: 60 } }
+          6: { material: FISHING_ROD, proc-chance: 100, success-rate: 50, ability-value: 6, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1, booster-chance: 7, min-exp-percent: 15, max-exp-percent: 200, min-sell-percent: 25, max-sell-percent: 124, min-exp-duration-seconds: 300, max-exp-duration-seconds: 1800, min-sell-duration-seconds: 15, max-sell-duration-seconds: 60 } }
+          7: { material: FISHING_ROD, proc-chance: 100, success-rate: 46, ability-value: 7, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1, booster-chance: 9, min-exp-percent: 15, max-exp-percent: 200, min-sell-percent: 25, max-sell-percent: 124, min-exp-duration-seconds: 300, max-exp-duration-seconds: 1800, min-sell-duration-seconds: 15, max-sell-duration-seconds: 60 } }
+          8: { material: FISHING_ROD, proc-chance: 100, success-rate: 42, ability-value: 8, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1, booster-chance: 11, min-exp-percent: 15, max-exp-percent: 200, min-sell-percent: 25, max-sell-percent: 124, min-exp-duration-seconds: 300, max-exp-duration-seconds: 1800, min-sell-duration-seconds: 15, max-sell-duration-seconds: 60 } }
+          9: { material: FISHING_ROD, proc-chance: 100, success-rate: 38, ability-value: 9, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1, booster-chance: 13, min-exp-percent: 15, max-exp-percent: 200, min-sell-percent: 25, max-sell-percent: 124, min-exp-duration-seconds: 300, max-exp-duration-seconds: 1800, min-sell-duration-seconds: 15, max-sell-duration-seconds: 60 } }
+          10: { material: FISHING_ROD, glow: true, proc-chance: 100, success-rate: 34, ability-value: 10, effect-settings: { cooldown-seconds: 0, bonus-reward-amount: 1, booster-chance: 15, min-exp-percent: 15, max-exp-percent: 200, min-sell-percent: 25, max-sell-percent: 124, min-exp-duration-seconds: 300, max-exp-duration-seconds: 1800, min-sell-duration-seconds: 15, max-sell-duration-seconds: 60 } }
 
       golden_harvest:
         display-name: "Golden Harvest"
@@ -900,6 +550,298 @@ war-chest:
 # update. Deliberately absent from every tier's `enchants:` block above, so
 # they carry no roll weight and can never be rolled again.
 legacy:
+  featherbound:
+    display-name: "Featherbound"
+    description: "Reduces fall damage"
+    compatible-types: [BOOTS]
+    effect: FALL_REDUCTION
+    tags: [MOVEMENT, DEFENSIVE, PASSIVE, EQUIPMENT]
+    levels:
+      1: { material: FEATHER, proc-chance: 100, success-rate: 75, ability-value: 12 }
+      2: { material: FEATHER, proc-chance: 100, success-rate: 60, ability-value: 20 }
+      3: { material: FEATHER, glow: true, proc-chance: 100, success-rate: 45, ability-value: 30 }
+
+  ironhide:
+    display-name: "Ironhide"
+    description: "Reduces all incoming damage"
+    compatible-types: [CHESTPLATE]
+    effect: DAMAGE_REDUCTION
+    tags: [DEFENSIVE, PASSIVE, EQUIPMENT]
+    levels:
+      1: { material: IRON_INGOT, proc-chance: 100, success-rate: 75, ability-value: 2 }
+      2: { material: IRON_INGOT, proc-chance: 100, success-rate: 60, ability-value: 3 }
+      3: { material: IRON_INGOT, glow: true, proc-chance: 100, success-rate: 45, ability-value: 4 }
+
+  guardians_will:
+    display-name: "Guardian's Will"
+    description: "Reduces PvP damage taken"
+    compatible-types: [CHESTPLATE]
+    effect: DAMAGE_REDUCTION
+    damage-source: PLAYER
+    tags: [DEFENSIVE, PLAYER, PASSIVE, EQUIPMENT]
+    levels:
+      1: { material: IRON_CHESTPLATE, proc-chance: 100, success-rate: 75, ability-value: 2 }
+      2: { material: IRON_CHESTPLATE, proc-chance: 100, success-rate: 60, ability-value: 3 }
+      3: { material: IRON_CHESTPLATE, glow: true, proc-chance: 100, success-rate: 45, ability-value: 4 }
+
+  quickdraw:
+    display-name: "Quickdraw"
+    description: "Increases bow damage against players"
+    compatible-types: [BOW]
+    effect: PROJECTILE_DAMAGE
+    target-filter: PLAYER
+    tags: [COMBAT, OFFENSIVE, PLAYER, PROJECTILE, PASSIVE]
+    levels:
+      1: { material: BOW, proc-chance: 100, success-rate: 75, ability-value: 4 }
+      2: { material: BOW, proc-chance: 100, success-rate: 60, ability-value: 6 }
+      3: { material: BOW, glow: true, proc-chance: 100, success-rate: 45, ability-value: 8 }
+
+  stonebreaker:
+    display-name: "Stonebreaker"
+    description: "Chance to duplicate mined ore drops -- worn, not wielded"
+    compatible-types: [HELMET]
+    effect: ORE_FORTUNE
+    tags: [MINING, PASSIVE, EQUIPMENT]
+    levels:
+      1: { material: IRON_HELMET, proc-chance: 100, success-rate: 75, ability-value: 6 }
+      2: { material: IRON_HELMET, proc-chance: 100, success-rate: 60, ability-value: 10 }
+      3: { material: IRON_HELMET, glow: true, proc-chance: 100, success-rate: 45, ability-value: 14 }
+
+  fieldworker:
+    display-name: "Fieldworker"
+    description: "Chance to duplicate harvested crops -- worn, not wielded"
+    compatible-types: [BOOTS]
+    effect: CROP_BOUNTY
+    tags: [FARMING, PASSIVE, EQUIPMENT]
+    levels:
+      1: { material: LEATHER_BOOTS, proc-chance: 100, success-rate: 75, ability-value: 7 }
+      2: { material: LEATHER_BOOTS, proc-chance: 100, success-rate: 60, ability-value: 12 }
+      3: { material: LEATHER_BOOTS, glow: true, proc-chance: 100, success-rate: 45, ability-value: 18 }
+
+  second_wind:
+    display-name: "Second Wind"
+    description: "Restores health after a kill"
+    compatible-types: [SWORD]
+    effect: KILL_HEAL
+    tags: [COMBAT, PASSIVE]
+    levels:
+      1: { material: APPLE, proc-chance: 100, success-rate: 75, ability-value: 3 }
+      2: { material: APPLE, proc-chance: 100, success-rate: 60, ability-value: 5 }
+      3: { material: APPLE, glow: true, proc-chance: 100, success-rate: 45, ability-value: 7 }
+
+  windrunner:
+    display-name: "Windrunner"
+    description: "Greatly reduces fall damage"
+    compatible-types: [BOOTS]
+    effect: FALL_REDUCTION
+    tags: [MOVEMENT, DEFENSIVE, PASSIVE, EQUIPMENT]
+    levels:
+      1: { material: WHITE_WOOL, proc-chance: 100, success-rate: 70, ability-value: 18 }
+      2: { material: WHITE_WOOL, proc-chance: 100, success-rate: 55, ability-value: 28 }
+      3: { material: WHITE_WOOL, glow: true, proc-chance: 100, success-rate: 40, ability-value: 40 }
+
+  piercer:
+    display-name: "Piercer"
+    description: "Increases crossbow damage against players"
+    compatible-types: [CROSSBOW]
+    effect: PROJECTILE_DAMAGE
+    target-filter: PLAYER
+    tags: [COMBAT, OFFENSIVE, PLAYER, PROJECTILE, PASSIVE]
+    levels:
+      1: { material: CROSSBOW, proc-chance: 100, success-rate: 70, ability-value: 7 }
+      2: { material: CROSSBOW, proc-chance: 100, success-rate: 55, ability-value: 10 }
+      3: { material: CROSSBOW, glow: true, proc-chance: 100, success-rate: 40, ability-value: 13 }
+
+  deep_vein:
+    display-name: "Deep Vein"
+    description: "Chance to duplicate mined ore drops"
+    compatible-types: [PICKAXE]
+    effect: ORE_FORTUNE
+    tags: [MINING, PASSIVE]
+    levels:
+      1: { material: DIAMOND_PICKAXE, proc-chance: 100, success-rate: 70, ability-value: 10 }
+      2: { material: DIAMOND_PICKAXE, proc-chance: 100, success-rate: 55, ability-value: 16 }
+      3: { material: DIAMOND_PICKAXE, glow: true, proc-chance: 100, success-rate: 40, ability-value: 22 }
+
+  bountiful_harvest:
+    display-name: "Bountiful Harvest"
+    description: "Chance to duplicate harvested crops"
+    compatible-types: [HOE]
+    effect: CROP_BOUNTY
+    tags: [FARMING, PASSIVE]
+    levels:
+      1: { material: DIAMOND_HOE, proc-chance: 100, success-rate: 70, ability-value: 12 }
+      2: { material: DIAMOND_HOE, proc-chance: 100, success-rate: 55, ability-value: 19 }
+      3: { material: DIAMOND_HOE, glow: true, proc-chance: 100, success-rate: 40, ability-value: 27 }
+
+  volatile_echo:
+    display-name: "Volatile Echo"
+    description: "Chance to damage nearby mobs on kill"
+    compatible-types: [CHESTPLATE]
+    effect: CORRUPTED_DETONATION
+    tags: [AOE, OFFENSIVE, MOB, PASSIVE, EQUIPMENT]
+    levels:
+      1: { material: MAGMA_CREAM, proc-chance: 20, success-rate: 70, ability-value: 8, effect-settings: { radius: 4.0 } }
+      2: { material: MAGMA_CREAM, proc-chance: 25, success-rate: 55, ability-value: 12, effect-settings: { radius: 4.5 } }
+      3: { material: MAGMA_CREAM, glow: true, proc-chance: 30, success-rate: 40, ability-value: 16, effect-settings: { radius: 5.0 } }
+
+  executioner:
+    display-name: "Executioner"
+    description: "Deals extra damage to weakened enemies"
+    compatible-types: [SWORD]
+    effect: EXECUTE
+    tags: [COMBAT, OFFENSIVE, PASSIVE]
+    levels:
+      1: { material: BONE, proc-chance: 100, success-rate: 62, ability-value: 8, effect-settings: { health-threshold-percent: 25 } }
+      2: { material: BONE, proc-chance: 100, success-rate: 48, ability-value: 12, effect-settings: { health-threshold-percent: 30 } }
+      3: { material: BONE, glow: true, proc-chance: 100, success-rate: 34, ability-value: 16, effect-settings: { health-threshold-percent: 35 } }
+
+  reclaimer:
+    display-name: "Reclaimer"
+    description: "Restores health after a kill"
+    compatible-types: [SWORD]
+    effect: KILL_HEAL
+    tags: [COMBAT, PASSIVE]
+    levels:
+      1: { material: APPLE, proc-chance: 100, success-rate: 62, ability-value: 4 }
+      2: { material: APPLE, proc-chance: 100, success-rate: 48, ability-value: 6 }
+      3: { material: APPLE, glow: true, proc-chance: 100, success-rate: 34, ability-value: 8 }
+
+  deadeye:
+    display-name: "Deadeye"
+    description: "Increases bow and crossbow damage"
+    compatible-types: [BOW]
+    effect: PROJECTILE_DAMAGE
+    tags: [COMBAT, OFFENSIVE, PROJECTILE, PASSIVE]
+    levels:
+      1: { material: ARROW, proc-chance: 100, success-rate: 62, ability-value: 5 }
+      2: { material: ARROW, proc-chance: 100, success-rate: 48, ability-value: 8 }
+      3: { material: ARROW, glow: true, proc-chance: 100, success-rate: 34, ability-value: 11 }
+
+  ironclad:
+    display-name: "Ironclad"
+    description: "Reduces PvP damage taken"
+    compatible-types: [CHESTPLATE]
+    effect: DAMAGE_REDUCTION
+    damage-source: PLAYER
+    tags: [DEFENSIVE, PLAYER, PASSIVE, EQUIPMENT]
+    levels:
+      1: { material: DIAMOND_CHESTPLATE, proc-chance: 100, success-rate: 62, ability-value: 4 }
+      2: { material: DIAMOND_CHESTPLATE, proc-chance: 100, success-rate: 48, ability-value: 5.5 }
+      3: { material: DIAMOND_CHESTPLATE, glow: true, proc-chance: 100, success-rate: 34, ability-value: 7 }
+
+  excavator:
+    display-name: "Excavator"
+    description: "Chance to duplicate mined ore drops"
+    compatible-types: [PICKAXE]
+    effect: ORE_FORTUNE
+    tags: [MINING, PASSIVE]
+    levels:
+      1: { material: NETHERITE_PICKAXE, proc-chance: 100, success-rate: 62, ability-value: 14 }
+      2: { material: NETHERITE_PICKAXE, proc-chance: 100, success-rate: 48, ability-value: 20 }
+      3: { material: NETHERITE_PICKAXE, glow: true, proc-chance: 100, success-rate: 34, ability-value: 27 }
+
+  abundance:
+    display-name: "Abundance"
+    description: "Chance to duplicate harvested crops"
+    compatible-types: [HOE]
+    effect: CROP_BOUNTY
+    tags: [FARMING, PASSIVE]
+    levels:
+      1: { material: NETHERITE_HOE, proc-chance: 100, success-rate: 62, ability-value: 16 }
+      2: { material: NETHERITE_HOE, proc-chance: 100, success-rate: 48, ability-value: 23 }
+      3: { material: NETHERITE_HOE, glow: true, proc-chance: 100, success-rate: 34, ability-value: 32 }
+
+  bloodthirst:
+    display-name: "Bloodthirst"
+    description: "Heals from melee damage dealt"
+    compatible-types: [SWORD]
+    effect: LIFESTEAL
+    tags: [COMBAT, OFFENSIVE, PASSIVE]
+    levels:
+      1: { material: NETHERITE_SWORD, proc-chance: 40, success-rate: 62, ability-value: 12 }
+      2: { material: NETHERITE_SWORD, proc-chance: 45, success-rate: 48, ability-value: 16 }
+      3: { material: NETHERITE_SWORD, glow: true, proc-chance: 50, success-rate: 34, ability-value: 20 }
+
+  titans_fury:
+    display-name: "Titan's Fury"
+    description: "Greatly increases axe damage"
+    compatible-types: [AXE]
+    effect: MELEE_DAMAGE
+    tags: [COMBAT, OFFENSIVE, PASSIVE]
+    levels:
+      1: { material: OBSIDIAN, proc-chance: 100, success-rate: 52, ability-value: 8 }
+      2: { material: OBSIDIAN, proc-chance: 100, success-rate: 38, ability-value: 11 }
+      3: { material: OBSIDIAN, glow: true, proc-chance: 100, success-rate: 25, ability-value: 14 }
+
+  void_leech:
+    display-name: "Void Leech"
+    description: "Steals a large share of melee damage as health"
+    compatible-types: [SWORD]
+    effect: LIFESTEAL
+    tags: [COMBAT, OFFENSIVE, PASSIVE]
+    levels:
+      1: { material: ENDER_PEARL, proc-chance: 40, success-rate: 52, ability-value: 14 }
+      2: { material: ENDER_PEARL, proc-chance: 45, success-rate: 38, ability-value: 18 }
+      3: { material: ENDER_PEARL, glow: true, proc-chance: 50, success-rate: 25, ability-value: 22 }
+
+  sentinel:
+    display-name: "Sentinel"
+    description: "Greatly reduces PvP damage taken"
+    compatible-types: [CHESTPLATE]
+    effect: DAMAGE_REDUCTION
+    damage-source: PLAYER
+    tags: [DEFENSIVE, PLAYER, PASSIVE, EQUIPMENT]
+    levels:
+      1: { material: NETHERITE_CHESTPLATE, proc-chance: 100, success-rate: 52, ability-value: 5 }
+      2: { material: NETHERITE_CHESTPLATE, proc-chance: 100, success-rate: 38, ability-value: 7 }
+      3: { material: NETHERITE_CHESTPLATE, glow: true, proc-chance: 100, success-rate: 25, ability-value: 9 }
+
+  hunters_mark:
+    display-name: "Hunter's Mark"
+    description: "Greatly increases crossbow damage against players"
+    compatible-types: [CROSSBOW]
+    effect: PROJECTILE_DAMAGE
+    target-filter: PLAYER
+    tags: [COMBAT, OFFENSIVE, PLAYER, PROJECTILE, PASSIVE]
+    levels:
+      1: { material: CROSSBOW, proc-chance: 100, success-rate: 52, ability-value: 11 }
+      2: { material: CROSSBOW, proc-chance: 100, success-rate: 38, ability-value: 15 }
+      3: { material: CROSSBOW, glow: true, proc-chance: 100, success-rate: 25, ability-value: 19 }
+
+  worldbreaker:
+    display-name: "Worldbreaker"
+    description: "Chance to duplicate mined ore drops"
+    compatible-types: [PICKAXE]
+    effect: ORE_FORTUNE
+    tags: [MINING, PASSIVE]
+    levels:
+      1: { material: NETHERITE_PICKAXE, proc-chance: 100, success-rate: 52, ability-value: 18 }
+      2: { material: NETHERITE_PICKAXE, proc-chance: 100, success-rate: 38, ability-value: 25 }
+      3: { material: NETHERITE_PICKAXE, glow: true, proc-chance: 100, success-rate: 25, ability-value: 32 }
+
+  eternal_bloom:
+    display-name: "Eternal Bloom"
+    description: "Chance to duplicate harvested crops"
+    compatible-types: [HOE]
+    effect: CROP_BOUNTY
+    tags: [FARMING, PASSIVE]
+    levels:
+      1: { material: NETHERITE_HOE, proc-chance: 100, success-rate: 52, ability-value: 20 }
+      2: { material: NETHERITE_HOE, proc-chance: 100, success-rate: 38, ability-value: 28 }
+      3: { material: NETHERITE_HOE, glow: true, proc-chance: 100, success-rate: 25, ability-value: 36 }
+
+  apex_predator:
+    display-name: "Apex Predator"
+    description: "Deals extra damage to weakened enemies"
+    compatible-types: [SWORD]
+    effect: EXECUTE
+    tags: [COMBAT, OFFENSIVE, PASSIVE]
+    levels:
+      1: { material: NETHERITE_SWORD, proc-chance: 100, success-rate: 52, ability-value: 12, effect-settings: { health-threshold-percent: 30 } }
+      2: { material: NETHERITE_SWORD, proc-chance: 100, success-rate: 38, ability-value: 16, effect-settings: { health-threshold-percent: 35 } }
+      3: { material: NETHERITE_SWORD, glow: true, proc-chance: 100, success-rate: 25, ability-value: 20, effect-settings: { health-threshold-percent: 40 } }
+
   haste_pickaxe:
     display-name: "Haste"
     description: "Legacy mining speed"

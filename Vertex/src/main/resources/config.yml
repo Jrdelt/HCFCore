@@ -80,8 +80,13 @@ network:
 teleports:
   countdown-seconds: 5
   rtp:
-    attempts: 5
-    claim-buffer-chunks: 5
+    # attempts x an 11x11 (2*claim-buffer-chunks+1 squared) fully-unclaimed
+    # chunk pocket is a genuinely hard target on a claim-dense map -- the old
+    # 5/5 defaults frequently exhausted every attempt and fell through to
+    # "rtp.failed" on a busy server, which reads as "/wild doesn't work"
+    # even though the claim-avoidance logic itself was never broken.
+    attempts: 30
+    claim-buffer-chunks: 3
     countdown-seconds: 5
     cooldown-seconds: 300
     retry-delay-seconds: 5
@@ -558,6 +563,25 @@ reboot:
 # ============================================
 # RESET VAULT
 # ============================================
+reset-vault:
+  enabled: true
+  block-material: BLUE_SHULKER_BOX
+  map-label: "Season 1"
+  sotw-milestone: "reset-vault-open"
+  give-allowlist:
+    - "cesardeltorojr"
+    - "Volos_"
+  approved-players:
+    - "Volos_"
+  rank-base-slots:
+    default: 1
+    vip: 2
+    hero: 3
+    legend: 4
+    titan: 5
+  remove-enchant:
+    - "temporary_enchant"
+
 binds:
   # One global delay applied between every queued ability attempt -- not configurable per bind/preset.
   ability-delay-seconds: 2

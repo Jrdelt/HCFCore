@@ -150,6 +150,8 @@ public final class EnchantManager {
     private volatile SeasonalItemCatalog seasonalCatalog;
 
     private volatile Map<String, EnchantDefinition> definitions = Map.of();
+    /** Reverse lookup for {@link #tierOf(String)} -- absent (not null) for a {@code legacy:} id, which belongs to no current tier. */
+    private volatile Map<String, RuneTier> definitionTiers = Map.of();
     private volatile Map<RuneTier, RuneRollTable> rollTables = Map.of();
     private volatile Map<RuneTier, RuneCosmetic> runeCosmetics = Map.of();
     private volatile Map<RuneTier, Double> runeShopPrices = Map.of();
@@ -217,6 +219,7 @@ public final class EnchantManager {
         successRateJitterPercent = Math.max(0D, config.getDouble("success-rate-jitter-percent", 10D));
 
         Map<String, EnchantDefinition> loadedDefinitions = new LinkedHashMap<>();
+        Map<String, RuneTier> loadedDefinitionTiers = new LinkedHashMap<>();
         Map<RuneTier, RuneCosmetic> cosmetics = new EnumMap<>(RuneTier.class);
         Map<RuneTier, Double> prices = new EnumMap<>(RuneTier.class);
         Map<RuneTier, Currency> currencies = new EnumMap<>(RuneTier.class);
@@ -247,11 +250,12 @@ public final class EnchantManager {
                             continue;
                         }
                         LoadedEnchant loaded = readEnchant(RUNES_CONFIG_PATH + " (" + tierKey + ")", id, enchantSection,
-                                buckets, levelCount);
+                                buckets, levelCount, tier);
                         if (loaded == null) {
                             continue;
                         }
                         loadedDefinitions.put(id, loaded.definition());
+                        loadedDefinitionTiers.put(id, tier);
                         entries.addAll(loaded.rollEntries());
                     }
                 }
@@ -290,11 +294,12 @@ public final class EnchantManager {
                             }
                             LoadedEnchant loaded = readEnchant(
                                     RUNES_CONFIG_PATH + " (" + tierKey + ".sets." + setName + ")", id, enchantSection,
-                                    buckets, levelCount, setName, setIconDefaults);
+                                    buckets, levelCount, setName, setIconDefaults, tier);
                             if (loaded == null) {
                                 continue;
                             }
                             loadedDefinitions.put(id, loaded.definition());
+                            loadedDefinitionTiers.put(id, tier);
                             entries.addAll(loaded.rollEntries());
                         }
                     }
@@ -313,7 +318,7 @@ public final class EnchantManager {
                 if (section == null) {
                     continue;
                 }
-                LoadedEnchant loaded = readEnchant(RUNES_CONFIG_PATH + " (legacy)", id, section, List.of(), 0);
+                LoadedEnchant loaded = readEnchant(RUNES_CONFIG_PATH + " (legacy)", id, section, List.of(), 0, null);
                 if (loaded != null) {
                     loadedDefinitions.put(id, loaded.definition());
                 }
@@ -328,6 +333,7 @@ public final class EnchantManager {
         // display order, like the Seasonal Set preview menu) needs that
         // order to actually be admin-controllable by editing the file.
         definitions = Collections.unmodifiableMap(loadedDefinitions);
+        definitionTiers = Map.copyOf(loadedDefinitionTiers);
         runeCosmetics = Map.copyOf(cosmetics);
         runeShopPrices = Map.copyOf(prices);
         runeShopCurrencies = Map.copyOf(currencies);
@@ -548,12 +554,13 @@ public final class EnchantManager {
     }
 
     private LoadedEnchant readEnchant(String where, String id, ConfigurationSection section,
-            List<LevelBucket> tierBuckets, int tierLevelCount) {
-        return readEnchant(where, id, section, tierBuckets, tierLevelCount, null, LevelIconDefaults.NONE);
+            List<LevelBucket> tierBuckets, int tierLevelCount, RuneTier tier) {
+        return readEnchant(where, id, section, tierBuckets, tierLevelCount, null, LevelIconDefaults.NONE, tier);
     }
 
     private LoadedEnchant readEnchant(String where, String id, ConfigurationSection section,
-            List<LevelBucket> tierBuckets, int tierLevelCount, String seasonalSet, LevelIconDefaults iconDefaults) {
+            List<LevelBucket> tierBuckets, int tierLevelCount, String seasonalSet, LevelIconDefaults iconDefaults,
+            RuneTier tier) {
         String displayName = section.getString("display-name", id);
         String description = section.getString("description", displayName);
         Set<String> compatible = new LinkedHashSet<>();
@@ -583,9 +590,9 @@ public final class EnchantManager {
         List<EnchantDefinition.Level> levels;
         List<RuneRollTable.Entry> rollEntries = new ArrayList<>();
         if (section.contains("per-level-value") && tierLevelCount > 0) {
-            levels = generateLevels(section, id, tierLevelCount, tierBuckets, rollEntries);
+            levels = generateLevels(section, id, tierLevelCount, tierBuckets, rollEntries, tier);
         } else {
-            levels = readExplicitLevels(where, id, section, rollEntries, iconDefaults);
+            levels = readExplicitLevels(where, id, section, rollEntries, iconDefaults, tier);
         }
         if (levels.isEmpty()) {
             plugin.getLogger().warning(where + ": enchant '" + id + "' has no levels configured, skipping it entirely.");
@@ -599,7 +606,7 @@ public final class EnchantManager {
 
     /** Legacy, hand-authored `levels: { 1: {...}, 2: {...} }` shape -- each level may carry its own roll `weight`. */
     private List<EnchantDefinition.Level> readExplicitLevels(String where, String id, ConfigurationSection section,
-            List<RuneRollTable.Entry> rollEntries, LevelIconDefaults iconDefaults) {
+            List<RuneRollTable.Entry> rollEntries, LevelIconDefaults iconDefaults, RuneTier tier) {
         List<EnchantDefinition.Level> levels = new ArrayList<>();
         ConfigurationSection levelsSection = section.getConfigurationSection("levels");
         if (levelsSection == null) {
@@ -620,7 +627,7 @@ public final class EnchantManager {
             if (levelSection == null) {
                 continue;
             }
-            levels.add(readLevel(where, id, levelNumber, levelSection, iconDefaults));
+            levels.add(readLevel(where, id, levelNumber, levelSection, iconDefaults, tier));
             double weight = levelSection.getDouble("weight", 0D);
             if (weight > 0D) {
                 rollEntries.add(new RuneRollTable.Entry(id, levelNumber, weight));
@@ -637,13 +644,15 @@ public final class EnchantManager {
      * weight per level comes from the tier's {@code level-buckets}.
      */
     private List<EnchantDefinition.Level> generateLevels(ConfigurationSection section, String id, int tierLevelCount,
-            List<LevelBucket> tierBuckets, List<RuneRollTable.Entry> rollEntries) {
+            List<LevelBucket> tierBuckets, List<RuneRollTable.Entry> rollEntries, RuneTier tier) {
         double perLevelValue = section.getDouble("per-level-value", 0D);
         double procChance = clampPercent(section.getDouble("proc-chance", 100D));
         Map<String, Double> effectSettings = readEffectSettings(RUNES_CONFIG_PATH, id, 0, section.getConfigurationSection("effect-settings"));
+        Material levelMaterial = tier != null && tier != RuneTier.SEASONAL
+                ? RuneFormatting.tierCandle(tier) : Material.STONE;
         List<EnchantDefinition.Level> levels = new ArrayList<>(tierLevelCount);
         for (int level = 1; level <= tierLevelCount; level++) {
-            levels.add(new EnchantDefinition.Level(level, Material.FIREWORK_STAR, null, level == tierLevelCount,
+            levels.add(new EnchantDefinition.Level(level, levelMaterial, null, level == tierLevelCount,
                     procChance, 50D, perLevelValue * level, effectSettings));
             double weight = weightForLevel(tierBuckets, level);
             if (weight > 0D) {
@@ -695,8 +704,10 @@ public final class EnchantManager {
     }
 
     private EnchantDefinition.Level readLevel(String where, String enchantId, int levelNumber,
-            ConfigurationSection section, LevelIconDefaults iconDefaults) {
-        Material materialFallback = iconDefaults.material() != null ? iconDefaults.material() : Material.STONE;
+            ConfigurationSection section, LevelIconDefaults iconDefaults, RuneTier tier) {
+        Material tierDefault = tier != null && tier != RuneTier.SEASONAL
+                ? RuneFormatting.tierCandle(tier) : Material.STONE;
+        Material materialFallback = iconDefaults.material() != null ? iconDefaults.material() : tierDefault;
         Material material = readMaterial(where, "enchant '" + enchantId + "' level " + levelNumber,
                 section.getString("material"), materialFallback);
         Integer customModelData = section.contains("custom-model-data")
@@ -781,6 +792,16 @@ public final class EnchantManager {
 
     public EnchantDefinition definition(String id) {
         return id == null ? null : definitions.get(id);
+    }
+
+    /**
+     * Which {@link RuneTier} rolls {@code id}, for coloring a chat message's
+     * rune name to match (see {@link me.vertex.core.enchant.RuneFormatting#coloredNameRaw}).
+     * {@code null} for a {@code legacy:} id (retired -- belongs to no
+     * current tier) or an unknown id.
+     */
+    public RuneTier tierOf(String id) {
+        return id == null ? null : definitionTiers.get(id);
     }
 
     public boolean isSeasonal(String id) {
@@ -1136,6 +1157,13 @@ public final class EnchantManager {
         lore.add(RuneFormatting.plain("ᴀᴘᴘʟɪᴇꜱ ᴛᴏ: ", NamedTextColor.GRAY)
                 .append(RuneFormatting.plain(RuneFormatting.smallCaps(String.join(", ", definition.compatibleTypes())),
                         NamedTextColor.GREEN)));
+        if (definition.isSeasonal()) {
+            // Every piece of the current seasonal (Fallen) set only ever
+            // comes from that season's crate, never a shop/roll -- this
+            // badge line makes that obvious on the item itself, not just in
+            // menus/marketing copy.
+            lore.add(RuneFormatting.plain("🔱 Fallen Crate Exclusive 🔱", NamedTextColor.GOLD));
+        }
 
         ItemMeta meta = item.getItemMeta();
         meta.displayName(RuneFormatting.titleFor(info.originTier(), definition.displayName(), info.level(),

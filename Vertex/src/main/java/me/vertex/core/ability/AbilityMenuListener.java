@@ -67,11 +67,7 @@ public final class AbilityMenuListener implements Listener {
             return;
         }
 
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(plugin, player,
-                java.util.List.of(abilityManager.createItem(ability)), "ability-menu-give")) {
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            return;
-        }
+        me.vertex.core.storage.ItemGiver.give(player, java.util.List.of(abilityManager.createItem(ability)));
         player.sendMessage(messages.getChat(player, "ability.gui-received")
                 .append(MessageFormatter.deserialize(ability.getDisplayName()))
                 .append(Component.text(".")));

@@ -1,14 +1,26 @@
+# ==============================================================================
+# Reset Vault Configuration
+# ==============================================================================
 enabled: true
 block-material: BLUE_SHULKER_BOX
 map-label: "Season 1"
 sotw-milestone: "reset-vault-open"
+
+# Players permitted to receive Reset Vault access point blocks via '/rv give <player>'.
+# Supports usernames, UUIDs, or '*' to allow all admins/developers.
+# Aliases supported: give-allowlist, approved-players, allowlist, whitelist.
 give-allowlist:
   - "cesardeltorojr"
+  - "Volos_"
+
+# Base vault slots granted per rank:
 rank-base-slots:
   default: 1
   vip: 2
   hero: 3
   legend: 4
   titan: 5
+
+# Custom enchants that should be stripped upon vault deposit:
 remove-enchant:
   - "temporary_enchant"

@@ -12,6 +12,7 @@ import me.vertex.core.lang.Messages;
 import me.vertex.core.shop.ShopManager;
 import me.vertex.core.util.Numbers;
 import me.vertex.core.storage.InventoryAccess;
+import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -59,6 +60,24 @@ public final class WandListener implements Listener {
 
     /** Containers mid-transaction, so the same one is never processed twice at once. */
     private final Set<Location> busy = ConcurrentHashMap.newKeySet();
+
+    private boolean acquireLocks(Set<Location> locks) {
+        synchronized (busy) {
+            for (Location loc : locks) {
+                if (busy.contains(loc)) {
+                    return false;
+                }
+            }
+            busy.addAll(locks);
+            return true;
+        }
+    }
+
+    private void releaseLocks(Set<Location> locks) {
+        synchronized (busy) {
+            busy.removeAll(locks);
+        }
+    }
 
     public WandListener(Plugin plugin, WandManager wands, ShopManager shop, ChunkCollectorManager collectors,
             FactionBankManager bank, FactionUpgradeManager upgrades, Messages messages,
@@ -112,34 +131,34 @@ public final class WandListener implements Listener {
             return;
         }
         Set<Location> locks=ContainerLocks.locations(block);
-        if (locks.stream().anyMatch(busy::contains)) {
+        if (!acquireLocks(locks)) {
             player.sendMessage(messages.get(player, "wand.container-busy"));
             return;
         }
-        busy.addAll(locks);
         if (tier.type() == WandType.SELL) {
             try {
                 runSell(player, held, tier, container);
             } finally {
-                busy.removeAll(locks);
+                releaseLocks(locks);
             }
             return;
         }
         // The TNT path finishes inside an async bank write, so it releases the
         // lock itself once that lands. Releasing here would drop the lock
         // while the transaction was still open.
-        if(!InventoryAccess.reserve(plugin,player)){busy.removeAll(locks);return;}
+        if(!InventoryAccess.reserve(plugin,player)){releaseLocks(locks);return;}
         try {
             if(runTnt(player,held,tier,container,block.getLocation(),locks))return;
         }catch(RuntimeException error){
             plugin.getLogger().log(java.util.logging.Level.SEVERE,"TNT wand transaction failed for "+player.getUniqueId(),error);
             player.sendMessage(messages.get(player,"wand.transaction-failed"));
         }
-        busy.removeAll(locks);InventoryAccess.release(player);
+        releaseLocks(locks);InventoryAccess.release(player);
     }
 
     private void runSell(Player player, ItemStack held, WandTier tier, WandContainer container) {
-        if (!EconomyHook.isAvailable()) {
+        Economy economy = EconomyHook.getEconomy();
+        if (economy == null) {
             player.sendMessage(messages.get(player, "wand.no-economy"));
             return;
         }
@@ -171,7 +190,7 @@ public final class WandListener implements Listener {
         // Paid and confirmed before anything is removed. The response used to
         // be ignored, which emptied the container for money that never
         // arrived; now a failed deposit costs the player nothing at all.
-        EconomyResponse deposit = EconomyHook.getEconomy().depositPlayer(player, payout);
+        EconomyResponse deposit = economy.depositPlayer(player, payout);
         if (deposit == null || !deposit.transactionSuccess()) {
             player.sendMessage(messages.get(player, "wand.payout-failed"));
             plugin.getLogger().warning("Sell Wand for " + player.getName() + " was aborted: the "
@@ -233,7 +252,7 @@ public final class WandListener implements Listener {
                                 &&expected.equals(live)&&wands.usesLeft(live)>0&&FactionsHook.getFactionId(player)==factionId;
                         settleTnt(player,valid?live:null,tier,container,location,factionId,converted);
                     } finally {
-                        busy.removeAll(locks);InventoryAccess.release(player);
+                        releaseLocks(locks);InventoryAccess.release(player);
                     }
                 }));
         return true;

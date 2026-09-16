@@ -139,7 +139,8 @@ public final class RuneListener implements Listener {
         }
         consumeHand(player, hand, baseRune);
         EnchantDefinition definition = manager.definition(outcome.enchantId());
-        String name = definition == null ? outcome.enchantId() : definition.displayName();
+        String name = definition == null ? outcome.enchantId()
+                : RuneFormatting.coloredNameRaw(tier, definition.displayName());
 
         if (autoIncineration.isActive(player)
                 && autoIncineration.isEligibleAndUnprotected(outcome.createdItem(), manager, player.getUniqueId())) {
@@ -194,7 +195,8 @@ public final class RuneListener implements Listener {
             cursorSetter.accept(decrease(rune));
         }
         EnchantDefinition definition = manager.definition(outcome.enchantId());
-        String name = definition == null ? String.valueOf(outcome.enchantId()) : definition.displayName();
+        String name = definition == null ? String.valueOf(outcome.enchantId())
+                : RuneFormatting.coloredNameRaw(manager.tierOf(outcome.enchantId()), definition.displayName());
         player.sendMessage(messages.get(player, message(outcome.result()), "enchant", name,
                 "level", RuneFormatting.roman(outcome.level())));
     }

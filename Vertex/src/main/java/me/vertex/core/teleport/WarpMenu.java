@@ -37,7 +37,9 @@ public final class WarpMenu implements Listener {
         holder.inventory = inventory;
         ItemStack filler = item(player, Material.BLACK_STAINED_GLASS_PANE, "warps.gui.filler", List.of());
         for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, filler);
-        List<NetworkStorage.LocationRow> rows = locations.warps();
+        List<NetworkStorage.LocationRow> rows = locations.warps().stream()
+                .filter(row -> WarpCommand.hasWarpPermission(player, row.name()))
+                .toList();
         for (int index = 0; index < Math.min(rows.size(), CONTENT.size()); index++) {
             NetworkStorage.LocationRow row = rows.get(index);
             int slot = CONTENT.get(index);
@@ -58,6 +60,11 @@ public final class WarpMenu implements Listener {
                 || event.getRawSlot() >= event.getInventory().getSize()) return;
         String name = holder.names.get(event.getRawSlot());
         if (name == null) return;
+        if (!WarpCommand.hasWarpPermission(player, name)) {
+            player.sendMessage(messages.get(player, "general.no-permission"));
+            player.closeInventory();
+            return;
+        }
         player.closeInventory();
         teleports.request(player, "warp", () -> locations.warpTarget(name), countdown, 0L, true);
     }

@@ -354,6 +354,13 @@ public final class KitManager {
         }
         int duration = Math.max(1, asInt(map.get("potion-duration-ticks"), 100));
         int amplifier = Math.max(0, asInt(map.get("potion-amplifier"), 0));
+        // A freshly-constructed ItemStack(Material.POTION/SPLASH_POTION/
+        // LINGERING_POTION) has no base potion type set at all, which the
+        // client renders as "Uncraftable Potion" -- adding a custom effect
+        // on top of that (below) never fixes the name/icon by itself.
+        // MUNDANE is an inert, always-registered base type; the custom
+        // effect list added right after is what actually matters.
+        meta.setBasePotionType(org.bukkit.potion.PotionType.MUNDANE);
         meta.addCustomEffect(new PotionEffect(type, duration, amplifier), true);
         item.setItemMeta(meta);
     }

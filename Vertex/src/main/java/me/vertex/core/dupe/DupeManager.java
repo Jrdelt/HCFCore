@@ -172,7 +172,7 @@ public final class DupeManager {
 
     /** Include an opened container in the next authoritative snapshot. */
     public void scanInventorySoon(Inventory inventory, String source) {
-        if (!enabled || inventory == null) {
+        if (!enabled || inventory == null || !DupeListener.isWorldContainer(inventory)) {
             return;
         }
         Bukkit.getScheduler().runTask(plugin, () -> {

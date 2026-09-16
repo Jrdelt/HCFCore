@@ -3,6 +3,8 @@ package me.vertex.core.lang;
 import me.vertex.core.user.User;
 import me.vertex.core.user.UserManager;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -17,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -222,14 +225,39 @@ public final class Messages {
         return applyPlaceholders(resolveTemplate(sender, key), placeholders);
     }
 
+    /**
+     * Resolves key for sender with support for both escaped text placeholders
+     * (e.g. player name) and rich Component placeholders (e.g. item display name).
+     */
+    public Component getWithComponents(CommandSender sender, String key, Map<String, Component> components, String... placeholders) {
+        String template = resolveTemplate(sender, key);
+        template = applyPlaceholders(template, placeholders);
+        if (components == null || components.isEmpty()) {
+            return MessageFormatter.deserialize(template);
+        }
+        List<TagResolver> resolvers = new ArrayList<>(components.size());
+        for (Map.Entry<String, Component> entry : components.entrySet()) {
+            String name = entry.getKey();
+            template = template.replace("{" + name + "}", "<" + name + ">");
+            resolvers.add(Placeholder.component(name, entry.getValue()));
+        }
+        return MessageFormatter.deserialize(template, resolvers.toArray(TagResolver[]::new));
+    }
+
     private String applyPlaceholders(String template, String... placeholders) {
         for (int i = 0; i + 1 < placeholders.length; i += 2) {
-            // Values (unlike the admin-authored template) may come from
-            // untrusted sources such as a player's name, so any MiniMessage
-            // tags (or legacy &-codes -- escapeTags() alone doesn't stop
-            // those) inside them must render as literal text, not formatting.
-            String safeValue = MessageFormatter.escapeForSubstitution(placeholders[i + 1]);
             String key = placeholders[i];
+            String rawValue = placeholders[i + 1];
+            String safeValue;
+            if ("item".equalsIgnoreCase(key) || "item_name".equalsIgnoreCase(key) || "enchant".equalsIgnoreCase(key)) {
+                // Item display names and rune/enchant names legitimately carry
+                // color codes (legacy &, section §, hex, or -- for a rune name --
+                // RuneFormatting.coloredNameRaw's tier-colored MiniMessage tags)
+                // and must not have their formatting mangled by zero-width space substitution.
+                safeValue = MessageFormatter.normalize(rawValue);
+            } else {
+                safeValue = MessageFormatter.escapeForSubstitution(rawValue);
+            }
             template = template.replace("{" + key + "}", safeValue)
                     // Early Blueprint language files used angle-bracket
                     // placeholders. Continue accepting them so an existing

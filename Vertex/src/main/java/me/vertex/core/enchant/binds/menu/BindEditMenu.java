@@ -50,10 +50,21 @@ public final class BindEditMenu {
             int slotIndex, String enchantId) {
         EnchantDefinition definition = manager.definition(enchantId);
         int level = RuneEquipment.highestAvailableLevel(player, manager, enchantId);
-        ItemStack item = manager.createEnchantItem(enchantId, Math.max(1, Math.min(level, definition == null ? 1 : definition.maxLevel())),
-                me.vertex.core.enchant.RuneTier.SIMPLE);
+        int targetLevel = Math.max(1, Math.min(level, definition == null ? 1 : definition.maxLevel()));
+        ItemStack item = RuneEquipment.resolveDisplayItem(player, manager, enchantId, targetLevel);
+        if (item == null) {
+            item = manager.createEnchantItem(enchantId, targetLevel, me.vertex.core.enchant.RuneTier.SIMPLE);
+        }
+        if (item == null) {
+            item = new ItemStack(Material.BOOK);
+        }
         ItemMeta meta = item.getItemMeta();
-        List<Component> lore = new ArrayList<>();
+        List<Component> lore = meta != null && meta.hasLore() && meta.lore() != null
+                ? new ArrayList<>(meta.lore())
+                : new ArrayList<>();
+        if (!lore.isEmpty()) {
+            lore.add(Component.empty());
+        }
         lore.add(messages.getGui(player, level > 0 ? "binds.slot-available" : "binds.slot-unavailable"));
         lore.add(Component.empty());
         lore.add(messages.getGui(player, "binds.slot-left-click"));
@@ -62,8 +73,10 @@ public final class BindEditMenu {
             lore.add(messages.getGui(player, "binds.slot-shift-left"));
         }
         lore.add(messages.getGui(player, "binds.slot-shift-right"));
-        meta.lore(lore);
-        item.setItemMeta(meta);
+        if (meta != null) {
+            meta.lore(lore);
+            item.setItemMeta(meta);
+        }
         return item;
     }
 

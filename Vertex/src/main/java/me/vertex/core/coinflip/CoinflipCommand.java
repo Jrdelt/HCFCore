@@ -28,10 +28,50 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
 
     private final CoinflipManager manager;
     private final Messages messages;
+    private volatile List<String> cachedPayoutKeys = List.of();
+    private volatile long lastPayoutKeysFetch = 0L;
+    private volatile boolean fetchingPayouts = false;
+    private volatile List<String> cachedIntentKeys = List.of();
+    private volatile long lastIntentKeysFetch = 0L;
+    private volatile boolean fetchingIntents = false;
 
     public CoinflipCommand(CoinflipManager manager, Messages messages) {
         this.manager = manager;
         this.messages = messages;
+    }
+
+    private List<String> getPayoutKeysAsync() {
+        long now = System.currentTimeMillis();
+        if (now - lastPayoutKeysFetch > 5000L && !fetchingPayouts) {
+            fetchingPayouts = true;
+            java.util.concurrent.CompletableFuture.supplyAsync(() -> manager.uncertainPayouts().stream()
+                    .map(CoinflipStorage.PendingPayout::key).toList())
+                .whenComplete((keys, err) -> {
+                    fetchingPayouts = false;
+                    if (keys != null) {
+                        cachedPayoutKeys = keys;
+                        lastPayoutKeysFetch = System.currentTimeMillis();
+                    }
+                });
+        }
+        return cachedPayoutKeys;
+    }
+
+    private List<String> getIntentKeysAsync() {
+        long now = System.currentTimeMillis();
+        if (now - lastIntentKeysFetch > 5000L && !fetchingIntents) {
+            fetchingIntents = true;
+            java.util.concurrent.CompletableFuture.supplyAsync(() -> manager.unresolvedCreationIntents().stream()
+                    .map(CoinflipStorage.CreationIntent::key).toList())
+                .whenComplete((keys, err) -> {
+                    fetchingIntents = false;
+                    if (keys != null) {
+                        cachedIntentKeys = keys;
+                        lastIntentKeysFetch = System.currentTimeMillis();
+                    }
+                });
+        }
+        return cachedIntentKeys;
     }
 
     @Override
@@ -218,8 +258,21 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
             try {
                 page = Math.max(0, Integer.parseInt(args[1]) - 1);
             } catch (NumberFormatException e) {
-                OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
-                filter = target.getUniqueId();
+                Player onlineTarget = Bukkit.getPlayerExact(args[1]);
+                if (onlineTarget != null) {
+                    filter = onlineTarget.getUniqueId();
+                } else {
+                    OfflinePlayer cached = Bukkit.getOfflinePlayerIfCached(args[1]);
+                    if (cached != null) {
+                        filter = cached.getUniqueId();
+                    } else {
+                        try {
+                            filter = UUID.fromString(args[1]);
+                        } catch (IllegalArgumentException ignored) {
+                            filter = Bukkit.getOfflinePlayer(args[1]).getUniqueId();
+                        }
+                    }
+                }
                 if (args.length >= 3) {
                     try {
                         page = Math.max(0, Integer.parseInt(args[2]) - 1);
@@ -470,7 +523,7 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2 && args[0].equalsIgnoreCase("payouts")
                 && sender.hasPermission("vertex.coinflip.payouts")) {
             String partial = args[1].toLowerCase(Locale.ROOT);
-            return manager.uncertainPayouts().stream().map(CoinflipStorage.PendingPayout::key)
+            return getPayoutKeysAsync().stream()
                     .filter(key -> key.toLowerCase(Locale.ROOT).startsWith(partial)).toList();
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("payouts")
@@ -481,7 +534,7 @@ public final class CoinflipCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2 && args[0].equalsIgnoreCase("intents")
                 && sender.hasPermission("vertex.coinflip.intents")) {
             String partial = args[1].toLowerCase(Locale.ROOT);
-            return manager.unresolvedCreationIntents().stream().map(CoinflipStorage.CreationIntent::key)
+            return getIntentKeysAsync().stream()
                     .filter(key -> key.toLowerCase(Locale.ROOT).startsWith(partial)).toList();
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("intents")

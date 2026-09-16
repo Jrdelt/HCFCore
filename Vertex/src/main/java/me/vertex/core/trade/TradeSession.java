@@ -15,20 +15,20 @@ final class TradeSession {
     final UUID requester;
     final UUID target;
     final long createdAt = System.currentTimeMillis();
-    long lastActivity = createdAt;
-    Inventory inventory;
-    boolean requesterLocked;
-    boolean targetLocked;
-    UUID firstLocked;
-    boolean finishing;
-    double requesterMoney;
-    double targetMoney;
-    int requesterExperience;
-    int targetExperience;
-    double requesterHeldMoney;
-    double targetHeldMoney;
-    int requesterHeldExperience;
-    int targetHeldExperience;
+    volatile long lastActivity = createdAt;
+    volatile Inventory inventory;
+    volatile boolean requesterLocked;
+    volatile boolean targetLocked;
+    volatile UUID firstLocked;
+    volatile boolean finishing;
+    volatile double requesterMoney;
+    volatile double targetMoney;
+    volatile int requesterExperience;
+    volatile int targetExperience;
+    volatile double requesterHeldMoney;
+    volatile double targetHeldMoney;
+    volatile int requesterHeldExperience;
+    volatile int targetHeldExperience;
 
     TradeSession(UUID requester, UUID target) {
         this.requester = requester;

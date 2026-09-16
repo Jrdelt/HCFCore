@@ -27,6 +27,10 @@ public final class WarpCommand implements CommandExecutor, TabCompleter {
         if (args.length == 0) { menu.open(player); return true; }
         String name = args[0];
         if (locations.warpTarget(name) == null) { player.sendMessage(messages.get(player, "warps.not-found")); return true; }
+        if (!hasWarpPermission(player, name)) {
+            player.sendMessage(messages.get(player, "general.no-permission"));
+            return true;
+        }
         teleports.request(player, "warp", () -> locations.warpTarget(name), countdown, 0L, true);
         return true;
     }
@@ -35,6 +39,16 @@ public final class WarpCommand implements CommandExecutor, TabCompleter {
         if (args.length != 1) return List.of();
         String prefix = args[0].toLowerCase(java.util.Locale.ROOT);
         return locations.warps().stream().map(me.vertex.core.network.NetworkStorage.LocationRow::name)
-                .filter(name -> name.toLowerCase(java.util.Locale.ROOT).startsWith(prefix)).toList();
+                .filter(name -> name.toLowerCase(java.util.Locale.ROOT).startsWith(prefix))
+                .filter(name -> !(sender instanceof Player p) || hasWarpPermission(p, name))
+                .toList();
+    }
+
+    public static boolean hasWarpPermission(Player player, String warpName) {
+        if (player.isOp() || player.hasPermission("vertex.admin") || player.hasPermission("vertex.warp.*")) {
+            return true;
+        }
+        return player.hasPermission("vertex.warp." + warpName.toLowerCase(java.util.Locale.ROOT));
     }
 }
+

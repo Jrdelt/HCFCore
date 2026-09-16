@@ -432,13 +432,6 @@ public final class GcCommand implements CommandExecutor, TabCompleter {
     }
 
     private static List<String> filterPrefix(List<String> options, String partial) {
-        String lower = partial.toLowerCase(Locale.ROOT);
-        List<String> matches = new ArrayList<>();
-        for (String option : options) {
-            if (option.startsWith(lower)) {
-                matches.add(option);
-            }
-        }
-        return matches;
+        return me.vertex.core.util.CommandUtil.filterPrefix(options, partial);
     }
 }

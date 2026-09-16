@@ -82,15 +82,8 @@ public final class BlueprintActivationMenuListener implements Listener {
                         }
                     }
 
-                    // Admit the refund before removing the source block. A
-                    // failed WAL and SQL inbox therefore leave the preview
-                    // beacon in place for a later retry.
                     ItemStack blueprintItem = listener.createBlueprintItem(template);
-                    if (!listener.queueOverflow(
-                            player, java.util.List.of(blueprintItem), "blueprint-preview-refund")) {
-                        player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-                        return;
-                    }
+                    listener.give(player, java.util.List.of(blueprintItem));
                     block.setType(Material.AIR, false);
 
                     player.sendMessage(messages.get(player, "blueprint.cancelled"));

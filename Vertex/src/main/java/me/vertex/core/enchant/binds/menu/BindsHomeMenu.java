@@ -2,6 +2,7 @@ package me.vertex.core.enchant.binds.menu;
 
 import me.vertex.core.enchant.EnchantDefinition;
 import me.vertex.core.enchant.EnchantManager;
+import me.vertex.core.enchant.RuneEquipment;
 import me.vertex.core.enchant.RuneFormatting;
 import me.vertex.core.enchant.binds.BindActivationOpener;
 import me.vertex.core.enchant.binds.BindManager;
@@ -95,20 +96,35 @@ public final class BindsHomeMenu {
 
     private static ItemStack bindIcon(Player player, EnchantManager manager, PlayerBinds binds, Messages messages, int bindIndex) {
         List<String> runeIds = binds.bind(bindIndex);
-        ItemStack item = new ItemStack(runeIds.isEmpty() ? Material.GRAY_DYE : Material.NAME_TAG, Math.max(1, runeIds.size()));
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(RuneFormatting.plain("ʙɪɴᴅ " + bindIndex, runeIds.isEmpty() ? NamedTextColor.DARK_GRAY : NamedTextColor.YELLOW)
-                .decoration(TextDecoration.ITALIC, false));
-        List<Component> lore = new ArrayList<>();
+        ItemStack item;
         if (runeIds.isEmpty()) {
-            lore.add(messages.getGui(player, "binds.bind-empty"));
+            item = new ItemStack(Material.GRAY_DYE);
         } else {
-            lore.add(messages.getGui(player, "binds.bind-order", "runes", runeIds.stream()
-                    .map(id -> displayName(manager, id)).collect(Collectors.joining(" > "))));
+            String primaryRune = runeIds.get(0);
+            int level = RuneEquipment.highestAvailableLevel(player, manager, primaryRune);
+            item = RuneEquipment.resolveDisplayItem(player, manager, primaryRune, Math.max(1, level));
+            if (item == null) {
+                item = new ItemStack(Material.NAME_TAG, runeIds.size());
+            } else {
+                item = item.clone();
+                item.setAmount(Math.max(1, Math.min(64, runeIds.size())));
+            }
         }
-        lore.add(messages.getGui(player, "binds.bind-edit-hint"));
-        meta.lore(lore);
-        item.setItemMeta(meta);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(RuneFormatting.plain("ʙɪɴᴅ " + bindIndex, runeIds.isEmpty() ? NamedTextColor.DARK_GRAY : NamedTextColor.YELLOW)
+                    .decoration(TextDecoration.ITALIC, false));
+            List<Component> lore = new ArrayList<>();
+            if (runeIds.isEmpty()) {
+                lore.add(messages.getGui(player, "binds.bind-empty"));
+            } else {
+                lore.add(messages.getGui(player, "binds.bind-order", "runes", runeIds.stream()
+                        .map(id -> displayName(manager, id)).collect(Collectors.joining(" > "))));
+            }
+            lore.add(messages.getGui(player, "binds.bind-edit-hint"));
+            meta.lore(lore);
+            item.setItemMeta(meta);
+        }
         return item;
     }
 

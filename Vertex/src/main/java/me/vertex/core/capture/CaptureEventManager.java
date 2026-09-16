@@ -342,6 +342,61 @@ public final class CaptureEventManager implements Listener {
         }
     }
 
+    public enum ScheduleResult { OK, NOT_FOUND, INVALID_TIME, ALREADY_SCHEDULED, NOT_SCHEDULED, SAVE_FAILED }
+
+    public List<String> scheduleTimes(CaptureEventType type, String eventId) {
+        CaptureDefinition definition = definition(type, eventId);
+        return definition == null ? List.of() : definition.scheduleTimes();
+    }
+
+    /** In-game equivalent of hand-editing {@code events.<id>.schedule-times} in capture-events.yml, then reloading. */
+    public ScheduleResult addScheduleTime(CaptureEventType type, String eventId, String time) {
+        CaptureDefinition definition = definition(type, eventId);
+        if (definition == null) {
+            return ScheduleResult.NOT_FOUND;
+        }
+        if (!time.matches("[0-2][0-9]:[0-5][0-9]") || !isValidScheduleTime(time)) {
+            return ScheduleResult.INVALID_TIME;
+        }
+        if (definition.scheduleTimes().contains(time)) {
+            return ScheduleResult.ALREADY_SCHEDULED;
+        }
+        List<String> times = new ArrayList<>(definition.scheduleTimes());
+        times.add(time);
+        return applyScheduleTimes(definition, times) ? ScheduleResult.OK : ScheduleResult.SAVE_FAILED;
+    }
+
+    public ScheduleResult removeScheduleTime(CaptureEventType type, String eventId, String time) {
+        CaptureDefinition definition = definition(type, eventId);
+        if (definition == null) {
+            return ScheduleResult.NOT_FOUND;
+        }
+        List<String> times = new ArrayList<>(definition.scheduleTimes());
+        if (!times.remove(time)) {
+            return ScheduleResult.NOT_SCHEDULED;
+        }
+        return applyScheduleTimes(definition, times) ? ScheduleResult.OK : ScheduleResult.SAVE_FAILED;
+    }
+
+    private boolean applyScheduleTimes(CaptureDefinition definition, List<String> times) {
+        List<String> sorted = times.stream().sorted().toList();
+        String path = "events." + definition.id();
+        config.set(path + ".schedule-times", sorted);
+        if (!saveDefinitions()) {
+            return false;
+        }
+        CaptureDefinition rebuilt = CaptureDefinition.from(definition.id(), config.getConfigurationSection(path),
+                defaultCaptureSeconds, defaultAdditionalMemberSpeed, defaultMaxDurationSeconds);
+        if (rebuilt == null) {
+            return false;
+        }
+        definitions.put(definition.id(), rebuilt);
+        // Let a time just re-added fire again today instead of waiting for
+        // the stale per-minute dedupe key from before it was removed.
+        lastScheduledMinute.remove(definition.id());
+        return true;
+    }
+
     public boolean beginSelection(Player player, CaptureEventType type, String eventId) {
         String normalized = normalizeId(eventId);
         if (normalized == null) {
@@ -370,10 +425,7 @@ public final class CaptureEventManager implements Listener {
         meta.lore(messages.getGuiList(player, "capture.wand-lore"));
         meta.getPersistentDataContainer().set(wandKey, PersistentDataType.STRING, type.id());
         wand.setItemMeta(meta);
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                plugin, player, List.of(wand), "capture-selector")) {
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-        }
+        me.vertex.core.storage.ItemGiver.give(player, List.of(wand));
     }
 
     public boolean cancelSelection(Player player) {
@@ -787,7 +839,8 @@ public final class CaptureEventManager implements Listener {
         return null;
     }
 
-    private boolean insideActiveKoth(Location location) {
+    /** Also used by {@code me.vertex.core.factions.WarzoneCobwebListener} to keep the Warzone-cobweb exception from applying while an active KOTH overlaps it. */
+    public boolean insideActiveKoth(Location location) {
         return active.values().stream().anyMatch(capture -> capture.definition.type() == CaptureEventType.KOTH
                 && capture.definition.contains(location));
     }

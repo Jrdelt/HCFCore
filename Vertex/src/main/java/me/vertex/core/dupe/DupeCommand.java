@@ -172,7 +172,6 @@ public final class DupeCommand implements CommandExecutor, TabCompleter {
     }
 
     private static List<String> prefix(List<String> options, String typed) {
-        String lower = typed.toLowerCase(Locale.ROOT);
-        return options.stream().filter(option -> option.startsWith(lower)).toList();
+        return me.vertex.core.util.CommandUtil.filterPrefix(options, typed);
     }
 }

@@ -311,7 +311,7 @@ public final class ChunkCollectorManager {
     }
 
     public boolean hasCollectorInChunk(World world,int chunkX,int chunkZ){return !collectorsByChunk.getOrDefault(chunkKey(world,chunkX,chunkZ),java.util.Set.of()).isEmpty();}
-    public boolean queueOverflow(Player player,java.util.Collection<ItemStack> items,String source){return me.vertex.core.storage.DeliveryManager.queueOverflow(plugin,player,items,source);}
+    public void give(Player player,java.util.Collection<ItemStack> items){me.vertex.core.storage.ItemGiver.give(player,items);}
 
     /** Uses the index, not a full claim scan, to avoid loading empty claimed chunks. */
     public List<Map.Entry<Location, ChunkCollectorData>> getCollectorsOwnedBy(String factionTag) {

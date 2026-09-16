@@ -41,10 +41,7 @@ public final class ChunkCollectorCommand implements CommandExecutor, TabComplete
         }
         ChunkCollectorData data = new ChunkCollectorData(0, target.getUniqueId(), null);
         ItemStack item = manager.createCollectorItem(manager.displayName(target), data);
-        if (!manager.queueOverflow(target, List.of(item), "collector-admin-give")) {
-            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
-            return true;
-        }
+        manager.give(target, List.of(item));
         sender.sendMessage(messages.get(sender, "collector.gave", "player", target.getName()));
         return true;
     }

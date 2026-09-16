@@ -63,7 +63,6 @@ public final class ZoneCommand implements CommandExecutor, TabCompleter {
         String result = zones.beginRegionSelection(player, type, args[1]);
         player.sendMessage(messages.get(player, switch (result) {
             case "ok" -> "zones.region-selection-started";
-            case "storage" -> "delivery.storage-unavailable";
             default -> "zones.region-name-invalid";
         }, "name", args[1], "zone", type.displayName()));
         return true;
@@ -167,7 +166,6 @@ public final class ZoneCommand implements CommandExecutor, TabCompleter {
             case "ok" -> "zones.route-selection-started";
             case "missing-region" -> "zones.route-region-not-found";
             case "invalid" -> "zones.route-name-invalid";
-            case "storage" -> "delivery.storage-unavailable";
             default -> "zones.route-selection-failed";
         };
         player.sendMessage(messages.get(player, key, "reason", result));

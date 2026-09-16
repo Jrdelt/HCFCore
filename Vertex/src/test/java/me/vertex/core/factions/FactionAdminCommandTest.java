@@ -27,3 +27,4 @@ class FactionAdminCommandTest {
         assertNull(FactionAdminCommand.BankChange.parse("tnt", "set", "1250"));
     }
 }
+

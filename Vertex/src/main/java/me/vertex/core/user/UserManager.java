@@ -14,7 +14,6 @@ public final class UserManager {
     private final Plugin plugin;
     private final Storage storage;
     private final Map<UUID, User> users = new ConcurrentHashMap<>();
-    private final Map<UUID, Boolean> failedLoads = new ConcurrentHashMap<>();
     private final Map<UUID, Long> loadGenerations = new ConcurrentHashMap<>();
 
     public UserManager(Plugin plugin, Storage storage) {
@@ -38,13 +37,11 @@ public final class UserManager {
             String locale = storage.loadLocale(uuid);
             if (loadGenerations.getOrDefault(uuid, 0L) == generation) {
                 users.put(uuid, new User(uuid, cooldowns, locale));
-                failedLoads.remove(uuid);
             }
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to load user data for " + uuid, e);
             if (loadGenerations.getOrDefault(uuid, 0L) == generation) {
                 users.remove(uuid);
-                failedLoads.put(uuid, Boolean.TRUE);
             }
         }
     }
@@ -52,7 +49,6 @@ public final class UserManager {
     public void unload(UUID uuid) {
         long generation = nextGeneration(uuid);
         users.remove(uuid);
-        failedLoads.remove(uuid);
         // Conditional remove: only clears the entry if nothing bumped the
         // generation again since (e.g. an instant rejoin's load() racing
         // this unload()) -- an unconditional remove could wipe out a newer

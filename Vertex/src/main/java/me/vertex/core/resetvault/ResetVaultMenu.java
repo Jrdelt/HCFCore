@@ -31,6 +31,10 @@ public final class ResetVaultMenu {
     private ResetVaultMenu() {}
 
     public static void open(Player player, ResetVaultManager manager, Messages messages, int page, int accessBlockId) {
+        if (manager.phase() == ResetVaultPhase.BACKUP_RUNNING || manager.phase() == ResetVaultPhase.BACKUP_PENDING) {
+            player.sendMessage(messages.get(player, "reset-vault.session-read-only"));
+            return;
+        }
         int sanitizedPage = Math.max(0, page);
         Holder holder = new Holder(player.getUniqueId(), manager, messages, sanitizedPage, accessBlockId);
         Inventory inventory = Bukkit.createInventory(holder, 54, messages.getGui(player, "reset-vault.gui.title"));

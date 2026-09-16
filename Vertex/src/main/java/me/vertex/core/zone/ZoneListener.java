@@ -92,8 +92,6 @@ public final class ZoneListener implements Listener {
                 event.setCancelled(true);
                 return;
             }
-            if (zones.isIn(victim, ZoneType.RIFTLANDS)) zones.releaseFlightFromHit(victim);
-            if (zones.isIn(attacker, ZoneType.RIFTLANDS)) zones.releaseFlightFromHit(attacker);
         }
     }
 
@@ -175,14 +173,6 @@ public final class ZoneListener implements Listener {
         ItemStack held = event.getItem();
         if (held == null) held = player.getInventory().getItemInMainHand();
         if (!zones.isSelector(held)) return;
-        // Preserve the flight-release precedence from the normal interaction
-        // handler: a selector click during guided flight means "drop now",
-        // never "edit a region while airborne".
-        if (zones.isFlying(player.getUniqueId())) {
-            zones.releaseFlight(player.getUniqueId(), true);
-            event.setCancelled(true);
-            return;
-        }
         switch (event.getAction()) {
             case LEFT_CLICK_BLOCK -> {
                 event.setCancelled(true);
@@ -223,11 +213,6 @@ public final class ZoneListener implements Listener {
         Player player = event.getPlayer();
         ItemStack held = event.getItem();
         if (held == null) held = player.getInventory().getItemInMainHand();
-        if (zones.isFlying(player.getUniqueId())) {
-            zones.releaseFlight(player.getUniqueId(), true);
-            event.setCancelled(true);
-            return;
-        }
         if (zones.isTicket(held) && (event.getAction().isRightClick())) {
             event.setCancelled(true);
             String result = zones.useTicket(player, held);

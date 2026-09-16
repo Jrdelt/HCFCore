@@ -399,11 +399,22 @@ public final class WandManager {
     }
 
     private Location locationFromKey(String locationKey) {
+        if (locationKey == null) {
+            return null;
+        }
         String[] parts = locationKey.split(":", 4);
+        if (parts.length < 4) {
+            return null;
+        }
         World world = plugin.getServer().getWorld(parts[0]);
         if (world == null) {
             return null;
         }
-        return new Location(world, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+        try {
+            return new Location(world, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+        } catch (NumberFormatException e) {
+            plugin.getLogger().warning("Malformed location key in WandManager: " + locationKey);
+            return null;
+        }
     }
 }

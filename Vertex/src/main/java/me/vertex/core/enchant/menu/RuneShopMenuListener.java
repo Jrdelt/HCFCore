@@ -91,6 +91,11 @@ public final class RuneShopMenuListener implements Listener {
             event.setCancelled(true);
             if (event.getSlot() == SeasonalSetMenu.BACK_SLOT) {
                 SeasonalMenu.open(player, manager, messages);
+            } else if (SeasonalSetMenu.isContentSlot(event.getSlot())) {
+                ItemStack clicked = event.getCurrentItem();
+                if (clicked != null && !clicked.getType().isAir() && manager.isEnchantItem(clicked)) {
+                    RuneCatalogMenu.open(player, manager, messages, RuneTier.SEASONAL);
+                }
             }
             return;
         }
@@ -108,7 +113,11 @@ public final class RuneShopMenuListener implements Listener {
             return;
         }
         if (event.getSlot() == RuneShopMenu.SEASONAL_SLOT) {
-            SeasonalMenu.open(player, manager, messages);
+            if (event.isRightClick()) {
+                RuneCatalogMenu.open(player, manager, messages, RuneTier.SEASONAL);
+            } else {
+                SeasonalMenu.open(player, manager, messages);
+            }
             return;
         }
         RuneShopMenu.PurchaseProduct product = holder.productAt(event.getSlot());

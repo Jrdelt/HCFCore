@@ -45,6 +45,9 @@ public final class CombatSafezoneListener implements Listener {
             // the (relatively expensive) claim/region check on every packet.
             return;
         }
+        if (!combatManager.isTagged(event.getPlayer().getUniqueId())) {
+            return;
+        }
         if (!blocksSafezoneEntry() || !shouldBlock(event.getPlayer(), to)) {
             return;
         }
@@ -55,6 +58,9 @@ public final class CombatSafezoneListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onTeleport(PlayerTeleportEvent event) {
         if (event.getCause() == PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
+            return;
+        }
+        if (!combatManager.isTagged(event.getPlayer().getUniqueId())) {
             return;
         }
         if (!blocksSafezoneEntry() || !shouldBlock(event.getPlayer(), event.getTo())) {
@@ -69,10 +75,10 @@ public final class CombatSafezoneListener implements Listener {
     }
 
     private boolean shouldBlock(Player player, Location destination) {
-        if (destination == null || player.hasPermission("vertex.combat.safezone.bypass")) {
+        if (destination == null || !combatManager.isTagged(player.getUniqueId())) {
             return false;
         }
-        if (!combatManager.isTagged(player.getUniqueId())) {
+        if (player.hasPermission("vertex.combat.safezone.bypass")) {
             return false;
         }
         return NoPearlSpawnListener.isProtected(plugin, destination);

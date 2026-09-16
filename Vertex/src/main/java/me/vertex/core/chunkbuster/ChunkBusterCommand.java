@@ -65,11 +65,7 @@ public final class ChunkBusterCommand implements CommandExecutor, TabCompleter {
             items.add(item);
             remaining -= stackAmount;
         }
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                plugin, target, items, "chunkbuster-admin-give")) {
-            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
-            return true;
-        }
+        me.vertex.core.storage.ItemGiver.give(target, items);
         sender.sendMessage(messages.get(sender, "chunkbuster.given", "amount", String.valueOf(amount),
                 "type", type.configKey(), "player", target.getName()));
         plugin.getLogger().info(sender.getName() + " gave " + amount + " " + type.configKey()
@@ -103,7 +99,6 @@ public final class ChunkBusterCommand implements CommandExecutor, TabCompleter {
     }
 
     private static List<String> matching(String prefix, List<String> values) {
-        String normalized = prefix.toLowerCase(Locale.ROOT);
-        return values.stream().filter(value -> value.startsWith(normalized)).toList();
+        return me.vertex.core.util.CommandUtil.filterPrefix(values, prefix);
     }
 }

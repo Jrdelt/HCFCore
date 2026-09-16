@@ -4,6 +4,7 @@ import me.vertex.core.enchant.EnchantDefinition;
 import me.vertex.core.enchant.EnchantManager;
 import me.vertex.core.enchant.RuneCooldownStore;
 import me.vertex.core.enchant.RuneEquipment;
+import me.vertex.core.enchant.RuneFormatting;
 import me.vertex.core.enchant.RuneProtection;
 import me.vertex.core.enchant.listener.RuneEffectListener;
 import me.vertex.core.lang.Messages;
@@ -175,16 +176,17 @@ public final class BindQueue {
         if (definition == null) {
             return;
         }
+        String coloredName = RuneFormatting.coloredNameRaw(enchants.tierOf(enchantId), definition.displayName());
         if (!tagsAllowedInCurrentZone(player, definition)) {
             if (announcementPreferences.isEnabled(player.getUniqueId(), AnnouncementCategory.RUNE_COOLDOWN_MESSAGES)) {
-                player.sendMessage(messages.get(player, "binds.rune-blocked-in-zone", "enchant", definition.displayName()));
+                player.sendMessage(messages.get(player, "binds.rune-blocked-in-zone", "enchant", coloredName));
             }
             return;
         }
         int level = RuneEquipment.highestAvailableLevel(player, enchants, enchantId);
         if (level <= 0) {
             if (announcementPreferences.isEnabled(player.getUniqueId(), AnnouncementCategory.RUNE_COOLDOWN_MESSAGES)) {
-                player.sendMessage(messages.get(player, "binds.rune-unavailable", "enchant", definition.displayName()));
+                player.sendMessage(messages.get(player, "binds.rune-unavailable", "enchant", coloredName));
             }
             return;
         }
@@ -192,7 +194,7 @@ public final class BindQueue {
         if (user != null && cooldowns.isOnCooldown(user, enchantId)) {
             if (announcementPreferences.isEnabled(player.getUniqueId(), AnnouncementCategory.RUNE_COOLDOWN_MESSAGES)) {
                 long remaining = cooldowns.remainingMillis(user, enchantId);
-                player.sendMessage(messages.get(player, "binds.rune-on-cooldown", "enchant", definition.displayName(),
+                player.sendMessage(messages.get(player, "binds.rune-on-cooldown", "enchant", coloredName,
                         "seconds", String.format(java.util.Locale.ROOT, "%.1f", remaining / 1000D)));
             }
             return;
@@ -200,7 +202,7 @@ public final class BindQueue {
         EnchantDefinition.Level levelConfig = definition.level(level);
         boolean fired = effects.manuallyActivate(player, definition, levelConfig);
         if (fired && announcementPreferences.isEnabled(player.getUniqueId(), AnnouncementCategory.RUNE_ACTIVATION_MESSAGES)) {
-            player.sendMessage(messages.get(player, "binds.rune-activated", "enchant", definition.displayName()));
+            player.sendMessage(messages.get(player, "binds.rune-activated", "enchant", coloredName));
         }
     }
 

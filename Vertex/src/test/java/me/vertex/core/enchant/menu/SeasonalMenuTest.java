@@ -77,7 +77,7 @@ class SeasonalMenuTest {
         long pieceIcons = Arrays.stream(player.getOpenInventory().getTopInventory().getContents())
                 .filter(item -> item != null && manager.isEnchantItem(item))
                 .count();
-        assertEquals(11, pieceIcons, "all 11 gear-applied seasonal items must appear in the set's detail grid");
+        assertEquals(10, pieceIcons, "all 10 gear-applied seasonal items must appear in the set's detail grid");
     }
 
     @Test
@@ -109,6 +109,6 @@ class SeasonalMenuTest {
             assertEquals(1, info.level());
             created++;
         }
-        assertEquals(11, created, "4 armor + 4 weapon + 3 farming tools");
+        assertEquals(10, created, "4 armor + 3 weapon + 3 farming/mining tools");
     }
 }

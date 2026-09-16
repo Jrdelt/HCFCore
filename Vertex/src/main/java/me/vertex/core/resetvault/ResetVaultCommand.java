@@ -67,7 +67,7 @@ public final class ResetVaultCommand implements CommandExecutor, TabCompleter {
                         "phase", messages.getRaw(sender, manager.phase().langKey())));
                 if (sender.hasPermission("vertex.reset.admin")) {
                     sender.sendMessage(messages.get(sender, "reset-vault.status-admin",
-                            "blocks", String.valueOf(manager.storage()),
+                            "blocks", String.valueOf(manager.accessBlockCount()),
                             "sessions", String.valueOf(manager.activeSessionCount())));
                 }
                 return true;
@@ -93,7 +93,7 @@ public final class ResetVaultCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 ItemStack blockItem = blockListener.createAccessBlockItem();
-                target.getInventory().addItem(blockItem);
+                me.vertex.core.storage.ItemGiver.give(target, List.of(blockItem));
                 sender.sendMessage(messages.get(sender, "reset-vault.give.success", "player", target.getName()));
                 target.sendMessage(messages.get(target, "reset-vault.give.received"));
                 return true;
@@ -119,9 +119,11 @@ public final class ResetVaultCommand implements CommandExecutor, TabCompleter {
                         amount = Math.max(1, Integer.parseInt(args[3]));
                     } catch (NumberFormatException ignored) {}
                 }
+                List<ItemStack> tokens = new ArrayList<>(amount);
                 for (int i = 0; i < amount; i++) {
-                    target.getInventory().addItem(manager.tokenManager().createToken(sender));
+                    tokens.add(manager.tokenManager().createToken(sender));
                 }
+                me.vertex.core.storage.ItemGiver.give(target, tokens);
                 sender.sendMessage(messages.get(sender, "reset-vault.token.given",
                         "player", target.getName(),
                         "amount", String.valueOf(amount)));
@@ -298,17 +300,20 @@ public final class ResetVaultCommand implements CommandExecutor, TabCompleter {
             }
         }
 
+        if (args.length == 3) {
+            if (args[0].equalsIgnoreCase("token") && args[1].equalsIgnoreCase("give") && sender.hasPermission("vertex.reset.admin")) {
+                List<String> names = new ArrayList<>();
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    names.add(p.getName());
+                }
+                return filterPrefix(names, args[2]);
+            }
+        }
+
         return Collections.emptyList();
     }
 
     private static List<String> filterPrefix(List<String> options, String prefix) {
-        String lower = prefix.toLowerCase(Locale.ROOT);
-        List<String> result = new ArrayList<>();
-        for (String opt : options) {
-            if (opt.toLowerCase(Locale.ROOT).startsWith(lower)) {
-                result.add(opt);
-            }
-        }
-        return result;
+        return me.vertex.core.util.CommandUtil.filterPrefix(options, prefix);
     }
 }

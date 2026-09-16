@@ -67,10 +67,7 @@ public final class GetItemCommand implements CommandExecutor, TabCompleter {
             items.add(abilityManager.createItem(ability));
         }
 
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(plugin, target, items, "ability-admin-give")) {
-            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
-            return true;
-        }
+        me.vertex.core.storage.ItemGiver.give(target, items);
 
         Component abilityName = MessageFormatter.deserialize(ability.getDisplayName());
         sender.sendMessage(messages.getChat(sender, "ability.getitem-given-sender",

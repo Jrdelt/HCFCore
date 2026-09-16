@@ -117,14 +117,7 @@ public final class SpawnerMenuListener implements Listener {
             return;
         }
 
-        // Admit the complete payload before touching the high-value stack.
-        // DeliveryManager persists this to its WAL (or SQL fallback) before
-        // returning, so a full inventory or crash cannot erase the items.
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(spawnerManager.plugin(), player,
-                payload, "spawner-withdraw")) {
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            return;
-        }
+        me.vertex.core.storage.ItemGiver.give(player, payload);
         int newSize = spawnerManager.decreaseStack(location, amount);
         clearBlockIfEmpty(location, newSize);
         player.sendMessage(messages.get(player, "spawner.withdrew", "amount", String.valueOf(amount)));

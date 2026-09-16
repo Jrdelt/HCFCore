@@ -85,7 +85,10 @@ public final class RuneShopMenu {
         inventory.setItem(LUCKY_GEM_SLOT, buildLuckyGemIcon(player, messages, manager));
         inventory.setItem(SEASONAL_SLOT, button(Material.NETHER_STAR,
                 messages.getGui(player, "rune.seasonal-button"),
-                List.of(messages.getGui(player, "rune.seasonal-button-lore"))));
+                List.of(
+                        messages.getGui(player, "rune.seasonal-button-lore"),
+                        messages.getGui(player, "rune.seasonal-button-hint")
+                )));
         inventory.setItem(INCINERATOR_SLOT, button(Material.ANVIL,
                 messages.getGui(player, "rune.incinerator-button"),
                 List.of(messages.getGui(player, "rune.incinerator-button-lore"))));

@@ -236,7 +236,16 @@ public final class FactionBankManager implements Listener {
                         : new Balance(previous.money(), previous.experience(), previous.tnt() - amount));
     }
 
-    /** Inventory changes cannot invalidate a withdrawal: its debit owns a durable UUID-addressed entitlement. */
+    /**
+     * Debits the balance, then hands the TNT straight to the actor if
+     * they're still online. {@link me.vertex.core.storage.ItemGiver} has no
+     * offline-delivery path by design (the old durable delivery inbox was
+     * removed in favor of a plain give that only ever targets an online
+     * player) -- so if the actor disconnects in the gap between the debit
+     * committing and this scheduled callback running, the TNT is refunded
+     * back into the faction's balance instead of being silently destroyed.
+     * They simply need to run the withdrawal again once back online.
+     */
     public CompletableFuture<Boolean> withdrawTntToInbox(Player actor, int factionId, long amount, String action) {
         if(amount<=0||amount>36L*64||!me.vertex.core.storage.InventoryAccess.ready(plugin,actor))
             return CompletableFuture.completedFuture(false);
@@ -244,11 +253,23 @@ public final class FactionBankManager implements Listener {
         if(member==null||member.factionId()!=factionId)return CompletableFuture.completedFuture(false);
         var authority=new Authority(actor.getUniqueId(),member.role(),action,
                 FactionsHook.service().configuredActionDefaultFor(member.role(),action));
-        var items=me.vertex.core.storage.DeliveryStorage.prepare(java.util.List.of(
-                new org.bukkit.inventory.ItemStack(org.bukkit.Material.TNT,(int)amount)));
         return mutate(factionId,authority,previous->previous.tnt()<amount?null:
-                new Balance(previous.money(),previous.experience(),previous.tnt()-amount),
-                connection->me.vertex.core.storage.DeliveryStorage.enqueueNew(connection,authority.actor(),items,"faction-tnt-withdraw"));
+                new Balance(previous.money(),previous.experience(),previous.tnt()-amount))
+                .thenApply(success->{
+                    if(Boolean.TRUE.equals(success)){
+                        org.bukkit.Bukkit.getScheduler().runTask(plugin,()->{
+                            Player online=org.bukkit.Bukkit.getPlayer(authority.actor());
+                            if(online!=null){
+                                me.vertex.core.storage.ItemGiver.give(online,
+                                        java.util.List.of(new org.bukkit.inventory.ItemStack(org.bukkit.Material.TNT,(int)amount)));
+                            } else {
+                                mutate(factionId,authority,previous->new Balance(previous.money(),
+                                        previous.experience(),previous.tnt()+amount));
+                            }
+                        });
+                    }
+                    return success;
+                });
     }
 
     /**

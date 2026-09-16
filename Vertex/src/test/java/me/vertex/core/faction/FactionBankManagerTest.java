@@ -33,25 +33,11 @@ class FactionBankManagerTest {
     private FactionBankStorage storage;
     private FactionBankManager manager;
 
-    @Test void withdrawalAndInboxEntitlementCommitTogetherAndCannotRepeat() throws Exception {
-        var inbox=new me.vertex.core.storage.DeliveryStorage(database);inbox.init();
-        var owner=java.util.UUID.randomUUID();
-        var items=me.vertex.core.storage.DeliveryStorage.prepare(java.util.List.of(new org.bukkit.inventory.ItemStack(org.bukkit.Material.TNT,10)));
-        assertTrue(manager.depositTnt(FACTION,100,1000).get());
-        java.util.function.Function<FactionBankStorage.StoredBank,FactionBankStorage.StoredBank> debit=b->
-                new FactionBankStorage.StoredBank(b.factionId(),b.money(),b.experience(),b.tnt()-10);
-        FactionBankStorage.TransactionEffect payout=c->me.vertex.core.storage.DeliveryStorage.enqueueNew(c,owner,items,"test-bank");
-        assertTrue(storage.mutate(FACTION,debit,payout).isPresent());
-        org.junit.jupiter.api.Assertions.assertThrows(java.sql.SQLException.class,()->storage.mutate(FACTION,debit,payout));
-        assertEquals(90,storage.loadAll().getFirst().tnt());
-        assertEquals(10,inbox.reserve(owner).rows().getFirst().item().getAmount());
-    }
-
-    @Test void failedInboxWriteRollsBackBankDebit() throws Exception {
+    @Test void failedTransactionEffectRollsBackBankDebit() throws Exception {
         assertTrue(manager.depositTnt(FACTION,100,1000).get());
         org.junit.jupiter.api.Assertions.assertThrows(java.sql.SQLException.class,()->storage.mutate(FACTION,
                 b->new FactionBankStorage.StoredBank(b.factionId(),b.money(),b.experience(),0),
-                c->{throw new java.sql.SQLException("injected delivery failure");}));
+                c->{throw new java.sql.SQLException("injected failure");}));
         assertEquals(100,storage.loadAll().getFirst().tnt());
     }
 

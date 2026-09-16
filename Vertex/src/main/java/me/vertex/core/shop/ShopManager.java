@@ -35,7 +35,6 @@ public final class ShopManager {
     private final Plugin plugin;
     private final ShopStorage storage;
     private final BoosterService boosters;
-    private final DeliveryAdmission deliveryAdmission;
     private final File file;
 
     private volatile boolean enabled;
@@ -56,22 +55,10 @@ public final class ShopManager {
     private final java.util.Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
 
     public ShopManager(Plugin plugin, ShopStorage storage, BoosterService boosters) {
-        this(plugin, storage, boosters, (player, items, source) ->
-                me.vertex.core.storage.DeliveryManager.queueOverflow(plugin, player, items, source));
-    }
-
-    ShopManager(Plugin plugin, ShopStorage storage, BoosterService boosters,
-            DeliveryAdmission deliveryAdmission) {
         this.plugin = plugin;
         this.storage = storage;
         this.boosters = boosters;
-        this.deliveryAdmission = java.util.Objects.requireNonNull(deliveryAdmission, "deliveryAdmission");
         this.file = new File(plugin.getDataFolder(), "shop.yml");
-    }
-
-    @FunctionalInterface
-    interface DeliveryAdmission {
-        boolean admit(Player player, java.util.Collection<ItemStack> items, String source);
     }
 
     /**
@@ -333,7 +320,7 @@ public final class ShopManager {
     }
 
     public enum TradeResult {
-        OK, DISABLED, UNKNOWN_BLOCK, NO_ECONOMY, CANNOT_AFFORD, NOT_ENOUGH_ITEMS, STORAGE_UNAVAILABLE, PENDING_DELIVERY
+        OK, DISABLED, UNKNOWN_BLOCK, NO_ECONOMY, CANNOT_AFFORD, NOT_ENOUGH_ITEMS, PENDING_DELIVERY
     }
 
     public record TradeOutcome(TradeResult result, double total) {
@@ -362,14 +349,7 @@ public final class ShopManager {
             return TradeOutcome.failure(TradeResult.CANNOT_AFFORD);
         }
 
-        if (!queueOverflow(player, List.of(new ItemStack(material, amount)), "shop-purchase")) {
-            EconomyResponse refund = economy.depositPlayer(player, cost);
-            if (refund == null || !refund.transactionSuccess()) {
-                plugin.getLogger().severe("Shop purchase delivery and Vault refund both failed for "
-                        + player.getUniqueId() + ": " + cost + " for " + amount + "x " + material);
-            }
-            return TradeOutcome.failure(TradeResult.STORAGE_UNAVAILABLE);
-        }
+        me.vertex.core.storage.ItemGiver.give(player, List.of(new ItemStack(material, amount)));
         adjustVolume(material, ShopPricing.afterBuy(volumeOf(material), amount));
         return new TradeOutcome(TradeResult.OK, cost);
     }
@@ -465,13 +445,42 @@ public final class ShopManager {
         return copy;
     }
 
+    /**
+     * The same internal "still waiting for a Chunk Collector" marker {@code
+     * ChunkCollectorListener} stamps onto every mob-kill drop (see its
+     * {@code mobDropKey}) -- constructed independently here via the
+     * two-string {@link org.bukkit.NamespacedKey} constructor (namespace
+     * "vertex", the plugin's lowercased name) rather than threading a
+     * {@link Plugin} instance through every caller of the static {@link
+     * #isPlainStack}. It is only ever meant to be removed the moment an
+     * item leaves "waiting on the ground" state; {@code
+     * ChunkCollectorListener} already strips it on a genuine player pickup,
+     * but a drop routed straight into a Backpack, or hopper-fed into a
+     * plain chest, never fires that event and keeps the tag forever --
+     * which made an otherwise perfectly ordinary mob-kill diamond fail
+     * {@link ItemStack#isSimilar} and get rejected as a "custom" item by
+     * both the shop and TNT Wand deposits ({@link
+     * me.vertex.core.wand.WandManager#isPlainStack} delegates here too).
+     */
+    private static final org.bukkit.NamespacedKey INTERNAL_MOB_DROP_TAG = new org.bukkit.NamespacedKey("vertex", "mob_drop");
+
     /** Uses Bukkit's similarity contract so default implementation metadata is not mistaken for custom item data. */
     public static boolean isPlainStack(ItemStack item) {
-        return item != null && !item.isEmpty() && item.isSimilar(new ItemStack(item.getType()));
-    }
-
-    public boolean queueOverflow(Player player, java.util.Collection<ItemStack> items, String source) {
-        return deliveryAdmission.admit(player, items, source);
+        if (item == null || item.isEmpty()) {
+            return false;
+        }
+        ItemStack probe = item;
+        if (item.hasItemMeta()) {
+            var meta = item.getItemMeta();
+            var pdc = meta.getPersistentDataContainer();
+            if (pdc.has(INTERNAL_MOB_DROP_TAG, org.bukkit.persistence.PersistentDataType.BYTE)) {
+                probe = item.clone();
+                var cleanMeta = probe.getItemMeta();
+                cleanMeta.getPersistentDataContainer().remove(INTERNAL_MOB_DROP_TAG);
+                probe.setItemMeta(cleanMeta);
+            }
+        }
+        return probe.isSimilar(new ItemStack(probe.getType()));
     }
 
     Plugin plugin() {

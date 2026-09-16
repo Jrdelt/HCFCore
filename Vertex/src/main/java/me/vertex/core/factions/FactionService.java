@@ -356,8 +356,12 @@ public final class FactionService {
      * Bulk-releases every chunk the system faction tagged {@code type}
      * (e.g. "safezone"/"warzone") owns, in a single DB statement rather
      * than one round trip per chunk -- {@code /f admin unclaimall}. The
-     * live cache and one {@code UNCLAIMED} event per released chunk are
-     * applied only after the delete durably commits. @return how many
+     * live cache is updated only after the delete durably commits.
+     * No {@code FactionUnclaimAllEvent} is fired: system factions never
+     * reach that event elsewhere (every other caller guards on
+     * {@code !faction.system()}), and claim-bound listeners such as
+     * spawner/collector cleanup aren't meant to sweep staff-placed
+     * blocks inside safezone/warzone claims. @return how many
      * chunks were released (0 if the system faction doesn't exist or the
      * delete failed).
      */
@@ -378,14 +382,8 @@ public final class FactionService {
             if (!Boolean.TRUE.equals(ok)) {
                 return 0;
             }
-            FactionData owner = factions.get(factionId);
             synchronized (this) {
                 claims.entrySet().removeIf(entry -> entry.getValue().intValue() == factionId.intValue());
-            }
-            if (owner != null) {
-                for (ChunkKey key : released) {
-                    callEvent(new FactionClaimEvent(FactionClaimEvent.Action.UNCLAIMED, owner, null, key));
-                }
             }
             return released.size();
         });

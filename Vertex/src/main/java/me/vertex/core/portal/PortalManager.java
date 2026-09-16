@@ -32,7 +32,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -50,9 +49,9 @@ public final class PortalManager {
     private final Map<String, EntryPortal> portals = new ConcurrentHashMap<>();
     private final Map<String, PortalRoute> routes = new ConcurrentHashMap<>();
     private final Map<UUID, Selection> selections = new ConcurrentHashMap<>();
-    private final Map<UUID, Flight> flights = new ConcurrentHashMap<>();
+    /** Player currently descending onto a target, and the flight state to restore once they land. */
+    private final Map<UUID, FlightState> descending = new ConcurrentHashMap<>();
     private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
-    private final Set<UUID> slowFallers = ConcurrentHashMap.newKeySet();
     private BukkitTask task;
     private volatile double defaultSpeed = .8D;
     private volatile long activationCooldownMillis = 3_000L;
@@ -102,14 +101,9 @@ public final class PortalManager {
     public void shutdown() {
         if (task != null) task.cancel();
         task = null;
-        for (UUID playerId : List.copyOf(flights.keySet())) releaseFlight(playerId, false);
-        for (UUID playerId : List.copyOf(slowFallers)) {
-            Player player = Bukkit.getPlayer(playerId);
-            if (player != null) clearSlowFall(player);
-        }
+        for (UUID playerId : List.copyOf(descending.keySet())) releaseFlight(playerId, false);
         selections.clear();
         cooldowns.clear();
-        slowFallers.clear();
     }
 
     public Collection<EntryPortal> portals() {
@@ -125,7 +119,7 @@ public final class PortalManager {
                 .sorted(Comparator.comparing(PortalRoute::id)).toList();
     }
 
-    public boolean isFlying(UUID playerId) { return flights.containsKey(playerId); }
+    public boolean isFlying(UUID playerId) { return descending.containsKey(playerId); }
 
     /** Starts a mine-menu arrival using the configured random spawn points. */
     public boolean startMineEntry(Player player, String mineId) {
@@ -154,10 +148,7 @@ public final class PortalManager {
         if (id == null || target == null || !targetExists(target)) return "invalid";
         Selection selection = Selection.portal(id, target);
         selections.put(player.getUniqueId(), selection);
-        if (!giveSelector(player)) {
-            selections.remove(player.getUniqueId(), selection);
-            return "storage";
-        }
+        giveSelector(player);
         return "ok";
     }
 
@@ -167,10 +158,7 @@ public final class PortalManager {
         Selection selection = Selection.route(id, target,
                 requestedSpeed <= 0D ? defaultSpeed : requestedSpeed);
         selections.put(player.getUniqueId(), selection);
-        if (!giveSelector(player)) {
-            selections.remove(player.getUniqueId(), selection);
-            return "storage";
-        }
+        giveSelector(player);
         return "ok";
     }
 
@@ -328,11 +316,13 @@ public final class PortalManager {
     /** Called on block movement. Cooldown and all validation are server-side. */
     public void tryEnter(Player player) {
         if (isFlying(player.getUniqueId())) return;
-        EntryPortal portal = portals.values().stream().filter(candidate -> candidate.contains(player.getLocation()))
-                .sorted(Comparator.comparing(EntryPortal::id)).findFirst().orElse(null);
-        if (portal == null) return;
+        if (portals.isEmpty()) return;
         long now = System.currentTimeMillis();
         if (cooldowns.getOrDefault(player.getUniqueId(), 0L) > now) return;
+        Location loc = player.getLocation();
+        EntryPortal portal = portals.values().stream().filter(candidate -> candidate.contains(loc))
+                .sorted(Comparator.comparing(EntryPortal::id)).findFirst().orElse(null);
+        if (portal == null) return;
         cooldowns.put(player.getUniqueId(), now + activationCooldownMillis);
         if (!player.hasPermission("vertex.portals.use")) {
             player.sendMessage(messages.get(player, "portals.no-permission"));
@@ -371,10 +361,6 @@ public final class PortalManager {
 
     public void releaseFlight(Player player, boolean slowFall) { releaseFlight(player.getUniqueId(), slowFall); }
 
-    public void clearSlowFall(Player player) {
-        slowFallers.remove(player.getUniqueId()); // Preserve effects granted by potions/other plugins.
-    }
-
     private PortalRoute chooseRoute(PortalTarget target) {
         List<PortalRoute> choices = routes(target).stream().filter(route -> !route.waypoints().isEmpty()).toList();
         // Haven/Riftlands already have a durable route system used by their
@@ -393,102 +379,59 @@ public final class PortalManager {
         return choices.isEmpty() ? null : choices.get(ThreadLocalRandom.current().nextInt(choices.size()));
     }
 
+    /**
+     * No more server-scripted per-tick flight through a recorded path --
+     * that meant an absolute-position teleport every tick, which resets the
+     * client's movement interpolation each time and reads as constant
+     * screen stutter/glitching. Instead: teleport straight above the
+     * route's actual destination (its last recorded waypoint; the earlier
+     * points, once just a guide path, are no longer used for anything) and
+     * let normal gravity carry the player down, same as any other fall --
+     * the client interpolates that exactly like every other bit of vanilla
+     * movement, and free look was never an issue here since nothing but
+     * position is being touched.
+     */
     private boolean startFlight(Player player, PortalRoute route, boolean preview) {
         if (!preview && combat.isTagged(player.getUniqueId())) return false;
-        // A route is an ordered flight path, not a bag of random spawn
-        // locations.  Start at its first recorded point and guide the player
-        // through every later point server-side.
-        ZoneRoute.Waypoint first = route.waypoints().getFirst();
-        World world = Bukkit.getWorld(first.world());
-        if (world == null || !isTargetLocation(route.target(), first.location(world))) return false;
-        for (ZoneRoute.Waypoint point : route.waypoints()) {
-            World pointWorld = Bukkit.getWorld(point.world());
-            if (pointWorld == null || !pointWorld.equals(world)
-                    || !isTargetLocation(route.target(), point.location(pointWorld))) {
-                return false;
-            }
-        }
+        ZoneRoute.Waypoint destination = route.waypoints().getLast();
+        World world = Bukkit.getWorld(destination.world());
+        if (world == null || !isTargetLocation(route.target(), destination.location(world))) return false;
+        Location dropPoint = destination.location(world);
+        dropPoint.setY(Math.min(world.getMaxHeight() - 8, dropPoint.getY() + 96D));
         FlightState previous = new FlightState(player.getAllowFlight(), player.isFlying(), player.getFlySpeed());
-        if (!player.teleport(first.location(world))) return false;
+        if (!player.teleport(dropPoint)) return false;
         player.setAllowFlight(false);
         player.setFlying(false);
-me.vertex.core.util.FlightEffects.renewSlowFall(player);
-        slowFallers.add(player.getUniqueId());
-        flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), previous, route.waypoints(), route.speed()));
+        me.vertex.core.util.FlightEffects.renewSlowFall(player);
+        descending.put(player.getUniqueId(), previous);
         if (!preview && route.target().kind() == PortalTarget.Kind.RIFTLANDS) zones.startPortalRiftSession(player);
         if (!preview) player.sendMessage(messages.get(player, "portals.entered", "target", route.target().displayName()));
         return true;
     }
 
     private void releaseFlight(UUID playerId, boolean slowFall) {
-        Flight flight = flights.remove(playerId);
+        FlightState before = descending.remove(playerId);
         Player player = Bukkit.getPlayer(playerId);
-        if (flight == null || player == null) return;
+        if (before == null || player == null) return;
         player.setFlying(false);
-        player.setAllowFlight(flight.before.allowFlight());
-        if (flight.before.allowFlight() && flight.before.flying()) player.setFlying(true);
-        player.setFlySpeed(flight.before.flySpeed());
-        if (slowFall) {
-            me.vertex.core.util.FlightEffects.renewSlowFall(player);
-            slowFallers.add(playerId);
-        }
+        player.setAllowFlight(before.allowFlight());
+        if (before.allowFlight() && before.flying()) player.setFlying(true);
+        player.setFlySpeed(before.flySpeed());
+        if (slowFall) me.vertex.core.util.FlightEffects.renewSlowFall(player);
     }
 
     private void tick() {
-        for (Flight flight : List.copyOf(flights.values())) tickFlight(flight);
-        for (UUID playerId : List.copyOf(slowFallers)) {
+        if (descending.isEmpty()) return;
+        for (UUID playerId : List.copyOf(descending.keySet())) {
             Player player = Bukkit.getPlayer(playerId);
-            if (player == null || player.isOnGround()) {
-                slowFallers.remove(playerId);
+            if (player == null) {
+                descending.remove(playerId);
+            } else if (player.isOnGround()) {
+                releaseFlight(playerId, false);
             } else {
                 // A finite, renewed effect cannot become permanent after a crash.
                 me.vertex.core.util.FlightEffects.renewSlowFall(player);
             }
-        }
-    }
-
-    private void tickFlight(Flight flight) {
-        Player player = Bukkit.getPlayer(flight.playerId);
-        if (player == null) {
-            flights.remove(flight.playerId);
-            return;
-        }
-        if (flight.nextWaypoint >= flight.waypoints.size()) {
-            releaseFlight(player.getUniqueId(), true);
-            return;
-        }
-        ZoneRoute.Waypoint waypoint = flight.waypoints.get(flight.nextWaypoint);
-        World world = Bukkit.getWorld(waypoint.world());
-        if (world == null || !world.equals(player.getWorld())) {
-            releaseFlight(player.getUniqueId(), false);
-            return;
-        }
-        Location target = waypoint.location(world);
-        Location current = player.getLocation();
-        double distance = current.distance(target);
-        double step = flight.speed / 20D;
-        if (distance <= step || distance < .001D) {
-            if (!player.teleport(target)) {
-                releaseFlight(player.getUniqueId(), false);
-                return;
-            }
-            flight.nextWaypoint++;
-            if (flight.nextWaypoint >= flight.waypoints.size()) {
-                releaseFlight(player.getUniqueId(), true);
-            }
-            return;
-        }
-        org.bukkit.util.Vector direction = target.toVector().subtract(current.toVector()).normalize().multiply(step);
-        Location next = current.add(direction);
-        // Only position is server-guided -- forcing yaw/pitch to the
-        // waypoint's authored facing every tick fought the player's own
-        // mouse input for the whole flight, leaving their camera unable to
-        // turn until the flight ended. The player keeps looking wherever
-        // they want while being carried.
-        next.setYaw(current.getYaw());
-        next.setPitch(current.getPitch());
-        if (!player.teleport(next)) {
-            releaseFlight(player.getUniqueId(), false);
         }
     }
 
@@ -536,30 +479,14 @@ me.vertex.core.util.FlightEffects.renewSlowFall(player);
         return output.toString();
     }
 
-    private boolean giveSelector(Player player) {
-        return me.vertex.core.storage.DeliveryManager.queueOverflow(
-                plugin, player, List.of(selectorItem()), "portal-selector");
+    private void giveSelector(Player player) {
+        me.vertex.core.storage.ItemGiver.give(player, List.of(selectorItem()));
     }
 
     Plugin plugin(){return plugin;}
 
     private static double bounded(double value, double min, double max) { return Math.max(min, Math.min(max, value)); }
     private record FlightState(boolean allowFlight, boolean flying, float flySpeed) { }
-    private static final class Flight {
-        private final UUID playerId;
-        private final FlightState before;
-        private final List<ZoneRoute.Waypoint> waypoints;
-        private final double speed;
-        private int nextWaypoint;
-
-        private Flight(UUID playerId, FlightState before, List<ZoneRoute.Waypoint> waypoints, double speed) {
-            this.playerId = playerId;
-            this.before = before;
-            this.waypoints = List.copyOf(waypoints);
-            this.speed = bounded(speed, .05D, 8D);
-            this.nextWaypoint = 1;
-        }
-    }
     private static final class Selection {
         private final String id;
         private final PortalTarget target;

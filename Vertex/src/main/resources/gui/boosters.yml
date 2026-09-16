@@ -61,13 +61,22 @@ items:
     name: "<dark_gray>ɴᴏ sᴏᴜʀᴄᴇs"
 
   # One per contributing source on the detail screen.
-  # Available: {source} {percent} {reason}
+  # Available: {source} {percent} {reason} {duration} {time_left}
   source-active:
     material: LIME_DYE
     name: "{source}"
     lore:
       - "<gray>ᴠᴀʟᴜᴇ: <green>+{percent}%"
       - "<gray>sᴛᴀᴛᴜs: <green>ᴀᴄᴛɪᴠᴇ"
+
+  # Used for timed/temporary boosters (e.g. personal boosters) to show countdown timer.
+  source-active-timed:
+    material: LIME_DYE
+    name: "{source}"
+    lore:
+      - "<gray>ᴠᴀʟᴜᴇ: <green>+{percent}%"
+      - "<gray>sᴛᴀᴛᴜs: <green>ᴀᴄᴛɪᴠᴇ"
+      - "<gray>ᴛɪᴍᴇ ʟᴇꜰᴛ: <yellow>{duration}"
 
   source-inactive:
     material: GRAY_DYE

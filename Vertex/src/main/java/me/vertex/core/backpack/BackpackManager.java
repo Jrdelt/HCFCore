@@ -313,8 +313,14 @@ public final class BackpackManager {
      * and returns every item that could not be stored. The caller is
      * responsible for dropping the returned items naturally.
      */
+    public record StoreResult(List<ItemStack> leftovers, long totalStored) {}
+
     public List<ItemStack> storeAutoCollected(EquippedBackpack equipped, List<ItemStack> drops) {
-        return store(equipped, drops, true);
+        return storeAutoCollectedWithResult(equipped, drops).leftovers();
+    }
+
+    public StoreResult storeAutoCollectedWithResult(EquippedBackpack equipped, List<ItemStack> drops) {
+        return storeWithResult(equipped, drops, true);
     }
 
     /**
@@ -323,12 +329,13 @@ public final class BackpackManager {
      * the same Backpack bonus is already part of Zone mob-drop amplification.
      */
     public List<ItemStack> storeExact(EquippedBackpack equipped, List<ItemStack> drops) {
-        return store(equipped, drops, false);
+        return storeWithResult(equipped, drops, false).leftovers();
     }
 
-    private List<ItemStack> store(EquippedBackpack equipped, List<ItemStack> drops, boolean applyDropBonus) {
+    private StoreResult storeWithResult(EquippedBackpack equipped, List<ItemStack> drops, boolean applyDropBonus) {
         if (equipped == null || drops == null || drops.isEmpty()) {
-            return drops == null ? List.of() : List.copyOf(drops);
+            long existing = equipped != null && equipped.data() != null ? storedItemCount(equipped.data().contents()) : 0L;
+            return new StoreResult(drops == null ? List.of() : List.copyOf(drops), existing);
         }
         BackpackData original = equipped.data();
         // One entry per distinct material -- not a fixed-size slot array,
@@ -337,7 +344,8 @@ public final class BackpackManager {
         // (capped at 64 per slot, and at however many slots existed) used
         // to impose. See BackpackData's contents() doc for why.
         List<ItemStack> contents = new java.util.ArrayList<>(java.util.Arrays.asList(original.contents()));
-        long remainingCapacity = Math.max(0L, itemCapacityForLevel(original.level()) - storedItemCount(original.contents()));
+        long initialCount = storedItemCount(original.contents());
+        long remainingCapacity = Math.max(0L, itemCapacityForLevel(original.level()) - initialCount);
         long stored = 0L;
         List<ItemStack> leftovers = new java.util.ArrayList<>();
 
@@ -366,7 +374,7 @@ public final class BackpackManager {
             // refreshes the inventory so clients see that new count now.
             writeData(equipped.item(), original.withContents(contents.toArray(new ItemStack[0])));
         }
-        return leftovers;
+        return new StoreResult(leftovers, initialCount + stored);
     }
 
     /**
@@ -625,6 +633,13 @@ public final class BackpackManager {
     }
 
     public record EquippedBackpack(ItemStack item, BackpackTier tier, BackpackData data) {
+        public int level() {
+            return data != null ? data.level() : 0;
+        }
+
+        public String tierId() {
+            return tier != null ? tier.id() : null;
+        }
     }
 
 }

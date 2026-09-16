@@ -408,10 +408,9 @@ public final class FactionBankMenu implements Listener {
                 // already cleared and nothing left to recover it from.
                 if (givenDirectly) {
                     me.vertex.core.storage.ClaimDelivery.checkpoint(player);
-                } else if (!me.vertex.core.storage.DeliveryManager.queueOverflow(plugin,player,
-                        List.of(new ItemStack(Material.TNT,(int)amount)),"faction-tnt-deposit-refund")) {
-                    plugin.getLogger().severe("TNT deposit refund could not be admitted: owner="+player.getUniqueId()
-                            +" faction="+faction.id()+" amount="+amount+"; staff recovery required.");
+                } else {
+                    me.vertex.core.storage.ItemGiver.give(player, List.of(new ItemStack(Material.TNT, (int) amount)));
+                    me.vertex.core.storage.ClaimDelivery.checkpoint(player);
                 }
                 manager.clearDepositIntent(operationId);
                 if(me.vertex.core.storage.InventoryAccess.ready(plugin,player))player.sendMessage(messages.getGui(player, "faction-bank.transaction-failed"));
@@ -432,11 +431,6 @@ public final class FactionBankMenu implements Listener {
         }
         manager.withdrawTntToInbox(player, faction.id(), amount, "tnt-withdraw")
                 .whenComplete((saved, error) -> onMain(() -> {
-            // Also reconcile an uncertain commit response: a committed entitlement may already exist.
-            Player current=Bukkit.getPlayer(player.getUniqueId());
-            if(current!=null&&plugin instanceof me.vertex.core.VertexPlugin vertex&&vertex.deliveryManager()!=null){
-                vertex.deliveryManager().deliver(current);
-            }
             if (error != null || !Boolean.TRUE.equals(saved)) {
                 if(me.vertex.core.storage.InventoryAccess.ready(plugin,player))player.sendMessage(messages.getGui(player, "faction-bank.transaction-failed"));
                 result.complete(false);

@@ -584,12 +584,7 @@ public final class BlueprintListener implements Listener {
 
                 if (template != null) {
                     ItemStack item = createBlueprintItem(template);
-                    if (!queueOverflow(event.getPlayer(), List.of(item), "blueprint-preview-break")) {
-                        event.setCancelled(true);
-                        event.getPlayer().sendMessage(messages.get(event.getPlayer(),
-                                "delivery.storage-unavailable"));
-                        return;
-                    }
+                    give(event.getPlayer(), List.of(item));
                 }
 
                 // Prevent vanilla beacon drop only after the custom item was
@@ -852,6 +847,9 @@ public final class BlueprintListener implements Listener {
     }
 
     public void tickBuilds() {
+        if (manager.activeBuilds().isEmpty()) {
+            return;
+        }
         long nowTicks = plugin.getServer().getCurrentTick();
 
         for (ActiveBuild build : List.copyOf(manager.activeBuilds().values())) {
@@ -970,16 +968,13 @@ public final class BlueprintListener implements Listener {
                 && build.isRefundEligible()) {
             ItemStack refund = createBlueprintItem(build.template());
             Player owner = Bukkit.getPlayer(build.ownerUuid());
-            boolean admitted = owner != null && owner.isOnline()
-                    ? queueOverflow(owner, List.of(refund), "blueprint-build-refund")
-                    : queueOffline(build.ownerUuid(), List.of(refund), "blueprint-build-refund");
-            if (!admitted) {
-                plugin.getLogger().severe("Could not durably admit Blueprint build refund for "
-                        + build.ownerUuid() + "; retaining the build record and anchor for retry.");
-                if (owner != null && owner.isOnline()) {
-                    owner.sendMessage(messages.get(owner, "delivery.storage-unavailable"));
-                }
-                return;
+            if (owner != null && owner.isOnline()) {
+                give(owner, List.of(refund));
+            } else {
+                // Owner is offline -- there is no durable inbox to hold this
+                // for their next join anymore, so drop it at the anchor
+                // instead of silently discarding the refund.
+                build.anchor().getWorld().dropItemNaturally(build.anchor(), refund);
             }
         }
         manager.unregister(build);
@@ -1034,15 +1029,8 @@ public final class BlueprintListener implements Listener {
         return item;
     }
 
-    public boolean queueOverflow(Player player, java.util.Collection<ItemStack> items, String source) {
-        return me.vertex.core.storage.DeliveryManager.queueOverflow(plugin, player, items, source);
-    }
-    private boolean queueOffline(UUID owner, java.util.Collection<ItemStack> items, String source) {
-        if (plugin instanceof me.vertex.core.VertexPlugin vertex && vertex.deliveryManager() != null) {
-            return vertex.deliveryManager().admit(owner, items, source);
-        }
-        plugin.getLogger().severe("Could not queue offline " + source + " for " + owner);
-        return false;
+    public void give(Player player, java.util.Collection<ItemStack> items) {
+        me.vertex.core.storage.ItemGiver.give(player, items);
     }
 
     private void createOrUpdateHologram(ActiveBuild build, String progress) {

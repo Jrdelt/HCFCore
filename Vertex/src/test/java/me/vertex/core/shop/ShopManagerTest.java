@@ -49,12 +49,7 @@ class ShopManagerTest {
         ShopStorage storage = new ShopStorage(database);
         storage.init();
 
-        manager = new ShopManager(plugin, storage, null, (target, items, source) -> {
-            for (org.bukkit.inventory.ItemStack item : items) {
-                if (!target.getInventory().addItem(item.clone()).isEmpty()) return false;
-            }
-            return true;
-        });
+        manager = new ShopManager(plugin, storage, null);
         manager.load();
         manager.loadState();
 

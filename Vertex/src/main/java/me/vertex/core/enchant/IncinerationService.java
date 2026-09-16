@@ -1,8 +1,12 @@
 package me.vertex.core.enchant;
 
 import me.vertex.core.economy.EconomyHook;
+import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
@@ -10,6 +14,8 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 
@@ -28,18 +34,22 @@ import java.util.logging.Level;
  * still repairs anything left incomplete by an actual crash; it just isn't
  * guaranteed durable against a crash in the same tick as the mutation.
  */
-public final class IncinerationService {
+public final class IncinerationService implements Listener {
+
+    private record PendingXp(String transactionId, int amount) { }
 
     private final Plugin plugin;
     private final EnchantManager manager;
     private final IncinerationStorage storage;
     private final RunePreferenceManager preferences;
+    private final Map<UUID, List<PendingXp>> pendingOfflineXp = new ConcurrentHashMap<>();
 
     public IncinerationService(Plugin plugin, EnchantManager manager, IncinerationStorage storage, RunePreferenceManager preferences) {
         this.plugin = plugin;
         this.manager = manager;
         this.storage = storage;
         this.preferences = preferences;
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
     public record Outcome(boolean success, String runeName, int level, EnchantManager.Currency currency, double rewardAmount) {
@@ -148,10 +158,11 @@ public final class IncinerationService {
             player.giveExp((int) Math.ceil(reward));
             return;
         }
-        if (!EconomyHook.isAvailable()) {
+        Economy economy = EconomyHook.getEconomy();
+        if (economy == null) {
             return;
         }
-        EconomyResponse response = EconomyHook.getEconomy().depositPlayer(player, reward);
+        EconomyResponse response = economy.depositPlayer(player, reward);
         if (response == null || !response.transactionSuccess()) {
             plugin.getLogger().warning("Incineration reward deposit failed for " + player.getUniqueId());
         }
@@ -175,6 +186,18 @@ public final class IncinerationService {
                 plugin.getLogger().log(Level.WARNING, "Could not update incineration transaction " + transactionId, e);
             }
         });
+    }
+
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        List<PendingXp> pending = pendingOfflineXp.remove(player.getUniqueId());
+        if (pending != null && !pending.isEmpty()) {
+            for (PendingXp px : pending) {
+                player.giveExp(px.amount());
+                persistStateAsync(px.transactionId(), IncinerationStorage.State.COMPLETE);
+            }
+        }
     }
 
     /**
@@ -201,17 +224,28 @@ public final class IncinerationService {
                 EnchantManager.Currency currency = EnchantManager.Currency.valueOf(transaction.currency());
                 if (currency == EnchantManager.Currency.XP_LEVELS) {
                     org.bukkit.entity.Player online = offline.getPlayer();
-                    if (online != null) {
+                    if (online != null && online.isOnline()) {
                         online.giveExp((int) Math.ceil(transaction.rewardAmount()));
+                        persistStateAsync(transaction.transactionId(), IncinerationStorage.State.COMPLETE);
                     } else {
-                        plugin.getLogger().warning("Could not re-credit offline player's incineration XP for transaction "
-                                + transaction.transactionId() + " -- they will need to contact staff.");
+                        pendingOfflineXp.computeIfAbsent(transaction.playerUuid(), k -> new CopyOnWriteArrayList<>())
+                                .add(new PendingXp(transaction.transactionId(), (int) Math.ceil(transaction.rewardAmount())));
+                        plugin.getLogger().info("Queued pending incineration XP (" + (int) Math.ceil(transaction.rewardAmount())
+                                + " XP) for offline player " + transaction.playerUuid() + " to deliver on join.");
+                        continue;
                     }
                 } else if (EconomyHook.isAvailable()) {
-                    EconomyHook.getEconomy().depositPlayer(offline, transaction.rewardAmount());
+                    Economy economy = EconomyHook.getEconomy();
+                    if (economy != null) {
+                        economy.depositPlayer(offline, transaction.rewardAmount());
+                    }
+                    persistStateAsync(transaction.transactionId(), IncinerationStorage.State.COMPLETE);
+                } else {
+                    persistStateAsync(transaction.transactionId(), IncinerationStorage.State.COMPLETE);
                 }
+            } else {
+                persistStateAsync(transaction.transactionId(), IncinerationStorage.State.COMPLETE);
             }
-            persistStateAsync(transaction.transactionId(), IncinerationStorage.State.COMPLETE);
         }
         if (!incomplete.isEmpty()) {
             plugin.getLogger().info("Reconciled " + incomplete.size() + " incomplete incineration transaction(s) from before the last restart.");

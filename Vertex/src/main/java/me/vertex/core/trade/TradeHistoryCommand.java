@@ -57,6 +57,20 @@ public final class TradeHistoryCommand implements CommandExecutor, TabCompleter 
     }
 
     private static UUIDAndName resolve(String raw) {
+        Player online = Bukkit.getPlayerExact(raw);
+        if (online != null) {
+            return new UUIDAndName(online.getUniqueId(), online.getName());
+        }
+        try {
+            UUID parsed = UUID.fromString(raw);
+            OfflinePlayer off = Bukkit.getOfflinePlayer(parsed);
+            return new UUIDAndName(parsed, off.getName() == null ? raw : off.getName());
+        } catch (IllegalArgumentException ignored) {
+            OfflinePlayer cached = Bukkit.getOfflinePlayerIfCached(raw);
+            if (cached != null) {
+                return new UUIDAndName(cached.getUniqueId(), cached.getName() == null ? raw : cached.getName());
+            }
+        }
         OfflinePlayer player = Bukkit.getOfflinePlayer(raw);
         return new UUIDAndName(player.getUniqueId(), player.getName() == null ? raw : player.getName());
     }

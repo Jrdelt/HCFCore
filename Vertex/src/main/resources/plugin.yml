@@ -40,6 +40,13 @@ commands:
   fpowerbooster:
     description: Give persistent personal faction-power booster vouchers.
     usage: /<command> give <player> <10|25|50|75|100> [amount]
+  xpbooster:
+    description: Give or check personal XP boosters.
+    usage: /<command> give [player] [percentage] [timeInSeconds]
+    aliases: [expbooster]
+  sellbooster:
+    description: Give or check personal shop sell boosters.
+    usage: /<command> give [player] [percentage] [timeInSeconds]
   kit:
     description: Claim, preview, or manage kits.
     usage: /<command> <name>|preview <name>
@@ -134,7 +141,7 @@ commands:
     usage: /<command> hand|all
   koth:
     description: Focus an active KOTH or manage KOTH regions as staff.
-    usage: /<command> focus [name|off]|create <name>|cancel|start|stop|delete|list|validate
+    usage: /<command> focus [name|off]|create <name>|cancel|start|stop|delete|list|validate|schedule <name> add/remove <HH:mm>/list
   cf:
     description: Browse, host, or play a coinflip.
     usage: /<command> [amount [exp|xp|money|gc] [player]|hand [player]|review <id>|approve <id>|deny <id>|ban|unban|cancel <id>|logs [player]]
@@ -151,7 +158,7 @@ commands:
     aliases: [auctionhouse]
   outpost:
     description: Focus an active Outpost or manage Outpost regions as staff.
-    usage: /<command> focus [name|off]|create <name>|cancel|start|stop|delete|list|validate
+    usage: /<command> focus [name|off]|create <name>|cancel|start|stop|delete|list|validate|schedule <name> add/remove <HH:mm>/list
   trade:
     description: Request, accept, or cancel a secure player trade.
     usage: /<command> <player>|accept <player>|cancel
@@ -218,6 +225,9 @@ commands:
     description: Open your persistent Reset Vault or manage Reset Vaults.
     usage: /<command> [give <player>|token give <player> [amount]|open <player>|setphase <phase>|backup [status]|restore|undo|blacklist|status]
     aliases: [resetvault]
+  firsttimejoin:
+    description: Manage the one-time kit new players receive on their first join.
+    usage: /<command> kit
 
 permissions:
   vertex.fa.*:
@@ -230,6 +240,7 @@ permissions:
       vertex.fa.power: true
       vertex.fa.claim: true
       vertex.fa.unclaim: true
+      vertex.fa.unclaimall: true
       vertex.fa.disband: true
       vertex.fa.relation: true
       vertex.fa.shield: true
@@ -247,6 +258,7 @@ permissions:
   vertex.fa.power: {default: op}
   vertex.fa.claim: {default: op}
   vertex.fa.unclaim: {default: op}
+  vertex.fa.unclaimall: {default: op}
   vertex.fa.disband: {default: op}
   vertex.fa.relation: {default: op}
   vertex.fa.shield: {default: op}
@@ -281,6 +293,12 @@ permissions:
   vertex.spawn.set:
     description: Set the persistent network Spawn location.
     default: op
+  vertex.warp:
+    description: Access to public network warps and warp browser.
+    default: true
+  vertex.warp.*:
+    description: Access to all configured network warps.
+    default: true
   vertex.server.warp:
     description: Create and delete public network warps with /s.
     default: op
@@ -292,6 +310,24 @@ permissions:
     default: op
   vertex.fpowerbooster.give:
     description: Give persistent F Power Booster vouchers.
+    default: op
+  vertex.xpbooster.use:
+    description: View your active XP booster status with /xpbooster.
+    default: true
+  vertex.xpbooster.give:
+    description: Give an XP booster potion to a player with /xpbooster give.
+    default: op
+  vertex.sellbooster.use:
+    description: View your active Sell booster status with /sellbooster.
+    default: true
+  vertex.sellbooster.give:
+    description: Give a Sell booster potion to a player with /sellbooster give.
+    default: op
+  vertex.booster.use:
+    description: View your active booster status with /xpbooster or /sellbooster.
+    default: true
+  vertex.booster.give:
+    description: Master administrative permission to give any booster potion.
     default: op
   vertex.admin:
     description: Reload Vertex's config, clear stacked mobs, or switch the storage backend.
@@ -376,6 +412,9 @@ permissions:
     default: op
   vertex.outpost.admin:
     description: Create, edit, start, stop, and delete Outpost events.
+    default: op
+  vertex.firsttimejoin.admin:
+    description: Set the one-time kit new players receive on their first join.
     default: op
   vertex.kit.create:
     description: Create a kit from the currently held inventory.

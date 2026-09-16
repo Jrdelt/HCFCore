@@ -1,11 +1,13 @@
 package me.vertex.core.booster;
 
+import me.vertex.core.enchant.listener.RuneEffectListener;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.menu.MenuLayout;
 import me.vertex.core.menu.MenuPlaceholders;
 import me.vertex.core.menu.MenuRegistry;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -47,7 +49,13 @@ public final class BoostersMenu {
                 viewer == subject ? null : "inspect",
                 MenuPlaceholders.of().put("player", subject.getName()));
         holder.inventory = inventory;
+        renderOverview(inventory, viewer, subject, service, messages, menus, holder);
+        viewer.openInventory(inventory);
+    }
 
+    public static void renderOverview(Inventory inventory, Player viewer, Player subject, BoosterService service,
+            Messages messages, MenuRegistry menus, Holder holder) {
+        MenuLayout layout = menus.layout(MENU_ID);
         int[] slots = layout.slots("category-slots", DEFAULT_CATEGORY_SLOTS);
         BoosterCategory[] categories = BoosterCategory.values();
         for (int index = 0; index < categories.length && index < slots.length; index++) {
@@ -70,7 +78,6 @@ public final class BoostersMenu {
             inventory.setItem(slots[index], template.render(iconMaterial(category), placeholders));
             holder.slotCategories.put(slots[index], category);
         }
-        viewer.openInventory(inventory);
     }
 
     public static void openDetail(Player viewer, Player subject, BoosterService service, Messages messages,
@@ -81,12 +88,27 @@ public final class BoostersMenu {
                 .put("player", subject.getName())
                 .put("category", messages.getRaw(viewer, "boosters.category-" + category.configKey())));
         holder.inventory = inventory;
+        renderDetail(inventory, viewer, subject, service, messages, menus, category);
+        layout.place(inventory, "back", MenuPlaceholders.of());
+        viewer.openInventory(inventory);
+    }
 
+    public static void renderDetail(Inventory inventory, Player viewer, Player subject, BoosterService service,
+            Messages messages, MenuRegistry menus, BoosterCategory category) {
+        MenuLayout layout = menus.layout(MENU_ID);
         List<BoosterContribution> contributions = service.contributions(subject, category);
         int[] slots = layout.slots("source-slots", DEFAULT_SOURCE_SLOTS);
         for (int index = 0; index < contributions.size() && index < slots.length; index++) {
             BoosterContribution contribution = contributions.get(index);
-            var template = layout.item(contribution.active() ? "source-active" : "source-inactive");
+            String templateId;
+            if (!contribution.active()) {
+                templateId = "source-inactive";
+            } else if (contribution.isTimed() && layout.item("source-active-timed") != null) {
+                templateId = "source-active-timed";
+            } else {
+                templateId = "source-active";
+            }
+            var template = layout.item(templateId);
             if (template == null) {
                 continue;
             }
@@ -95,8 +117,22 @@ public final class BoostersMenu {
         if (contributions.isEmpty()) {
             layout.place(inventory, "empty", MenuPlaceholders.of());
         }
-        layout.place(inventory, "back", MenuPlaceholders.of());
-        viewer.openInventory(inventory);
+    }
+
+    /** Re-renders an open booster menu to update timers live while the inventory is viewed. */
+    public static void refreshOpen(Player viewer, BoosterService service, Messages messages, MenuRegistry menus) {
+        if (!(viewer.getOpenInventory().getTopInventory().getHolder() instanceof Holder holder)) {
+            return;
+        }
+        Player subject = Bukkit.getPlayer(holder.subjectUuid());
+        if (subject == null) {
+            return;
+        }
+        if (holder.category() == null) {
+            renderOverview(holder.inventory, viewer, subject, service, messages, menus, holder);
+        } else {
+            renderDetail(holder.inventory, viewer, subject, service, messages, menus, holder.category());
+        }
     }
 
     /** The Back button's configured slot, so the listener never hardcodes it. */
@@ -107,9 +143,14 @@ public final class BoostersMenu {
 
     private static MenuPlaceholders placeholdersFor(Player viewer, Messages messages,
             BoosterContribution contribution) {
+        String duration = contribution.isTimed()
+                ? RuneEffectListener.formatDuration(contribution.remainingSeconds())
+                : messages.getRaw(viewer, "boosters.duration-permanent");
         MenuPlaceholders placeholders = MenuPlaceholders.of()
                 .putTrusted("source", messages.getRaw(viewer, "boosters.source-" + contribution.sourceId()))
-                .put("percent", percent(contribution.percent()));
+                .put("percent", percent(contribution.percent()))
+                .put("duration", duration)
+                .put("time_left", duration);
         if (!contribution.active()) {
             placeholders.putTrusted("reason",
                     messages.getRaw(viewer, "boosters.reason-" + contribution.inactiveReasonKey()));
@@ -121,10 +162,19 @@ public final class BoostersMenu {
             Messages messages, BoosterCategory category, MenuLayout layout) {
         List<Component> lines = new ArrayList<>();
         for (BoosterContribution contribution : service.contributions(subject, category)) {
-            lines.add(MessageFormatter.deserialize(messages.getRaw(viewer,
-                    contribution.active() ? "boosters.line-active" : "boosters.line-inactive",
-                    "source", MessageFormatter.plain(messages.getRaw(viewer, "boosters.source-" + contribution.sourceId())),
-                    "percent", percent(contribution.percent()))));
+            if (contribution.active() && contribution.isTimed()) {
+                String duration = RuneEffectListener.formatDuration(contribution.remainingSeconds());
+                lines.add(MessageFormatter.deserialize(messages.getRaw(viewer,
+                        "boosters.line-active-timed",
+                        "source", MessageFormatter.plain(messages.getRaw(viewer, "boosters.source-" + contribution.sourceId())),
+                        "percent", percent(contribution.percent()),
+                        "duration", duration)));
+            } else {
+                lines.add(MessageFormatter.deserialize(messages.getRaw(viewer,
+                        contribution.active() ? "boosters.line-active" : "boosters.line-inactive",
+                        "source", MessageFormatter.plain(messages.getRaw(viewer, "boosters.source-" + contribution.sourceId())),
+                        "percent", percent(contribution.percent()))));
+            }
         }
         if (lines.isEmpty()) {
             var empty = layout.item("no-sources");

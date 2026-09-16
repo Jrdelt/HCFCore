@@ -40,7 +40,7 @@ import java.util.stream.Stream;
 /** Granular, command-only /fa administration with durable auditing. */
 public final class FactionAdminCommand implements CommandExecutor, TabCompleter {
     private static final List<String> ROOTS = List.of("help", "info", "grace", "power", "claim",
-            "unclaim", "disband", "relation", "shield", "bank", "vault", "upgrades", "members", "combat", "logs", "network", "season");
+            "unclaim", "unclaimall", "disband", "relation", "shield", "bank", "vault", "upgrades", "members", "combat", "logs", "network", "season");
     private static final DateTimeFormatter LOG_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
             .withZone(ZoneId.systemDefault());
 
@@ -106,6 +106,7 @@ public final class FactionAdminCommand implements CommandExecutor, TabCompleter 
             case "power" -> power(sender, args);
             case "claim" -> claim(sender, args);
             case "unclaim" -> unclaim(sender, args);
+            case "unclaimall" -> unclaimall(sender, args);
             case "disband" -> disband(sender, args);
             case "relation" -> relation(sender, args);
             case "shield" -> shield(sender, args);
@@ -192,6 +193,39 @@ public final class FactionAdminCommand implements CommandExecutor, TabCompleter 
         ChunkKey chunk = ChunkKey.of(((Player) sender).getLocation());
         submit(sender, "FORCE_UNCLAIM", chunk.toString(), "--force",
                 () -> factions.forceUnclaim(chunk));
+    }
+
+    private void unclaimall(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            send(sender, "usage-unclaimall");
+            return;
+        }
+        String raw = args[1].trim().toLowerCase(Locale.ROOT);
+        String type;
+        if (raw.equals("safezone") || raw.equals("safe") || raw.equals("sz")) {
+            type = "safezone";
+        } else if (raw.equals("warzone") || raw.equals("war") || raw.equals("wz")) {
+            type = "warzone";
+        } else {
+            send(sender, "usage-unclaimall");
+            return;
+        }
+        String tag = factions.systemTag(type);
+        int pending = factions.systemClaimChunks(type).size();
+        if (pending == 0) {
+            sender.sendMessage(messages.get(sender, "fa.unclaim-empty", "faction", tag));
+            return;
+        }
+        sender.sendMessage(messages.get(sender, "fa.unclaim-started", "faction", tag, "count", String.valueOf(pending)));
+        factions.forceUnclaimAllSystemClaims(type).whenComplete((removed, error) -> onMain(() -> {
+            boolean success = error == null && removed != null && removed > 0;
+            audited(sender, "FORCE_UNCLAIMALL", tag, type, success);
+            if (!success) {
+                sender.sendMessage(messages.get(sender, "fa.unclaim-failed", "faction", tag));
+                return;
+            }
+            sender.sendMessage(messages.get(sender, "fa.unclaim-finished", "faction", tag, "count", String.valueOf(removed)));
+        }));
     }
 
     private void disband(CommandSender sender, String[] args) {
@@ -554,6 +588,7 @@ public final class FactionAdminCommand implements CommandExecutor, TabCompleter 
         String root = args[0].toLowerCase(Locale.ROOT);
         Stream<String> values = Stream.empty();
         if (args.length == 2 && List.of("info", "claim", "disband", "shield", "bank", "vault", "upgrades", "logs").contains(root)) values = factionTags();
+        else if (args.length == 2 && root.equals("unclaimall")) values = Stream.of("Warzone", "Safezone");
         else if (args.length == 2 && root.equals("grace")) values = Stream.of("on", "off");
         else if (args.length == 2 && root.equals("power")) values = Stream.of("set");
         else if (args.length == 3 && root.equals("power")) values = playerNames();

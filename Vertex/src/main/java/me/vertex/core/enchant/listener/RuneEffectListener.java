@@ -6,6 +6,7 @@ import me.vertex.core.booster.BoosterSource;
 import me.vertex.core.enchant.EnchantDefinition;
 import me.vertex.core.enchant.EnchantManager;
 import me.vertex.core.enchant.RuneCooldownStore;
+import me.vertex.core.enchant.RuneFormatting;
 import me.vertex.core.enchant.RuneProtection;
 import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.pvp.CombatManager;
@@ -41,7 +42,6 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
@@ -92,20 +92,17 @@ public final class RuneEffectListener implements Listener {
     private volatile ZoneManager zones;
     private volatile me.vertex.core.lang.Messages messages;
     private volatile me.vertex.core.preferences.AnnouncementPreferenceManager announcementPreferences;
+    private volatile me.vertex.core.backpack.BackpackAutoStoreListener backpacks;
 
     /** Talon Rend / Crown Breaker's "next qualifying melee hit" empowerment, one per player. */
     private final Map<UUID, ArmedHit> armedHits = new ConcurrentHashMap<>();
     /** Talon Rend's active incoming-healing-reduction debuff, one per wounded entity (player or mob). */
     private final Map<UUID, Wound> wounds = new ConcurrentHashMap<>();
-    /** Raptor's Reversal's brace window, one per bracing player. */
-    private final Map<UUID, Brace> braces = new ConcurrentHashMap<>();
     /** Huntmaster's Call's active mark, one per marked target. */
     private final Map<UUID, Mark> marks = new ConcurrentHashMap<>();
-    /** Golden Bastion's active circle, one per casting owner. */
-    private final Map<UUID, Circle> bastions = new ConcurrentHashMap<>();
     /** Slipstream's active trail, one per casting owner. */
     private final Map<UUID, Trail> trails = new ConcurrentHashMap<>();
-    /** Rally Arrow / Gale Bolt's "next shot" empowerment, one per shooter, consumed on {@link EntityShootBowEvent}. */
+    /** Rally Arrow's "next shot" empowerment, one per shooter, consumed on {@link EntityShootBowEvent}. */
     private final Map<UUID, ArmedHit> armedShots = new ConcurrentHashMap<>();
     /** Rally Arrow's active healing circles, keyed by the tagged projectile's entity id so impact resolves in O(1). */
     private final List<HealCircle> healCircles = new ArrayList<>();
@@ -114,19 +111,23 @@ public final class RuneEffectListener implements Listener {
     private static final String PLACED_BLOCK_METADATA = "vertex_player_placed";
     private volatile BukkitTask seasonalTask;
 
+    /** Tags on a Gilded Catch booster potion identifying which category it grants, its rolled percent, and its rolled duration -- read back on {@link #onConsume}. */
+    private final NamespacedKey boosterCategoryKey;
+    private final NamespacedKey boosterPercentKey;
+    private final NamespacedKey boosterDurationKey;
+    /** Gilded Catch's active personal EXP/Sell booster grants, one slot per category per player -- lazily expired on read, never swept by a task. */
+    private final Map<UUID, Map<BoosterCategory, PersonalBoost>> personalBoosts = new ConcurrentHashMap<>();
+
+    public record PersonalBoost(double percent, long expiresAt) {
+    }
+
     private record ArmedHit(EnchantDefinition definition, EnchantDefinition.Level level, long expiresAt) {
     }
 
     private record Wound(double healingReductionPercent, long expiresAt) {
     }
 
-    private record Brace(double damageReductionPercent, double knockbackStrength, long expiresAt) {
-    }
-
     private record Mark(UUID casterUuid, double damageBonusPercent, double supportRangeBlocks, long expiresAt) {
-    }
-
-    private record Circle(UUID ownerUuid, Location center, double radiusBlocks, double reductionPercent, long expiresAt) {
     }
 
     private record Trail(UUID ownerUuid, int wearerLevel, int friendlyLevel, int enemyLevel,
@@ -143,6 +144,9 @@ public final class RuneEffectListener implements Listener {
         this.users = users;
         this.cooldowns = cooldowns;
         this.shotEffectKey = new NamespacedKey(manager.plugin(), "seasonal_shot_effect");
+        this.boosterCategoryKey = new NamespacedKey(manager.plugin(), "gilded_catch_booster_category");
+        this.boosterPercentKey = new NamespacedKey(manager.plugin(), "gilded_catch_booster_percent");
+        this.boosterDurationKey = new NamespacedKey(manager.plugin(), "gilded_catch_booster_duration_seconds");
     }
 
     /** Wired in once Haven/Riftlands are initialized -- zone-gated runes are simply inert until then. */
@@ -164,6 +168,35 @@ public final class RuneEffectListener implements Listener {
         this.announcementPreferences = announcementPreferences;
     }
 
+    /**
+     * Wired in alongside the others above -- optional, so a caller that
+     * never sets this simply gets every bonus-drop rune (Ore Fortune,
+     * Golden Vein, Crop Bounty, Golden Harvest) dropping on the ground the
+     * way they always did, instead of a null-dereference. Once set, {@link
+     * #duplicateDrops} routes its bonus items through the player's equipped
+     * Backpack exactly like their real drop already is (via {@code
+     * BackpackAutoStoreListener#onMine}), instead of unconditionally
+     * dropping them at the block regardless of what's equipped.
+     */
+    public void setBackpackRouter(me.vertex.core.backpack.BackpackAutoStoreListener backpacks) {
+        this.backpacks = backpacks;
+    }
+
+    /**
+     * Whether {@code uuid} currently wants rune activation/proc chat
+     * messages at all -- every self/target proc message in this class
+     * (Crown Breaker, Raptor's Reversal, Gilded Catch) gates on this so
+     * turning rune messages off in {@code /runeprefs} actually silences
+     * them, not just the bind-queue's own activation/cooldown lines.
+     * Defaults to enabled when no preference manager is wired, matching
+     * {@link #announceMark}'s existing fallback.
+     */
+    private boolean runeActivationMessagesEnabled(UUID uuid) {
+        me.vertex.core.preferences.AnnouncementPreferenceManager preferences = announcementPreferences;
+        return preferences == null || preferences.isEnabled(uuid,
+                me.vertex.core.preferences.AnnouncementCategory.RUNE_ACTIVATION_MESSAGES);
+    }
+
     /** Backs a Mob Drop Boost rune (e.g. Abyssal Scavenger) the same way any other booster source contributes. */
     public BoosterSource boosterSource() {
         return new BoosterSource() {
@@ -181,6 +214,54 @@ public final class RuneEffectListener implements Listener {
                 return value <= 0D ? List.of() : List.of(BoosterContribution.active(id(), category, value));
             }
         };
+    }
+
+    /** Backs the personal EXP/Sell boosters a Gilded Catch potion grants when drunk -- see {@link #onConsume}. */
+    public BoosterSource gildedCatchBoosterSource() {
+        return new BoosterSource() {
+            @Override
+            public String id() {
+                return "gilded-catch";
+            }
+
+            @Override
+            public List<BoosterContribution> contribute(Player player, BoosterCategory category) {
+                if (category != BoosterCategory.EXP && category != BoosterCategory.SELL) {
+                    return List.of();
+                }
+                PersonalBoost boost = activePersonalBoost(player.getUniqueId(), category);
+                return boost == null || boost.percent() <= 0D
+                        ? List.of()
+                        : List.of(BoosterContribution.activeTimed(id(), category, boost.percent(), boost.expiresAt()));
+            }
+        };
+    }
+
+    private double personalBoostPercent(UUID uuid, BoosterCategory category) {
+        PersonalBoost boost = activePersonalBoost(uuid, category);
+        return boost == null ? 0D : boost.percent();
+    }
+
+    public PersonalBoost activePersonalBoost(UUID uuid, BoosterCategory category) {
+        Map<BoosterCategory, PersonalBoost> perPlayer = personalBoosts.get(uuid);
+        if (perPlayer == null) {
+            return null;
+        }
+        PersonalBoost boost = perPlayer.get(category);
+        if (boost == null) {
+            return null;
+        }
+        if (System.currentTimeMillis() > boost.expiresAt()) {
+            perPlayer.remove(category);
+            return null;
+        }
+        return boost;
+    }
+
+    public void applyPersonalBoost(UUID uuid, BoosterCategory category, double percent, double durationSeconds) {
+        long expiresAt = System.currentTimeMillis() + Math.round(durationSeconds * 1000D);
+        personalBoosts.computeIfAbsent(uuid, ignored -> new HashMap<>())
+                .put(category, new PersonalBoost(percent, expiresAt));
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -227,7 +308,7 @@ public final class RuneEffectListener implements Listener {
                 return;
             }
             player.sendMessage(messages.get(player, "rune.movement-on-cooldown",
-                    "enchant", rune.definition().displayName(),
+                    "enchant", RuneFormatting.coloredNameRaw(manager.tierOf(rune.definition().id()), rune.definition().displayName()),
                     "seconds", String.format(java.util.Locale.ROOT, "%.1f", remaining / 1000D)));
             return;
         }
@@ -311,9 +392,8 @@ public final class RuneEffectListener implements Listener {
         boolean fromMob = isMobDamage(damager);
 
         if (event.getDamage() > 0D && damager != null && !(damager instanceof Projectile)) {
-            consumeBrace(victim, damager, event);
+            applyRaptorsReversal(victim, damager, event);
         }
-        applyBastionReduction(victim, event);
 
         if (event.getCause() == EntityDamageEvent.DamageCause.FALL) {
             for (ActiveRune rune : active(victim, List.of("FALL_REDUCTION"))) {
@@ -470,56 +550,139 @@ public final class RuneEffectListener implements Listener {
                 double currentAbsorption = target.getAbsorptionAmount();
                 double removed = Math.min(currentAbsorption, heartsToRemove * 2D);
                 target.setAbsorptionAmount(Math.max(0D, currentAbsorption - removed));
+                me.vertex.core.lang.Messages currentMessages = messages;
+                if (removed > 0D && target instanceof Player victim && currentMessages != null
+                        && runeActivationMessagesEnabled(victim.getUniqueId())) {
+                    String coloredName = RuneFormatting.coloredNameRaw(
+                            me.vertex.core.enchant.RuneTier.SEASONAL, armed.definition().displayName());
+                    victim.sendMessage(currentMessages.get(victim, "rune.crown-breaker-proc",
+                            "enchant", coloredName, "attacker", attacker.getName()));
+                }
             }
             default -> {
             }
         }
     }
 
-    /** Raptor's Reversal: one counter per activation -- consumed here regardless of outcome, matching "mistiming wastes the activation." */
-    private void consumeBrace(Player victim, Entity attackerEntity, EntityDamageEvent event) {
-        Brace brace = braces.get(victim.getUniqueId());
-        if (brace == null) {
-            return;
-        }
-        braces.remove(victim.getUniqueId());
-        if (System.currentTimeMillis() > brace.expiresAt()) {
-            return;
-        }
-        event.setDamage(event.getDamage() * reductionMultiplier(brace.damageReductionPercent()));
-        if (attackerEntity instanceof LivingEntity livingAttacker) {
-            Vector push = livingAttacker.getLocation().toVector().subtract(victim.getLocation().toVector());
-            if (push.lengthSquared() < 0.0001D) {
-                push = new Vector(1D, 0D, 0D);
-            }
-            push.setY(0D).normalize().multiply(brace.knockbackStrength()).setY(0.35D);
-            livingAttacker.setVelocity(livingAttacker.getVelocity().add(push));
+    /**
+     * Raptor's Reversal: fully passive now -- no activation, no bind. Every
+     * equipped copy gets its own {@link #activate} roll (proc-chance +
+     * cooldown, exactly like any other passive effect in this file) on each
+     * incoming melee hit; a hit is never reduced by more than one copy since
+     * {@link #active} only returns the highest level per enchant id.
+     */
+    private void applyRaptorsReversal(Player victim, Entity attackerEntity, EntityDamageEvent event) {
+        for (ActiveRune rune : active(victim, List.of("RAPTORS_REVERSAL"))) {
+            activate(victim, rune, () -> {
+                double minPercent = rune.level().setting("min-reduction-percent", 15D);
+                double maxPercent = Math.max(minPercent, rune.level().setting("max-reduction-percent", 45D));
+                double reduction = minPercent + ThreadLocalRandom.current().nextDouble() * (maxPercent - minPercent);
+                event.setDamage(event.getDamage() * reductionMultiplier(reduction));
+                if (attackerEntity instanceof LivingEntity livingAttacker) {
+                    Vector push = livingAttacker.getLocation().toVector().subtract(victim.getLocation().toVector());
+                    if (push.lengthSquared() < 0.0001D) {
+                        push = new Vector(1D, 0D, 0D);
+                    }
+                    push.setY(0D).normalize().multiply(rune.level().setting("knockback-strength", 1.0D)).setY(0.35D);
+                    livingAttacker.setVelocity(livingAttacker.getVelocity().add(push));
+                }
+                me.vertex.core.lang.Messages currentMessages = messages;
+                if (attackerEntity instanceof Player attackerPlayer && currentMessages != null) {
+                    String coloredName = RuneFormatting.coloredNameRaw(
+                            me.vertex.core.enchant.RuneTier.SEASONAL, rune.definition().displayName());
+                    if (runeActivationMessagesEnabled(victim.getUniqueId())) {
+                        victim.sendMessage(currentMessages.get(victim, "rune.raptors-reversal-proc-self",
+                                "enchant", coloredName, "player", attackerPlayer.getName()));
+                    }
+                    if (runeActivationMessagesEnabled(attackerPlayer.getUniqueId())) {
+                        attackerPlayer.sendMessage(currentMessages.get(attackerPlayer, "rune.raptors-reversal-proc-target",
+                                "enchant", coloredName, "player", victim.getName()));
+                    }
+                }
+                return true;
+            });
         }
     }
 
-    /** Golden Bastion: strongest active circle the victim currently stands in wins; overlapping circles never stack. */
-    private void applyBastionReduction(Player victim, EntityDamageEvent event) {
-        double best = 0D;
-        long now = System.currentTimeMillis();
-        for (java.util.Iterator<Circle> it = bastions.values().iterator(); it.hasNext(); ) {
-            Circle circle = it.next();
-            if (now > circle.expiresAt()) {
-                it.remove();
-                continue;
-            }
-            Player owner = Bukkit.getPlayer(circle.ownerUuid());
-            if (owner == null || !RuneProtection.isTeamOf(owner, victim)) {
-                continue;
-            }
-            if (!victim.getWorld().equals(circle.center().getWorld())
-                    || victim.getLocation().distanceSquared(circle.center()) > circle.radiusBlocks() * circle.radiusBlocks()) {
-                continue;
-            }
-            best = Math.max(best, circle.reductionPercent());
+    /** How often (in ticks) an active Golden Bastion field re-checks for intruders and redraws its boundary while it's up. */
+    private static final long BASTION_FIELD_PERIOD_TICKS = 4L;
+
+    /**
+     * Golden Bastion: a standing field around the caster, not a single
+     * instant pulse -- for {@code duration-seconds} (4 at level 1, up to 8 at
+     * level 5) it keeps re-checking every {@link #BASTION_FIELD_PERIOD_TICKS}
+     * and knocking away anyone caught in the box who isn't the caster and
+     * isn't {@link RuneProtection#isTeamOf} them (own faction or an ally),
+     * following the caster if they move so the field always stays centered
+     * on them. The box is the same size in every direction ("5x5" at level
+     * 1, wider at higher levels, including straight down), so nobody
+     * standing above or below the caster is safe either. A ring of particles
+     * traces the current radius every tick of the field so both the caster
+     * and anyone nearby can see exactly where the "can't walk in" boundary
+     * is -- wrapped in try/catch since headless/mock environments don't
+     * support particle rendering (see {@link #detonate} for the same guard).
+     * Never procs from inside a protected spawn/safezone (the same check
+     * {@link me.vertex.core.ability.NoPearlSpawnListener#isProtected} and
+     * {@link me.vertex.core.pvp.CombatSafezoneListener} already gate on) --
+     * shoving people around inside a zone meant to be a fight-free area is
+     * exactly the kind of abuse those two exist to prevent elsewhere.
+     */
+    private boolean pushBastion(Player player, ActiveRune rune) {
+        if (me.vertex.core.ability.NoPearlSpawnListener.isProtected(manager.plugin(), player.getLocation())) {
+            return false;
         }
-        if (best > 0D) {
-            event.setDamage(event.getDamage() * reductionMultiplier(best));
+        double radius = Math.max(1D, rune.level().setting("radius-blocks", 5D));
+        double strength = Math.max(0D, rune.level().abilityValue());
+        double durationSeconds = Math.max(0D, rune.level().setting("duration-seconds", 4D));
+        long durationTicks = Math.round(durationSeconds * 20D);
+        if (durationTicks <= 0L || !manager.plugin().isEnabled()) {
+            return true;
         }
+        new org.bukkit.scheduler.BukkitRunnable() {
+            long elapsedTicks = 0L;
+
+            @Override
+            public void run() {
+                if (elapsedTicks >= durationTicks || !player.isOnline() || player.isDead()) {
+                    this.cancel();
+                    return;
+                }
+                org.bukkit.Location center = player.getLocation();
+                // The caster can walk into a safezone mid-duration since the
+                // field follows them -- if they do, stop pushing (but keep
+                // ticking down the duration) until they leave it again.
+                boolean casterInSafezone = me.vertex.core.ability.NoPearlSpawnListener.isProtected(manager.plugin(), center);
+                for (Entity entity : casterInSafezone ? List.<Entity>of() : player.getNearbyEntities(radius, radius, radius)) {
+                    if (!(entity instanceof Player target) || RuneProtection.isTeamOf(player, target)) {
+                        continue;
+                    }
+                    Vector push = target.getLocation().toVector().subtract(center.toVector());
+                    if (push.lengthSquared() < 0.0001D) {
+                        push = new Vector(1D, 0D, 0D);
+                    }
+                    push.setY(0D).normalize().multiply(strength).setY(0.4D);
+                    target.setVelocity(target.getVelocity().add(push));
+                }
+                try {
+                    int particleCount = Math.max(12, (int) (radius * 10D));
+                    for (int i = 0; i < particleCount; i++) {
+                        double angle = 2D * Math.PI * i / particleCount;
+                        double x = Math.cos(angle) * radius;
+                        double z = Math.sin(angle) * radius;
+                        center.getWorld().spawnParticle(org.bukkit.Particle.FLAME,
+                                center.clone().add(x, 0.2D, z), 1, 0D, 0D, 0D, 0D);
+                    }
+                } catch (Throwable ignored) {
+                    // Headless / mock environments without particle support
+                }
+                elapsedTicks += BASTION_FIELD_PERIOD_TICKS;
+            }
+        }.runTaskTimer(manager.plugin(), 0L, BASTION_FIELD_PERIOD_TICKS);
+        // A defensive panic-button field always consumes its cooldown once
+        // cast, whether or not anyone was actually in range to push --
+        // unlike a targeted ability (Huntmaster's Call), there's no single
+        // "target" whose absence means the cast did nothing.
+        return true;
     }
 
     /** Huntmaster's Call: the caster or any teammate within the caster's support range deals bonus damage to the marked target. */
@@ -545,7 +708,7 @@ public final class RuneEffectListener implements Listener {
         event.setDamage(event.getDamage() * (1D + mark.damageBonusPercent() / 100D));
     }
 
-    /** Rally Arrow / Gale Bolt: consumes the caster's armed shot and tags exactly one fired projectile, so a multishot volley still produces only one effect. */
+    /** Rally Arrow: consumes the caster's armed shot and tags exactly one fired projectile, so a multishot volley still produces only one effect. */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onShootBow(EntityShootBowEvent event) {
         if (!(event.getEntity() instanceof Player shooter) || !(event.getProjectile() instanceof Entity projectile)) {
@@ -562,7 +725,7 @@ public final class RuneEffectListener implements Listener {
                 armed.definition().id() + ":" + armed.level().level() + ":" + shooter.getUniqueId());
     }
 
-    /** Resolves Rally Arrow's healing circle / Gale Bolt's outward gust at the tagged projectile's impact point. */
+    /** Resolves Rally Arrow's healing circle at the tagged projectile's impact point. */
     @EventHandler
     public void onProjectileHit(ProjectileHitEvent event) {
         if (!(event.getEntity() instanceof org.bukkit.persistence.PersistentDataHolder holder)) {
@@ -593,7 +756,6 @@ public final class RuneEffectListener implements Listener {
         Location impact = event.getHitEntity() != null ? event.getHitEntity().getLocation() : event.getEntity().getLocation();
         switch (definition.effect()) {
             case "RALLY_ARROW" -> createHealCircle(caster, levelConfig, impact);
-            case "GALE_BOLT" -> applyGaleGust(caster, levelConfig, impact);
             default -> {
             }
         }
@@ -606,25 +768,6 @@ public final class RuneEffectListener implements Listener {
         healCircles.add(new HealCircle(caster.getUniqueId(), impact.clone(), radius, Math.max(0D, level.abilityValue()) * 2D,
                 System.currentTimeMillis() + Math.round(duration * 1000D), pulses, new HashMap<>()));
         ensureSeasonalTask();
-    }
-
-    private void applyGaleGust(Player caster, EnchantDefinition.Level level, Location impact) {
-        double radius = Math.max(0.5D, level.abilityValue());
-        double strength = Math.max(0D, level.setting("horizontal-knockback-strength", 1D));
-        for (Entity entity : impact.getWorld().getNearbyEntities(impact, radius, radius, radius)) {
-            if (!(entity instanceof Player nearby) || RuneProtection.isTeamOf(caster, nearby)) {
-                continue;
-            }
-            if (FactionsHook.isInstalled() && !FactionsHook.service().canPvp(caster, nearby)) {
-                continue;
-            }
-            Vector push = nearby.getLocation().toVector().subtract(impact.toVector());
-            if (push.lengthSquared() < 0.0001D) {
-                continue;
-            }
-            push.setY(0D).normalize().multiply(strength).setY(0.25D);
-            nearby.setVelocity(nearby.getVelocity().add(push));
-        }
     }
 
     private static final double SEASONAL_TICK_SECONDS = 0.25D;
@@ -726,7 +869,13 @@ public final class RuneEffectListener implements Listener {
      * Gilded Catch: on a genuine successful catch, reuses the exact item the
      * player just caught (the safest possible "reuse existing loot" reward
      * -- no new economy item is invented) and rolls the level's chance to
-     * grant one more of it.
+     * grant one more of it. Every proc also announces itself in chat, and
+     * separately rolls a rarer {@code booster-chance} for a personal,
+     * drinkable XP or Sell booster potion -- a higher rod level makes this
+     * roll both more likely to succeed at all AND, once it does, biases the
+     * potion's rolled percent/duration toward the top of its configured
+     * range (see {@link #createBoosterPotion} and {@link #onConsume}),
+     * configurable end to end via {@code effect-settings}.
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onFish(org.bukkit.event.player.PlayerFishEvent event) {
@@ -743,8 +892,134 @@ public final class RuneEffectListener implements Listener {
                 reward.setAmount((int) Math.max(1D, rune.level().setting("bonus-reward-amount", 1D)));
                 java.util.Map<Integer, ItemStack> overflow = player.getInventory().addItem(reward);
                 overflow.values().forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+                me.vertex.core.lang.Messages currentMessages = messages;
+                String coloredName = RuneFormatting.coloredNameRaw(
+                        me.vertex.core.enchant.RuneTier.SEASONAL, rune.definition().displayName());
+                boolean messagesEnabled = runeActivationMessagesEnabled(player.getUniqueId());
+                if (currentMessages != null && messagesEnabled) {
+                    player.sendMessage(currentMessages.get(player, "rune.gilded-catch-proc", "enchant", coloredName));
+                }
+                double boosterChance = rune.level().setting("booster-chance", 0D);
+                if (boosterChance > 0D && ThreadLocalRandom.current().nextDouble(100D) < boosterChance) {
+                    ItemStack potion = createBoosterPotion(rune);
+                    java.util.Map<Integer, ItemStack> potionOverflow = player.getInventory().addItem(potion);
+                    potionOverflow.values().forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+                    if (currentMessages != null && messagesEnabled) {
+                        String boosterLabel = boosterCategory(potion) == BoosterCategory.EXP ? "XP" : "Sell";
+                        player.sendMessage(currentMessages.get(player, "rune.gilded-catch-booster-proc",
+                                "enchant", coloredName, "booster", boosterLabel));
+                    }
+                }
                 return true;
             });
+        }
+    }
+
+    /**
+     * How far up each roll's floor gets pushed toward its ceiling at max
+     * level -- 0.85 rather than 1.0 so even a level-10 rod keeps a sliver of
+     * randomness (a narrow high-end band) instead of every roll collapsing
+     * onto the exact same number.
+     */
+    private static final double BOOSTER_QUALITY_BIAS = 0.85D;
+
+    /**
+     * Rolls one of the two personal booster categories (EXP or Sell) with
+     * equal odds, then a percent and a duration within that category's
+     * fully configurable {@code min-*}/{@code max-*} range -- but a higher
+     * rod level doesn't just proc a booster more often (see the {@code
+     * booster-chance} curve in {@code runes.yml}), it also raises the
+     * <em>floor</em> of that roll toward the ceiling (see {@link
+     * #biasedFloor}), so a level 10 rod's boosters consistently land near
+     * the top of the range instead of anywhere in it. Bakes the rolled
+     * category/percent/duration onto a plain, no-vanilla-effect potion via
+     * PDC tags so {@link #onConsume} can read them back without re-rolling
+     * anything.
+     */
+    public ItemStack createBoosterPotion(BoosterCategory category, double percent, double durationSeconds) {
+        ItemStack item = new ItemStack(Material.POTION);
+        org.bukkit.inventory.meta.PotionMeta meta = (org.bukkit.inventory.meta.PotionMeta) item.getItemMeta();
+        meta.setBasePotionType(org.bukkit.potion.PotionType.WATER);
+        boolean exp = category == BoosterCategory.EXP;
+        String label = exp ? "xp booster" : "sell booster";
+        meta.displayName(RuneFormatting.plain(RuneFormatting.smallCaps(label) + " +" + RuneFormatting.percent(percent) + "%",
+                exp ? net.kyori.adventure.text.format.NamedTextColor.AQUA : net.kyori.adventure.text.format.NamedTextColor.GOLD));
+        meta.lore(List.of(RuneFormatting.plain(RuneFormatting.smallCaps("lasts " + formatDuration(durationSeconds)),
+                net.kyori.adventure.text.format.NamedTextColor.GRAY)));
+        meta.getPersistentDataContainer().set(boosterCategoryKey, PersistentDataType.STRING, category.name());
+        meta.getPersistentDataContainer().set(boosterPercentKey, PersistentDataType.DOUBLE, percent);
+        meta.getPersistentDataContainer().set(boosterDurationKey, PersistentDataType.DOUBLE, durationSeconds);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack createBoosterPotion(ActiveRune rune) {
+        EnchantDefinition.Level level = rune.level();
+        double levelFraction = rune.definition().maxLevel() <= 1 ? 1D
+                : (level.level() - 1D) / (rune.definition().maxLevel() - 1D);
+        boolean exp = ThreadLocalRandom.current().nextBoolean();
+        BoosterCategory category = exp ? BoosterCategory.EXP : BoosterCategory.SELL;
+        double minPercent = level.setting(exp ? "min-exp-percent" : "min-sell-percent", exp ? 15D : 25D);
+        double maxPercent = Math.max(minPercent, level.setting(exp ? "max-exp-percent" : "max-sell-percent", exp ? 200D : 124D));
+        double minDuration = level.setting(exp ? "min-exp-duration-seconds" : "min-sell-duration-seconds", exp ? 300D : 15D);
+        double maxDuration = Math.max(minDuration, level.setting(exp ? "max-exp-duration-seconds" : "max-sell-duration-seconds", exp ? 1800D : 60D));
+        double percentFloor = biasedFloor(minPercent, maxPercent, levelFraction);
+        double durationFloor = biasedFloor(minDuration, maxDuration, levelFraction);
+        double percent = percentFloor + ThreadLocalRandom.current().nextDouble() * (maxPercent - percentFloor);
+        double durationSeconds = durationFloor + ThreadLocalRandom.current().nextDouble() * (maxDuration - durationFloor);
+        return createBoosterPotion(category, percent, durationSeconds);
+    }
+
+    /** @return a roll floor between {@code min} and {@code max}, pushed up by {@code levelFraction} (0 at level 1, 1 at max level) times {@link #BOOSTER_QUALITY_BIAS}. */
+    private static double biasedFloor(double min, double max, double levelFraction) {
+        return min + (max - min) * levelFraction * BOOSTER_QUALITY_BIAS;
+    }
+
+    private BoosterCategory boosterCategory(ItemStack potion) {
+        if (!potion.hasItemMeta()) {
+            return null;
+        }
+        String raw = potion.getItemMeta().getPersistentDataContainer().get(boosterCategoryKey, PersistentDataType.STRING);
+        try {
+            return raw == null ? null : BoosterCategory.valueOf(raw);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    public static String formatDuration(double seconds) {
+        long totalSeconds = Math.round(seconds);
+        return totalSeconds >= 60L ? (totalSeconds / 60L) + "m " + (totalSeconds % 60L) + "s" : totalSeconds + "s";
+    }
+
+    /** Drinking a Gilded Catch booster potion grants its baked-in personal EXP or Sell boost immediately; a plain potion with none of these tags is left untouched. */
+    @EventHandler(ignoreCancelled = true)
+    public void onConsume(org.bukkit.event.player.PlayerItemConsumeEvent event) {
+        ItemStack item = event.getItem();
+        BoosterCategory category = boosterCategory(item);
+        if (category == null) {
+            return;
+        }
+        var pdc = item.getItemMeta().getPersistentDataContainer();
+        Double percent = pdc.get(boosterPercentKey, PersistentDataType.DOUBLE);
+        Double durationSeconds = pdc.get(boosterDurationKey, PersistentDataType.DOUBLE);
+        if (percent == null || durationSeconds == null || percent <= 0D || durationSeconds <= 0D) {
+            return;
+        }
+        Player player = event.getPlayer();
+        long expiresAt = System.currentTimeMillis() + Math.round(durationSeconds * 1000D);
+        personalBoosts.computeIfAbsent(player.getUniqueId(), ignored -> new HashMap<>())
+                .put(category, new PersonalBoost(percent, expiresAt));
+        me.vertex.core.lang.Messages currentMessages = messages;
+        if (currentMessages != null && runeActivationMessagesEnabled(player.getUniqueId())) {
+            EnchantDefinition gildedCatch = manager.definition("gilded_catch");
+            String coloredName = RuneFormatting.coloredNameRaw(me.vertex.core.enchant.RuneTier.SEASONAL,
+                    gildedCatch == null ? "Gilded Catch" : gildedCatch.displayName());
+            player.sendMessage(currentMessages.get(player, "rune.gilded-catch-booster-consumed",
+                    "enchant", coloredName,
+                    "booster", category == BoosterCategory.EXP ? "XP" : "Sell",
+                    "percent", RuneFormatting.percent(percent),
+                    "duration", formatDuration(durationSeconds)));
         }
     }
 
@@ -777,8 +1052,6 @@ public final class RuneEffectListener implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
         armedHits.remove(uuid);
-        braces.remove(uuid);
-        bastions.remove(uuid);
         trails.remove(uuid);
         armedShots.remove(uuid);
     }
@@ -813,15 +1086,45 @@ public final class RuneEffectListener implements Listener {
         if (damage <= 0D) {
             return false;
         }
-        double radius = Math.max(1D, rune.level().setting("radius", 5D));
+        double maxRadius = Math.max(1D, rune.level().setting("radius", 5D));
+        org.bukkit.Location center = event.getEntity().getLocation();
+        
         boolean hitAny = false;
-        for (Entity entity : event.getEntity().getNearbyEntities(radius, radius, radius)) {
+        for (Entity entity : event.getEntity().getNearbyEntities(maxRadius, maxRadius, maxRadius)) {
             if (!(entity instanceof LivingEntity target) || target instanceof Player || !RuneProtection.canDamage(killer, target)) {
                 continue;
             }
             target.damage(damage, killer);
             hitAny = true;
         }
+
+        if (maxRadius > 1.0 && manager.plugin().isEnabled()) {
+            new org.bukkit.scheduler.BukkitRunnable() {
+                double currentRadius = 0.5;
+
+                @Override
+                public void run() {
+                    if (currentRadius > maxRadius) {
+                        this.cancel();
+                        return;
+                    }
+                    try {
+                        int particleCount = (int) (currentRadius * 15);
+                        for (int i = 0; i < particleCount; i++) {
+                            double angle = 2 * Math.PI * i / particleCount;
+                            double x = Math.cos(angle) * currentRadius;
+                            double z = Math.sin(angle) * currentRadius;
+                            center.getWorld().spawnParticle(org.bukkit.Particle.WITCH, 
+                                    center.clone().add(x, 0.5, z), 1, 0, 0, 0, 0);
+                        }
+                    } catch (Throwable ignored) {
+                        // Headless / mock environments without particle support
+                    }
+                    currentRadius += 1.0;
+                }
+            }.runTaskTimer(manager.plugin(), 0L, 2L);
+        }
+
         return hitAny;
     }
 
@@ -845,22 +1148,12 @@ public final class RuneEffectListener implements Listener {
         return activate(player, rune, () -> switch (definition.effect()) {
             case "SKY_STEPPER", "DASHER", "RIFTWALKER" -> activateMovement(player, rune);
             case "TALON_REND", "CROWN_BREAKER" -> armNextHit(player, rune);
-            case "RAPTORS_REVERSAL" -> armBrace(player, rune);
             case "HUNTMASTERS_CALL" -> markTarget(player, rune);
-            case "GOLDEN_BASTION" -> createBastion(player, rune);
+            case "GOLDEN_BASTION" -> pushBastion(player, rune);
             case "SLIPSTREAM" -> activateSlipstream(player, rune);
-            case "RALLY_ARROW", "GALE_BOLT" -> armNextShot(player, rune);
+            case "RALLY_ARROW" -> armNextShot(player, rune);
             default -> false;
         });
-    }
-
-    /** Raptor's Reversal: brace for the configured window; the first qualifying incoming melee hit consumes it (see {@link #consumeBrace}). */
-    private boolean armBrace(Player player, ActiveRune rune) {
-        double windowSeconds = rune.level().setting("counter-window-seconds", 2D);
-        braces.put(player.getUniqueId(), new Brace(Math.max(0D, Math.min(100D, rune.level().abilityValue())),
-                Math.max(0D, rune.level().setting("knockback-strength", 1D)),
-                System.currentTimeMillis() + Math.round(Math.max(0D, windowSeconds) * 1000D)));
-        return true;
     }
 
     /**
@@ -872,7 +1165,7 @@ public final class RuneEffectListener implements Listener {
      */
     private boolean markTarget(Player player, ActiveRune rune) {
         double range = rune.level().setting("target-range-blocks", 24D);
-        Player target = rayTraceHostilePlayer(player, range);
+        Player target = RuneProtection.rayTraceHostilePlayer(player, range);
         if (target == null) {
             return false;
         }
@@ -880,25 +1173,27 @@ public final class RuneEffectListener implements Listener {
         double duration = rune.level().setting("mark-duration-seconds", 6D);
         marks.put(target.getUniqueId(), new Mark(player.getUniqueId(), Math.max(0D, rune.level().abilityValue()),
                 Math.max(0D, supportRange), System.currentTimeMillis() + Math.round(Math.max(0D, duration) * 1000D)));
+        announceMark(rune.definition(), target);
         return true;
     }
 
-    private Player rayTraceHostilePlayer(Player caster, double range) {
-        RayTraceResult trace = caster.getWorld().rayTraceEntities(caster.getEyeLocation(),
-                caster.getEyeLocation().getDirection(), range, 0.4D,
-                candidate -> candidate instanceof Player candidatePlayer && candidatePlayer != caster
-                        && !RuneProtection.isTeamOf(caster, candidatePlayer));
-        return trace != null && trace.getHitEntity() instanceof Player hit ? hit : null;
-    }
-
-    /** Golden Bastion: one stationary circle per owner: a new activation simply replaces the owner's previous one. */
-    private boolean createBastion(Player player, ActiveRune rune) {
-        double radius = rune.level().setting("radius-blocks", 5D);
-        double duration = rune.level().setting("duration-seconds", 6D);
-        bastions.put(player.getUniqueId(), new Circle(player.getUniqueId(), player.getLocation().clone(),
-                Math.max(0.5D, radius), Math.max(0D, Math.min(100D, rune.level().abilityValue())),
-                System.currentTimeMillis() + Math.round(Math.max(0D, duration) * 1000D)));
-        return true;
+    /** Broadcasts every Huntmaster's Call mark to chat, so a caster's teammates know who's about to take bonus damage. */
+    private void announceMark(EnchantDefinition definition, Player target) {
+        me.vertex.core.lang.Messages currentMessages = messages;
+        if (currentMessages == null) {
+            return;
+        }
+        String coloredName = RuneFormatting.coloredNameRaw(me.vertex.core.enchant.RuneTier.SEASONAL, definition.displayName());
+        me.vertex.core.preferences.AnnouncementPreferenceManager preferences = announcementPreferences;
+        if (preferences != null) {
+            preferences.broadcast(me.vertex.core.preferences.AnnouncementCategory.RUNE_ACTIVATION_MESSAGES,
+                    "rune.mark-proc-broadcast", "enchant", coloredName, "player", target.getName());
+            return;
+        }
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            online.sendMessage(currentMessages.get(online, "rune.mark-proc-broadcast",
+                    "enchant", coloredName, "player", target.getName()));
+        }
     }
 
     /** Slipstream: an immediate wearer speed burst, plus a trail the shared seasonal tick follows for its duration. */
@@ -916,7 +1211,7 @@ public final class RuneEffectListener implements Listener {
     }
 
     /**
-     * Rally Arrow / Gale Bolt: empowers the caster's next bow/crossbow shot
+     * Rally Arrow: empowers the caster's next bow shot
      * rather than an immediate hit. Consumed exactly once by {@link
      * #onShootBow}, which tags only the single fired projectile -- so a
      * multishot volley still produces only one effect on impact, per spec,
@@ -931,8 +1226,8 @@ public final class RuneEffectListener implements Listener {
 
     /**
      * Seasonal "empower the next qualifying hit" mechanic shared by Talon
-     * Rend and Crown Breaker. A future per-projectile equivalent (Rally
-     * Arrow/Gale Bolt) needs its own arming map keyed by the fired
+     * Rend and Crown Breaker. The per-projectile equivalent (Rally Arrow)
+     * uses its own arming map ({@link #armedShots}) keyed by the fired
      * projectile, not this one. Arming itself always succeeds once {@link
      * #activate}'s cooldown/combat/proc gate has already passed -- "a
      * required target that is invalid before activation does not consume a
@@ -1118,13 +1413,19 @@ public final class RuneEffectListener implements Listener {
                 || material == Material.BEETROOTS || material == Material.NETHER_WART || material == Material.COCOA;
     }
 
-    private static boolean duplicateDrops(BlockBreakEvent event, double chancePercent) {
+    private boolean duplicateDrops(BlockBreakEvent event, double chancePercent) {
         if (chancePercent <= 0D || ThreadLocalRandom.current().nextDouble(100D) >= chancePercent) {
             return false;
         }
         ItemStack tool = event.getPlayer().getInventory().getItemInMainHand();
+        List<ItemStack> drops = new ArrayList<>();
         for (ItemStack drop : event.getBlock().getDrops(tool, event.getPlayer())) {
-            event.getBlock().getWorld().dropItemNaturally(event.getBlock().getLocation(), drop.clone());
+            drops.add(drop.clone());
+        }
+        me.vertex.core.backpack.BackpackAutoStoreListener router = backpacks;
+        List<ItemStack> leftovers = router == null ? drops : router.routePlayerMiningDrops(event.getPlayer(), drops);
+        for (ItemStack leftover : leftovers) {
+            event.getBlock().getWorld().dropItemNaturally(event.getBlock().getLocation(), leftover);
         }
         return true;
     }

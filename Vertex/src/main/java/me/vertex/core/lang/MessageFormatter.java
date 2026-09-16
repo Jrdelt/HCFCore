@@ -3,6 +3,7 @@ package me.vertex.core.lang;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
@@ -29,6 +30,14 @@ public final class MessageFormatter {
 
     public static Component deserialize(String message) {
         return MINI_MESSAGE.deserialize(normalize(message))
+            .decoration(TextDecoration.ITALIC, false);
+    }
+
+    public static Component deserialize(String message, TagResolver... resolvers) {
+        if (resolvers == null || resolvers.length == 0) {
+            return deserialize(message);
+        }
+        return MINI_MESSAGE.deserialize(normalize(message), TagResolver.resolver(resolvers))
             .decoration(TextDecoration.ITALIC, false);
     }
 
@@ -82,7 +91,16 @@ public final class MessageFormatter {
         return MINI_MESSAGE.escapeTags(value).replace("&", "&​");
     }
 
-    private static String normalize(String message) {
+    public static String normalize(String message) {
+        if (message == null) {
+            return "";
+        }
+        if (message.indexOf('§') >= 0) {
+            message = message.replace('§', '&');
+        }
+        if (message.contains("&\u200B")) {
+            message = message.replaceAll("&\\u200B([xX0-9a-fA-Fk-oK-OrR])", "&$1");
+        }
         message = replaceSpreadHex(message);
         message = LEGACY_HEX.matcher(message).replaceAll("<#$1>");
         return message
@@ -115,7 +133,19 @@ public final class MessageFormatter {
                 .replace("&m", "<strikethrough>")
                 .replace("&n", "<underlined>")
                 .replace("&o", "")
-                .replace("&r", "<reset>");
+                .replace("&r", "<reset>")
+                .replace("&A", "<green>")
+                .replace("&B", "<aqua>")
+                .replace("&C", "<red>")
+                .replace("&D", "<light_purple>")
+                .replace("&E", "<yellow>")
+                .replace("&F", "<white>")
+                .replace("&K", "<obfuscated>")
+                .replace("&L", "<bold>")
+                .replace("&M", "<strikethrough>")
+                .replace("&N", "<underlined>")
+                .replace("&O", "")
+                .replace("&R", "<reset>");
     }
 
     /** Converts every {@code &x&R&R&G&G&B&B} run into {@code <#RRGGBB>}, stripping the per-digit {@code &} separators. */

@@ -1,7 +1,9 @@
 package me.vertex.core.preferences;
 
 import me.vertex.core.lang.Messages;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -15,6 +17,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.logging.Level;
 
 /** Delivers optional broadcasts and owns every persistent player communication toggle. */
@@ -25,7 +28,7 @@ public final class AnnouncementPreferenceManager implements Listener {
     private final Map<UUID, Set<AnnouncementCategory>> disabled = new ConcurrentHashMap<>();
     private final Set<CompletableFuture<?>> pendingWrites = ConcurrentHashMap.newKeySet();
     private final Object stateLock = new Object();
-    private final Map<UUID, CompletableFuture<Void>> writeChains = new java.util.HashMap<>();
+    private final Map<UUID, CompletableFuture<Void>> writeChains = new ConcurrentHashMap<>();
     private final Map<UUID, Object> loading = new java.util.HashMap<>();
     private final Map<UUID, Map<AnnouncementCategory, Boolean>> pendingEdits = new java.util.HashMap<>();
 
@@ -141,9 +144,31 @@ public final class AnnouncementPreferenceManager implements Listener {
         Bukkit.getConsoleSender().sendMessage(messages.get(Bukkit.getConsoleSender(), messageKey, placeholders));
     }
 
+    public void broadcast(AnnouncementCategory category, Function<CommandSender, Component> messageProvider) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (isEnabled(player.getUniqueId(), category)) {
+                player.sendMessage(messageProvider.apply(player));
+            }
+        }
+        Bukkit.getConsoleSender().sendMessage(messageProvider.apply(Bukkit.getConsoleSender()));
+    }
+
+    public void broadcast(AnnouncementCategory category, Component message) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            send(player, category, message);
+        }
+        Bukkit.getConsoleSender().sendMessage(message);
+    }
+
     public void send(Player player, AnnouncementCategory category, String messageKey, String... placeholders) {
         if (isEnabled(player.getUniqueId(), category)) {
             player.sendMessage(messages.get(player, messageKey, placeholders));
+        }
+    }
+
+    public void send(Player player, AnnouncementCategory category, Component message) {
+        if (isEnabled(player.getUniqueId(), category)) {
+            player.sendMessage(message);
         }
     }
 

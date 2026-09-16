@@ -113,6 +113,15 @@ public final class MineListener implements Listener {
             return;
         }
 
+        if (!region.isOre(block.getType()) && mines.denyNonMineBreak()) {
+            // Same protection flag also restricts filler (base) blocks --
+            // only the ore itself is the player's to break; stone/deepslate
+            // stays solid instead of breaking for nothing and regenerating.
+            event.setCancelled(true);
+            player.sendMessage(messages.get(player, "mines.cannot-break"));
+            return;
+        }
+
         // Vertex owns the drop entirely: Silk Touch cannot yield the ore
         // block itself, and Fortune has no effect. Only the configured base
         // drop and the Ore Drop booster decide the amount.
@@ -120,7 +129,8 @@ public final class MineListener implements Listener {
         event.setExpToDrop(0);
 
         if (!region.isOre(block.getType())) {
-            // A base block still regenerates, it just pays nothing.
+            // Protection is disabled for this server: a base block still
+            // regenerates, it just pays nothing.
             mines.scheduleRegen(region, block);
             return;
         }
@@ -129,16 +139,9 @@ public final class MineListener implements Listener {
         int amount = applyOreBooster(player, entry.dropAmount());
         if (amount > 0) {
             java.util.List<ItemStack> drops = java.util.List.of(new ItemStack(entry.dropMaterial(), amount));
-            ItemStack offhandBefore = player.getInventory().getItemInOffHand().clone();
             java.util.List<ItemStack> leftovers = backpackDrops == null
                     ? drops : backpackDrops.routePlayerMiningDrops(player, drops);
-            if (!mines.queueOverflow(player, leftovers, "mine-ore")) {
-                player.getInventory().setItemInOffHand(offhandBefore);
-                player.updateInventory();
-                event.setCancelled(true);
-                player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-                return;
-            }
+            mines.give(player, leftovers);
         }
         mines.scheduleRegen(region, block);
     }

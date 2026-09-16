@@ -50,27 +50,41 @@ class RuneCatalogMenuTest {
         List<ItemStack> entries = Arrays.stream(player.getOpenInventory().getTopInventory().getContents())
                 .filter(item -> item != null && manager.isEnchantItem(item))
                 .toList();
-        assertEquals(10, entries.size(), "Simple has ten configured enchant types, not one icon per level");
+        assertEquals(4, entries.size(), "Simple has four configured enchant types, not one icon per level");
         assertTrue(entries.stream().allMatch(item -> item.getItemMeta().lore().stream()
                 .map(PlainTextComponentSerializer.plainText()::serialize)
-                .anyMatch(line -> line.contains("I-III"))));
+                .anyMatch(line -> line.contains("III"))));
         assertFalse(entries.stream().anyMatch(item -> item.getItemMeta().lore().stream()
                 .map(PlainTextComponentSerializer.plainText()::serialize)
                 .anyMatch(line -> line.contains("Arena Runes"))));
     }
 
     @Test
-    void catalogLoreIsTerseWithNoPerLevelBreakdownOrSuccessFailOdds() {
+    void catalogLoreShowsAPerLevelProcChanceAndValueBreakdownButNoSuccessFailOdds() {
         RuneCatalogMenu.open(player, manager, messages, RuneTier.LEGENDARY);
 
         List<ItemStack> entries = Arrays.stream(player.getOpenInventory().getTopInventory().getContents())
                 .filter(item -> item != null && manager.isEnchantItem(item))
                 .toList();
-        assertTrue(entries.stream().allMatch(item -> item.getItemMeta().lore().size() <= 4),
-                "the catalog is a browsing view -- description, level range, value range, applies-to, nothing more");
+        assertTrue(entries.stream().allMatch(item -> item.getItemMeta().lore().size() >= 5),
+                "description + one line per level (Legendary is 3 levels) + applies-to, at minimum");
+        assertTrue(entries.stream().allMatch(item -> item.getItemMeta().lore().stream()
+                .map(PlainTextComponentSerializer.plainText()::serialize)
+                .anyMatch(line -> line.contains("ᴘʀᴏᴄ"))),
+                "each level's real proc chance must be shown, not just a min-max range");
         assertFalse(entries.stream().anyMatch(item -> item.getItemMeta().lore().stream()
                 .map(PlainTextComponentSerializer.plainText()::serialize)
                 .anyMatch(line -> line.contains("Success") || line.contains("Fail"))),
                 "success/fail odds must only ever appear on the identified item itself");
+    }
+
+    @Test
+    void catalogSupportsSeasonalTier() {
+        RuneCatalogMenu.open(player, manager, messages, RuneTier.SEASONAL);
+
+        List<ItemStack> entries = Arrays.stream(player.getOpenInventory().getTopInventory().getContents())
+                .filter(item -> item != null && manager.isEnchantItem(item))
+                .toList();
+        assertEquals(10, entries.size(), "Seasonal has ten configured gear enchant types");
     }
 }

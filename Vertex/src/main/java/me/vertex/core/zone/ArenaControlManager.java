@@ -7,7 +7,6 @@ import me.vertex.core.factions.FactionsHook;
 import me.vertex.core.lang.Messages;
 import me.vertex.core.mine.MineKothControl;
 import me.vertex.core.storage.Database;
-import me.vertex.core.storage.DeliveryManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -121,9 +120,7 @@ public final class ArenaControlManager implements Listener {
         meta.lore(messages.getGuiList(player, "arena-controls.wand-lore"));
         meta.getPersistentDataContainer().set(wandKey, PersistentDataType.STRING, zone.name() + ":" + type.name());
         wand.setItemMeta(meta);
-        if (!DeliveryManager.queueOverflow(plugin, player, List.of(wand), "arena-control-selector")) {
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-        }
+        me.vertex.core.storage.ItemGiver.give(player, List.of(wand));
     }
     public boolean cancelSelection(Player player) { return selections.remove(player.getUniqueId()) != null; }
     public List<String> names(ZoneType zone, ControlType type) { return points.values().stream().filter(point -> point.zone == zone && point.type == type).map(Point::name).sorted().toList(); }

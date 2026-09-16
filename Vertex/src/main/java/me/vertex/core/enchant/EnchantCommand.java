@@ -106,11 +106,7 @@ public final class EnchantCommand implements CommandExecutor, TabCompleter {
         for (int i = 0; i < amount; i++) {
             items.add(kind.equals("rune") ? manager.createRune(tier) : manager.createLuckyGem());
         }
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                manager.plugin(), target, items, "enchant-admin-give")) {
-            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
-            return true;
-        }
+        me.vertex.core.storage.ItemGiver.give(target, items);
         String kindLabel = kind.equals("rune") ? (tier.name() + " Rune") : "Lucky Gem";
         sender.sendMessage(messages.get(sender, "enchant.given", "player", target.getName(),
                 "amount", String.valueOf(amount), "kind", kindLabel));
@@ -182,11 +178,7 @@ public final class EnchantCommand implements CommandExecutor, TabCompleter {
             }
             items.add(created);
         }
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                manager.plugin(), target, items, "enchant-admin-give-item")) {
-            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
-            return true;
-        }
+        me.vertex.core.storage.ItemGiver.give(target, items);
         String kindLabel = manager.definition(id).displayName() + " " + me.vertex.core.enchant.RuneFormatting.roman(level);
         sender.sendMessage(messages.get(sender, "enchant.given", "player", target.getName(),
                 "amount", String.valueOf(amount), "kind", kindLabel));
@@ -198,7 +190,7 @@ public final class EnchantCommand implements CommandExecutor, TabCompleter {
      * copy of <em>every level</em>, of <em>every</em> currently registered
      * seasonal enchant, in a single call: 5 levels each for the I-V armor/
      * weapon pieces, 10 each for the I-X farming tools. Assembling that by
-     * hand would be eleven separate {@code give item} calls times each
+     * hand would be ten separate {@code give item} calls times each
      * item's own level count.
      */
     private boolean handleGiveSeasonalSet(CommandSender sender, Player target, String[] args) {
@@ -232,11 +224,7 @@ public final class EnchantCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(messages.get(sender, "enchant.unknown-seasonal-item", "id", "seasonalset"));
             return true;
         }
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                manager.plugin(), target, items, "enchant-admin-give-seasonal-set")) {
-            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
-            return true;
-        }
+        me.vertex.core.storage.ItemGiver.give(target, items);
         sender.sendMessage(messages.get(sender, "enchant.given-seasonal-set", "player", target.getName(),
                 "amount", String.valueOf(items.size())));
         return true;

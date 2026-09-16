@@ -115,12 +115,7 @@ public final class ShopMenuListener implements Listener {
         SpawnerManager.MobConfig config = spawnerManager.getMobConfig(type);
         if (config == null) return;
         if (!withdraw(player, config.price(), "spawner.no-economy", "spawner.cannot-afford")) return;
-        if (!give(player, SpawnerManager.createSpawnerItem(type,
-                MessageFormatter.deserialize(config.displayName())))) {
-            refund(player, config.price(), "spawner");
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            return;
-        }
+        give(player, SpawnerManager.createSpawnerItem(type, MessageFormatter.deserialize(config.displayName())));
         player.sendMessage(messages.get(player, "spawner.purchased", "amount", EconomyHook.format(config.price())));
     }
 
@@ -130,11 +125,7 @@ public final class ShopMenuListener implements Listener {
         if (!chunkBusterManager.isEnabled(type)) return;
         double price = chunkBusterManager.price(type);
         if (!withdraw(player, price, "chunkbuster.no-economy", "chunkbuster.cannot-afford")) return;
-        if (!give(player, chunkBusterManager.createItem(type))) {
-            refund(player, price, "chunk-buster");
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            return;
-        }
+        give(player, chunkBusterManager.createItem(type));
         player.sendMessage(messages.get(player, "chunkbuster.purchased", "type", chunkBusterManager.displayName(type),
                 "amount", EconomyHook.format(price)));
     }
@@ -143,11 +134,7 @@ public final class ShopMenuListener implements Listener {
         SourceBucketType type = sourceBucketManager.variant(id);
         if (type == null || !type.enabled()) return;
         if (!withdraw(player, type.shopPrice(), "sourcebucket.no-economy", "sourcebucket.cannot-afford")) return;
-        if (!give(player, sourceBucketManager.createItem(type))) {
-            refund(player, type.shopPrice(), "source-bucket");
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            return;
-        }
+        give(player, sourceBucketManager.createItem(type));
         player.sendMessage(messages.get(player, "sourcebucket.purchased",
                 "amount", EconomyHook.format(type.shopPrice())));
     }
@@ -163,16 +150,8 @@ public final class ShopMenuListener implements Listener {
         return false;
     }
 
-    private boolean give(Player player, ItemStack item) {
-        return manager.queueOverflow(player, List.of(item), "shop-custom-purchase");
-    }
-
-    private void refund(Player player, double amount, String source) {
-        EconomyResponse response = EconomyHook.getEconomy().depositPlayer(player, amount);
-        if (response == null || !response.transactionSuccess()) {
-            manager.plugin().getLogger().severe("Could not refund failed " + source + " shop purchase for "
-                    + player.getUniqueId() + ": " + amount);
-        }
+    private void give(Player player, ItemStack item) {
+        me.vertex.core.storage.ItemGiver.give(player, List.of(item));
     }
 
     private void openCategory(Player player, String categoryId, int page) {
@@ -185,7 +164,6 @@ public final class ShopMenuListener implements Listener {
             case DISABLED -> "shop.disabled";
             case NO_ECONOMY -> "spawner.no-economy";
             case CANNOT_AFFORD -> "shop.cannot-afford";
-            case STORAGE_UNAVAILABLE -> "delivery.storage-unavailable";
             case PENDING_DELIVERY -> "delivery.pending";
             default -> "shop.trade-failed";
         };
@@ -196,7 +174,6 @@ public final class ShopMenuListener implements Listener {
             case DISABLED -> "shop.disabled";
             case NO_ECONOMY -> "spawner.no-economy";
             case NOT_ENOUGH_ITEMS -> "shop.not-enough-items";
-            case STORAGE_UNAVAILABLE -> "delivery.storage-unavailable";
             case PENDING_DELIVERY -> "delivery.pending";
             default -> "shop.trade-failed";
         };

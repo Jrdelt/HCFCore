@@ -2,7 +2,10 @@ package me.vertex.core.listener;
 
 import me.vertex.core.essentials.EssentialsHook;
 import me.vertex.core.lang.MessageFormatter;
+import me.vertex.core.lang.Messages;
 import me.vertex.core.luckperms.LuckPermsHook;
+import me.vertex.core.preferences.AnnouncementCategory;
+import me.vertex.core.preferences.AnnouncementPreferenceManager;
 import me.vertex.core.pvp.CombatManager;
 import me.vertex.core.pvp.GhostPlayerManager;
 import me.vertex.core.user.UserManager;
@@ -20,12 +23,17 @@ public final class PlayerConnectionListener implements Listener {
 
     private final UserManager userManager;
     private final CombatManager combatManager;
+    private final AnnouncementPreferenceManager announcements;
+    private final Messages messages;
     private volatile GhostPlayerManager ghostPlayerManager;
     private volatile java.util.function.Predicate<UUID> trustedTransfer = ignored -> false;
 
-    public PlayerConnectionListener(UserManager userManager, CombatManager combatManager) {
+    public PlayerConnectionListener(UserManager userManager, CombatManager combatManager,
+            AnnouncementPreferenceManager announcements, Messages messages) {
         this.userManager = userManager;
         this.combatManager = combatManager;
+        this.announcements = announcements;
+        this.messages = messages;
     }
 
     public void setGhostPlayerManager(GhostPlayerManager ghostPlayerManager) {
@@ -48,9 +56,10 @@ public final class PlayerConnectionListener implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.LOW)
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        event.joinMessage(messages.get(player, "general.player-joined", "player", player.getName()));
         GhostPlayerManager ghosts = ghostPlayerManager;
         if (ghosts != null) {
             ghosts.handleJoin(player);
@@ -67,11 +76,20 @@ public final class PlayerConnectionListener implements Listener {
                 ? "[" + rank + "] " + displayName
                 : displayName));
 
+        if (!event.getPlayer().hasPlayedBefore()) {
+            announcements.broadcast(AnnouncementCategory.SERVER, "general.welcome-new-player", "player", displayName);
+        }
     }
 
-    @EventHandler
+    /**
+     * LOW, not the default NORMAL -- {@link me.vertex.core.staff.VanishListener#onQuit}
+     * nulls the quit message for a vanished staff member at NORMAL, and that
+     * suppression must win over this styling, not the other way around.
+     */
+    @EventHandler(priority = EventPriority.LOW)
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
+        event.quitMessage(messages.get(player, "general.player-left", "player", player.getName()));
         UUID uuid = player.getUniqueId();
 
         GhostPlayerManager ghosts = ghostPlayerManager;

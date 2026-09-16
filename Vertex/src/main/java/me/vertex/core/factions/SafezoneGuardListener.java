@@ -58,13 +58,16 @@ public final class SafezoneGuardListener implements Listener {
             return;
         }
         Player player = event.getPlayer();
+        if (!combat.isTagged(player.getUniqueId())) {
+            return;
+        }
         boolean enteringSafezone = !factions.isSystemProtectedZone(from) && factions.isSystemProtectedZone(to);
-        if (enteringSafezone && combat.isTagged(player.getUniqueId())) {
+        if (enteringSafezone) {
             event.setCancelled(true);
             player.sendMessage(messages.get(player, "factions.safezone-entry-denied"));
             return;
         }
-        if (!factions.isSystemProtectedZone(to) || !combat.isTagged(player.getUniqueId())) {
+        if (!factions.isSystemProtectedZone(to)) {
             return;
         }
         Vector push = borderPushVector(to);

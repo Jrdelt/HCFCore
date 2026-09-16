@@ -113,13 +113,14 @@ public final class WarChestListener implements Listener {
         return region != null;
     }
 
-    private boolean isWarChestEquipped(Player player) {
+    private BackpackManager.EquippedBackpack getEquippedWarChest(Player player) {
         BackpackManager.EquippedBackpack equipped = backpacks.equippedBackpack(player);
-        return equipped != null && "war_chest".equals(backpacks.backpackTierId(equipped.item()));
+        return equipped != null && "war_chest".equals(equipped.tierId()) ? equipped : null;
     }
 
     private void attemptProc(Player player) {
-        if (!isWarChestEquipped(player)) {
+        BackpackManager.EquippedBackpack equipped = getEquippedWarChest(player);
+        if (equipped == null) {
             return;
         }
         UUID uuid = player.getUniqueId();
@@ -128,7 +129,7 @@ public final class WarChestListener implements Listener {
         if (cooldownUntil != null && now < cooldownUntil) {
             return;
         }
-        int level = backpacks.equippedLevel(player);
+        int level = equipped.level();
         if (level <= 0) {
             return;
         }

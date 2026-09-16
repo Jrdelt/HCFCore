@@ -77,13 +77,7 @@ public final class CoinflipWagerMenuListener implements Listener {
             if (item != null && !item.isEmpty()) returns.add(item.clone());
         }
         if (returns.isEmpty()) return;
-        if (!manager.queueOverflow(player, returns, "coinflip-wager-return")) {
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            org.bukkit.Bukkit.getScheduler().runTask(manager.plugin(), () -> {
-                if (player.isOnline()) player.openInventory(event.getInventory());
-            });
-            return;
-        }
+        manager.give(player, returns);
         for (int slot = CoinflipWagerMenu.GRID_START;
                 slot < CoinflipWagerMenu.GRID_START + CoinflipWagerMenu.GRID_SLOTS; slot++) {
             event.getInventory().setItem(slot, null);

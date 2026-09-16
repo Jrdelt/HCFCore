@@ -49,17 +49,17 @@ mob-spawning:
   # definition can survive peaceful difficulty.
   force-normal-difficulty: true
   min-spawn-distance: 5
-  max-spawn-distance: 30
+  max-spawn-distance: 64
   # Four times the previous local budget, with a faster fill rate.
   base-local-mobs: 72
   additional-mobs-per-player: 40
   max-local-mobs: 400
   # Vertex mobs farther than this many blocks from every active player despawn.
-  despawn-radius: 40
+  despawn-radius: 100
   max-spawns-per-pass: 12
-  # Values above 1 bias random distances toward the player.
+  # Values above 1 bias random distances toward the player (higher = more concentrated near player).
   distance-bias: 2.5
-  cluster-radius: 80
+  cluster-radius: 100
 progression:
   # Riftlands defaults are stronger to reward its PvP risk.
   milestones:

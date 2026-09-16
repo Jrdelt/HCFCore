@@ -12,14 +12,13 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -31,11 +30,11 @@ public final class TagManager {
 
     private final Plugin plugin;
     private final File file;
-    private final Map<String, Tag> tags = new HashMap<>();
-    private final Map<UUID, PlayerPrefs> playerPrefs = new HashMap<>();
-    private final Map<String, Integer> owners = new HashMap<>();
+    private final Map<String, Tag> tags = new ConcurrentHashMap<>();
+    private final Map<UUID, PlayerPrefs> playerPrefs = new ConcurrentHashMap<>();
+    private final Map<String, Integer> owners = new ConcurrentHashMap<>();
     /** Every tag id a player has ever equipped, so `owners` counts distinct players, not selections. */
-    private final Map<UUID, Set<String>> everOwned = new HashMap<>();
+    private final Map<UUID, Set<String>> everOwned = new ConcurrentHashMap<>();
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "vertex-tags-io");
         thread.setDaemon(true);
@@ -100,14 +99,18 @@ public final class TagManager {
                         playerSection.getBoolean("nickname-reversed", false)));
                     List<String> owned = playerSection.getStringList("owned-tags");
                     if (!owned.isEmpty()) {
-                        everOwned.put(uuid, new HashSet<>(owned));
+                        Set<String> set = ConcurrentHashMap.newKeySet();
+                        set.addAll(owned);
+                        everOwned.put(uuid, set);
                     }
                 } else {
                     // Backward-compat: a bare string value is just a tag id.
                     String legacyTagId = players.getString(uuidKey);
                     if (legacyTagId != null) {
                         playerPrefs.put(uuid, new PlayerPrefs(legacyTagId, false, false));
-                        everOwned.put(uuid, new HashSet<>(Set.of(legacyTagId.toLowerCase(Locale.ROOT))));
+                        Set<String> set = ConcurrentHashMap.newKeySet();
+                        set.add(legacyTagId.toLowerCase(Locale.ROOT));
+                        everOwned.put(uuid, set);
                     }
                 }
             }
@@ -158,7 +161,7 @@ public final class TagManager {
         // Owners counts distinct players who have ever equipped this tag,
         // not selections -- so re-selecting a tag the player already owned
         // (e.g. A -> B -> A) must not increment it again.
-        Set<String> owned = everOwned.computeIfAbsent(uuid, key -> new HashSet<>());
+        Set<String> owned = everOwned.computeIfAbsent(uuid, key -> ConcurrentHashMap.newKeySet());
         if (owned.add(tag.id().toLowerCase(Locale.ROOT))) {
             owners.merge(tag.id().toLowerCase(Locale.ROOT), 1, Integer::sum);
         }

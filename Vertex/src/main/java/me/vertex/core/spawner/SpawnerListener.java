@@ -188,11 +188,7 @@ public final class SpawnerListener implements Listener {
         if (spawnerManager.breakMode() == SpawnerManager.BreakMode.DECREMENT && stackSize > 1) {
             event.setCancelled(true);
             ItemStack item=SpawnerManager.createSpawnerItem(mobType,displayName);
-            if (!me.vertex.core.storage.DeliveryManager.queueOverflow(spawnerManager.plugin(), player,
-                    java.util.List.of(item), "spawner-break")) {
-                player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-                return;
-            }
+            me.vertex.core.storage.ItemGiver.give(player, java.util.List.of(item));
             spawnerManager.decreaseStack(location, 1);
             return;
         }
@@ -200,12 +196,7 @@ public final class SpawnerListener implements Listener {
         int dropped = stackSize;
         java.util.List<ItemStack> items=new java.util.ArrayList<>();
         for(int i=0;i<dropped;i++)items.add(SpawnerManager.createSpawnerItem(mobType,displayName));
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(spawnerManager.plugin(), player,
-                items, "spawner-break")) {
-            event.setCancelled(true);
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            return;
-        }
+        me.vertex.core.storage.ItemGiver.give(player, items);
 
         event.setDropItems(false);
         spawnerManager.remove(location);

@@ -95,11 +95,7 @@ public final class FPowerBooster implements CommandExecutor, TabCompleter, Liste
             items.add(create(tier, stackSize));
             remaining -= stackSize;
         }
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                plugin, target, items, "f-power-booster-admin-give")) {
-            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
-            return true;
-        }
+        me.vertex.core.storage.ItemGiver.give(target, items);
         sender.sendMessage(messages.get(sender, "fpowerbooster.given", "player", target.getName(),
                 "tier", String.valueOf(tier), "amount", String.valueOf(count)));
         return true;
@@ -145,12 +141,9 @@ public final class FPowerBooster implements CommandExecutor, TabCompleter, Liste
     }
 
     private void refund(Player player, ItemStack refund) {
-        if (me.vertex.core.storage.DeliveryManager.queueOverflow(
-                plugin, player, List.of(refund), "f-power-booster-refund")) return;
-
-        // Both durable admission paths are unavailable. Put the one voucher
-        // directly back into the stack it came from whenever possible; the
-        // source operation removed exactly one item moments earlier.
+        // Put the one voucher directly back into the stack it came from
+        // whenever possible; the source operation removed exactly one item
+        // moments earlier.
         ItemStack held = player.getInventory().getItemInMainHand();
         Integer refundTier = tier(refund);
         if (refundTier != null && refundTier.equals(tier(held))
@@ -159,14 +152,8 @@ public final class FPowerBooster implements CommandExecutor, TabCompleter, Liste
             player.updateInventory();
             return;
         }
-        if (me.vertex.core.storage.InventoryAccess.ready(plugin, player)
-                && player.getInventory().addItem(refund).isEmpty()) {
-            player.updateInventory();
-            return;
-        }
-        plugin.getLogger().severe("Could not restore an F Power Booster to " + player.getUniqueId()
-                + " after both delivery storage and immediate inventory restoration failed.");
-        player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
+        me.vertex.core.storage.ItemGiver.give(player, List.of(refund));
+        player.updateInventory();
     }
 
     ItemStack create(int tier, int count) {

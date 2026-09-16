@@ -218,7 +218,9 @@ public final class ResetVaultMenuListener implements Listener {
 
         int slot = event.getSlot();
         if (slot == EligibleItemsMenu.BACK_SLOT) {
-            ResetVaultMenu.open(player, manager, messages, 0, -1);
+            ResetVaultManager.VaultSession session = manager.getSession(player.getUniqueId());
+            int accessBlockId = session != null ? session.accessBlockId() : -1;
+            ResetVaultMenu.open(player, manager, messages, 0, accessBlockId);
             return;
         }
 
@@ -257,8 +259,10 @@ public final class ResetVaultMenuListener implements Listener {
 
         if (slot == DepositConfirmMenu.CONFIRM_SLOT) {
             player.closeInventory();
+            ResetVaultManager.VaultSession session = manager.getSession(player.getUniqueId());
+            int accessBlockId = session != null ? session.accessBlockId() : -1;
             manager.depositItem(player, holder.sourceSlot(), holder.originalItem(), () -> {
-                ResetVaultMenu.open(player, manager, messages, 0, -1);
+                ResetVaultMenu.open(player, manager, messages, 0, accessBlockId);
             }, errorMsg -> {
                 player.sendMessage(errorMsg);
             });

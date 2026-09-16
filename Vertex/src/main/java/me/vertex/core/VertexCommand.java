@@ -258,7 +258,7 @@ public final class VertexCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 1) {
             String partial = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("reload", "clearmobstacks", "storage", "spawnerinfo", "spawnerdebug")
+            return Stream.of("reload", "clearmobstacks", "storage", "spawnerinfo", "spawnerdebug", "performance")
                     .filter(sub -> sub.startsWith(partial))
                     .collect(Collectors.toList());
         }

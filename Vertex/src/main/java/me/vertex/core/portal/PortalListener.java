@@ -5,7 +5,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -30,11 +29,6 @@ public final class PortalListener implements Listener {
     public void onInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Player player = event.getPlayer();
-        if (portals.isFlying(player.getUniqueId())) {
-            portals.releaseFlight(player, true);
-            event.setCancelled(true);
-            return;
-        }
         ItemStack held = event.getItem();
         if (held == null) held = player.getInventory().getItemInMainHand();
         if (!portals.isSelector(held)) return;
@@ -78,19 +72,12 @@ public final class PortalListener implements Listener {
         // Do not restrict this to block changes. A one-block portal can be
         // entered or triggered by a jump while the player's feet remain in
         // the same block, and the movement event is the only reliable signal
-        // for that case. PortalManager applies its own activation cooldown.
-        if (event.getTo() != null) portals.tryEnter(event.getPlayer());
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onDamage(EntityDamageEvent event) {
-        if (event.getEntity() instanceof Player player && portals.isFlying(player.getUniqueId())) portals.releaseFlight(player, true);
+        if (event.getTo() != null && event.hasChangedPosition()) portals.tryEnter(event.getPlayer());
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         if (portals.isFlying(event.getPlayer().getUniqueId())) portals.releaseFlight(event.getPlayer(), false);
-        portals.clearSlowFall(event.getPlayer());
     }
 
     private void feedback(Player player, String result) {

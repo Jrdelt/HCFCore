@@ -107,6 +107,13 @@ factions:
     # transaction is all-or-nothing; only cache/event publication is spread
     # over ticks to keep large areas responsive.
     max-chunks-per-tick: 64
+    # Cobwebs are otherwise unplaceable in the Warzone claim like any other
+    # block (see WarzoneCobwebListener) -- this is the one carved-out
+    # exception, and only outside an active KOTH's cuboid (that stays fully
+    # unbuildable, exactly like today). A placed cobweb reverts to air on
+    # its own after this many seconds; it is never persisted, so a server
+    # restart before it expires leaves it in place until removed manually.
+    warzone-cobweb-expiry-seconds: 30
   # These are safe defaults. Faction leaders can override an action per role
   # in /f permissions; each action is persisted in the database.
   permissions:

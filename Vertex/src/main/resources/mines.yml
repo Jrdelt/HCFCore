@@ -34,11 +34,16 @@ regeneration:
   # ground. Raise it to fill faster; lower it if filling causes lag.
   fill-blocks-per-tick: 4000
 
-# Players inside a mine region may only break blocks the mine generates.
-# Structure, walls, floor, and decoration are therefore safe without listing
-# them. Placing blocks inside a region is denied outright, which is also what
-# makes "is this ore plugin-generated?" answerable without tracking half a
-# million positions: nothing inside the region can be player-placed.
+# Players inside a mine region may only break the configured ore blocks.
+# Structure, walls, floor, decoration, and the stone/deepslate filler ore
+# generates into are all safe without listing them -- filler stays solid
+# instead of breaking for nothing. Placing blocks inside a region is denied
+# outright, which is also what makes "is this ore plugin-generated?"
+# answerable without tracking half a million positions: nothing inside the
+# region can be player-placed.
+#
+# Set deny-non-mine-block-break to false to restore the old behavior where
+# base-blocks (below) are also breakable and regenerate, paying nothing.
 protection:
   deny-block-place: true
   deny-non-mine-block-break: true

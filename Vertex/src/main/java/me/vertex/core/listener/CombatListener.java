@@ -6,6 +6,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -35,7 +36,18 @@ public final class CombatListener implements Listener {
         blockedCommands = List.copyOf(plugin.getConfig().getStringList("pvp.blocked-commands-in-combat"));
     }
 
-    @EventHandler(ignoreCancelled = true)
+    /**
+     * HIGHEST (not the default NORMAL) so this always runs after {@code
+     * FactionProtectionListener#onPvp}'s HIGH-priority safezone/no-PvP
+     * cancellation -- at NORMAL this fired first and tagged both players
+     * for a swing that never actually dealt damage, which is exactly how a
+     * hit thrown in spawn/a safezone was putting both players in combat
+     * even though PvP there is disabled. {@code ignoreCancelled = true}
+     * only actually protects against that once this runs late enough to
+     * see the cancellation (see {@code ArcherTagListener#onDamage} for the
+     * same fix applied to that tag path).
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent event) {
         if (!(event.getEntity() instanceof Player victim)) {
             return;

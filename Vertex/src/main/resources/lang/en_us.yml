@@ -1,7 +1,7 @@
 # Bumped whenever a bundled message changes. On startup Vertex replaces an
 # older on-disk copy of this file with the new bundled one, moving the
 # previous file into lang/backup/ first so customizations can be re-applied.
-lang-version: 36
+lang-version: 38
 
 general:
   no-permission: "<red>✖ You do not have access to that command."
@@ -9,6 +9,9 @@ general:
   player-not-found: "<red>✖ Player not found."
   players-only: "&c&lSTAFF&r &7> Only players can use this command."
   none: "None"
+  welcome-new-player: "<green>✔ <gray>Welcome <white>{player}</white> to the server for the first time!"
+  player-joined: "<gray>[<green>+</green>] <white>{player}"
+  player-left: "<gray>[<red>-</red>] <white>{player}"
   server: "Server"
   unknown: "unknown"
 
@@ -169,6 +172,18 @@ kit:
   gui-access: "<green><bold>ᴜɴʟᴏᴄᴋᴇᴅ"
   gui-no-access: "<red><bold>ʟᴏᴄᴋᴇᴅ"
   gui-cooldown: "<red>ᴄᴏᴏʟᴅᴏᴡɴ: <green>{seconds}s"
+  gui-ready: "<green>Ready to claim."
+  gui-cost-money: "<white>Cost: {amount}"
+  gui-cost-item: "<white>Cost: {amount}x {item}"
+  gui-left-click: "<gray>Left-click to claim."
+  gui-right-click: "<gray>Right-click to preview."
+  gui-previous-page: "<yellow>Previous page"
+  gui-next-page: "<yellow>Next page"
+  preview-title: "Preview: {kit}"
+
+first-join-kit:
+  usage: "<red>Usage: /firsttimejoin kit -- saves your current inventory as the kit new players get on their first join."
+  saved: "<green>✔ <gray>Saved your current inventory as the first-join kit. Every player's first join from now on will receive it."
   gui-ready: "<green>ʀᴇᴀᴅʏ ᴛᴏ ᴄʟᴀɪᴍ."
   gui-cost-money: "<red>ᴄᴏꜱᴛ: {amount}"
   gui-cost-item: "<red>ᴄᴏꜱᴛ: {amount}x {item}"
@@ -283,6 +298,8 @@ factions:
   rally-cleared: "&a&lRALLY &r&8» Faction rally has been cleared!"
   rally-bossbar-title: "<green><bold>ꜰᴀᴄᴛɪᴏɴ ʀᴀʟʟʏ"
   rally-bossbar-distance: "<white>ʙʟᴏᴄᴋꜱ ᴀᴡᴀʏ"
+  announce-created: "&6&lFACTIONS&r &7> <gray>Faction <white>{faction}</white> has been created!"
+  announce-disbanded: "&6&lFACTIONS&r &7> <gray>Faction <white>{faction}</white> has disbanded."
 
 ftop:
   header: "<gold><bold>ꜰ ᴛᴏᴘ <gray>• <yellow>next check in <white>{time}"
@@ -431,7 +448,7 @@ sourcebucket:
 
 rune:
   table-empty: "&5&lRUNES&r &7> <red>That Rune's roll table is empty. Ask staff to configure customEnchants/runes.yml."
-  rolled: "&5&lRUNES&r &7> <green>✔ <gray>Rolled <white>{enchant} {level}<gray>!"
+  rolled: "<green>✔ <gray>Rolled <white>{enchant} {level}<gray>!"
   unknown-tier: "&5&lRUNES&r &7> <red>Unknown Rune tier. Valid tiers: simple, elite, rare, legendary, arena."
   shop-title: "<light_purple>ʀᴜɴᴇꜱ"
   shop-price: "<yellow>Price: <white>{amount}"
@@ -439,7 +456,7 @@ rune:
   gem-shop-hint: "<gray>Click: <white>1 <dark_gray>| <gray>Shift-left: <white>64 <dark_gray>| <gray>Shift-right: <white>Maximum"
   purchased: "&5&lRUNES&r &7> <green>✔ <gray>Purchased <white>{count}x {tier} Rune<gray> for <white>{amount}<gray>."
   purchased-gem: "&5&lRUNES&r &7> <green>✔ <gray>Purchased <white>{count}x Lucky Gem<gray> for <white>{amount}<gray>."
-  movement-on-cooldown: "&5&lRUNES&r &7> <red>{enchant} is on cooldown for <white>{seconds}s<red>."
+  movement-on-cooldown: "<red>{enchant} <red>is on cooldown for <white>{seconds}s<red>."
   cannot-afford: "&5&lRUNES&r &7> <red>✖ <gray>You cannot afford <white>{amount}<gray>."
   no-economy: "&5&lRUNES&r &7> <red>✖ <gray>No economy plugin is available to charge for that purchase."
   inventory-full: "&5&lRUNES&r &7> <red>✖ <gray>You need free inventory space for that purchase."
@@ -459,13 +476,17 @@ rune:
   catalog-title: "<dark_purple>ʀᴜɴᴇ ᴄᴀᴛᴀʟᴏɢ"
   catalog-tab-hint: "<gray>Right-click a shop category or click this tab to view it."
   catalog-current-tab: "<green>Current category"
+  raptors-reversal-proc-self: "{enchant} 🔱 <gray>Procced against <white>{player}</white><gray> and knocked them back!"
+  raptors-reversal-proc-target: "{enchant} 🔱 <yellow>Your hit on <white>{player}</white><yellow> was reduced and knocked back!"
+  mark-proc-broadcast: "{enchant} 🔱 <gray>Proced on <white>{player}</white>."
+  crown-breaker-proc: "{enchant} 🔱 <white>{attacker}</white><gray> has struck through your absorption hearts!"
+  gilded-catch-proc: "{enchant} 🔱 <gray>Duplicated your catch!"
+  gilded-catch-booster-proc: "{enchant} 🔱 <white>You found a {booster} Booster Potion!"
+  gilded-catch-booster-consumed: "{enchant} 🔱 <green>Your <yellow>{booster} Booster</yellow><green> is now active: <white>+{percent}%</white> for <white>{duration}</white>."
   catalog-back: "<yellow>Back to Runes"
   catalog-back-lore: "<gray>Return to the Rune Shop."
-  catalog-description: "<gray>{description}"
-  catalog-levels-range: "<gray>Levels: <white>{first}-{last}"
-  catalog-level-detail: "<gray>{level} <gold>{maximum}<gray>: <white>+{value}"
-  catalog-generated-value: "<gray>Value: <white>+{min} <dark_gray>to <white>+{max}"
-  catalog-compatible: "<gray>Applies to: <white>{items}"
+  catalog-level-detail: "<gray>{level} <gold>{maximum}<gray>: <white>{proc}%<dark_gray> ᴘʀᴏᴄ <gray>| <white>+{value}%"
+  catalog-cooldown: "<gray>Cooldown: <white>{seconds}s"
   info-empty: "&5&lRUNES&r &7> <red>Your main-hand item has no applied custom enchants."
   info-title: "<dark_purple>ʀᴜɴᴇ ɪɴꜰᴏ"
   info-detail-title: "<dark_purple>ʀᴜɴᴇ ᴅᴇᴛᴀɪʟ"
@@ -488,12 +509,14 @@ rune:
   incinerator-button-lore: "<gray>Destroy standalone Runes for a partial refund."
   seasonal-button: "<gold><bold>ꜱᴇᴀꜱᴏɴᴀʟ ʀᴜɴᴇꜱ"
   seasonal-button-lore: "<gray>Browse limited-time seasonal Rune sets."
+  seasonal-button-hint: "<gray>Click: <white>Sets <dark_gray>| <gray>Right-click: <white>Catalog"
   seasonal-title: "<dark_gray>Seasonal Runes"
   seasonal-back: "<gray>Back"
   seasonal-back-lore: "<gray>Return to the Seasonal set list."
   seasonal-set-hint: "<gray>Click to view this set."
   seasonal-set-title: "<dark_gray>{name}"
   seasonal-hover-hint: "<gray>Hover a piece to see its Rune."
+  seasonal-item-catalog-hint: "<yellow>Click to view in rune catalog."
   incinerator-title: "<dark_red>ʀᴜɴᴇ ɪɴᴄɪɴᴇʀᴀᴛᴏʀ"
   incinerator-click-hint: "<yellow>Click to incinerate this stack"
   incinerator-all: "<red><bold>ɪɴᴄɪɴᴇʀᴀᴛᴇ ᴀʟʟ"
@@ -524,8 +547,8 @@ rune:
   filter-level-unprotect-hint: "<yellow>Left-click to unprotect"
   auto-disabled: "&5&lAUTO-INCINERATE&r &7> <green>✔ <gray>Disabled."
   auto-enabled: "&5&lAUTO-INCINERATE&r &7> <green>✔ <gray>Enabled. Unprotected standalone Runes were swept immediately."
-  auto-incinerated: "&5&lAUTO-INCINERATE&r &7> <gray>Auto-incinerated <white>{enchant} {level}<gray>."
-  auto-notify-individual: "&5&lAUTO-INCINERATE&r &7> <gray>Incinerated <white>{enchant} {level}<gray> for <white>{reward}<gray>."
+  auto-incinerated: "<gray>Auto-incinerated <white>{enchant} {level}<gray>."
+  auto-notify-individual: "<gray>Incinerated <white>{enchant} {level}<gray> for <white>{reward}<gray>."
   auto-notify-summary: "&5&lAUTO-INCINERATE&r &7> <gray>Auto-incinerated <white>{count}<gray> runes for <white>{rewards}<gray>."
   auto-confirm-title: "<dark_red>Enable Auto-Incineration?"
   auto-confirm-name: "<red><bold>ᴇɴᴀʙʟᴇ ᴀᴜᴛᴏ-ɪɴᴄɪɴᴇʀᴀᴛɪᴏɴ"
@@ -551,6 +574,7 @@ seasonal:
   unknown-material: "<red>'{material}' isn't a valid item material."
   item-given: "<green>✔ Gave <white>1x {material} <white>(CMD {cmd})<green>."
   give-usage: "<red>Usage: /seasonal give <id> [level] [amount] -- id is a seasonal Rune (huntmasters_call, golden_bastion, ...), a backpack tier (fallen_crate), or a saved catalog item"
+  invalid-level-range: "<red>{id} only goes up to level {max} ({max-roman}). Pick a level between 1 and {max}."
   given: "<green>✔ Gave <white>{amount}x {id}<green>."
   unknown-catalog-item: "<red>'{id}' isn't a saved catalog item or backpack tier."
   catalog-usage: "<red>Usage: /seasonal catalog save <id>|remove <id>|list"
@@ -620,10 +644,10 @@ binds:
   hud-empty: "&5&lBINDS&r &7> <red>You have no bind keys assigned. Use /binds to set one up."
   hud-unavailable: "Unavailable"
   queue-full: "&5&lBINDS&r &7> <red>Your ability queue is full. Wait for it to clear before queuing more."
-  rune-activated: "&5&lBINDS&r &7> <green>✔ <gray>Activated <white>{enchant}<gray>."
-  rune-on-cooldown: "&5&lBINDS&r &7> <red>{enchant} is on cooldown for <white>{seconds}s<red>."
-  rune-unavailable: "&5&lBINDS&r &7> <red>{enchant} is bound but not currently available."
-  rune-blocked-in-zone: "&5&lBINDS&r &7> <red>{enchant} cannot be activated in this zone."
+  rune-activated: "<green>✔ <gray>Activated <white>{enchant}<gray>."
+  rune-on-cooldown: "{enchant} <red>is on cooldown for <white>{seconds}s<red>."
+  rune-unavailable: "{enchant} <red>is bound but not currently available."
+  rune-blocked-in-zone: "{enchant} <red>cannot be activated in this zone."
 
 pvptop:
   header: "<red><bold>ᴘᴠᴘ ᴛᴏᴘ"
@@ -923,6 +947,7 @@ backpack:
     - "<yellow>ʜᴏʟᴅ ɪɴ ʏᴏᴜʀ ᴏғғʜᴀɴᴅ!"
     - "<yellow>sɴᴇᴀᴋ + ʀɪɢʜᴛ ᴄʟɪᴄᴋ ɪɴ ᴛʜᴇ ᴀɪʀ ᴛᴏ ᴏᴘᴇɴ."
   store-action-bar: "<gold>{backpack_name} <dark_gray>• <aqua>{tier} <dark_gray>• <yellow>ʟᴇᴠᴇʟ {backpack_level} <dark_gray>• <white>{used_storage}<gray>/<white>{storage}"
+  full-action-bar: "<red>{backpack_name} <dark_gray>• <yellow>ʟᴇᴠᴇʟ {backpack_level} <dark_gray>• <red>ꜰᴜʟʟ <dark_gray>({used_storage}<gray>/<white>{storage}<dark_gray>) -- ᴜᴘɢʀᴀᴅᴇ ᴏʀ ᴇᴍᴘᴛʏ ɪᴛ"
   command-usage: "&e&lBACKPACKS &7>&r <gray>Usage: /<yellow>backpack give <player> <tier> [level]"
   unknown-tier: "&e&lBACKPACKS &7>&r <red>No Backpack tier by that name."
   invalid-item-type: "&e&lBACKPACKS &7>&r <red>That Backpack tier has an invalid item type."
@@ -952,7 +977,7 @@ item-restrictions:
   crafting-disabled: "&c✘ &7You cannot craft that item."
 
 capture:
-  command-usage: "&c&l{command}&r &7> <yellow>/{command} focus [name|off] <gray>| <yellow>/{command} create <name><gray>|<yellow>cancel|start|stop|delete|list|validate"
+  command-usage: "&c&l{command}&r &7> <yellow>/{command} focus [name|off] <gray>| <yellow>/{command} create <name><gray>|<yellow>cancel|start|stop|delete|list|validate|schedule <name> add/remove <HH:mm>/list"
   invalid-name: "<red>✖ <gray>Use 1–32 lowercase letters, numbers, underscores, or hyphens for the event ID."
   already-exists: "<red>✖ <gray>An event named <white>{name}</white> already exists."
   wand-name: "<gold><bold>ᴄᴀᴘᴛᴜʀᴇ ꜱᴇʟᴇᴄᴛɪᴏɴ ᴡᴀɴᴅ"
@@ -999,6 +1024,13 @@ capture:
   validate-list: "<red>Expected a YAML list."
   validate-time: "<red>Invalid time <white>{value}</white>; use 24-hour HH:mm."
   validate-booster-multiplier: "<red>Enabled XP boosters must be greater than 1.0."
+  schedule-added: "<green>✔ <gray>{type} <white>{name}</white> will now auto-start daily at <white>{time}</white>."
+  schedule-removed: "<green>✔ <gray>Removed the <white>{time}</white> auto-start time from {type} <white>{name}</white>."
+  schedule-invalid-time: "<red>✖ <gray>'{time}' isn't a valid 24-hour time; use HH:mm (e.g. 18:30)."
+  schedule-already-scheduled: "<yellow>{type} <white>{name}</white> already auto-starts at <white>{time}</white>."
+  schedule-not-scheduled: "<yellow>{type} <white>{name}</white> has no <white>{time}</white> auto-start time to remove."
+  schedule-list-empty: "<yellow>{type} <white>{name}</white> has no scheduled auto-start times."
+  schedule-list: "<gray>{type} <white>{name}</white> auto-starts daily at: <white>{times}"
   koth:
     started: "&4&lKOTH &7>&r <red>{name}</red> <gray>is now claimable. <yellow>/koth focus <gray>to get directions."
     stopped: "&4&lKOTH &7>&r <red>{name}</red> <gray>has ended."
@@ -1361,7 +1393,17 @@ sandbot:
 boosters:
   usage: "&b&lBOOSTERS&r &7> <gray>Usage: <yellow>/boosters"
   usage-admin: "&b&lBOOSTERS&r &7> <gray>Staff: <yellow>/boosters inspect <player>"
+  usage-personal: "&b&lBOOSTERS&r &7> <gray>Usage: <yellow>/{label} give [player] [percentage] [duration]"
   subject-offline: "&b&lBOOSTERS&r &7> <red>{player} went offline, so their boosters can no longer be read."
+  active-status: "&b&lBOOSTERS&r &7> <gray>Active <yellow>{type} Booster</yellow>: <green>+{percent}%</green> (<white>{duration}</white> remaining)"
+  no-active: "&b&lBOOSTERS&r &7> <gray>You do not currently have an active {type} Booster. Use <yellow>/boosters</yellow> to view all active boosts."
+  console-specify-player: "&b&lBOOSTERS&r &7> <red>Console must specify target player: /{label} give <player> [percentage] [duration]"
+  invalid-percent: "&b&lBOOSTERS&r &7> <red>Percentage must be greater than 0."
+  invalid-percent-format: "&b&lBOOSTERS&r &7> <red>Invalid percentage: <yellow>{value}</yellow>."
+  invalid-duration: "&b&lBOOSTERS&r &7> <red>Duration must be greater than 0 seconds."
+  invalid-duration-format: "&b&lBOOSTERS&r &7> <red>Invalid duration: <yellow>{value}</yellow>."
+  booster-given: "&b&lBOOSTERS&r &7> <green>Gave <white>{player}</white> a <yellow>{type} Booster Potion</yellow> (<yellow>+{percent}%</yellow>, <gray>{duration}</gray>)."
+  booster-received: "&b&lBOOSTERS&r &7> <green>You received a <yellow>{type} Booster Potion</yellow> (<yellow>+{percent}%</yellow>, <gray>{duration}</gray>)!"
 
   category-ore-drop: "ᴏʀᴇ ᴅʀᴏᴘ ʙᴏɴᴜs"
   category-sell: "sᴇʟʟ ʙᴏɴᴜs"
@@ -1377,9 +1419,12 @@ boosters:
   source-zone: "ᴢᴏɴᴇ"
   source-arena-runes: "ᴀʀᴇɴᴀ ʀᴜɴᴇs"
   source-arena-control: "ᴀʀᴇɴᴀ ᴄᴏɴᴛʀᴏʟ"
+  source-gilded-catch: "ᴘᴇʀsᴏɴᴀʟ ʙᴏᴏsᴛᴇʀ"
 
   line-active: "<gray>{source}: <green>+{percent}%"
+  line-active-timed: "<gray>{source}: <green>+{percent}% <dark_gray>(<yellow>{duration}</yellow>)"
   line-inactive: "<dark_gray>{source}: <dark_gray>inactive"
+  duration-permanent: "ᴘᴇʀᴍᴀɴᴇɴᴛ"
   no-sources: "<dark_gray>ɴᴏ sᴏᴜʀᴄᴇs"
 
 
@@ -1568,7 +1613,6 @@ dupe:
 
 delivery:
   pending: "&c&lDELIVERY&r &7> <yellow>Your items are waiting for storage confirmation."
-  storage-unavailable: "&c&lDELIVERY&r &7> <red>Item storage is temporarily unavailable. Nothing was consumed; please try again."
 
 zones:
   selector-name: "<gold>Zone Selector"
@@ -1913,6 +1957,11 @@ fa:
   usage-grace: "<yellow>/fa grace on <duration>|off"
   usage-power: "<yellow>/fa power set <player> current|max <amount>"
   usage-unclaim: "<yellow>/fa unclaim --force"
+  usage-unclaimall: "<yellow>/fa unclaimall <Safezone|Warzone>"
+  unclaim-empty: "&6&lFA ADMIN&r &7> <yellow>{faction} has no claimed chunks to release."
+  unclaim-started: "&6&lFA ADMIN&r &7> <yellow>Releasing all of {faction}'s <white>{count}<yellow> chunk(s)."
+  unclaim-finished: "&6&lFA ADMIN&r &7> <green>Released all <white>{count}<green> of {faction}'s chunk(s)."
+  unclaim-failed: "&6&lFA ADMIN&r &7> <red>Could not release the {faction} claims. No chunks were changed."
   usage-disband: "<yellow>/fa disband <faction> --force"
   usage-relation: "<yellow>/fa relation <faction> <faction> ally|neutral|enemy --force"
   usage-shield: "<yellow>/fa shield <faction> active|inactive|clear --force"
@@ -1929,6 +1978,7 @@ fa:
     power: "/fa power set <player> current|max <amount>"
     claim: "/fa claim <faction>"
     unclaim: "/fa unclaim --force"
+    unclaimall: "/fa unclaimall <Safezone|Warzone>"
     disband: "/fa disband <faction> --force"
     relation: "/fa relation <faction> <faction> ally|neutral|enemy --force"
     shield: "/fa shield <faction> active|inactive|clear --force"

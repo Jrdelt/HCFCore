@@ -6,11 +6,13 @@ import me.vertex.core.backpack.BackpackManager;
 import me.vertex.core.enchant.EnchantManager;
 import me.vertex.core.lang.MessageFormatter;
 import me.vertex.core.lang.Messages;
+import me.vertex.core.essentials.EssentialsHook;
 import me.vertex.core.luckperms.LuckPermsHook;
 import me.vertex.core.preferences.AnnouncementCategory;
 import me.vertex.core.preferences.AnnouncementPreferenceManager;
 import me.vertex.core.storage.SqlRetry;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -23,7 +25,10 @@ import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 
+import java.io.File;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -175,9 +180,18 @@ public final class ResetVaultManager {
     }
 
     public void reloadConfig() {
-        this.enabled = plugin.getConfig().getBoolean("reset-vault.enabled", true);
+        File vaultFile = new File(plugin.getDataFolder(), "resetvault.yml");
+        if (!vaultFile.exists()) {
+            try {
+                plugin.saveResource("resetvault.yml", false);
+            } catch (Exception ignored) {}
+        }
+        YamlConfiguration vaultConfig = vaultFile.exists() ? YamlConfiguration.loadConfiguration(vaultFile) : null;
+        FileConfiguration mainConfig = plugin.getConfig();
+
+        this.enabled = getBooleanConfig(vaultConfig, mainConfig, "enabled", true);
         
-        String configuredMat = plugin.getConfig().getString("reset-vault.block-material", "BLUE_SHULKER_BOX");
+        String configuredMat = getStringConfig(vaultConfig, mainConfig, "block-material", "BLUE_SHULKER_BOX");
         Material mat = Material.matchMaterial(configuredMat == null ? "" : configuredMat);
         if (mat != null && !mat.isAir()) {
             this.blockMaterial = mat;
@@ -186,7 +200,7 @@ public final class ResetVaultManager {
         }
 
         Map<String, Integer> ranks = new LinkedHashMap<>();
-        ConfigurationSection ranksSection = plugin.getConfig().getConfigurationSection("reset-vault.rank-base-slots");
+        ConfigurationSection ranksSection = getSectionConfig(vaultConfig, mainConfig, "rank-base-slots");
         if (ranksSection != null) {
             for (String key : ranksSection.getKeys(false)) {
                 ranks.put(key.toLowerCase(Locale.ROOT), Math.max(0, ranksSection.getInt(key, 0)));
@@ -202,22 +216,30 @@ public final class ResetVaultManager {
         this.rankBaseSlots = Map.copyOf(ranks);
 
         Set<String> allowlist = new HashSet<>();
-        for (String name : plugin.getConfig().getStringList("reset-vault.give-allowlist")) {
-            if (name != null && !name.isBlank()) {
-                allowlist.add(name.trim().toLowerCase(Locale.ROOT));
+        List<String> allowKeys = List.of(
+                "give-allowlist", "give_allowlist",
+                "approved-players", "approved_players",
+                "approved-users", "approved_users",
+                "allowlist", "whitelist"
+        );
+        for (String key : allowKeys) {
+            for (String name : getStringListConfig(vaultConfig, mainConfig, key)) {
+                if (name != null && !name.isBlank()) {
+                    allowlist.add(name.trim().toLowerCase(Locale.ROOT));
+                }
             }
         }
         this.giveAllowlist = Set.copyOf(allowlist);
 
         Set<String> enchants = new HashSet<>();
-        for (String eId : plugin.getConfig().getStringList("reset-vault.remove-enchant")) {
+        for (String eId : getStringListConfig(vaultConfig, mainConfig, "remove-enchant")) {
             if (eId != null && !eId.isBlank()) {
                 enchants.add(eId.trim().toLowerCase(Locale.ROOT));
             }
         }
         this.removeEnchantIds = Set.copyOf(enchants);
 
-        this.sotwMilestoneName = plugin.getConfig().getString("reset-vault.sotw-milestone", "reset-vault-open");
+        this.sotwMilestoneName = getStringConfig(vaultConfig, mainConfig, "sotw-milestone", "reset-vault-open");
         
         if (storage != null) {
             try {
@@ -228,6 +250,36 @@ public final class ResetVaultManager {
             }
             Bukkit.getScheduler().runTask(plugin, this::refreshAllHolograms);
         }
+    }
+
+    private boolean getBooleanConfig(YamlConfiguration vaultConfig, FileConfiguration mainConfig, String key, boolean def) {
+        if (vaultConfig != null && vaultConfig.contains(key)) return vaultConfig.getBoolean(key, def);
+        if (vaultConfig != null && vaultConfig.contains("reset-vault." + key)) return vaultConfig.getBoolean("reset-vault." + key, def);
+        if (mainConfig.contains("reset-vault." + key)) return mainConfig.getBoolean("reset-vault." + key, def);
+        return mainConfig.getBoolean(key, def);
+    }
+
+    private String getStringConfig(YamlConfiguration vaultConfig, FileConfiguration mainConfig, String key, String def) {
+        if (vaultConfig != null && vaultConfig.contains(key)) return vaultConfig.getString(key, def);
+        if (vaultConfig != null && vaultConfig.contains("reset-vault." + key)) return vaultConfig.getString("reset-vault." + key, def);
+        if (mainConfig.contains("reset-vault." + key)) return mainConfig.getString("reset-vault." + key, def);
+        return mainConfig.getString(key, def);
+    }
+
+    private ConfigurationSection getSectionConfig(YamlConfiguration vaultConfig, FileConfiguration mainConfig, String key) {
+        if (vaultConfig != null && vaultConfig.isConfigurationSection(key)) return vaultConfig.getConfigurationSection(key);
+        if (vaultConfig != null && vaultConfig.isConfigurationSection("reset-vault." + key)) return vaultConfig.getConfigurationSection("reset-vault." + key);
+        if (mainConfig.isConfigurationSection("reset-vault." + key)) return mainConfig.getConfigurationSection("reset-vault." + key);
+        return mainConfig.getConfigurationSection(key);
+    }
+
+    private List<String> getStringListConfig(YamlConfiguration vaultConfig, FileConfiguration mainConfig, String key) {
+        List<String> list = new ArrayList<>();
+        if (vaultConfig != null && vaultConfig.isList(key)) list.addAll(vaultConfig.getStringList(key));
+        if (vaultConfig != null && vaultConfig.isList("reset-vault." + key)) list.addAll(vaultConfig.getStringList("reset-vault." + key));
+        if (mainConfig.isList("reset-vault." + key)) list.addAll(mainConfig.getStringList("reset-vault." + key));
+        if (mainConfig.isList(key)) list.addAll(mainConfig.getStringList(key));
+        return list;
     }
 
     // ------------------------------------------------------------------
@@ -245,8 +297,53 @@ public final class ResetVaultManager {
     public List<ResetVaultStorage.BlacklistEntry> blacklist() { return Collections.unmodifiableList(blacklist); }
 
     public boolean isGiveAllowed(String playerName) {
-        if (playerName == null) return false;
-        return giveAllowlist.contains(playerName.toLowerCase(Locale.ROOT));
+        if (playerName == null || playerName.isBlank()) return false;
+        String normalized = playerName.trim().toLowerCase(Locale.ROOT);
+        if (giveAllowlist.contains("*") || giveAllowlist.contains("all")) {
+            return true;
+        }
+        if (giveAllowlist.contains(normalized)) {
+            return true;
+        }
+        String noDashes = normalized.replace("-", "");
+        if (giveAllowlist.contains(noDashes)) {
+            return true;
+        }
+        for (String entry : giveAllowlist) {
+            if (entry.replace("-", "").equalsIgnoreCase(noDashes)) {
+                return true;
+            }
+        }
+        Player player = Bukkit.getPlayerExact(playerName);
+        if (player == null) {
+            player = Bukkit.getPlayer(playerName);
+        }
+        if (player != null) {
+            String uuidStr = player.getUniqueId().toString().toLowerCase(Locale.ROOT);
+            if (giveAllowlist.contains(uuidStr) || giveAllowlist.contains(uuidStr.replace("-", ""))) {
+                return true;
+            }
+            if ((giveAllowlist.contains("op") || giveAllowlist.contains("ops") || giveAllowlist.contains("admin")) && player.isOp()) {
+                return true;
+            }
+            if (player.hasPermission("vertex.developer") || player.hasPermission("vertex.developer.give") || player.isOp()) {
+                return true;
+            }
+        } else {
+            try {
+                org.bukkit.OfflinePlayer offline = Bukkit.getOfflinePlayer(playerName);
+                if (offline != null && offline.getUniqueId() != null) {
+                    String uuidStr = offline.getUniqueId().toString().toLowerCase(Locale.ROOT);
+                    if (giveAllowlist.contains(uuidStr) || giveAllowlist.contains(uuidStr.replace("-", ""))) {
+                        return true;
+                    }
+                    if ((giveAllowlist.contains("op") || giveAllowlist.contains("ops") || giveAllowlist.contains("admin")) && offline.isOp()) {
+                        return true;
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        return false;
     }
 
     // ------------------------------------------------------------------
@@ -333,6 +430,10 @@ public final class ResetVaultManager {
         return accessBlocksById.get(id);
     }
 
+    public int accessBlockCount() {
+        return accessBlocksById.size();
+    }
+
     public boolean isSessionActiveOnBlock(int blockId) {
         for (VaultSession session : activeSessions.values()) {
             if (session.accessBlockId == blockId) {
@@ -392,6 +493,10 @@ public final class ResetVaultManager {
 
         public boolean isReadOnly() {
             return readOnly;
+        }
+
+        public int accessBlockId() {
+            return accessBlockId;
         }
 
         public UUID uuid() {
@@ -519,13 +624,11 @@ public final class ResetVaultManager {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     Player p = Bukkit.getPlayer(uuid);
                     if (p != null && p.isOnline()) {
-                        Map<Integer, ItemStack> leftovers = p.getInventory().addItem(clone);
-                        if (!leftovers.isEmpty()) {
-                            ((me.vertex.core.VertexPlugin) plugin).deliveryManager().queue(uuid, leftovers.values(), "Reset Vault Token Refund");
-                        }
+                        me.vertex.core.storage.ItemGiver.give(p, List.of(clone));
                         p.sendMessage(messages.getRaw(p, "reset-vault.commit-failed"));
                     } else {
-                        ((me.vertex.core.VertexPlugin) plugin).deliveryManager().queue(uuid, List.of(clone), "Reset Vault Token Refund");
+                        plugin.getLogger().severe("Reset Vault token refund of 1x could not be delivered to "
+                                + uuid + ": they disconnected before the DB write failure was handled; staff recovery required.");
                     }
                 });
             } finally {
@@ -751,12 +854,10 @@ public final class ResetVaultManager {
                     releaseMutationLock(uuid);
                     Player p = Bukkit.getPlayer(uuid);
                     if (p != null && p.isOnline()) {
-                        Map<Integer, ItemStack> leftovers = p.getInventory().addItem(expectedSourceItem.clone());
-                        if (!leftovers.isEmpty()) {
-                            ((me.vertex.core.VertexPlugin) plugin).deliveryManager().queue(uuid, leftovers.values(), "Reset Vault Refund");
-                        }
+                        me.vertex.core.storage.ItemGiver.give(p, List.of(expectedSourceItem.clone()));
                     } else {
-                        ((me.vertex.core.VertexPlugin) plugin).deliveryManager().queue(uuid, List.of(expectedSourceItem.clone()), "Reset Vault Refund");
+                        plugin.getLogger().severe("Reset Vault deposit refund could not be delivered to "
+                                + uuid + ": they disconnected before the DB write failure was handled; staff recovery required.");
                     }
                     onFail.accept(messages.getRaw(player, "reset-vault.commit-failed"));
                 });
@@ -819,15 +920,22 @@ public final class ResetVaultManager {
                         updateCache(updated);
                         Player p = Bukkit.getPlayer(uuid);
                         if (p != null && p.isOnline()) {
-                            Map<Integer, ItemStack> leftovers = p.getInventory().addItem(itemToWithdraw.clone());
-                            if (!leftovers.isEmpty()) {
-                                ((me.vertex.core.VertexPlugin) plugin).deliveryManager().queue(uuid, leftovers.values(), "Reset Vault Withdrawal");
-                            }
+                            me.vertex.core.storage.ItemGiver.give(p, List.of(itemToWithdraw.clone()));
                             p.updateInventory();
                             broadcastWithdrawal(p, itemToWithdraw);
                             onSuccess.run();
                         } else {
-                            ((me.vertex.core.VertexPlugin) plugin).deliveryManager().queue(uuid, List.of(itemToWithdraw.clone()), "Reset Vault Withdrawal");
+                            plugin.getLogger().warning("Reset Vault withdrawal of " + itemToWithdraw
+                                    + " for " + uuid + ": player disconnected before delivery; rolling back item into vault.");
+                            ResetVaultData rolledBack = updated.addItem(itemToWithdraw);
+                            updateCache(rolledBack);
+                            runAsyncWrite(() -> {
+                                try {
+                                    SqlRetry.run(plugin, "rollback disconnected reset vault withdrawal", () -> storage.savePlayerData(rolledBack));
+                                } catch (Exception e) {
+                                    plugin.getLogger().log(Level.SEVERE, "Failed to rollback reset vault withdrawal for disconnected " + uuid, e);
+                                }
+                            });
                         }
                     } finally {
                         releaseMutationLock(uuid);
@@ -897,37 +1005,75 @@ public final class ResetVaultManager {
     // ------------------------------------------------------------------
 
     public void broadcastDeposit(Player player, ItemStack item) {
-        String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
+        String rank = LuckPermsHook.getPrefix(player);
         if (rank == null) rank = "";
-        String itemName = nameResolver.resolve(item);
+        Component itemComponent = nameResolver.resolveComponent(item);
+        if (item != null && !item.getType().isAir()) {
+            try {
+                itemComponent = itemComponent.hoverEvent(item.asHoverEvent());
+            } catch (Throwable ignored) {
+                // Ignore in headless/mocked test environments
+            }
+        }
+        Component finalItemComponent = itemComponent;
+        String finalRank = rank;
+
         if (announcements != null) {
-            announcements.broadcast(AnnouncementCategory.RESET_VAULT, "reset-vault.broadcast.deposit",
-                    "player", player.getName(),
-                    "rank", rank,
-                    "item", itemName);
+            announcements.broadcast(AnnouncementCategory.RESET_VAULT, sender ->
+                    buildBroadcastMessage(sender, "reset-vault.broadcast.deposit", player, finalRank, finalItemComponent));
         } else {
-            Bukkit.broadcast(messages.get(Bukkit.getConsoleSender(), "reset-vault.broadcast.deposit",
-                    "player", player.getName(),
-                    "rank", rank,
-                    "item", itemName));
+            Bukkit.broadcast(buildBroadcastMessage(Bukkit.getConsoleSender(), "reset-vault.broadcast.deposit",
+                    player, finalRank, finalItemComponent));
         }
     }
 
     public void broadcastWithdrawal(Player player, ItemStack item) {
-        String rank = LuckPermsHook.getPrimaryGroupDisplayName(player);
+        String rank = LuckPermsHook.getPrefix(player);
         if (rank == null) rank = "";
-        String itemName = nameResolver.resolve(item);
-        if (announcements != null) {
-            announcements.broadcast(AnnouncementCategory.RESET_VAULT, "reset-vault.broadcast.withdraw",
-                    "player", player.getName(),
-                    "rank", rank,
-                    "item", itemName);
-        } else {
-            Bukkit.broadcast(messages.get(Bukkit.getConsoleSender(), "reset-vault.broadcast.withdraw",
-                    "player", player.getName(),
-                    "rank", rank,
-                    "item", itemName));
+        Component itemComponent = nameResolver.resolveComponent(item);
+        if (item != null && !item.getType().isAir()) {
+            try {
+                itemComponent = itemComponent.hoverEvent(item.asHoverEvent());
+            } catch (Throwable ignored) {
+                // Ignore in headless/mocked test environments
+            }
         }
+        Component finalItemComponent = itemComponent;
+        String finalRank = rank;
+
+        if (announcements != null) {
+            announcements.broadcast(AnnouncementCategory.RESET_VAULT, sender ->
+                    buildBroadcastMessage(sender, "reset-vault.broadcast.withdraw", player, finalRank, finalItemComponent));
+        } else {
+            Bukkit.broadcast(buildBroadcastMessage(Bukkit.getConsoleSender(), "reset-vault.broadcast.withdraw",
+                    player, finalRank, finalItemComponent));
+        }
+    }
+
+    private Component buildBroadcastMessage(CommandSender sender, String key, Player player, String rank, Component itemComponent) {
+        String template = messages.getRaw(sender, key);
+        String playerVal = player != null ? EssentialsHook.resolveName(player) : "Unknown";
+        String rankVal = rank != null ? rank.trim() : "";
+
+        if (rankVal.isEmpty()) {
+            template = template.replace("{rank} ", "").replace("<rank> ", "")
+                    .replace("{rank}", "").replace("<rank>", "");
+        } else {
+            // {rank} here is LuckPerms' own prefix meta (see broadcastDeposit/
+            // broadcastWithdrawal), which already carries whatever color/
+            // bracket formatting an admin configured -- substituted raw
+            // rather than through MessageFormatter.normalize's escaped path,
+            // same reasoning as ChatFormatterListener's {prefix} handling.
+            template = template.replace("{rank}", rankVal).replace("<rank>", rankVal);
+        }
+        // playerVal is EssentialsHook.resolveName()'s output, already
+        // converted to MiniMessage tags for a colored nickname (see its
+        // class doc) -- escaping here would print those tags as literal
+        // text instead of applying the color, same reasoning as {rank} above.
+        template = template.replace("{player}", playerVal).replace("<player>", playerVal);
+
+        template = template.replace("{item}", "<item>");
+        return MessageFormatter.deserialize(template, Placeholder.component("item", itemComponent));
     }
 
     // ------------------------------------------------------------------

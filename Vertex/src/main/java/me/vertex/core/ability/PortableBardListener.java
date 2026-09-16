@@ -124,11 +124,7 @@ public final class PortableBardListener implements Listener {
         }
 
         ItemStack buffItem = abilityManager.createItem(buffAbility);
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                plugin, player, List.of(buffItem), "portable-bard-exchange")) {
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            return;
-        }
+        me.vertex.core.storage.ItemGiver.give(player, List.of(buffItem));
         if (!consumeOnePortableBard(player)) {
             plugin.getLogger().severe("Portable Bard source disappeared after output admission for "
                     + player.getName());

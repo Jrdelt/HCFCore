@@ -142,13 +142,9 @@ public final class SeasonalCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(messages.get(player, "enchant.unknown-seasonal-item", "id", id));
             return true;
         }
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                manager.plugin(), player, items, "enchant-admin-seasonal-roll")) {
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            return true;
-        }
+        me.vertex.core.storage.ItemGiver.give(player, items);
         player.sendMessage(messages.get(player, "seasonal.rolled", "amount", String.valueOf(items.size()),
-                "enchant", definition.displayName()));
+                "enchant", RuneFormatting.coloredNameRaw(RuneTier.SEASONAL, definition.displayName())));
         return true;
     }
 
@@ -211,11 +207,7 @@ public final class SeasonalCommand implements CommandExecutor, TabCompleter {
             meta.displayName(MessageFormatter.deserialize(name));
         }
         item.setItemMeta(meta);
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                manager.plugin(), player, List.of(item), "enchant-admin-seasonal-item")) {
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            return true;
-        }
+        me.vertex.core.storage.ItemGiver.give(player, List.of(item));
         player.sendMessage(messages.get(player, "seasonal.item-given",
                 "material", material.name(), "cmd", String.valueOf(customModelData)));
         return true;
@@ -247,11 +239,7 @@ public final class SeasonalCommand implements CommandExecutor, TabCompleter {
                 }
             }
             ItemStack backpack = backpackManager.createBackpackItem(id, level);
-            if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                    manager.plugin(), player, List.of(backpack), "enchant-admin-seasonal-give")) {
-                player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-                return true;
-            }
+            me.vertex.core.storage.ItemGiver.give(player, List.of(backpack));
             player.sendMessage(messages.get(player, "seasonal.item-given",
                     "material", backpackManager.tierDisplayName(id), "cmd", String.valueOf(level)));
             return true;
@@ -268,8 +256,11 @@ public final class SeasonalCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
             }
-            if (level < 1 || level > definition.maxLevel()) {
-                player.sendMessage(messages.get(player, "enchant.invalid-level"));
+            int maxLevel = definition.maxLevel();
+            if (level < 1 || level > maxLevel) {
+                player.sendMessage(messages.get(player, "seasonal.invalid-level-range",
+                        "id", definition.displayName(), "max", String.valueOf(maxLevel),
+                        "max-roman", RuneFormatting.roman(maxLevel)));
                 return true;
             }
             int pieceAmount = 1;
@@ -295,11 +286,7 @@ public final class SeasonalCommand implements CommandExecutor, TabCompleter {
             for (int i = 0; i < pieceAmount; i++) {
                 pieces.add(manager.createEnchantItem(id, level, RuneTier.SEASONAL));
             }
-            if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                    manager.plugin(), player, pieces, "enchant-admin-seasonal-give")) {
-                player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-                return true;
-            }
+            me.vertex.core.storage.ItemGiver.give(player, pieces);
             player.sendMessage(messages.get(player, "seasonal.given",
                     "amount", String.valueOf(pieces.size()), "id", definition.displayName()));
             return true;
@@ -328,11 +315,7 @@ public final class SeasonalCommand implements CommandExecutor, TabCompleter {
         for (int i = 0; i < amount; i++) {
             items.add(catalogued.clone());
         }
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                manager.plugin(), player, items, "enchant-admin-seasonal-give")) {
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            return true;
-        }
+        me.vertex.core.storage.ItemGiver.give(player, items);
         player.sendMessage(messages.get(player, "seasonal.given", "amount", String.valueOf(items.size()), "id", id));
         return true;
     }
@@ -382,7 +365,8 @@ public final class SeasonalCommand implements CommandExecutor, TabCompleter {
                     ItemStack baked = manager.bakeEnchantOnto(held.clone(), definition.id(), level, RuneTier.SEASONAL);
                     catalog.save(id, baked);
                     player.sendMessage(messages.get(player, "seasonal.catalog-saved-with-enchant", "id", id,
-                            "enchant", definition.displayName(), "level", String.valueOf(level)));
+                            "enchant", RuneFormatting.coloredNameRaw(RuneTier.SEASONAL, definition.displayName()),
+                            "level", String.valueOf(level)));
                     return true;
                 }
                 catalog.save(id, held);
@@ -447,6 +431,23 @@ public final class SeasonalCommand implements CommandExecutor, TabCompleter {
                         .flatMap(s -> s)
                         .filter(id -> id.startsWith(partial))
                         .toList();
+            }
+            if (args.length == 3) {
+                String id = args[1];
+                EnchantDefinition definition = manager.definition(id);
+                if (definition == null || !manager.isSeasonal(id)) {
+                    return List.of();
+                }
+                int maxLevel = definition.maxLevel();
+                String partial = args[2];
+                List<String> levels = new ArrayList<>(maxLevel);
+                for (int level = 1; level <= maxLevel; level++) {
+                    String value = String.valueOf(level);
+                    if (value.startsWith(partial)) {
+                        levels.add(value);
+                    }
+                }
+                return levels;
             }
             return List.of();
         }

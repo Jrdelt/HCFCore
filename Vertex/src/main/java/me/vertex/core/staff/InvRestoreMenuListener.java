@@ -86,11 +86,7 @@ public final class InvRestoreMenuListener implements Listener {
                 items.add(item.clone());
             }
         }
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                plugin, staffPlayer, items, "staff-inventory-restore")) {
-            staffPlayer.sendMessage(messages.get(staffPlayer, "delivery.storage-unavailable"));
-            return;
-        }
+        me.vertex.core.storage.ItemGiver.give(staffPlayer, items);
         staffPlayer.sendMessage(messages.getChat(staffPlayer, "staff.restore-success",
                 "added", String.valueOf(items.size())));
     }

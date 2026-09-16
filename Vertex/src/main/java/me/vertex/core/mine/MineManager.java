@@ -292,9 +292,7 @@ public final class MineManager {
         meta.lore(messages.getGuiList(player, "mines.wand-lore"));
         meta.getPersistentDataContainer().set(wandKey, PersistentDataType.STRING, "mine");
         wand.setItemMeta(meta);
-        if (!queueOverflow(player, List.of(wand), "mine-selector")) {
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-        }
+        give(player, List.of(wand));
     }
 
     public boolean isSelectionWand(ItemStack item) {
@@ -302,8 +300,8 @@ public final class MineManager {
                 && item.getItemMeta().getPersistentDataContainer().has(wandKey, PersistentDataType.STRING);
     }
 
-    public boolean queueOverflow(Player player, java.util.Collection<ItemStack> items, String source) {
-        return me.vertex.core.storage.DeliveryManager.queueOverflow(plugin, player, items, source);
+    public void give(Player player, java.util.Collection<ItemStack> items) {
+        me.vertex.core.storage.ItemGiver.give(player, items);
     }
 
     public void setCorner(Player player, Location location, boolean first) {

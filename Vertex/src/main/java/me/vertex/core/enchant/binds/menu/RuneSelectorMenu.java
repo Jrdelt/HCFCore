@@ -68,16 +68,28 @@ public final class RuneSelectorMenu {
     }
 
     private static ItemStack icon(EnchantManager manager, Messages messages, Player player, String enchantId, int level) {
-        ItemStack item = manager.createEnchantItem(enchantId, level, RuneTier.SIMPLE);
+        ItemStack item = RuneEquipment.resolveDisplayItem(player, manager, enchantId, level);
+        if (item == null) {
+            item = manager.createEnchantItem(enchantId, level, RuneTier.SIMPLE);
+        }
+        if (item == null) {
+            item = new ItemStack(Material.BOOK);
+        }
         ItemMeta meta = item.getItemMeta();
         EnchantDefinition definition = manager.definition(enchantId);
-        List<Component> lore = new ArrayList<>(meta.hasLore() && meta.lore() != null ? meta.lore() : List.of());
+        List<Component> lore = meta != null && meta.hasLore() && meta.lore() != null
+                ? new ArrayList<>(meta.lore())
+                : new ArrayList<>();
         lore.add(Component.empty());
-        lore.add(messages.getGui(player, "binds.selector-description",
-                "description", RuneFormatting.smallCaps(definition.description())));
+        if (definition != null && definition.description() != null) {
+            lore.add(messages.getGui(player, "binds.selector-description",
+                    "description", RuneFormatting.smallCaps(definition.description())));
+        }
         lore.add(messages.getGui(player, "binds.selector-hint"));
-        meta.lore(lore);
-        item.setItemMeta(meta);
+        if (meta != null) {
+            meta.lore(lore);
+            item.setItemMeta(meta);
+        }
         return item;
     }
 

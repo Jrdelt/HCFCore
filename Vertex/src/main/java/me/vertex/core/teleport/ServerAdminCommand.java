@@ -47,5 +47,7 @@ public final class ServerAdminCommand implements CommandExecutor, TabCompleter {
                 locations.warps().stream().map(me.vertex.core.network.NetworkStorage.LocationRow::name).toList());
         return List.of();
     }
-    private static List<String> complete(String raw,List<String> values){String p=raw.toLowerCase();return values.stream().filter(v->v.toLowerCase().startsWith(p)).toList();}
+    private static List<String> complete(String raw, List<String> values) {
+        return me.vertex.core.util.CommandUtil.filterPrefix(values, raw);
+    }
 }

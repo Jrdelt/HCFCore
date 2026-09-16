@@ -1264,8 +1264,8 @@ public final class CoinflipManager {
 
     public enum ClaimResult { CLAIMED, EMPTY, FULL, OFFLINE, BUSY, FAILED }
 
-    public boolean queueOverflow(Player player, java.util.Collection<ItemStack> items, String source) {
-        return me.vertex.core.storage.DeliveryManager.queueOverflow(plugin, player, items, source);
+    public void give(Player player, java.util.Collection<ItemStack> items) {
+        me.vertex.core.storage.ItemGiver.give(player, items);
     }
 
     Plugin plugin() {

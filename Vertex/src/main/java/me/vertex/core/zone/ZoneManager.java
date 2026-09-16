@@ -100,6 +100,7 @@ public final class ZoneManager {
     private final Map<UUID, Selection> selections = new ConcurrentHashMap<>();
     private final Map<UUID, Countdown> entries = new ConcurrentHashMap<>();
     private final Map<UUID, Countdown> exits = new ConcurrentHashMap<>();
+    /** Player currently descending onto a zone entry point, and what's needed to restore/return them once grounded. */
     private final Map<UUID, Flight> flights = new ConcurrentHashMap<>();
     private final Set<UUID> slowFalling = ConcurrentHashMap.newKeySet();
     private final Set<UUID> spawnDispatchBypass = ConcurrentHashMap.newKeySet();
@@ -164,7 +165,6 @@ public final class ZoneManager {
     public NamespacedKey sessionKey() { return sessionKey; }
     public boolean isZoneMob(Entity entity) { return entity != null && entity.getPersistentDataContainer().has(zoneMobKey, PersistentDataType.STRING); }
     public boolean isTicket(ItemStack item) { return item != null && item.hasItemMeta() && item.getItemMeta().getPersistentDataContainer().has(ticketKey, PersistentDataType.BYTE); }
-    public boolean queueOverflow(Player player,java.util.Collection<ItemStack> items,String source){return me.vertex.core.storage.DeliveryManager.queueOverflow(plugin,player,items,source);}
 
     public void initStorage() throws SQLException { storage.init(); }
 
@@ -225,7 +225,7 @@ public final class ZoneManager {
     private double readMobDespawnRadius(ZoneType type) {
         File file = new File(plugin.getDataFolder(), type.configKey() + ".yml");
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-        return Math.max(1D, yaml.getDouble("mob-spawning.despawn-radius", 40D));
+        return Math.max(1D, yaml.getDouble("mob-spawning.despawn-radius", 100D));
     }
 
     /** Called once after storage init; all definitions are loaded before commands become usable. */
@@ -462,10 +462,7 @@ public final class ZoneManager {
         if (normalized == null) return "invalid";
         Selection selection = Selection.region(type, normalized);
         selections.put(player.getUniqueId(), selection);
-        if (!giveSelector(player)) {
-            selections.remove(player.getUniqueId(), selection);
-            return "storage";
-        }
+        giveSelector(player);
         return "ok";
     }
     public String beginRouteSelection(Player player, ZoneType type, String regionId, String routeId) {
@@ -475,15 +472,11 @@ public final class ZoneManager {
         if (normalized == null) return "invalid";
         Selection selection = Selection.route(type, region.id(), normalized);
         selections.put(player.getUniqueId(), selection);
-        if (!giveSelector(player)) {
-            selections.remove(player.getUniqueId(), selection);
-            return "storage";
-        }
+        giveSelector(player);
         return "ok";
     }
-    private boolean giveSelector(Player player) {
-        return me.vertex.core.storage.DeliveryManager.queueOverflow(plugin, player,
-                List.of(selectorItem()), "zone-selector");
+    private void giveSelector(Player player) {
+        me.vertex.core.storage.ItemGiver.give(player, List.of(selectorItem()));
     }
     public String selectCorner(Player player, Location location, boolean first) {
         Selection selection = selections.get(player.getUniqueId()); if (selection == null) return "none";
@@ -556,23 +549,32 @@ public final class ZoneManager {
     }
     public boolean deleteRegion(String id) { String normalized=ZoneRegion.normalizeId(id);ZoneRegion removed=regions.get(normalized);if(removed==null)return false;try{storage.deleteRegion(removed.id());}catch(SQLException error){plugin.getLogger().log(Level.SEVERE,"Could not delete zone region "+removed.id(),error);return false;}regions.remove(normalized,removed);routes.values().removeIf(route->route.regionId().equals(removed.id()));return true; }
     public boolean deleteRoute(String id) { String normalized=ZoneRegion.normalizeId(id);ZoneRoute removed=routes.get(normalized);if(removed==null)return false;try{storage.deleteRoute(removed.id());}catch(SQLException error){plugin.getLogger().log(Level.SEVERE,"Could not delete zone route "+removed.id(),error);return false;}routes.remove(normalized,removed);return true; }
-    /** Staff preview uses the same server-authoritative path as a real entry, but does not create a Riftlands session. */
+    /**
+     * Staff preview uses the same server-authoritative path as a real entry,
+     * but does not create a Riftlands session. Both this and {@link
+     * #startFlight} just teleport above the route's actual destination (its
+     * last waypoint) and let gravity carry the player down, instead of
+     * server-scripting a per-tick flight through every recorded point --
+     * that meant an absolute-position teleport every tick, which reset the
+     * client's own movement interpolation each time and read as constant
+     * screen stutter. It also used to force the camera to the waypoint's
+     * authored facing every tick, fighting the player's own mouse input for
+     * the whole flight; a plain fall never touches rotation at all.
+     */
     public boolean previewRoute(Player player, String id) {
         ZoneRoute route = routes.get(ZoneRegion.normalizeId(id)); if (route == null || route.waypoints().isEmpty()) return false;
         ZoneRegion region = region(route.regionId()); World world = region == null ? null : Bukkit.getWorld(region.world());
         if (world == null) return false;
-        ZoneRoute.Waypoint first = route.waypoints().getFirst();
-        for (ZoneRoute.Waypoint point : route.waypoints()) {
-            World pointWorld = Bukkit.getWorld(point.world());
-            if (pointWorld == null || !pointWorld.equals(world) || !region.contains(point.location(pointWorld))) return false;
-        }
-        if (!player.teleport(first.location(world))) return false;
+        ZoneRoute.Waypoint destination = route.waypoints().getLast();
+        World destinationWorld = Bukkit.getWorld(destination.world());
+        if (destinationWorld == null || !destinationWorld.equals(world) || !region.contains(destination.location(destinationWorld))) return false;
+        Location dropPoint = destination.location(world);
+        dropPoint.setY(Math.min(world.getMaxHeight() - 8, dropPoint.getY() + 96D));
+        if (!player.teleport(dropPoint)) return false;
         FlightState before = new FlightState(player.getAllowFlight(), player.isFlying(), player.getFlySpeed());
         player.setAllowFlight(false); player.setFlying(false);
 me.vertex.core.util.FlightEffects.renewSlowFall(player);
-        slowFalling.add(player.getUniqueId());
-        flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), region.type(), route.regionId(), before,
-                route.waypoints(), route.speed()));
+        flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), route.regionId(), before));
         return true;
     }
 
@@ -626,27 +628,22 @@ me.vertex.core.util.FlightEffects.renewSlowFall(player);
             }
         }
 
-        // Each recorded point is an ordered waypoint.  The first starts the
-        // flight; later points are followed by the server flight tick.
-        ZoneRoute.Waypoint first = route.waypoints().getFirst();
-        World world = Bukkit.getWorld(first.world());
+        // Drop straight down onto the route's actual destination (its last
+        // recorded waypoint) instead of flying the recorded path -- see
+        // previewRoute's doc for why.
+        ZoneRoute.Waypoint destination = route.waypoints().getLast();
+        World world = Bukkit.getWorld(destination.world());
         ZoneRegion spawnRegion = region(route.regionId());
-        if (world == null || spawnRegion == null || !spawnRegion.contains(first.location(world))) return false;
-        for (ZoneRoute.Waypoint point : route.waypoints()) {
-            World pointWorld = Bukkit.getWorld(point.world());
-            if (pointWorld == null || !pointWorld.equals(world) || !spawnRegion.contains(point.location(pointWorld))) {
-                return false;
-            }
-        }
+        if (world == null || spawnRegion == null || !spawnRegion.contains(destination.location(world))) return false;
+        Location dropPoint = destination.location(world);
+        dropPoint.setY(Math.min(world.getMaxHeight() - 8, dropPoint.getY() + 96D));
 
         FlightState before = new FlightState(player.getAllowFlight(), player.isFlying(), player.getFlySpeed());
-        if (!player.teleport(first.location(world))) return false;
+        if (!player.teleport(dropPoint)) return false;
         player.setAllowFlight(false);
         player.setFlying(false);
         me.vertex.core.util.FlightEffects.renewSlowFall(player);
-        slowFalling.add(player.getUniqueId());
-        flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), type, route.regionId(), before,
-                route.waypoints(), route.speed()));
+        flights.put(player.getUniqueId(), new Flight(player.getUniqueId(), route.regionId(), before));
         player.sendMessage(messages.get(player, "zones.entered", "zone", type.displayName()));
         return true;
     }
@@ -676,7 +673,6 @@ me.vertex.core.util.FlightEffects.renewSlowFall(player);
         player.setFlySpeed(flight.before.flySpeed());
         if(slowFall){me.vertex.core.util.FlightEffects.renewSlowFall(player);slowFalling.add(uuid);}
     }
-    public void releaseFlightFromHit(Player player){if(flights.containsKey(player.getUniqueId()))releaseFlight(player.getUniqueId(),true);}
     public void recordFlightDisconnect(Player player) { Flight flight=flights.get(player.getUniqueId());if(flight==null||combat.isTagged(player.getUniqueId()))return;ZoneRegion region=region(flight.regionId);if(region==null)return;Location current=player.getLocation().clone();Location safe=findSafeGround(region,current);Location stored=safe==null?current:safe;releaseFlight(player.getUniqueId(),false);ZoneStorage.FlightReturn row=new ZoneStorage.FlightReturn(region.id(),stored.getWorld().getName(),stored.getX(),stored.getY(),stored.getZ());pendingFlightReturns.put(player.getUniqueId(),row);persist("flight-return:"+player.getUniqueId(),()->storage.saveFlightReturn(player.getUniqueId(),region.id(),stored.getWorld().getName(),stored.getX(),stored.getY(),stored.getZ())); }
 
     // ---- mobs, loot, progression, sessions ------------------------------
@@ -726,29 +722,10 @@ me.vertex.core.util.FlightEffects.renewSlowFall(player);
             tagged.add(copy);
         }
 
-        // A marked delivery owns the player's inventory until SQL confirms
-        // it. Queue the new rewards without touching an equipped Backpack or
-        // any live slot; the normal delivery reconciliation will hand them
-        // over once the existing transaction finishes.
-        if (!me.vertex.core.storage.InventoryAccess.ready(plugin, player)) {
-            if (!queueOverflow(player, tagged, "zone-loot")) {
-                player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            }
-            return;
-        }
-
         BackpackManager.EquippedBackpack bag = backpacks.equippedBackpack(player);
-        ItemStack backpackBefore = bag == null ? null : bag.item().clone();
         long storedBefore = bag == null ? -1L : backpacks.equippedStoredCount(player);
         List<ItemStack> leftovers = bag == null ? tagged : backpacks.storeExact(bag, tagged);
-        if (!queueOverflow(player, leftovers, "zone-loot")) {
-            if (backpackBefore != null) {
-                player.getInventory().setItemInOffHand(backpackBefore);
-                player.updateInventory();
-            }
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            return;
-        }
+        me.vertex.core.storage.ItemGiver.give(player, leftovers);
         if (bag != null) {
             player.getInventory().setItemInOffHand(bag.item().clone());
             player.updateInventory();
@@ -804,39 +781,11 @@ me.vertex.core.util.FlightEffects.renewSlowFall(player);
             Player player = Bukkit.getPlayer(flight.playerId);
             if (player == null) {
                 flights.remove(flight.playerId);
-                continue;
-            }
-            if (flight.nextWaypoint >= flight.waypoints.size()) {
-                releaseFlight(player.getUniqueId(), true);
-                continue;
-            }
-            ZoneRoute.Waypoint waypoint = flight.waypoints.get(flight.nextWaypoint);
-            World world = Bukkit.getWorld(waypoint.world());
-            if (world == null || !world.equals(player.getWorld())) {
+            } else if (player.isOnGround()) {
                 releaseFlight(player.getUniqueId(), false);
-                continue;
-            }
-            Location target = waypoint.location(world);
-            Location current = player.getLocation();
-            double distance = current.distance(target);
-            double step = flight.speed / 20D;
-            if (distance <= step || distance < .001D) {
-                if (!player.teleport(target)) {
-                    releaseFlight(player.getUniqueId(), false);
-                    continue;
-                }
-                flight.nextWaypoint++;
-                if (flight.nextWaypoint >= flight.waypoints.size()) {
-                    releaseFlight(player.getUniqueId(), true);
-                }
-                continue;
-            }
-            Vector direction = target.toVector().subtract(current.toVector()).normalize().multiply(step);
-            Location next = current.add(direction);
-            next.setYaw(target.getYaw());
-            next.setPitch(target.getPitch());
-            if (!player.teleport(next)) {
-                releaseFlight(player.getUniqueId(), false);
+            } else {
+                // A finite, renewed effect cannot become permanent after a crash.
+                me.vertex.core.util.FlightEffects.renewSlowFall(player);
             }
         }
     }
@@ -844,7 +793,7 @@ me.vertex.core.util.FlightEffects.renewSlowFall(player);
         slowFalling.remove(player.getUniqueId()); // Short flight effect expires naturally.
     }
     private void tickSlowFalling(){for(UUID uuid:List.copyOf(slowFalling)){Player player=Bukkit.getPlayer(uuid);if(player==null||player.isOnGround()){slowFalling.remove(uuid);}else{me.vertex.core.util.FlightEffects.renewSlowFall(player);}}}
-    private void tickMobs(){for(ZoneType type:ZoneType.values()){Map<String,List<Player>> byRegion=new HashMap<>();for(Player p:Bukkit.getOnlinePlayers()){ZoneRegion r=regionAt(p.getLocation());if(r!=null&&r.type()==type)byRegion.computeIfAbsent(r.id(),ignored->new ArrayList<>()).add(p);}for(ZoneRegion r:regions(type)){List<Player> active=byRegion.getOrDefault(r.id(),List.of());if(active.isEmpty()){despawnZoneMobs(r);continue;}maintainMobs(r,active);despawnFarZoneMobs(r,active,mobDespawnRadii.getOrDefault(type,40D));}}}
+    private void tickMobs(){for(ZoneType type:ZoneType.values()){Map<String,List<Player>> byRegion=new HashMap<>();for(Player p:Bukkit.getOnlinePlayers()){ZoneRegion r=regionAt(p.getLocation());if(r!=null&&r.type()==type)byRegion.computeIfAbsent(r.id(),ignored->new ArrayList<>()).add(p);}for(ZoneRegion r:regions(type)){List<Player> active=byRegion.getOrDefault(r.id(),List.of());if(active.isEmpty()){despawnZoneMobs(r);continue;}maintainMobs(r,active);despawnFarZoneMobs(r,active,mobDespawnRadii.getOrDefault(type,100D));}}}
     private void maintainMobs(ZoneRegion region, List<Player> active) {
         if (region == null || active.isEmpty()) return;
         ZoneConfig c = config(region.type());
@@ -1214,22 +1163,13 @@ me.vertex.core.util.FlightEffects.renewSlowFall(player);
     private record FlightState(boolean allowFlight,boolean flying,float flySpeed) { }
     private static final class Flight {
         private final UUID playerId;
-        private final ZoneType type;
         private final String regionId;
         private final FlightState before;
-        private final List<ZoneRoute.Waypoint> waypoints;
-        private final double speed;
-        private int nextWaypoint;
 
-        private Flight(UUID playerId, ZoneType type, String regionId, FlightState before,
-                List<ZoneRoute.Waypoint> waypoints, double speed) {
+        private Flight(UUID playerId, String regionId, FlightState before) {
             this.playerId = playerId;
-            this.type = type;
             this.regionId = regionId;
             this.before = before;
-            this.waypoints = List.copyOf(waypoints);
-            this.speed = Math.max(.05D, Math.min(8D, speed));
-            this.nextWaypoint = 1;
         }
     }
     private static final class Selection { final ZoneType type;final String regionId;final String routeId;Location first,second;final List<ZoneRoute.Waypoint> points=new ArrayList<>();private Selection(ZoneType type,String regionId,String routeId){this.type=type;this.regionId=regionId;this.routeId=routeId;}static Selection region(ZoneType type,String id){return new Selection(type,id,null);}static Selection route(ZoneType type,String region,String route){return new Selection(type,region,route);}void clear(){first=null;second=null;points.clear();} }

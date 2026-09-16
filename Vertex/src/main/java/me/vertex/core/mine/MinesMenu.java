@@ -169,7 +169,7 @@ public final class MinesMenu {
         boolean active = hotZones.isActive(region.id());
         return MenuPlaceholders.of()
                 .putTrusted("hotzone", messages.getRaw(null, active ? "mines.hotzone-active" : "mines.hotzone-inactive"))
-                .put("hotzone_percent", trimmed(hotZones.oreDropPercent()))
+                .put("hotzone_percent", trimmedBonus(hotZones.oreDropPercent()))
                 .put("hotzone_remaining", active ? duration(hotZones.remainingSeconds()) : "-")
                 .put("hotzone_next", active ? "-" : duration(hotZones.secondsUntilNext()));
     }
@@ -180,7 +180,7 @@ public final class MinesMenu {
             lines.add(MessageFormatter.deserialize(messages.getRaw(viewer,
                     contribution.active() ? "boosters.line-active" : "boosters.line-inactive",
                     "source", MessageFormatter.plain(messages.getRaw(viewer, "boosters.source-" + contribution.sourceId())),
-                    "percent", trimmed(contribution.percent()))));
+                    "percent", trimmedBonus(contribution.percent()))));
         }
         if (lines.isEmpty()) {
             lines.add(MessageFormatter.deserialize(messages.getRaw(viewer, "boosters.no-sources")));
@@ -188,7 +188,7 @@ public final class MinesMenu {
         BoosterStacking.Result result = boosters.result(viewer, BoosterCategory.ORE_DROP);
         return MenuPlaceholders.of()
                 .putBlock("breakdown", lines)
-                .put("effective", trimmed(result.effective()));
+                .put("effective", trimmedBonus(result.effective()));
     }
 
     /** One line per configured block, read from the mine rather than written into the GUI file. */
@@ -205,7 +205,7 @@ public final class MinesMenu {
         if (koth == null || koths.ownerOf(region.id()) == null) {
             return "+0%";
         }
-        return "+" + trimmed(koth.booster().percentFor(koths.heldSeconds(region.id()))) + "%";
+        return "+" + trimmedBonus(koth.booster().percentFor(koths.heldSeconds(region.id()))) + "%";
     }
 
     private static String nextTier(MineKothDefinition koth, long heldSeconds) {
@@ -213,7 +213,7 @@ public final class MinesMenu {
             return "-";
         }
         MineKothBooster.Tier next = koth.booster().nextTier(heldSeconds);
-        return next == null ? "-" : "+" + trimmed(next.percent()) + "% in " + duration(
+        return next == null ? "-" : "+" + trimmedBonus(next.percent()) + "% in " + duration(
                 koth.booster().secondsUntilNextTier(heldSeconds));
     }
 
@@ -225,7 +225,7 @@ public final class MinesMenu {
     private static String hotZoneLabel(MineRegion region, HotZoneManager hotZones, Messages messages, Player viewer) {
         return hotZones.isActive(region.id())
                 ? messages.getRaw(viewer, "mines.hotzone-active-short",
-                        "percent", trimmed(hotZones.oreDropPercent()))
+                        "percent", trimmedBonus(hotZones.oreDropPercent()))
                 : messages.getRaw(viewer, "mines.hotzone-inactive");
     }
 
@@ -244,6 +244,18 @@ public final class MinesMenu {
         long minutes = seconds % 3600 / 60;
         long secs = seconds % 60;
         return hours > 0 ? hours + "h " + minutes + "m" : minutes > 0 ? minutes + "m " + secs + "s" : secs + "s";
+    }
+
+    private static final java.text.DecimalFormat BONUS_FORMAT = new java.text.DecimalFormat("0.#", java.text.DecimalFormatSymbols.getInstance(Locale.US));
+    static {
+        BONUS_FORMAT.setRoundingMode(java.math.RoundingMode.HALF_UP);
+    }
+
+    private static String trimmedBonus(double value) {
+        if (value > 0D && value < 0.05D) {
+            return "0.1";
+        }
+        return BONUS_FORMAT.format(value);
     }
 
     private static String trimmed(double value) {

@@ -69,11 +69,7 @@ public final class BlueprintCommand implements CommandExecutor, TabCompleter {
         meta.getPersistentDataContainer().set(templateKey, PersistentDataType.STRING, template.name());
         item.setItemMeta(meta);
 
-        if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                plugin, target, List.of(item), "blueprint-admin-give")) {
-            sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
-            return true;
-        }
+        me.vertex.core.storage.ItemGiver.give(target, List.of(item));
         sender.sendMessage(messages.get(sender, "blueprint.gave", "player", target.getName(), "template",
                 MessageFormatter.plain(template.displayName())));
         return true;

@@ -70,6 +70,16 @@ public final class BindActivationListener implements Listener {
             return;
         }
         BindActivationOpener opener = binds.activationOpener(player);
+        UUID uuid = player.getUniqueId();
+        if (hud.isActive(uuid) && isClickBasedOpener(opener) && !player.isSneaking()) {
+            // Bind 1's alternate trigger for a click-based opener (see the
+            // matching guard in onInteract) -- a plain F press can't collide
+            // with either LEFT_THEN_RIGHT_CLICK or SHIFT_RIGHT_CLICK the way
+            // right-click itself would.
+            event.setCancelled(true);
+            hud.selectBind(player, 1);
+            return;
+        }
         if (opener == BindActivationOpener.SHIFT_F) {
             if (player.isSneaking()) {
                 event.setCancelled(true);
@@ -79,10 +89,10 @@ public final class BindActivationListener implements Listener {
         }
         if (opener == BindActivationOpener.DOUBLE_TAP_F) {
             long now = System.currentTimeMillis();
-            Long last = lastSwapPress.put(player.getUniqueId(), now);
+            Long last = lastSwapPress.put(uuid, now);
             if (last != null && now - last <= binds.doubleTapWindowMillis(player) && !player.isSneaking()) {
                 event.setCancelled(true);
-                lastSwapPress.remove(player.getUniqueId());
+                lastSwapPress.remove(uuid);
                 hud.activate(player);
             }
         }
@@ -94,10 +104,29 @@ public final class BindActivationListener implements Listener {
         if (inputBlocked(player) || isHoldingRuneItem(event.getItem()) || opensTextEntryScreen(event)) {
             return;
         }
-        BindActivationOpener opener = binds.activationOpener(player);
         Action action = event.getAction();
-        long now = System.currentTimeMillis();
         UUID uuid = player.getUniqueId();
+        BindActivationOpener opener = binds.activationOpener(player);
+        // Bind 1's hotbar number can never register while the HUD is open --
+        // the HUD parks the player's held slot on slot 1 itself (see
+        // BindHudService#PARKED_HOTBAR_SLOT) so every OTHER bind number is a
+        // guaranteed genuine slot change, but that same parking means slot 1
+        // is already selected, so pressing "1" produces no event at all. A
+        // plain (non-sneaking) right-click is bind 1's alternate trigger --
+        // except for a click-based opener (LEFT_THEN_RIGHT_CLICK,
+        // SHIFT_RIGHT_CLICK), where right-click is itself part of the
+        // opener gesture: a player closing/reopening the HUD, or just
+        // right-clicking normally afterward, would otherwise fire bind 1 by
+        // accident. Those two openers get a plain F press instead (see
+        // onSwapHandItems). Sneaking is left alone either way so a
+        // sneak+right-click opener gesture (below) still works exactly as
+        // configured.
+        if (hud.isActive(uuid) && !isClickBasedOpener(opener) && action.isRightClick() && !player.isSneaking()) {
+            event.setCancelled(true);
+            hud.selectBind(player, 1);
+            return;
+        }
+        long now = System.currentTimeMillis();
         if (opener == BindActivationOpener.SHIFT_RIGHT_CLICK) {
             if (player.isSneaking() && event.getAction().isRightClick()) {
                 event.setCancelled(true);
@@ -197,6 +226,11 @@ public final class BindActivationListener implements Listener {
         hud.hide(uuid);
     }
 
+    /** Openers where right-click is itself part of the gesture, so bind 1's alternate trigger has to be F instead -- see {@link BindHudService#bindOneAlternateTriggerLabel}. */
+    static boolean isClickBasedOpener(BindActivationOpener opener) {
+        return opener == BindActivationOpener.LEFT_THEN_RIGHT_CLICK || opener == BindActivationOpener.SHIFT_RIGHT_CLICK;
+    }
+
     private boolean inputBlocked(Player player) {
         return player.getOpenInventory().getType() != org.bukkit.event.inventory.InventoryType.CRAFTING;
     }
@@ -215,7 +249,7 @@ public final class BindActivationListener implements Listener {
             return true;
         }
         Block clicked = event.getClickedBlock();
-        return clicked != null && clicked.getState() instanceof org.bukkit.block.Sign;
+        return clicked != null && clicked.getBlockData() instanceof org.bukkit.block.data.type.Sign;
     }
 
     private static boolean isBindMenu(InventoryView view) {

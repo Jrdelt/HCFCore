@@ -4,6 +4,7 @@ import io.papermc.paper.event.player.AsyncChatEvent;
 import me.vertex.core.claims.ChunkKey;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -32,16 +33,25 @@ public final class FactionGameplayListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
-        if (event.getTo() == null || ChunkKey.of(event.getFrom()).equals(ChunkKey.of(event.getTo()))) return;
+        Location to = event.getTo();
+        if (to == null) return;
+        Location from = event.getFrom();
+        if ((from.getBlockX() >> 4 == to.getBlockX() >> 4)
+                && (from.getBlockZ() >> 4 == to.getBlockZ() >> 4)
+                && from.getWorld() == to.getWorld()) {
+            return;
+        }
         Player player = event.getPlayer();
         FactionStorage.PlayerSettings settings = factions.settings(player.getUniqueId());
+        if (!settings.autoclaim() && !settings.mapEnabled()) {
+            return;
+        }
+        ChunkKey target = ChunkKey.of(to);
         if (settings.autoclaim()) {
-            ChunkKey target=ChunkKey.of(event.getTo());
-            factions.submitMutation(()->factions.claim(player,target,factions.claimsMayOverclaim()));
+            factions.submitMutation(() -> factions.claim(player, target, factions.claimsMayOverclaim()));
         }
         if (settings.mapEnabled()) {
-            ChunkKey current = ChunkKey.of(event.getTo());
-            if (!current.equals(lastMapChunk.put(player.getUniqueId(), current))) player.sendMessage(factions.map(player));
+            if (!target.equals(lastMapChunk.put(player.getUniqueId(), target))) player.sendMessage(factions.map(player));
         }
     }
 

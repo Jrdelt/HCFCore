@@ -14,6 +14,10 @@ import java.util.Locale;
 /** /trade request, accept and cancellation command family. */
 public final class TradeCommand implements CommandExecutor, TabCompleter {
     private final TradeManager manager; private final Messages messages;
+    private volatile List<String> cachedPayoutKeys = List.of();
+    private volatile long lastPayoutKeysFetch = 0L;
+    private volatile boolean fetchingPayouts = false;
+
     public TradeCommand(TradeManager manager, Messages messages) { this.manager=manager; this.messages=messages; }
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) { sender.sendMessage(messages.get(sender, "general.players-only")); return true; }
@@ -21,7 +25,19 @@ public final class TradeCommand implements CommandExecutor, TabCompleter {
         if (!player.hasPermission("vertex.trade.use")) { player.sendMessage(messages.get(player, "general.no-permission")); return true; }
         if (args.length == 0) { player.sendMessage(messages.get(player, "trade.usage")); return true; }
         if (args[0].equalsIgnoreCase("cancel")) { manager.cancel(manager.session(player.getUniqueId()), "trade-cancelled"); return true; }
-        if (args[0].equalsIgnoreCase("accept")) { Player other = args.length < 2 ? null : Bukkit.getPlayerExact(args[1]); send(player, manager.accept(player, other == null ? player : other), other); return true; }
+        if (args[0].equalsIgnoreCase("accept")) {
+            if (args.length < 2) {
+                player.sendMessage(messages.get(player, "trade.usage"));
+                return true;
+            }
+            Player other = Bukkit.getPlayerExact(args[1]);
+            if (other == null) {
+                player.sendMessage(messages.get(player, "general.player-not-found"));
+                return true;
+            }
+            send(player, manager.accept(player, other), other);
+            return true;
+        }
         Player target = Bukkit.getPlayerExact(args[0]); if (target == null) { player.sendMessage(messages.get(player, "general.player-not-found")); return true; }
         TradeManager.Result result = manager.request(player, target); if (result == TradeManager.Result.OK) { player.sendMessage(messages.get(player, "trade.request-sent", "player", target.getName())); target.sendMessage(messages.get(target, "trade.request-received", "player", player.getName())); } else send(player, result, target); return true;
     }
@@ -46,10 +62,26 @@ public final class TradeCommand implements CommandExecutor, TabCompleter {
                 "key", args[1], "action", paid ? "PAID" : "RETRY"));
     }
     private static String playerName(java.util.UUID uuid) { String name=Bukkit.getOfflinePlayer(uuid).getName(); return name==null?uuid.toString():name; }
+    private List<String> getPayoutKeysAsync() {
+        long now = System.currentTimeMillis();
+        if (now - lastPayoutKeysFetch > 5000L && !fetchingPayouts) {
+            fetchingPayouts = true;
+            java.util.concurrent.CompletableFuture.supplyAsync(() -> manager.uncertainPayouts().stream()
+                    .map(TradeStorage.PendingPayout::key).toList())
+                .whenComplete((keys, err) -> {
+                    fetchingPayouts = false;
+                    if (keys != null) {
+                        cachedPayoutKeys = keys;
+                        lastPayoutKeysFetch = System.currentTimeMillis();
+                    }
+                });
+        }
+        return cachedPayoutKeys;
+    }
     @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if(args.length==1){String partial=args[0].toLowerCase(Locale.ROOT);List<String> values=new ArrayList<>();values.add("accept");values.add("cancel");if(sender.hasPermission("vertex.trade.payouts"))values.add("payouts");Bukkit.getOnlinePlayers().stream().map(Player::getName).forEach(values::add);return values.stream().filter(value->value.toLowerCase(Locale.ROOT).startsWith(partial)).distinct().toList();}
         if(args.length==2&&args[0].equalsIgnoreCase("accept"))return Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
-        if(args.length==2&&args[0].equalsIgnoreCase("payouts")&&sender.hasPermission("vertex.trade.payouts")){String partial=args[1].toLowerCase(Locale.ROOT);return manager.uncertainPayouts().stream().map(TradeStorage.PendingPayout::key).filter(key->key.toLowerCase(Locale.ROOT).startsWith(partial)).toList();}
+        if(args.length==2&&args[0].equalsIgnoreCase("payouts")&&sender.hasPermission("vertex.trade.payouts")){String partial=args[1].toLowerCase(Locale.ROOT);return getPayoutKeysAsync().stream().filter(key->key.toLowerCase(Locale.ROOT).startsWith(partial)).toList();}
         if(args.length==3&&args[0].equalsIgnoreCase("payouts")&&sender.hasPermission("vertex.trade.payouts")){String partial=args[2].toLowerCase(Locale.ROOT);return List.of("paid","retry").stream().filter(value->value.startsWith(partial)).toList();}
         return List.of();
     }

@@ -190,8 +190,6 @@ public final class StorageMigrator {
         TABLES.put("entry_portals", List.of("id", "target", "world", "min_x", "min_y", "min_z", "max_x",
                 "max_y", "max_z"));
         TABLES.put("entry_portal_routes", List.of("id", "target", "speed", "waypoints"));
-        TABLES.put("item_delivery_inbox", List.of("delivery_id", "owner_uuid", "source", "item", "state",
-                "reservation_token", "created_at"));
         TABLES.put("vertex_network_shards", List.of("shard_id", "role", "state", "max_players", "current_players", "heartbeat_at", "restart_eta", "updated_by"));
         TABLES.put("vertex_network_events", List.of("id", "source_shard", "topic", "payload", "created_at"));
         TABLES.put("vertex_transfer_handoffs", List.of("transfer_id", "player_uuid", "source_shard", "destination_shard", "destination_world", "x", "y", "z", "yaw", "pitch", "reason", "state", "snapshot", "created_at", "updated_at", "error"));
@@ -455,7 +453,6 @@ public final class StorageMigrator {
         new me.vertex.core.chunkbuster.ChunkBusterStorage(database).init();
         new me.vertex.core.zone.ZoneStorage(database).init();
         new me.vertex.core.portal.PortalStorage(database).init();
-        new DeliveryStorage(database).init();
         new me.vertex.core.network.NetworkStorage(database).init();
         new me.vertex.core.teleport.RtpStorage(database).init();
         new PlayerStatsStorage(database).init();

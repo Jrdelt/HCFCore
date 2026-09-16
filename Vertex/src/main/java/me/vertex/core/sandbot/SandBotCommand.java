@@ -37,11 +37,7 @@ public final class SandBotCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             ItemStack item = manager.createGiveItem();
-            if (!me.vertex.core.storage.DeliveryManager.queueOverflow(
-                    manager.plugin(), target, List.of(item), "sandbot-admin-give")) {
-                sender.sendMessage(messages.get(sender, "delivery.storage-unavailable"));
-                return true;
-            }
+            me.vertex.core.storage.ItemGiver.give(target, List.of(item));
             sender.sendMessage(messages.get(sender, "sandbot.given", "player", target.getName()));
             return true;
         }

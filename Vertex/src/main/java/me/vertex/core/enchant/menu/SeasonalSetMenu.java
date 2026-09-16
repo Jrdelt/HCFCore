@@ -3,9 +3,11 @@ package me.vertex.core.enchant.menu;
 import me.vertex.core.backpack.BackpackManager;
 import me.vertex.core.enchant.EnchantDefinition;
 import me.vertex.core.enchant.EnchantManager;
+import me.vertex.core.enchant.RuneFormatting;
 import me.vertex.core.enchant.RuneTier;
 import me.vertex.core.lang.Messages;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -20,14 +22,18 @@ import java.util.List;
  * One seasonal set's detail view: a double-chest-sized (54 slot), black-
  * stained-glass-bordered grid showing every piece in the set -- armor,
  * weapons, and tools -- centered in the middle rows. Each icon is that
- * piece's actual identified Rune item (level I), rendered through the exact
- * same {@link EnchantManager#createEnchantItem} every other menu uses, so
- * hovering it shows its real description/ability value/application info --
- * no separate lore is authored here. A piece whose {@code runes.yml} entry
- * sets {@code hidden: true} (directly, or inherited from its {@code sets:}
- * group) is skipped here -- staged content stays fully usable through every
- * admin command, just not shown in this player-facing preview until
- * released.
+ * piece's actual identified Rune item (level I) for its real material/
+ * custom model data, via the exact same {@link EnchantManager#createEnchantItem}
+ * every other menu uses -- but its lore is replaced here with just this one
+ * ability's name/level and a short, word-wrapped description, deliberately
+ * dropping the full identified-item stat block (proc chance, application
+ * success/fail odds, "applies to") and any other enchant that item's
+ * underlying catalog piece happens to also carry: a set preview is a
+ * "what is this ability" card, not the same tooltip a real owned copy shows.
+ * A piece whose {@code runes.yml} entry sets {@code hidden: true} (directly,
+ * or inherited from its {@code sets:} group) is skipped here -- staged
+ * content stays fully usable through every admin command, just not shown in
+ * this player-facing preview until released.
  */
 public final class SeasonalSetMenu {
 
@@ -60,6 +66,18 @@ public final class SeasonalSetMenu {
                 continue;
             }
             ItemStack item = manager.createEnchantItem(id, 1, RuneTier.SEASONAL);
+            if (item != null && item.hasItemMeta()) {
+                ItemMeta meta = item.getItemMeta();
+                meta.displayName(RuneFormatting.seasonalTitle(definition.displayName(), 1));
+                List<Component> lore = new java.util.ArrayList<>();
+                for (String line : RuneFormatting.wrap(definition.description(), 20)) {
+                    lore.add(RuneFormatting.plain(line, NamedTextColor.GRAY));
+                }
+                lore.add(Component.empty());
+                lore.add(messages.getGui(player, "rune.seasonal-item-catalog-hint"));
+                meta.lore(lore);
+                item.setItemMeta(meta);
+            }
             inventory.setItem(CONTENT_SLOTS.get(index), item);
             index++;
         }
@@ -70,6 +88,10 @@ public final class SeasonalSetMenu {
         inventory.setItem(BACK_SLOT, button(Material.ARROW, messages.getGui(player, "rune.seasonal-back"),
                 List.of(messages.getGui(player, "rune.seasonal-back-lore"))));
         player.openInventory(inventory);
+    }
+
+    public static boolean isContentSlot(int slot) {
+        return CONTENT_SLOTS.contains(slot);
     }
 
     private static ItemStack filler() {

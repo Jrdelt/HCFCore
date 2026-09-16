@@ -20,7 +20,7 @@ public final class CommandVisibilityListener implements Listener {
 
     private static final List<String> FA_PERMISSIONS = List.of(
             "vertex.fa.*", "vertex.fa.help", "vertex.fa.info", "vertex.fa.grace", "vertex.fa.power",
-            "vertex.fa.claim", "vertex.fa.unclaim", "vertex.fa.disband", "vertex.fa.relation",
+            "vertex.fa.claim", "vertex.fa.unclaim", "vertex.fa.unclaimall", "vertex.fa.disband", "vertex.fa.relation",
             "vertex.fa.shield", "vertex.fa.bank", "vertex.fa.vault", "vertex.fa.upgrades",
             "vertex.fa.members", "vertex.fa.combat", "vertex.fa.logs", "vertex.fa.network",
             "vertex.fa.season");

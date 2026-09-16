@@ -31,12 +31,18 @@ public final class ZoneCommandRestrictionListener implements Listener {
         String raw = event.getMessage();
         if (raw == null || raw.length() < 2) return;
         String[] typed = raw.substring(1).trim().toLowerCase(Locale.ROOT).split("\\s+");
-        if (typed.length == 0 || typed[0].contains(":")) return;
+        if (typed.length == 0 || typed[0].isEmpty()) return;
+
+        String[] unnamespaced = typed.clone();
+        int colon = typed[0].indexOf(':');
+        if (colon != -1 && colon < typed[0].length() - 1) {
+            unnamespaced[0] = typed[0].substring(colon + 1);
+        }
 
         List<String> blocked = zones.blockedCommands(region.type());
         for (String configured : blocked) {
             String[] tokens = configured.toLowerCase(Locale.ROOT).trim().split("\\s+");
-            if (matches(typed, tokens)) {
+            if (matches(typed, tokens) || matches(unnamespaced, tokens)) {
                 event.setCancelled(true);
                 player.sendMessage(messages.get(player, "zones.command-blocked", "zone", region.type().displayName()));
                 return;

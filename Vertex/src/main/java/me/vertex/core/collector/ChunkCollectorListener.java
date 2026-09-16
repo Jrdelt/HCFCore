@@ -26,6 +26,7 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.Tag;
 import org.bukkit.plugin.Plugin;
 
 import java.util.Iterator;
@@ -242,7 +243,7 @@ public final class ChunkCollectorListener implements Listener {
             return;
         }
         Block block = event.getClickedBlock();
-        if (block == null || !manager.isTracked(block.getLocation())) {
+        if (block == null || !Tag.SHULKER_BOXES.isTagged(block.getType()) || !manager.isTracked(block.getLocation())) {
             return;
         }
         ChunkCollectorData data = manager.readData(block.getLocation());
@@ -273,6 +274,9 @@ public final class ChunkCollectorListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
+        if (!Tag.SHULKER_BOXES.isTagged(block.getType())) {
+            return;
+        }
         Location location = block.getLocation();
         if (!manager.isTracked(location)) {
             return;
@@ -296,11 +300,7 @@ public final class ChunkCollectorListener implements Listener {
         }
 
         ItemStack collector=manager.createCollectorItem(manager.displayName(player),data);
-        if (!manager.queueOverflow(player, java.util.List.of(collector), "collector-break")) {
-            event.setCancelled(true);
-            player.sendMessage(messages.get(player, "delivery.storage-unavailable"));
-            return;
-        }
+        manager.give(player, java.util.List.of(collector));
         event.setDropItems(false);
         manager.unregister(location);
     }

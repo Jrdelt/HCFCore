@@ -6,6 +6,8 @@ import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /** Shared presentation rules for every rune item, across every tier. */
@@ -49,6 +51,59 @@ public final class RuneFormatting {
                     .decoration(TextDecoration.ITALIC, false));
         }
         return result;
+    }
+
+    /**
+     * Greedy word-wrap for a lore tooltip: breaks {@code text} into lines no
+     * longer than {@code maxLineLength} characters, splitting only on spaces
+     * so no word is ever cut mid-character. A single word longer than the
+     * limit is kept whole on its own line rather than force-split, since a
+     * client tooltip box already just widens for one long word -- it's a
+     * whole unbroken paragraph that makes a lore box uncomfortably wide.
+     */
+    public static List<String> wrap(String text, int maxLineLength) {
+        List<String> lines = new ArrayList<>();
+        if (text == null || text.isBlank()) {
+            return lines;
+        }
+        StringBuilder current = new StringBuilder();
+        for (String word : text.split(" ")) {
+            if (current.isEmpty()) {
+                current.append(word);
+            } else if (current.length() + 1 + word.length() <= maxLineLength) {
+                current.append(' ').append(word);
+            } else {
+                lines.add(current.toString());
+                current = new StringBuilder(word);
+            }
+        }
+        if (!current.isEmpty()) {
+            lines.add(current.toString());
+        }
+        return lines;
+    }
+
+    /**
+     * A rune's display name as a raw MiniMessage-tagged string, styled to
+     * match its actual on-item name -- for embedding in a chat message
+     * template's {@code {enchant}} placeholder (see {@link
+     * me.vertex.core.lang.Messages}' raw-passthrough handling for that
+     * key), so every chat line that names a specific rune shows it exactly
+     * like the item itself does, instead of a generic "RUNES >" style
+     * prefix. Seasonal gets the same bold gold-to-bronze per-character
+     * gradient {@link #seasonalTitle} renders on the item (a flat color
+     * here would visibly mismatch it); every other tier gets a flat color
+     * matching {@link #title}'s plain (non-gradient, non-bold) name. {@code
+     * null} tier (a retired/legacy rune with no current tier) falls back to
+     * plain gray.
+     */
+    public static String coloredNameRaw(RuneTier tier, String name) {
+        if (tier == RuneTier.SEASONAL) {
+            return "<bold><gradient:" + SEASONAL_GRADIENT_START.asHexString() + ":"
+                    + SEASONAL_GRADIENT_END.asHexString() + ">" + name + "</gradient></bold>";
+        }
+        TextColor color = tier == null ? NamedTextColor.GRAY : tierColor(tier);
+        return "<color:" + color.asHexString() + ">" + name + "</color>";
     }
 
     public static Component plain(String text, NamedTextColor color) {

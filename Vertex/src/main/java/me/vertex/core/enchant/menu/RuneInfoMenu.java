@@ -104,6 +104,7 @@ public final class RuneInfoMenu {
             lore.add(messages.getGui(player, "rune.catalog-level-detail",
                     "level", RuneFormatting.roman(levelConfig.level()),
                     "maximum", levelConfig.level() == definition.maxLevel() ? "ᴍᴀx" : "",
+                    "proc", RuneFormatting.percent(levelConfig.procChance()),
                     "value", RuneFormatting.percent(levelConfig.abilityValue()),
                     "success", RuneFormatting.percent(levelConfig.successRate()),
                     "failure", RuneFormatting.percent(100D - levelConfig.successRate())));

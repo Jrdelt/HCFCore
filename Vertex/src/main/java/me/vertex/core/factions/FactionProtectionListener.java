@@ -69,7 +69,7 @@ public final class FactionProtectionListener implements Listener {
         if (event.getHand() != EquipmentSlot.HAND || event.getClickedBlock() == null || !event.getAction().isRightClick()) return;
         Block block = event.getClickedBlock(); Player player = event.getPlayer();
         if (staffBuild(player)) return;
-        if (block.getState() instanceof Container) {
+        if (block.getState(false) instanceof Container) {
             if (!factions.canUseContainers(player, block.getLocation())) deny(player, event);
         } else if (block.getType().isInteractable() && !factions.canUseDoors(player, block.getLocation())) {
             deny(player, event);

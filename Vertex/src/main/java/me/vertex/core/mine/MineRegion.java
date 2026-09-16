@@ -48,7 +48,12 @@ public record MineRegion(
                 && location.getBlockZ() >= minZ && location.getBlockZ() <= maxZ;
     }
 
-    /** True for a block the mine generates, and therefore one players may break. */
+    /**
+     * True for a block the mine generates -- ore or filler. Whether filler
+     * itself is breakable is a separate policy decision in
+     * {@code protection.deny-non-mine-block-break} ({@link #isOre} is the
+     * strict "pays and is meant to be mined" check).
+     */
     public boolean isMineBlock(Material material) {
         return oreEntry(material) != null || baseBlocks.contains(material);
     }

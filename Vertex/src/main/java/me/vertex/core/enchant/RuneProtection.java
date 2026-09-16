@@ -3,6 +3,7 @@ package me.vertex.core.enchant;
 import me.vertex.core.factions.FactionsHook;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.util.RayTraceResult;
 
 import java.util.Set;
 
@@ -78,6 +79,21 @@ public final class RuneProtection {
             return true;
         }
         return FactionsHook.isAllyFaction(FactionsHook.getFactionId(self), FactionsHook.getFactionId(other));
+    }
+
+    /**
+     * Ray-traces from {@code caster}'s eye line for the nearest player who is
+     * NOT a recognized teammate (see {@link #isTeamOf}) within {@code range}
+     * blocks -- the single source of truth for every target-lock rune
+     * (Huntmaster's Call) and its live HUD readout ({@code BindHudService}),
+     * so the HUD can never show a lock the actual activation wouldn't honor,
+     * and neither ever locks onto the caster's own faction or an ally.
+     */
+    public static Player rayTraceHostilePlayer(Player caster, double range) {
+        RayTraceResult trace = caster.getWorld().rayTraceEntities(caster.getEyeLocation(),
+                caster.getEyeLocation().getDirection(), range, 0.4D,
+                candidate -> candidate instanceof Player candidatePlayer && !isTeamOf(caster, candidatePlayer));
+        return trace != null && trace.getHitEntity() instanceof Player hit ? hit : null;
     }
 
     /**

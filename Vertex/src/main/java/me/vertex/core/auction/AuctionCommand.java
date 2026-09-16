@@ -22,10 +22,50 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
 
     private final AuctionManager manager;
     private final Messages messages;
+    private volatile List<String> cachedPayoutKeys = List.of();
+    private volatile long lastPayoutKeysFetch = 0L;
+    private volatile boolean fetchingPayouts = false;
+    private volatile List<String> cachedIntentKeys = List.of();
+    private volatile long lastIntentKeysFetch = 0L;
+    private volatile boolean fetchingIntents = false;
 
     public AuctionCommand(AuctionManager manager, Messages messages) {
         this.manager = manager;
         this.messages = messages;
+    }
+
+    private List<String> getPayoutKeysAsync() {
+        long now = System.currentTimeMillis();
+        if (now - lastPayoutKeysFetch > 5000L && !fetchingPayouts) {
+            fetchingPayouts = true;
+            java.util.concurrent.CompletableFuture.supplyAsync(() -> manager.uncertainPayouts().stream()
+                    .map(AuctionStorage.PendingPayout::key).toList())
+                .whenComplete((keys, err) -> {
+                    fetchingPayouts = false;
+                    if (keys != null) {
+                        cachedPayoutKeys = keys;
+                        lastPayoutKeysFetch = System.currentTimeMillis();
+                    }
+                });
+        }
+        return cachedPayoutKeys;
+    }
+
+    private List<String> getIntentKeysAsync() {
+        long now = System.currentTimeMillis();
+        if (now - lastIntentKeysFetch > 5000L && !fetchingIntents) {
+            fetchingIntents = true;
+            java.util.concurrent.CompletableFuture.supplyAsync(() -> manager.unresolvedCreationIntents().stream()
+                    .map(AuctionStorage.CreationIntent::key).toList())
+                .whenComplete((keys, err) -> {
+                    fetchingIntents = false;
+                    if (keys != null) {
+                        cachedIntentKeys = keys;
+                        lastIntentKeysFetch = System.currentTimeMillis();
+                    }
+                });
+        }
+        return cachedIntentKeys;
     }
 
     @Override
@@ -290,7 +330,7 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2 && args[0].equalsIgnoreCase("payouts")
                 && sender.hasPermission("vertex.auction.payouts")) {
             String partial = args[1].toLowerCase(Locale.ROOT);
-            return manager.uncertainPayouts().stream().map(AuctionStorage.PendingPayout::key)
+            return getPayoutKeysAsync().stream()
                     .filter(key -> key.toLowerCase(Locale.ROOT).startsWith(partial)).toList();
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("payouts")
@@ -301,7 +341,7 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2 && args[0].equalsIgnoreCase("intents")
                 && sender.hasPermission("vertex.auction.intents")) {
             String partial = args[1].toLowerCase(Locale.ROOT);
-            return manager.unresolvedCreationIntents().stream().map(AuctionStorage.CreationIntent::key)
+            return getIntentKeysAsync().stream()
                     .filter(key -> key.toLowerCase(Locale.ROOT).startsWith(partial)).toList();
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("intents")

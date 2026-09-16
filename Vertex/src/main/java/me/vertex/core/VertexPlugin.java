@@ -1,6 +1,7 @@
 package me.vertex.core;
 
 import me.vertex.core.ability.AbilitiesCommand;
+import org.bukkit.entity.Player;
 import me.vertex.core.ability.AbilityManager;
 import me.vertex.core.ability.AbilityMenuListener;
 import me.vertex.core.ability.CooldownsCommand;
@@ -112,6 +113,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.util.ChatAmountPrompt chatAmountPrompt;
     private LanguageCommand languageCommand;
     private KitManager kitManager;
+    private me.vertex.core.join.FirstJoinKitManager firstJoinKitManager;
     private AbilityManager abilityManager;
     private CombatManager combatManager;
     private LegacyCombatManager legacyCombatManager;
@@ -211,7 +213,6 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.performance.PerformanceManager performanceManager;
     private me.vertex.core.zone.ZoneManager zoneManager;
     private me.vertex.core.portal.PortalManager portalManager;
-    private me.vertex.core.storage.DeliveryManager deliveryManager;
     private me.vertex.core.network.NetworkManager networkManager;
     private me.vertex.core.network.NetworkDeployment networkDeployment;
     private me.vertex.core.teleport.TeleportManager teleportManager;
@@ -221,6 +222,7 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
     private me.vertex.core.season.SeasonResetManager seasonResetManager;
     private me.vertex.core.resetvault.ResetVaultStorage resetVaultStorage;
     private me.vertex.core.resetvault.ResetVaultManager resetVaultManager;
+    private me.vertex.core.enchant.SeasonalItemCatalog seasonalItemCatalog;
     private Difficulty defaultWorldDifficulty = Difficulty.NORMAL;
 
     @Override
@@ -325,15 +327,6 @@ public final class VertexPlugin extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.command.CommandVisibilityListener(), this);
         staffManager = new StaffManager(this);
-        try {
-            deliveryManager=new me.vertex.core.storage.DeliveryManager(this,database,messages);
-            deliveryManager.init();
-            Bukkit.getPluginManager().registerEvents(deliveryManager,this);
-        } catch (Exception error) {
-            getLogger().log(Level.SEVERE,"Failed to initialize the durable item delivery inbox, disabling.",error);
-            Bukkit.getPluginManager().disablePlugin(this);
-            return;
-        }
         printStartupBanner();
         factionService.setMessages(messages);
         me.vertex.core.factions.FactionCommand factionCommand = new me.vertex.core.factions.FactionCommand(
@@ -563,6 +556,8 @@ combatManager.start();
         captureEventManager.setPvpTopManager(pvpTopManager);
         captureEventManager.start();
         Bukkit.getPluginManager().registerEvents(captureEventManager, this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.factions.WarzoneCobwebListener(this, factionService, captureEventManager), this);
         CaptureCommand kothCommand = new CaptureCommand(captureEventManager, messages, CaptureEventType.KOTH);
         getCommand("koth").setExecutor(kothCommand);
         getCommand("koth").setTabCompleter(kothCommand);
@@ -733,6 +728,8 @@ combatManager.start();
                 new me.vertex.core.shield.ShieldCombatListener(shieldManager, messages), this);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.shield.ShieldFactionLifecycleListener(shieldManager), this);
+        Bukkit.getPluginManager().registerEvents(
+                new me.vertex.core.factions.FactionAnnounceListener(announcementPreferenceManager), this);
 
         graceManager = new me.vertex.core.grace.GraceManager(this, graceStorage);
         graceManager.load();
@@ -865,8 +862,7 @@ combatManager.start();
                 enchantManager, runePreferenceManager, autoIncineration, incinerationService, messages);
         getCommand("enchant").setExecutor(enchantCommand);
         getCommand("enchant").setTabCompleter(enchantCommand);
-        me.vertex.core.enchant.SeasonalItemCatalog seasonalItemCatalog =
-                new me.vertex.core.enchant.SeasonalItemCatalog(this);
+        seasonalItemCatalog = new me.vertex.core.enchant.SeasonalItemCatalog(this);
         seasonalItemCatalog.load();
         enchantManager.setSeasonalCatalog(seasonalItemCatalog);
         me.vertex.core.enchant.SeasonalCommand seasonalCommand =
@@ -916,6 +912,11 @@ combatManager.start();
         getCommand("boosters").setTabCompleter(boostersCommand);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.booster.BoostersMenuListener(boosterService, messages, menuRegistry), this);
+        Bukkit.getScheduler().runTaskTimer(this, () -> {
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                me.vertex.core.booster.BoostersMenu.refreshOpen(online, boosterService, messages, menuRegistry);
+            }
+        }, 20L, 20L);
         me.vertex.core.backpack.BackpackFilterManager backpackFilterManager = new me.vertex.core.backpack.BackpackFilterManager(
                 this);
         backpackFilterManager.load();
@@ -927,6 +928,7 @@ combatManager.start();
                 backpackManager, backpackFilterManager, messages);
         Bukkit.getPluginManager().registerEvents(backpackAutoStoreListener, this);
         mobStackListener.setPlayerDropRouter(backpackAutoStoreListener::routePlayerMobDrops);
+        runeEffectListener.setBackpackRouter(backpackAutoStoreListener);
         Bukkit.getPluginManager().registerEvents(
                 new me.vertex.core.backpack.BackpackMenuListener(backpackManager, messages), this);
         me.vertex.core.backpack.BackpackCommand backpackCommand = new me.vertex.core.backpack.BackpackCommand(
@@ -1207,6 +1209,20 @@ combatManager.start();
         bindQueue.setZoneManager(zoneManager);
         warChestListener.setZoneManager(zoneManager);
         boosterService.register(runeEffectListener.boosterSource());
+        boosterService.register(runeEffectListener.gildedCatchBoosterSource());
+        Bukkit.getPluginManager().registerEvents(new me.vertex.core.booster.BoosterExpListener(boosterService), this);
+        me.vertex.core.booster.PersonalBoosterCommand xpBoosterCommand =
+                new me.vertex.core.booster.PersonalBoosterCommand(runeEffectListener, boosterService, messages, menuRegistry, me.vertex.core.booster.BoosterCategory.EXP);
+        if (getCommand("xpbooster") != null) {
+            getCommand("xpbooster").setExecutor(xpBoosterCommand);
+            getCommand("xpbooster").setTabCompleter(xpBoosterCommand);
+        }
+        me.vertex.core.booster.PersonalBoosterCommand sellBoosterCommand =
+                new me.vertex.core.booster.PersonalBoosterCommand(runeEffectListener, boosterService, messages, menuRegistry, me.vertex.core.booster.BoosterCategory.SELL);
+        if (getCommand("sellbooster") != null) {
+            getCommand("sellbooster").setExecutor(sellBoosterCommand);
+            getCommand("sellbooster").setTabCompleter(sellBoosterCommand);
+        }
         me.vertex.core.zone.ArenaControlManager arenaControls = new me.vertex.core.zone.ArenaControlManager(
                 this, database, zoneManager, pvpTopManager, messages);
         try {
@@ -1254,7 +1270,7 @@ combatManager.start();
         portalManager.start();
         Bukkit.getPluginManager().registerEvents(new me.vertex.core.teleport.DeathSpawnListener(this,
                 globalLocationManager, networkManager, mineManager, zoneManager, factionService), this);
-        playerConnectionListener = new PlayerConnectionListener(userManager, combatManager);
+        playerConnectionListener = new PlayerConnectionListener(userManager, combatManager, announcementPreferenceManager, messages);
         playerConnectionListener.setGhostPlayerManager(ghostPlayerManager);
         playerConnectionListener.setTrustedTransfer(networkManager::isTrustedDeparture);
         Bukkit.getPluginManager().registerEvents(playerConnectionListener, this);
@@ -1309,6 +1325,14 @@ combatManager.start();
         getCommand("kit").setTabCompleter(kitCommand);
         getCommand("kits").setExecutor(new KitsCommand(this, kitManager, userManager, messages));
         Bukkit.getPluginManager().registerEvents(new KitMenuListener(this, kitManager, messages), this);
+
+        firstJoinKitManager = new me.vertex.core.join.FirstJoinKitManager(this);
+        firstJoinKitManager.load();
+        Bukkit.getPluginManager().registerEvents(firstJoinKitManager, this);
+        me.vertex.core.join.FirstJoinKitCommand firstJoinKitCommand =
+                new me.vertex.core.join.FirstJoinKitCommand(firstJoinKitManager, messages);
+        getCommand("firsttimejoin").setExecutor(firstJoinKitCommand);
+        getCommand("firsttimejoin").setTabCompleter(firstJoinKitCommand);
 
         VertexCommand vertexCommand = new VertexCommand(this, messages);
         getCommand("vertex").setExecutor(vertexCommand);
@@ -1563,7 +1587,6 @@ combatManager.start();
         if (dupeManager != null) {
             dupeManager.awaitWrites();
         }
-        if(deliveryManager!=null){deliveryManager.awaitWrites();}
         if (baseClaimManager != null) {
             baseClaimManager.awaitWrites();
         }
@@ -1674,7 +1697,6 @@ combatManager.start();
         return performanceManager;
     }
 
-    public me.vertex.core.storage.DeliveryManager deliveryManager(){return deliveryManager;}
     public me.vertex.core.network.NetworkManager networkManager(){return networkManager;}
     public me.vertex.core.resetvault.ResetVaultManager resetVaultManager(){return resetVaultManager;}
 
@@ -1855,6 +1877,19 @@ combatManager.start();
         if (resetVaultManager != null) {
             resetVaultManager.reloadConfig();
         }
+        if (seasonalItemCatalog != null) {
+            seasonalItemCatalog.load();
+        }
+        if (rtpManager != null) {
+            try {
+                rtpManager.load();
+            } catch (Exception e) {
+                getLogger().log(java.util.logging.Level.WARNING, "Could not reload RTP manager", e);
+            }
+        }
+        if (globalLocationManager != null) {
+            globalLocationManager.refreshAsync();
+        }
 
         if (combatManager != null) {
             combatManager.reconfigure(
@@ -1983,8 +2018,6 @@ combatManager.start();
             gcManager.awaitWrites();
         if (dupeManager != null)
             dupeManager.awaitWrites();
-        if (deliveryManager != null)
-            deliveryManager.drainWrites();
         if (resetVaultManager != null)
             resetVaultManager.awaitWrites();
         if (runeCooldownStore != null)
