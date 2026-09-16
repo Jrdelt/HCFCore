@@ -886,6 +886,7 @@ combatManager.start();
         bindManager = new me.vertex.core.enchant.binds.BindManager(this, bindStorage, enchantManager, runePreferenceManager);
         bindManager.setDefaultDoubleTapWindowMillis(getConfig().getLong("binds.double-tap-window-ms", 400L));
         Bukkit.getPluginManager().registerEvents(bindManager, this);
+        runeEffectListener.setBindManager(bindManager);
         bindQueue = new me.vertex.core.enchant.binds.BindQueue(this, enchantManager, runeEffectListener, runeCooldownStore,
                 userManager, announcementPreferenceManager, messages);
         bindQueue.setDelaySeconds(getConfig().getDouble("binds.ability-delay-seconds", 2D));

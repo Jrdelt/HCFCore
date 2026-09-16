@@ -155,6 +155,9 @@ public final class RuneFormatting {
             case LEGENDARY -> NamedTextColor.RED;
             case ARENA -> NamedTextColor.BLUE;
             case SEASONAL -> NamedTextColor.GOLD;
+            case COMMON -> NamedTextColor.WHITE;
+            case MYTHIC -> NamedTextColor.DARK_AQUA;
+            case CURSED -> NamedTextColor.DARK_RED;
         };
     }
 
@@ -172,6 +175,9 @@ public final class RuneFormatting {
             case RARE -> Material.MAGENTA_CANDLE;
             case LEGENDARY -> Material.RED_CANDLE;
             case ARENA -> Material.BLUE_CANDLE;
+            case COMMON -> Material.WHITE_CANDLE;
+            case MYTHIC -> Material.CYAN_CANDLE;
+            case CURSED -> Material.BLACK_CANDLE;
             case SEASONAL -> throw new IllegalArgumentException("Seasonal Runes keep their own configured material");
         };
     }

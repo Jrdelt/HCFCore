@@ -13,5 +13,11 @@ public enum RuneTier {
     LEGENDARY,
     ARENA,
     /** Admin/event-distributed only -- never appears in any tier's roll table (see {@code seasonal:} in runes.yml). */
-    SEASONAL
+    SEASONAL,
+    /** The Expanded Rune Module's basic tier (Zeus, Obliterate, Ghost, ...). */
+    COMMON,
+    /** The Expanded Rune Module's top non-cursed tier (Petrify, Phoenix, Angelic, ...). */
+    MYTHIC,
+    /** The Expanded Rune Module's niche/anti-gank tier (Equalizer, Fat). */
+    CURSED
 }

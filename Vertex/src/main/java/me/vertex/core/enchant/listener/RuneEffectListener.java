@@ -35,7 +35,10 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
@@ -84,6 +87,17 @@ import java.util.function.BooleanSupplier;
  */
 public final class RuneEffectListener implements Listener {
     private static final List<String> MOVEMENT_EFFECTS = List.of("SKY_STEPPER", "DASHER", "RIFTWALKER");
+    /**
+     * Effect id -> the fixed potion effect it grants for as long as at
+     * least one currently-eligible equipped item carries it (Bat Vision
+     * now; Aquatic/Speed/Jump/Haste/Obsidian Shield reuse this exact same
+     * map for the Expanded Rune Module's other "permanent while equipped"
+     * runes). Level only ever changes the amplifier; there is no proc, no
+     * cooldown, and {@link #recalculatePassiveAuras} is event-driven
+     * (equip change, join, respawn) rather than a per-tick scan, per spec.
+     */
+    private static final Map<String, PotionEffectType> PASSIVE_AURA_EFFECTS = Map.of(
+            "BAT_VISION", PotionEffectType.NIGHT_VISION);
 
     private final EnchantManager manager;
     private final CombatManager combat;
@@ -93,6 +107,9 @@ public final class RuneEffectListener implements Listener {
     private volatile me.vertex.core.lang.Messages messages;
     private volatile me.vertex.core.preferences.AnnouncementPreferenceManager announcementPreferences;
     private volatile me.vertex.core.backpack.BackpackAutoStoreListener backpacks;
+    private volatile me.vertex.core.enchant.binds.BindManager binds;
+    /** Ghost's active-invisibility state, one per player -- checked to cancel it the instant its holder deals an attack, and cleaned up on quit/death. */
+    private final Set<UUID> ghostActive = ConcurrentHashMap.newKeySet();
 
     /** Talon Rend / Crown Breaker's "next qualifying melee hit" empowerment, one per player. */
     private final Map<UUID, ArmedHit> armedHits = new ConcurrentHashMap<>();
@@ -180,6 +197,28 @@ public final class RuneEffectListener implements Listener {
      */
     public void setBackpackRouter(me.vertex.core.backpack.BackpackAutoStoreListener backpacks) {
         this.backpacks = backpacks;
+    }
+
+    /**
+     * Wired in alongside the others above -- optional, so a caller that
+     * never sets this simply gets Ghost/Rocket Escape defaulting to their
+     * automatic low-health trigger (as if never bound), since {@link
+     * #isBound} degrades to {@code false} without it. Once set, assigning
+     * either rune to any {@code /binds} slot switches it to bind-only
+     * activation, per the Expanded Rune Module spec.
+     */
+    public void setBindManager(me.vertex.core.enchant.binds.BindManager binds) {
+        this.binds = binds;
+    }
+
+    /** Whether {@code player} has assigned {@code enchantId} to any of their {@code /binds} slots right now. */
+    private boolean isBound(Player player, String enchantId) {
+        me.vertex.core.enchant.binds.BindManager currentBinds = binds;
+        if (currentBinds == null) {
+            return false;
+        }
+        me.vertex.core.enchant.binds.PlayerBinds playerBinds = currentBinds.get(player.getUniqueId());
+        return playerBinds != null && playerBinds.binds().values().stream().anyMatch(bound -> bound.contains(enchantId));
     }
 
     /**
@@ -395,6 +434,25 @@ public final class RuneEffectListener implements Listener {
             applyRaptorsReversal(victim, damager, event);
         }
 
+        Player enemyAttacker = attacker(damager);
+        if (enemyAttacker != null && event.getDamage() > 0D && !RuneProtection.isTeamOf(enemyAttacker, victim)) {
+            // Ghost and Rocket Escape default to this automatic low-health
+            // trigger; assigning either to a /binds slot disables it
+            // entirely in favor of manual activation (see manuallyActivate
+            // and BindQueue, which re-checks eligibility at the queue's
+            // own execution time, not here).
+            for (ActiveRune rune : active(victim, List.of("GHOST"))) {
+                if (!isBound(victim, rune.definition().id())) {
+                    activate(victim, rune, () -> activateGhost(victim, rune));
+                }
+            }
+            for (ActiveRune rune : active(victim, List.of("ROCKET_ESCAPE"))) {
+                if (!isBound(victim, rune.definition().id())) {
+                    activate(victim, rune, () -> activateRocketEscape(victim, rune));
+                }
+            }
+        }
+
         if (event.getCause() == EntityDamageEvent.DamageCause.FALL) {
             for (ActiveRune rune : active(victim, List.of("FALL_REDUCTION"))) {
                 activate(victim, rune, () -> {
@@ -447,8 +505,32 @@ public final class RuneEffectListener implements Listener {
         }
         boolean projectile = event.getDamager() instanceof Projectile;
         boolean targetIsPlayer = event.getEntity() instanceof Player;
+        if (event.getDamage() > 0D) {
+            cancelGhostOnAttack(attacker);
+        }
         if (!projectile && event.getDamage() > 0D && event.getEntity() instanceof LivingEntity target) {
             consumeArmedHit(attacker, target);
+        }
+        if (projectile && targetIsPlayer && event.getDamage() > 0D && event.getEntity() instanceof Player zeusTarget
+                && !RuneProtection.isTeamOf(attacker, zeusTarget)) {
+            for (ActiveRune rune : active(attacker, List.of("ZEUS"))) {
+                activate(attacker, rune, () -> {
+                    // Visual-only strike (no fire, no block damage, no real
+                    // lightning entity) folded into this same damage event
+                    // as extra damage -- never a second damage() call, so it
+                    // can never recursively trigger another offensive rune.
+                    // Wrapped like detonate()'s particles: the bonus damage
+                    // must land even in a headless/mock environment without
+                    // lightning-effect support.
+                    try {
+                        zeusTarget.getWorld().strikeLightningEffect(zeusTarget.getLocation());
+                    } catch (Throwable ignored) {
+                        // Headless / mock environments without lightning-effect support
+                    }
+                    event.setDamage(event.getDamage() + Math.max(0D, rune.level().abilityValue()) * 2D);
+                    return true;
+                });
+            }
         }
         if (event.getDamage() > 0D && event.getEntity() instanceof Player markedTarget) {
             applyHuntmastersCallBonus(attacker, markedTarget, event);
@@ -493,13 +575,50 @@ public final class RuneEffectListener implements Listener {
                     return true;
                 });
             }
+            for (ActiveRune rune : active(attacker, List.of("OBLITERATE"))) {
+                activate(attacker, rune, () -> {
+                    if (!(event.getEntity() instanceof Player targetPlayer) || RuneProtection.isTeamOf(attacker, targetPlayer)) {
+                        return false;
+                    }
+                    Vector push = targetPlayer.getLocation().toVector().subtract(attacker.getLocation().toVector());
+                    if (push.lengthSquared() < 0.0001D) {
+                        push = new Vector(1D, 0D, 0D);
+                    }
+                    push.setY(0D).normalize().multiply(rune.level().setting("horizontal-velocity", 0.2D))
+                            .setY(rune.level().setting("vertical-velocity", 0.05D));
+                    // Away from the attacker, no fall-damage immunity -- a
+                    // plain velocity shove, nothing else.
+                    targetPlayer.setVelocity(targetPlayer.getVelocity().add(push));
+                    return true;
+                });
+            }
+            for (ActiveRune rune : active(attacker, List.of("FEATHERWEIGHT"))) {
+                if (!matchesTargetFilter(rune.definition(), targetIsPlayer)) {
+                    continue;
+                }
+                activate(attacker, rune, () -> {
+                    // Reactivation refreshes the effect at this same rune's
+                    // own fixed amplifier -- addPotionEffect always
+                    // overwrites, so no separate "don't downgrade" merge is
+                    // needed the way FlightEffects-style helpers use
+                    // elsewhere for effects that can come from other sources.
+                    int amplifier = Math.max(0, rune.level().level() - 1);
+                    int durationTicks = (int) Math.round(rune.level().setting("haste-duration-seconds", 3D) * 20D);
+                    attacker.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, durationTicks, amplifier, true, false));
+                    return true;
+                });
+            }
         }
         for (ActiveRune rune : active(attacker, List.of("LIGHTNING_STRIKE"))) {
             activate(attacker, rune, () -> {
                 if (!(event.getEntity() instanceof LivingEntity target)) {
                     return false;
                 }
-                target.getWorld().strikeLightningEffect(target.getLocation());
+                try {
+                    target.getWorld().strikeLightningEffect(target.getLocation());
+                } catch (Throwable ignored) {
+                    // Headless / mock environments without lightning-effect support
+                }
                 // Add the configured bonus to this one damage event rather
                 // than calling target.damage again, which would recursively
                 // re-enter this listener and could proc Lightning Strike a
@@ -1054,10 +1173,46 @@ public final class RuneEffectListener implements Listener {
         armedHits.remove(uuid);
         trails.remove(uuid);
         armedShots.remove(uuid);
+        ghostActive.remove(uuid);
+    }
+
+    @EventHandler
+    public void onArmorChange(PlayerArmorChangeEvent event) {
+        recalculatePassiveAuras(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        recalculatePassiveAuras(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onRespawn(PlayerRespawnEvent event) {
+        recalculatePassiveAuras(event.getPlayer());
+    }
+
+    /** See {@link #PASSIVE_AURA_EFFECTS}. */
+    private void recalculatePassiveAuras(Player player) {
+        for (Map.Entry<String, PotionEffectType> entry : PASSIVE_AURA_EFFECTS.entrySet()) {
+            PotionEffectType type = entry.getValue();
+            List<ActiveRune> matches = active(player, List.of(entry.getKey()));
+            if (matches.isEmpty()) {
+                if (player.hasPotionEffect(type)) {
+                    player.removePotionEffect(type);
+                }
+                continue;
+            }
+            int amplifier = matches.getFirst().level().level() - 1;
+            PotionEffect current = player.getPotionEffect(type);
+            if (current == null || current.getAmplifier() != amplifier) {
+                player.addPotionEffect(new PotionEffect(type, Integer.MAX_VALUE, amplifier, true, false, false));
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onDeath(EntityDeathEvent event) {
+        ghostActive.remove(event.getEntity().getUniqueId());
         Player killer = event.getEntity().getKiller();
         if (killer == null) {
             return;
@@ -1152,6 +1307,8 @@ public final class RuneEffectListener implements Listener {
             case "GOLDEN_BASTION" -> pushBastion(player, rune);
             case "SLIPSTREAM" -> activateSlipstream(player, rune);
             case "RALLY_ARROW" -> armNextShot(player, rune);
+            case "GHOST" -> activateGhost(player, rune);
+            case "ROCKET_ESCAPE" -> activateRocketEscape(player, rune);
             default -> false;
         });
     }
@@ -1265,6 +1422,72 @@ public final class RuneEffectListener implements Listener {
             }
             default -> false;
         };
+    }
+
+    /**
+     * Ghost's shared eligibility check -- combat-tagged and at/below the
+     * level's health threshold -- re-run both by the automatic trigger
+     * ({@link #onDamage}) and, when bound, by {@link #manuallyActivate} at
+     * the moment the queued rune actually executes (never cached from
+     * queue time, per the Expanded Rune Module spec).
+     */
+    private boolean ghostEligible(Player player, ActiveRune rune) {
+        if (combat == null || !combat.isTagged(player.getUniqueId())) {
+            return false;
+        }
+        double thresholdPercent = rune.level().setting("health-threshold-percent", 25D);
+        return player.getHealth() <= player.getMaxHealth() * thresholdPercent / 100D;
+    }
+
+    /**
+     * Invisibility + Speed for the level's configured duration. Damage
+     * taken never cancels it (nothing here reacts to that); dealing an
+     * attack does, immediately, via {@link #cancelGhostOnAttack}. Hiding
+     * worn armor needs no packet work of its own -- a real Invisibility
+     * potion effect already renders a player's entire model, armor
+     * included, invisible to everyone else, and restores it the instant
+     * the effect ends, which is exactly the visibility contract asked for.
+     */
+    private boolean activateGhost(Player player, ActiveRune rune) {
+        if (!ghostEligible(player, rune)) {
+            return false;
+        }
+        int speedAmplifier = (int) Math.round(rune.level().setting("speed-level", 1D)) - 1;
+        int durationTicks = (int) Math.round(rune.level().setting("duration-seconds", 2D) * 20D);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, durationTicks, 0, true, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, durationTicks, Math.max(0, speedAmplifier), true, false));
+        ghostActive.add(player.getUniqueId());
+        return true;
+    }
+
+    /** Dealing an attack cancels Ghost immediately -- called from {@link #onDamageByEntity} before any other attacker-side rune runs. */
+    private void cancelGhostOnAttack(Player attacker) {
+        if (ghostActive.remove(attacker.getUniqueId())) {
+            attacker.removePotionEffect(PotionEffectType.INVISIBILITY);
+            attacker.removePotionEffect(PotionEffectType.SPEED);
+        }
+    }
+
+    /**
+     * Rocket Escape: launches the wearer in their facing direction. No
+     * fall-damage immunity is granted, per spec -- landing still deals
+     * normal fall damage if the launch doesn't clear it.
+     */
+    private boolean activateRocketEscape(Player player, ActiveRune rune) {
+        double thresholdPercent = rune.level().setting("health-threshold-percent", 20D);
+        if (player.getHealth() > player.getMaxHealth() * thresholdPercent / 100D) {
+            return false;
+        }
+        Vector direction = player.getLocation().getDirection();
+        Vector horizontal = direction.clone().setY(0D);
+        if (horizontal.lengthSquared() < 0.0001D) {
+            horizontal = new Vector(0D, 0D, 1D);
+        }
+        horizontal.normalize();
+        double forward = rune.level().setting("forward-velocity", 0.65D);
+        double upward = rune.level().setting("upward-velocity", 0.55D);
+        player.setVelocity(horizontal.multiply(forward).setY(upward));
+        return true;
     }
 
     /**

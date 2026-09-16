@@ -44,9 +44,15 @@ class ShippedRuneConfigurationTest {
         // another tier's ability under a different name.
         Map<RuneTier, Integer> expectedCounts = Map.of(
                 RuneTier.SIMPLE, 4, RuneTier.ELITE, 4, RuneTier.RARE, 3,
-                RuneTier.LEGENDARY, 3, RuneTier.ARENA, 3, RuneTier.SEASONAL, 10);
+                RuneTier.LEGENDARY, 3, RuneTier.ARENA, 3, RuneTier.SEASONAL, 10,
+                RuneTier.COMMON, 4);
 
         for (RuneTier tier : RuneTier.values()) {
+            // Expanded Rune Module tiers land across several batches; Mythic
+            // and Cursed are declared in RuneTier but not populated yet.
+            if (tier == RuneTier.MYTHIC || tier == RuneTier.CURSED) {
+                continue;
+            }
             String tierKey = tier.name().toLowerCase(Locale.ROOT);
             ConfigurationSection enchants = config.getConfigurationSection("runes." + tierKey + ".enchants");
             assertNotNull(enchants, tier + " must have a Rune pool");
@@ -74,7 +80,7 @@ class ShippedRuneConfigurationTest {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(RUNES_FILE);
         Set<String> effectsSeen = new HashSet<>();
         for (RuneTier tier : RuneTier.values()) {
-            if (tier == RuneTier.SEASONAL) {
+            if (tier == RuneTier.SEASONAL || tier == RuneTier.MYTHIC || tier == RuneTier.CURSED) {
                 continue;
             }
             String tierKey = tier.name().toLowerCase(Locale.ROOT);
@@ -115,6 +121,11 @@ class ShippedRuneConfigurationTest {
             if (tier == RuneTier.SEASONAL) {
                 // Deliberately never rollable -- every level omits `weight`.
                 assertTrue(manager.rollTable(tier).isEmpty(), "Seasonal must never be rollable");
+                continue;
+            }
+            if (tier == RuneTier.MYTHIC || tier == RuneTier.CURSED) {
+                // Expanded Rune Module tiers land across several batches;
+                // not populated yet.
                 continue;
             }
             assertFalse(manager.rollTable(tier).isEmpty(), tier + "'s roll table must not be empty");

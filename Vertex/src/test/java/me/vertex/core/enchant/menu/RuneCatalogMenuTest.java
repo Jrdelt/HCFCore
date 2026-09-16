@@ -85,6 +85,6 @@ class RuneCatalogMenuTest {
         List<ItemStack> entries = Arrays.stream(player.getOpenInventory().getTopInventory().getContents())
                 .filter(item -> item != null && manager.isEnchantItem(item))
                 .toList();
-        assertEquals(10, entries.size(), "Seasonal has ten configured gear enchant types");
+        assertEquals(11, entries.size(), "Seasonal has ten Fallen Set gear types plus Ghost (Halloween)");
     }
 }

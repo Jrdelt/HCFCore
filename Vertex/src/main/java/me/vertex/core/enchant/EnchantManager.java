@@ -942,6 +942,9 @@ public final class EnchantManager {
             case LEGENDARY -> "ʟᴇɢᴇɴᴅᴀʀʏ";
             case ARENA -> "ᴀʀᴇɴᴀ";
             case SEASONAL -> "ꜱᴇᴀꜱᴏɴᴀʟ";
+            case COMMON -> "ᴄᴏᴍᴍᴏɴ";
+            case MYTHIC -> "ᴍʏᴛʜɪᴄ";
+            case CURSED -> "ᴄᴜʀꜱᴇᴅ";
         };
     }
 

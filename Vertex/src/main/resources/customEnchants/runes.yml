@@ -328,6 +328,85 @@ runes:
   #       enchants:
   #         huntmasters_call: { ... same shape as any enchant below ... }
   #         golden_bastion: { ... }
+  # Expanded Rune Module -- Common tier. Acquisition `weight` on each level
+  # uses the spec's own default fallback distribution for that rune's max
+  # level (e.g. Max III: 65/25/10) applied identically to every rune of that
+  # shape, so every Common rune has equal odds of being the one that rolls
+  # and, within it, a harder-to-roll higher level -- never the other way
+  # around. `proc-chance` is the unrelated, separately-configured COMBAT
+  # proc percent from the spec; never confused with `weight`.
+  common:
+    material: WHITE_CANDLE
+    glow: false
+    shop-price: 300.0
+    currency: MONEY
+    enchants:
+      zeus:
+        display-name: "Zeus"
+        description: "Successful arrow hits on enemy players may call down a visual bolt for bonus damage"
+        compatible-types: [BOW]
+        effect: ZEUS
+        bindable: false
+        tags: [COMBAT, OFFENSIVE, PASSIVE]
+        levels:
+          1: { material: GOLD_NUGGET, proc-chance: 4, success-rate: 75, ability-value: 1, weight: 65, effect-settings: { cooldown-seconds: 30 } }
+          2: { material: GOLD_NUGGET, proc-chance: 7, success-rate: 60, ability-value: 1.5, weight: 25, effect-settings: { cooldown-seconds: 20 } }
+          3: { material: GOLD_NUGGET, glow: true, proc-chance: 10, success-rate: 45, ability-value: 2, weight: 10, effect-settings: { cooldown-seconds: 10 } }
+
+      obliterate:
+        display-name: "Obliterate"
+        description: "Successful axe hits on enemy players may knock them away from you"
+        compatible-types: [AXE]
+        effect: OBLITERATE
+        bindable: false
+        tags: [COMBAT, OFFENSIVE, PASSIVE]
+        levels:
+          1: { material: IRON_NUGGET, proc-chance: 4, success-rate: 70, ability-value: 0.20, weight: 55, effect-settings: { cooldown-seconds: 30, horizontal-velocity: 0.20, vertical-velocity: 0.05 } }
+          2: { material: IRON_NUGGET, proc-chance: 6, success-rate: 60, ability-value: 0.25, weight: 23, effect-settings: { cooldown-seconds: 24, horizontal-velocity: 0.25, vertical-velocity: 0.06 } }
+          3: { material: IRON_NUGGET, proc-chance: 8, success-rate: 50, ability-value: 0.30, weight: 12, effect-settings: { cooldown-seconds: 18, horizontal-velocity: 0.30, vertical-velocity: 0.07 } }
+          4: { material: IRON_NUGGET, proc-chance: 10, success-rate: 40, ability-value: 0.35, weight: 7, effect-settings: { cooldown-seconds: 12, horizontal-velocity: 0.35, vertical-velocity: 0.08 } }
+          5: { material: IRON_NUGGET, glow: true, proc-chance: 12, success-rate: 30, ability-value: 0.40, weight: 3, effect-settings: { cooldown-seconds: 6, horizontal-velocity: 0.40, vertical-velocity: 0.10 } }
+
+      featherweight:
+        display-name: "Featherweight"
+        description: "Successful melee hits may grant you a brief burst of Haste"
+        compatible-types: [SWORD]
+        effect: FEATHERWEIGHT
+        bindable: false
+        tags: [COMBAT, PASSIVE]
+        levels:
+          1: { material: FEATHER, proc-chance: 5, success-rate: 75, ability-value: 1, weight: 65, effect-settings: { cooldown-seconds: 30, haste-duration-seconds: 3 } }
+          2: { material: FEATHER, proc-chance: 8, success-rate: 60, ability-value: 2, weight: 25, effect-settings: { cooldown-seconds: 20, haste-duration-seconds: 4 } }
+          3: { material: FEATHER, glow: true, proc-chance: 12, success-rate: 45, ability-value: 3, weight: 10, effect-settings: { cooldown-seconds: 10, haste-duration-seconds: 5 } }
+
+      bat_vision:
+        display-name: "Bat Vision"
+        description: "Permanent Night Vision while equipped"
+        compatible-types: [HELMET]
+        effect: BAT_VISION
+        bindable: false
+        tags: [PASSIVE, EQUIPMENT]
+        levels:
+          1: { material: FERMENTED_SPIDER_EYE, proc-chance: 100, success-rate: 70, ability-value: 1, weight: 100 }
+
+  # Expanded Rune Module -- Mythic tier. Populated in a later batch
+  # (Petrify, Angelic, Obsidian Shield, Disarmor, Phoenix, Leadership,
+  # Protection, Berserker); header present now so RuneTier.MYTHIC never
+  # falls back to a missing-cosmetic warning in the meantime.
+  mythic:
+    material: CYAN_CANDLE
+    glow: true
+    shop-price: 9000.0
+    currency: MONEY
+
+  # Expanded Rune Module -- Cursed tier. Populated in a later batch
+  # (Equalizer, Fat).
+  cursed:
+    material: BLACK_CANDLE
+    glow: true
+    shop-price: 5000.0
+    currency: MONEY
+
   seasonal:
     material: GOLD_BLOCK
     glow: true
@@ -513,6 +592,30 @@ runes:
           8: { material: WOODEN_PICKAXE, proc-chance: 100, success-rate: 42, ability-value: 8, effect-settings: { disable-on-silk-touch: 1, bonus-item-amount: 1 } }
           9: { material: WOODEN_PICKAXE, proc-chance: 100, success-rate: 38, ability-value: 9, effect-settings: { disable-on-silk-touch: 1, bonus-item-amount: 1 } }
           10: { material: WOODEN_PICKAXE, glow: true, proc-chance: 100, success-rate: 34, ability-value: 10, effect-settings: { disable-on-silk-touch: 1, bonus-item-amount: 1 } }
+
+    # Named sub-groups are their own seasonal EVENT, never the Fallen Set
+    # above -- SeasonalSetMenu (the "Fallen Set" preview grid) explicitly
+    # skips any definition whose seasonalSet() is non-null, so a piece
+    # placed here never shows up mixed into that unrelated crate's grid,
+    # while still being a fully normal SEASONAL-tier Rune everywhere else
+    # (RuneCatalogMenu's Seasonal tab, /seasonal give, manager.seasonalIds()).
+    sets:
+      halloween:
+        enchants:
+          ghost:
+            display-name: "Ghost"
+            description: "Emergency escape: turns you invisible and speeds you up while below the level's health threshold"
+            compatible-types: [HELMET, CHESTPLATE, LEGGINGS, BOOTS]
+            effect: GHOST
+            seasonal: true
+            bindable: true
+            tags: [DEFENSIVE, ACTIVE, COOLDOWN, EQUIPMENT]
+            levels:
+              1: { material: LEATHER_HELMET, proc-chance: 100, success-rate: 70, ability-value: 1, effect-settings: { health-threshold-percent: 25, speed-level: 1, duration-seconds: 2, cooldown-seconds: 90 } }
+              2: { material: LEATHER_HELMET, proc-chance: 100, success-rate: 62, ability-value: 1, effect-settings: { health-threshold-percent: 30, speed-level: 1, duration-seconds: 2.5, cooldown-seconds: 75 } }
+              3: { material: LEATHER_HELMET, proc-chance: 100, success-rate: 54, ability-value: 2, effect-settings: { health-threshold-percent: 35, speed-level: 2, duration-seconds: 3, cooldown-seconds: 60 } }
+              4: { material: LEATHER_HELMET, proc-chance: 100, success-rate: 46, ability-value: 2, effect-settings: { health-threshold-percent: 40, speed-level: 2, duration-seconds: 3.5, cooldown-seconds: 45 } }
+              5: { material: LEATHER_HELMET, glow: true, proc-chance: 100, success-rate: 38, ability-value: 3, effect-settings: { health-threshold-percent: 45, speed-level: 3, duration-seconds: 4, cooldown-seconds: 30 } }
 
 # War Chest I-V is a passive, owner-only BACKPACK booster, not gear-applied
 # enchant -- it does not fit EnchantDefinition's compatible-types/apply-to-gear

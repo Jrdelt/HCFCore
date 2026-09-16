@@ -27,10 +27,22 @@ import java.util.Map;
  */
 public final class RuneShopMenu {
 
-    // Simple stays put; every other tier shifts one slot left of its old
-    // position, freeing slot 16 (immediately right of Arena/"mob runes") for
-    // the Seasonal button.
-    private static final List<Integer> TIER_SLOTS = List.of(10, 11, 12, 13, 15);
+    // Simple stays put; every other original tier shifts one slot left of
+    // its old position, freeing slot 16 (immediately right of Arena/"mob
+    // runes") for the Seasonal button. The Expanded Rune Module's three new
+    // purchasable tiers (Common/Mythic/Cursed) fill the row's remaining gaps
+    // (9, 14, 17) rather than extending past Seasonal's button slot.
+    //
+    // <p>Deliberately an explicit (tier, slot) list instead of indexing
+    // straight into {@code RuneTier.values()} -- Seasonal sits between the
+    // original five tiers and these three newer ones in that enum's
+    // declaration order, and it is never sold here (see {@link #forTier}),
+    // so a positional loop over the raw enum would either skip the new
+    // tiers or crash trying to sell Seasonal the moment it did reach them.
+    private static final List<RuneTier> SHOP_TIERS = List.of(
+            RuneTier.SIMPLE, RuneTier.ELITE, RuneTier.RARE, RuneTier.LEGENDARY, RuneTier.ARENA,
+            RuneTier.COMMON, RuneTier.MYTHIC, RuneTier.CURSED);
+    private static final List<Integer> TIER_SLOTS = List.of(10, 11, 12, 13, 15, 9, 14, 17);
     public static final int SEASONAL_SLOT = 16;
     public static final int LUCKY_GEM_SLOT = 20;
     public static final int INCINERATOR_SLOT = 24;
@@ -41,6 +53,9 @@ public final class RuneShopMenu {
         RARE(RuneTier.RARE),
         LEGENDARY(RuneTier.LEGENDARY),
         ARENA(RuneTier.ARENA),
+        COMMON(RuneTier.COMMON),
+        MYTHIC(RuneTier.MYTHIC),
+        CURSED(RuneTier.CURSED),
         LUCKY_GEM(null);
 
         private final RuneTier tier;
@@ -59,6 +74,9 @@ public final class RuneShopMenu {
                 case RARE -> RARE;
                 case LEGENDARY -> LEGENDARY;
                 case ARENA -> ARENA;
+                case COMMON -> COMMON;
+                case MYTHIC -> MYTHIC;
+                case CURSED -> CURSED;
                 case SEASONAL -> throw new IllegalArgumentException("Seasonal Runes are admin-distributed only and are never sold in the shop");
             };
         }
@@ -75,8 +93,8 @@ public final class RuneShopMenu {
         for (int slot = 0; slot < inventory.getSize(); slot++) {
             inventory.setItem(slot, filler());
         }
-        for (int index = 0; index < RuneTier.values().length && index < TIER_SLOTS.size(); index++) {
-            RuneTier tier = RuneTier.values()[index];
+        for (int index = 0; index < SHOP_TIERS.size() && index < TIER_SLOTS.size(); index++) {
+            RuneTier tier = SHOP_TIERS.get(index);
             int slot = TIER_SLOTS.get(index);
             holder.slotToProduct.put(slot, PurchaseProduct.forTier(tier));
             inventory.setItem(slot, buildIcon(player, messages, manager, tier));

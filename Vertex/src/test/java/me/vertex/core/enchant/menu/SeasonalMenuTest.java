@@ -109,6 +109,6 @@ class SeasonalMenuTest {
             assertEquals(1, info.level());
             created++;
         }
-        assertEquals(10, created, "4 armor + 3 weapon + 3 farming/mining tools");
+        assertEquals(11, created, "4 armor + 3 weapon + 3 farming/mining tools, plus Ghost (Halloween)");
     }
 }

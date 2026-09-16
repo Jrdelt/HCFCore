@@ -186,7 +186,7 @@ class SeasonalRuneEffectTest {
 
     @Test
     void seasonalGiveByIdCoversAllTenGearAppliedItems() {
-        assertEquals(10, manager.seasonalIds().size(), "4 armor + 3 weapon + 3 farming/mining tools");
+        assertEquals(11, manager.seasonalIds().size(), "4 armor + 3 weapon + 3 farming/mining tools, plus Ghost (Halloween)");
         for (String id : manager.seasonalIds()) {
             assertTrue(manager.isSeasonal(id));
             ItemStack item = manager.createEnchantItem(id, 1, RuneTier.SEASONAL);

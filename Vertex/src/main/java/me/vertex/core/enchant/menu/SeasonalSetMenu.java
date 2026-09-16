@@ -62,7 +62,11 @@ public final class SeasonalSetMenu {
                 break;
             }
             EnchantDefinition definition = manager.definition(id);
-            if (definition == null || definition.isHidden()) {
+            // Skip any piece nested under its own named seasonal.sets.<name>
+            // group (Halloween's Ghost, Winter's Frozen/Ice Aspect, ...) --
+            // this grid is specifically the Fallen Set, and those pieces
+            // belong to a separate seasonal event, not this crate.
+            if (definition == null || definition.isHidden() || definition.seasonalSet() != null) {
                 continue;
             }
             ItemStack item = manager.createEnchantItem(id, 1, RuneTier.SEASONAL);
